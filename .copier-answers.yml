@@ -1,0 +1,8 @@
+# Do not edit - changes here will be overwritten by Copier
+_commit: v1
+_src_path: gh:tlambert03/pyrepo
+mode: tooling
+module_name: ndv
+project_name: ndv
+project_short_description: simple ndviewer
+

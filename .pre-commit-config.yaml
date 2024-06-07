@@ -1,0 +1,36 @@
+# enable pre-commit.ci at https://pre-commit.ci/
+# it adds:
+# 1. auto fixing pull requests
+# 2. auto updating the pre-commit configuration
+ci:
+  autoupdate_schedule: monthly
+  autofix_commit_msg: "style(pre-commit.ci): auto fixes [...]"
+  autoupdate_commit_msg: "ci(pre-commit.ci): autoupdate"
+
+repos:
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.18
+    hooks:
+      - id: validate-pyproject
+
+  - repo: https://github.com/crate-ci/typos
+    rev: typos-dict-v0.11.20
+    hooks:
+      - id: typos
+        args: [--force-exclude]  # omiting --write-changes
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.4.8
+    hooks:
+      - id: ruff
+        args: [--fix]  # may also add '--unsafe-fixes'
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        files: "^src/"
+        # # you have to add the things you want to type check against here
+        # additional_dependencies:
+        #   - numpy
