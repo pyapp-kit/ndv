@@ -8,3 +8,8 @@ except PackageNotFoundError:
     __version__ = "uninstalled"
 __author__ = "Talley Lambert"
 __email__ = "talley.lambert@example.com"
+
+from .viewer._indexing import DataWrapper
+from .viewer._stack_viewer import NDViewer
+
+__all__ = ["NDViewer", "DataWrapper"]
