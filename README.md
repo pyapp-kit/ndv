@@ -11,7 +11,7 @@ Simple, fast-loading, asynchronous, n-dimensional viewer for Qt, with minimal de
 ```python
 from qtpy import QtWidgets
 from ndv import NDViewer
-from skimage import data
+from skimage import data  # just for example data here
 
 qapp = QtWidgets.QApplication([])
 v = NDViewer(data.cells3d())
