@@ -39,6 +39,7 @@ dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]"]
 pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
+pygfx = ["pygfx"]
 test = ["pytest", "pytest-cov", "pytest-qt", "dask"]
 dev = [
     "ipython",

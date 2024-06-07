@@ -100,12 +100,14 @@ class PyGFXViewerCanvas:
     def set_ndim(self, ndim: int) -> None:
         """Set the number of dimensions of the displayed data."""
         if ndim != 2:
-            raise NotImplementedError("Volume rendering is not supported by pygfx yet.")
+            raise NotImplementedError(
+                "Volume rendering with pygfx is not yet supported."
+            )
 
     def add_volume(
         self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
     ) -> PyGFXImageHandle:
-        raise NotImplementedError("Volume rendering is not supported by pygfx yet.")
+        raise NotImplementedError("Volume rendering with pygfx is not yet supported.")
 
     def add_image(
         self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
