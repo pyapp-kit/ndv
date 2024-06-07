@@ -6,12 +6,12 @@
 [![CI](https://github.com/tlambert03/ndv/actions/workflows/ci.yml/badge.svg)](https://github.com/tlambert03/ndv/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/tlambert03/ndv/branch/main/graph/badge.svg)](https://codecov.io/gh/tlambert03/ndv)
 
-Simple python nd array viewer:
+Simple, fast-loading, asynchronous, n-dimensional viewer for Qt, with minimal dependencies.
 
 ```python
 from qtpy import QtWidgets
 from ndv import NDViewer
-from skimage import data
+from skimage import data  # just for example data here
 
 qapp = QtWidgets.QApplication([])
 v = NDViewer(data.cells3d())
@@ -22,8 +22,6 @@ qapp.exec()
 ![Montage](https://github.com/tlambert03/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
 
 ## `NDViewer`
-
-Simple, fast-loading, asynchronous, n-dimensional viewer for Qt.  Minimal dependencies.
 
 - supports arbitrary number of dimensions, with 2D/3D view canvas, and sliders for all non-visible dims
 - sliders support integer as well as slice (range)-based slicing
