@@ -270,7 +270,11 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
         return {dim.label: dim.size for dim in self._data.domain}
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        result = self._data[self._ts.d[*indexers][*indexers.values()]].read().result()
+        result = (
+            self._data[self._ts.d[tuple(indexers)][tuple(indexers.values())]]
+            .read()
+            .result()
+        )
         return np.asarray(result)
 
     @classmethod
