@@ -1,4 +1,4 @@
-"""simple ndviewer"""
+"""simple ndviewer."""
 
 from importlib.metadata import PackageNotFoundError, version
 
