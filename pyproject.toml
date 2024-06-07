@@ -40,7 +40,7 @@ pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
 pygfx = ["pygfx"]
-test = ["pytest", "pytest-cov", "pytest-qt", "dask"]
+test = ["pytest", "pytest-cov", "pytest-qt", "dask", "vispy", "pyopengl"]
 dev = [
     "ipython",
     "mypy",
