@@ -29,6 +29,7 @@ jobs:
       python-version: ${{ matrix.python-version }}
       coverage-upload: artifact
       qt: pyqt6
+      pip-pre-installs: 'pyopencl[pocl]'
     strategy:
       fail-fast: false
       matrix:
