@@ -27,12 +27,22 @@ qapp.exec()
 - sliders support integer as well as slice (range)-based slicing
 - colormaps provided by [cmap](https://github.com/tlambert03/cmap)
 - supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
-- supports any numpy-like duck arrays, with special support for features in:
-  - `xarray.DataArray`
+- supports any numpy-like duck arrays, including (but not limited to):
   - `dask.array.Array`
-  - `tensorstore.TensorStore`
-  - `zarr`
-  - `dask`
+  - `torch.Tensor`
+  - `jax.Array`
+  - `dask.array.Array`
+  - `cupy.ndarray`
+  - `pyopencl.array.Array`
+  - `sparse.COO`
+  - with special support for arrays with named dimensions:
+    - `xarray.DataArray`
+    - `tensorstore.TensorStore`
+    - `zarr`
+  - You can add support for your own storage class by subclassing `ndv.DataWrapper`
+    and implementing a couple methods
+
+See examples for each of these array types in [examples](./examples/)
 
 ## Installation
 

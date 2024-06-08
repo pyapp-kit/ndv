@@ -14,7 +14,7 @@ from superqt.utils import qthrottled, signals_blocked
 
 from ._backends import get_canvas
 from ._dims_slider import DimsSliders
-from ._indexing import DataWrapper
+from ._data_wrapper import DataWrapper
 from ._lut_control import LutControl
 
 if TYPE_CHECKING:
@@ -140,8 +140,8 @@ class NDViewer(QWidget):
     - `_update_data_for_index` is an asynchronous method that retrieves the data for
       the given index from the datastore (using `_isel`) and queues the
       `_on_data_slice_ready` method to be called when the data is ready. The logic
-      for extracting data from the datastore is defined in `_indexing.py`, which handles
-      idiosyncrasies of different datastores (e.g. xarray, tensorstore, etc).
+      for extracting data from the datastore is defined in `_data_wrapper.py`, which
+      handles idiosyncrasies of different datastores (e.g. xarray, tensorstore, etc).
     - `_on_data_slice_ready` is called when the data is ready, and updates the image.
       Note that if the slice is multidimensional, the data will be reduced to 2D using
       max intensity projection (and double-clicking on any given dimension slider will
@@ -154,8 +154,10 @@ class NDViewer(QWidget):
     Parameters
     ----------
     data : Any
-        The data to display.  This can be an ND array, an xarray DataArray, or any
-        object that supports numpy-style indexing.
+        The data to display.  This can be any duck-like ND array, including numpy, dask,
+        xarray, jax, tensorstore, zarr, etc.  You can add support for new datastores by
+        subclassing `DataWrapper` and implementing the required methods.  See
+        `DataWrapper` for more information.
     parent : QWidget, optional
         The parent widget of this widget.
     channel_axis : Hashable, optional
@@ -168,7 +170,7 @@ class NDViewer(QWidget):
 
     def __init__(
         self,
-        data: Any,
+        data: DataWrapper | Any,
         *,
         colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
         parent: QWidget | None = None,
@@ -296,7 +298,7 @@ class NDViewer(QWidget):
 
     def set_data(
         self,
-        data: Any,
+        data: DataWrapper | Any,
         sizes: SizesLike | None = None,
         channel_axis: int | None = None,
         visualized_dims: Iterable[DimKey] | None = None,
@@ -436,6 +438,7 @@ class NDViewer(QWidget):
         if (
             self._channel_axis is not None
             and self._channel_mode == ChannelMode.COMPOSITE
+            and self._channel_axis in self._sizes
         ):
             indices: list[Indices] = [
                 {**index, self._channel_axis: i}

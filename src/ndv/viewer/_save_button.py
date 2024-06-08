@@ -7,7 +7,7 @@ from qtpy.QtWidgets import QFileDialog, QPushButton, QWidget
 from superqt.iconify import QIconifyIcon
 
 if TYPE_CHECKING:
-    from ._indexing import DataWrapper
+    from ._data_wrapper import DataWrapper
 
 
 class SaveButton(QPushButton):
