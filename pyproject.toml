@@ -105,6 +105,7 @@ pretty = true
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]
+addopts = ["-v"]
 minversion = "7.0"
 testpaths = ["tests"]
 filterwarnings = ["error"]
