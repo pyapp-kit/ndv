@@ -40,7 +40,8 @@ qapp.exec()
     - `tensorstore.TensorStore`
     - `zarr`
   - You can add support for your own storage class by subclassing `ndv.DataWrapper`
-    and implementing a couple methods
+    and implementing a couple methods. (This doesn't require modifying ndv,
+    but contributions of new wrappers are welcome!)
 
 See examples for each of these array types in [examples](./examples/)
 

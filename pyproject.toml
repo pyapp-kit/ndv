@@ -106,6 +106,7 @@ pretty = true
 minversion = "7.0"
 testpaths = ["tests"]
 filterwarnings = ["error"]
+markers = ["allow_leaks: mark test to allow widget leaks"]
 
 # https://coverage.readthedocs.io/
 [tool.coverage.report]

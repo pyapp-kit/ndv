@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import zarr
-import zarr.storage
-from qtpy import QtWidgets
+import ndv
 
-from ndv import NDViewer
+try:
+    import zarr
+    import zarr.storage
+except ImportError:
+    raise ImportError("Please `pip install zarr aiohttp` to run this example")
+
 
 URL = "https://s3.embl.de/i2k-2020/ngff-example-data/v0.4/tczyx.ome.zarr"
 zarr_arr = zarr.open(URL, mode="r")
 
-if __name__ == "__main__":
-    qapp = QtWidgets.QApplication([])
-    v = NDViewer(zarr_arr["s0"])
-    v.show()
-    qapp.exec()
+ndv.imshow(zarr_arr["s0"])

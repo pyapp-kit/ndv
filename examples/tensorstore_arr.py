@@ -1,23 +1,28 @@
 from __future__ import annotations
 
-import numpy as np
-import tensorstore as ts
-from qtpy import QtWidgets
+try:
+    import tensorstore as ts
+except ImportError:
+    raise ImportError("Please install tensorstore to run this example")
 
-from ndv import NDViewer
 
-shape = (10, 4, 3, 512, 512)
+import ndv
+
+data = ndv.data.cells3d()
+
 ts_array = ts.open(
-    {"driver": "zarr", "kvstore": {"driver": "memory"}},
+    {
+        "driver": "zarr",
+        "kvstore": {"driver": "memory"},
+        "transform": {
+            # tensorstore supports labeled dimensions
+            "input_labels": ["z", "c", "y", "x"],
+        },
+    },
     create=True,
-    shape=shape,
-    dtype=ts.uint8,
+    shape=data.shape,
+    dtype=data.dtype,
 ).result()
-ts_array[:] = np.random.randint(0, 255, size=shape, dtype=np.uint8)
-ts_array = ts_array[ts.d[:].label["t", "c", "z", "y", "x"]]
+ts_array[:] = ndv.data.cells3d()
 
-if __name__ == "__main__":
-    qapp = QtWidgets.QApplication([])
-    v = NDViewer(ts_array)
-    v.show()
-    qapp.exec()
+ndv.imshow(ts_array)

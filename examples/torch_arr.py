@@ -4,17 +4,18 @@ try:
     import torch
 except ImportError:
     raise ImportError("Please install torch to run this example")
-from numpy_arr import generate_5d_sine_wave
-from qtpy import QtWidgets
 
-from ndv import NDViewer
+import warnings
+
+import ndv
+
+warnings.filterwarnings("ignore", "Named tensors")  # Named tensors are experimental
 
 # Example usage
-array_shape = (10, 3, 5, 512, 512)  # Specify the desired dimensions
-sine_wave_5d = torch.asarray(generate_5d_sine_wave(array_shape))
+try:
+    torch_data = torch.tensor(ndv.data.nd_sine_wave(), names=("t", "c", "z", "y", "x"))
+except TypeError:
+    print("Named tensors are not supported in your version of PyTorch")
+    torch_data = torch.tensor(ndv.data.nd_sine_wave())
 
-if __name__ == "__main__":
-    qapp = QtWidgets.QApplication([])
-    v = NDViewer(sine_wave_5d, channel_axis=1)
-    v.show()
-    qapp.exec()
+ndv.imshow(torch_data)

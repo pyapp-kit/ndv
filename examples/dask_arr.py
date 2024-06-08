@@ -6,6 +6,7 @@ try:
     from dask.array.core import map_blocks
 except ImportError:
     raise ImportError("Please `pip install dask[array]` to run this example.")
+import ndv
 
 frame_size = (1024, 1024)
 
@@ -21,12 +22,4 @@ chunks = [(1,) * x for x in (1000, 64, 3)]
 chunks += [(x,) for x in frame_size]
 dask_arr = map_blocks(_dask_block, chunks=chunks, dtype=np.uint8)
 
-if __name__ == "__main__":
-    from qtpy import QtWidgets
-
-    from ndv import NDViewer
-
-    qapp = QtWidgets.QApplication([])
-    v = NDViewer(dask_arr)
-    v.show()
-    qapp.exec()
+v = ndv.imshow(dask_arr)

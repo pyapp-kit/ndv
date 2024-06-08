@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ndv import DataWrapper
+import ndv
 
 if TYPE_CHECKING:
     from ndv import Indices, Sizes
@@ -16,10 +16,10 @@ class MyArrayThing:
         self._data = np.random.randint(0, 256, shape)
 
     def __getitem__(self, item: Any) -> np.ndarray:
-        return self._data[item]
+        return self._data[item]  # type: ignore [no-any-return]
 
 
-class MyWrapper(DataWrapper[MyArrayThing]):
+class MyWrapper(ndv.DataWrapper[MyArrayThing]):
     @classmethod
     def supports(cls, data: Any) -> bool:
         if isinstance(data, MyArrayThing):
@@ -36,13 +36,5 @@ class MyWrapper(DataWrapper[MyArrayThing]):
         return self.data[idx]
 
 
-if __name__ == "__main__":
-    from qtpy import QtWidgets
-
-    from ndv import NDViewer
-
-    qapp = QtWidgets.QApplication([])
-    data = MyArrayThing((10, 3, 512, 512))
-    v = NDViewer(data, channel_axis=1)
-    v.show()
-    qapp.exec()
+data = MyArrayThing((10, 3, 512, 512))
+ndv.imshow(data)

@@ -18,6 +18,11 @@ def _find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[Non
     `functools.partial(self._method)` or `lambda: self._method` being used in that
     widget's code.
     """
+    # check for the "allow_leaks" marker
+    if "allow_leaks" in request.node.keywords:
+        yield
+        return
+
     nbefore = len(qapp.topLevelWidgets())
     failures_before = request.session.testsfailed
     yield

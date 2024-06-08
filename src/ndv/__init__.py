@@ -11,10 +11,12 @@ __email__ = "talley.lambert@example.com"
 
 from typing import TYPE_CHECKING
 
+from . import data
+from .util import imshow
 from .viewer._data_wrapper import DataWrapper
-from .viewer._stack_viewer import NDViewer
+from .viewer._viewer import NDViewer
 
-__all__ = ["NDViewer", "DataWrapper"]
+__all__ = ["NDViewer", "DataWrapper", "imshow", "data"]
 
 
 if TYPE_CHECKING:

@@ -426,7 +426,11 @@ class NDViewer(QWidget):
             {k: v for k, v in idx.items() if k not in self._visualized_dims}
             for idx in indices
         ]
-        self._last_future = f = self._isel(indices)
+        try:
+            self._last_future = f = self._data_wrapper.isel_async(indices)
+        except Exception as e:
+            raise type(e)(f"Failed to index data with {index}: {e}") from e
+
         f.add_done_callback(self._on_data_slice_ready)
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
@@ -434,15 +438,6 @@ class NDViewer(QWidget):
             self._last_future.cancel()
             self._last_future = None
         super().closeEvent(a0)
-
-    def _isel(
-        self, indices: list[Indices]
-    ) -> Future[Iterable[tuple[Indices, np.ndarray]]]:
-        """Select data from the datastore using the given index."""
-        try:
-            return self._data_wrapper.isel_async(indices)
-        except Exception as e:
-            raise type(e)(f"Failed to index data with {indices}: {e}") from e
 
     @ensure_main_thread  # type: ignore
     def _on_data_slice_ready(

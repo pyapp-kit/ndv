@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 import sys
 from abc import abstractmethod
-from collections.abc import Hashable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Container, Hashable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import numpy as np
 
@@ -21,9 +21,12 @@ if TYPE_CHECKING:
     import pyopencl.array as cl_array
     import sparse
     import tensorstore as ts
+    import torch
     import xarray as xr
+    import zarr
+    from torch._tensor import Tensor
 
-    from ._dims_slider import Index, Indices
+    from ._dims_slider import Index, Indices, Sizes
 
     _T_contra = TypeVar("_T_contra", contravariant=True)
 
@@ -43,7 +46,6 @@ if TYPE_CHECKING:
 
 ArrayT = TypeVar("ArrayT")
 _T = TypeVar("_T", bound=type)
-MAX_CHANNELS = 16
 
 # Global executor for slice requests
 _EXECUTOR = ThreadPoolExecutor(max_workers=2)
@@ -71,6 +73,10 @@ class DataWrapper(Generic[ArrayT]):
     # Default is 50, and fallback to numpy-like duckarray is 100.
     # Subclasses can override this to change the priority in which they are checked
     PRIORITY: ClassVar[SupportsRichComparison] = 50
+    # These names will be checked when looking for a channel axis
+    COMMON_CHANNEL_NAMES: ClassVar[Container[str]] = ("channel", "ch", "c")
+    # Maximum dimension size consider when guessing the channel axis
+    MAX_CHANNELS = 16
 
     @classmethod
     def create(cls, data: ArrayT) -> DataWrapper[ArrayT]:
@@ -121,29 +127,40 @@ class DataWrapper(Generic[ArrayT]):
 
     def guess_channel_axis(self) -> Hashable | None:
         """Return the (best guess) axis name for the channel dimension."""
-        if isinstance(shp := getattr(self._data, "shape", None), Sequence):
-            # for numpy arrays, use the smallest dimension as the channel axis
-            if min(shp) <= MAX_CHANNELS:
-                return shp.index(min(shp))
+        # for arrays with labeled dimensions,
+        # see if any of the dimensions are named "channel"
+        for dimkey, val in self.sizes().items():
+            if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
+                if val <= self.MAX_CHANNELS:
+                    return dimkey
+
+        # for shaped arrays, use the smallest dimension as the channel axis
+        shape = getattr(self._data, "shape", None)
+        if isinstance(shape, Sequence):
+            with suppress(ValueError):
+                smallest_dim = min(shape)
+                if smallest_dim <= self.MAX_CHANNELS:
+                    return shape.index(smallest_dim)
         return None
 
     def save_as_zarr(self, save_loc: str | Path) -> None:
         raise NotImplementedError("save_as_zarr not implemented for this data type.")
 
-    def sizes(self) -> Mapping[Hashable, int]:
-        if (shape := getattr(self._data, "shape", None)) and isinstance(shape, tuple):
-            _sizes: dict[Hashable, int] = {}
-            for i, val in enumerate(shape):
-                if isinstance(val, int):
-                    _sizes[i] = val
-                elif isinstance(val, Sequence) and len(val) == 2:
-                    _sizes[val[0]] = int(val[1])
-                else:
-                    raise ValueError(
-                        f"Invalid size: {val}. Must be an int or a 2-tuple."
-                    )
-            return _sizes
-        raise NotImplementedError(f"Cannot determine sizes for {type(self._data)}")
+    def sizes(self) -> Sizes:
+        """Return a mapping of {dimkey: size} for the data.
+
+        The default implementation uses the shape attribute of the data, and
+        tries to find dimension names in the `dims`, `names`, or `labels` attributes.
+        (`dims` is used by xarray, `names` is used by torch, etc...). If no labels
+        are found, the dimensions are just named by their integer index.
+        """
+        shape = getattr(self._data, "shape", None)
+        if not isinstance(shape, Sequence) or not all(
+            isinstance(x, int) for x in shape
+        ):
+            raise NotImplementedError(f"Cannot determine sizes for {type(self._data)}")
+        dims = range(len(shape))
+        return {dim: int(size) for dim, size in zip(dims, shape)}
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""
@@ -167,6 +184,8 @@ class DataWrapper(Generic[ArrayT]):
 
 
 class XarrayWrapper(DataWrapper["xr.DataArray"]):
+    """Wrapper for xarray DataArray objects."""
+
     def isel(self, indexers: Indices) -> np.ndarray:
         return np.asarray(self._data.isel(indexers))
 
@@ -179,17 +198,13 @@ class XarrayWrapper(DataWrapper["xr.DataArray"]):
             return True
         return False
 
-    def guess_channel_axis(self) -> Hashable | None:
-        for d in self._data.dims:
-            if str(d).lower() in ("channel", "ch", "c"):
-                return cast("Hashable", d)
-        return None
-
     def save_as_zarr(self, save_loc: str | Path) -> None:
         self._data.to_zarr(save_loc)
 
 
 class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
+    """Wrapper for tensorstore.TensorStore objects."""
+
     def __init__(self, data: Any) -> None:
         super().__init__(data)
         import tensorstore as ts
@@ -215,6 +230,8 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
 
 
 class ArrayLikeWrapper(DataWrapper, Generic[ArrayT]):
+    """Wrapper for numpy duck array-like objects."""
+
     PRIORITY = 100
 
     def isel(self, indexers: Indices) -> np.ndarray:
@@ -227,10 +244,14 @@ class ArrayLikeWrapper(DataWrapper, Generic[ArrayT]):
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[SupportsIndexing]:
         if (
-            isinstance(obj, np.ndarray)
-            or hasattr(obj, "__array_function__")
-            or hasattr(obj, "__array_namespace__")
-            or (hasattr(obj, "__getitem__") and hasattr(obj, "__array__"))
+            (
+                isinstance(obj, np.ndarray)
+                or hasattr(obj, "__array_function__")
+                or hasattr(obj, "__array_namespace__")
+                or hasattr(obj, "__array__")
+            )
+            and hasattr(obj, "__getitem__")
+            and hasattr(obj, "shape")
         ):
             return True
         return False
@@ -248,6 +269,8 @@ class ArrayLikeWrapper(DataWrapper, Generic[ArrayT]):
 
 
 class DaskWrapper(DataWrapper["da.Array"]):
+    """Wrapper for dask array objects."""
+
     def isel(self, indexers: Indices) -> np.ndarray:
         idx = tuple(indexers.get(k, slice(None)) for k in range(len(self._data.shape)))
         return np.asarray(self._data[idx].compute())
@@ -263,6 +286,8 @@ class DaskWrapper(DataWrapper["da.Array"]):
 
 
 class CLArrayWrapper(ArrayLikeWrapper["cl_array.Array"]):
+    """Wrapper for pyopencl array objects."""
+
     PRIORITY = 50
 
     @classmethod
@@ -288,3 +313,64 @@ class SparseArrayWrapper(ArrayLikeWrapper["sparse.Array"]):
 
     def _asarray(self, data: sparse.COO) -> np.ndarray:
         return np.asarray(data.todense())
+
+
+class ZarrArrayWrapper(ArrayLikeWrapper["zarr.Array"]):
+    """Wrapper for zarr array objects."""
+
+    PRIORITY = 50
+
+    def __init__(self, data: Any) -> None:
+        super().__init__(data)
+        self._name2index: dict[Hashable, int]
+        if "_ARRAY_DIMENSIONS" in data.attrs:
+            self._name2index = {
+                name: i for i, name in enumerate(data.attrs["_ARRAY_DIMENSIONS"])
+            }
+        else:
+            self._name2index = {i: i for i in range(data.ndim)}
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[zarr.Array]:
+        if (zarr := sys.modules.get("zarr")) and isinstance(obj, zarr.Array):
+            return True
+        return False
+
+    def sizes(self) -> Sizes:
+        return dict(zip(self._name2index, self.data.shape))
+
+    def isel(self, indexers: Indices) -> np.ndarray:
+        # convert possibly named indices to integer indices
+        real_indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
+        return super().isel(real_indexers)
+
+
+class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
+    """Wrapper for torch tensor objects."""
+
+    def __init__(self, data: Tensor) -> None:
+        super().__init__(data)
+        self._name2index: dict[Hashable, int]
+        if names := getattr(data, "names", None):
+            # names may be something like (None, None, None)...
+            self._name2index = {
+                (i if name is None else name): i for i, name in enumerate(names)
+            }
+        else:
+            self._name2index = {i: i for i in range(data.ndim)}
+
+    def sizes(self) -> Sizes:
+        return dict(zip(self._name2index, self.data.shape))
+
+    def isel(self, indexers: Indices) -> np.ndarray:
+        # convert possibly named indices to integer indices
+        real_indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
+        # convert to tuple of slices
+        idx = tuple(real_indexers.get(i, slice(None)) for i in range(self.data.ndim))
+        return self.data[idx].numpy(force=True)  # type: ignore [no-any-return]
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[torch.Tensor]:
+        if (torch := sys.modules.get("torch")) and isinstance(obj, torch.Tensor):
+            return True
+        return False
