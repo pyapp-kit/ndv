@@ -40,15 +40,17 @@ pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
 pygfx = ["pygfx"]
-test = ["pytest", "pytest-cov", "pytest-qt", "dask", "vispy", "pyopengl"]
-dev = [
-    "ipython",
-    "mypy",
-    "pdbpp",      # https://github.com/pdbpp/pdbpp
-    "pre-commit",
-    "rich",       # https://github.com/Textualize/rich
-    "ruff",
+third_party_arrays = [
+    "torch",
+    "jax[cpu]",
+    "xarray",
+    "tensorstore",
+    "sparse",
+    "dask[array]",
+    "pyopencl",
 ]
+test = ["ndv[vispy,third_party_arrays]", "pytest", "pytest-cov", "pytest-qt"]
+dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"
