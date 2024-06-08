@@ -54,7 +54,9 @@ def cells3d() -> np.ndarray:
     try:
         from imageio.v2 import volread
     except ImportError as e:
-        raise ImportError("Please install imageio to load cells3d") from e
+        raise ImportError(
+            "Please `pip install imageio[tifffile]` to load cells3d"
+        ) from e
 
     url = "https://gitlab.com/scikit-image/data/-/raw/2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba/cells3d.tif"
     return volread(url)  # type: ignore [no-any-return]

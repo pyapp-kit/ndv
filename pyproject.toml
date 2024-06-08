@@ -52,7 +52,7 @@ third_party_arrays = [
     "zarr",
     "aiohttp",     # for zarr example
 ]
-test = ["ndv[vispy]", "pytest", "pytest-cov", "pytest-qt", "imageio"]
+test = ["ndv[vispy]", "pytest", "pytest-cov", "pytest-qt", "imageio[tifffile]"]
 dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
