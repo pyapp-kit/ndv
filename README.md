@@ -14,6 +14,7 @@ import ndv
 data = ndv.data.cells3d()
 # or ndv.data.nd_sine_wave()
 # or *any* arraylike object (see support below)
+
 ndv.imshow(data)
 ```
 
