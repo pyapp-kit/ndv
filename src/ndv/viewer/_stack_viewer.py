@@ -13,8 +13,8 @@ from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_threa
 from superqt.utils import qthrottled, signals_blocked
 
 from ._backends import get_canvas
-from ._dims_slider import DimsSliders
 from ._data_wrapper import DataWrapper
+from ._dims_slider import DimsSliders
 from ._lut_control import LutControl
 
 if TYPE_CHECKING:
