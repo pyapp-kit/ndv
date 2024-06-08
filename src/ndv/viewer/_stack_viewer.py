@@ -61,7 +61,7 @@ class ChannelModeButton(QPushButton):
         self.toggled.connect(self.next_mode)
 
         # set minimum width to the width of the larger string 'composite'
-        self.setMinimumWidth(92)  # FIXME: magic number
+        self.setMinimumWidth(92)  # magic number :/
 
     def next_mode(self) -> None:
         if self.isChecked():
@@ -86,31 +86,6 @@ class DimToggleButton(QPushButton):
         super().__init__(icn, "", parent)
         self.setCheckable(True)
         self.setChecked(True)
-
-
-# @dataclass
-# class LutModel:
-#     name: str = ""
-#     autoscale: bool = True
-#     min: float = 0.0
-#     max: float = 1.0
-#     colormap: cmap.Colormap = GRAYS
-#     visible: bool = True
-
-
-# @dataclass
-# class ViewerModel:
-#     data: Any = None
-#     # dimensions of the data that will *not* be sliced.
-#     visualized_dims: Container[DimKey] = (-2, -1)
-#     # the axis that represents the channels in the data
-#     channel_axis: DimKey | None = None
-#     # the mode for displaying the channels
-#     # if MONO, only the current selection of channel_axis is displayed
-#     # if COMPOSITE, the full channel_axis is sliced, and luts determine display
-#     channel_mode: ChannelMode = ChannelMode.MONO
-#     # map of index in the channel_axis to LutModel
-#     luts: Mapping[int, LutModel] = {}
 
 
 class NDViewer(QWidget):
@@ -181,8 +156,6 @@ class NDViewer(QWidget):
 
         # ATTRIBUTES ----------------------------------------------------
 
-        # dimensions of the data in the datastore
-        self._sizes: Sizes = {}
         # mapping of key to a list of objects that control image nodes in the canvas
         self._img_handles: defaultdict[ImgKey, list[PImageHandle]] = defaultdict(list)
         # mapping of same keys to the LutControl objects control image display props
@@ -277,38 +250,34 @@ class NDViewer(QWidget):
 
     # ------------------- PUBLIC API ----------------------------
     @property
+    def dims_sliders(self) -> DimsSliders:
+        """Return the DimsSliders widget."""
+        return self._dims_sliders
+
+    @property
+    def data_wrapper(self) -> DataWrapper:
+        """Return the DataWrapper object around the datastore."""
+        return self._data_wrapper
+
+    @property
     def data(self) -> Any:
         """Return the data backing the view."""
-        return self._data_wrapper._data
+        return self._data_wrapper.data
 
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data backing the view."""
         raise AttributeError("Cannot set data directly. Use `set_data` method.")
 
-    @property
-    def dims_sliders(self) -> DimsSliders:
-        """Return the DimsSliders widget."""
-        return self._dims_sliders
-
-    @property
-    def sizes(self) -> Sizes:
-        """Return sizes {dimkey: int} of the dimensions in the datastore."""
-        return self._sizes
-
     def set_data(
         self,
         data: DataWrapper | Any,
-        sizes: SizesLike | None = None,
         channel_axis: int | None = None,
         visualized_dims: Iterable[DimKey] | None = None,
     ) -> None:
         """Set the datastore, and, optionally, the sizes of the data."""
         # store the data
         self._data_wrapper = DataWrapper.create(data)
-
-        # determine sizes of the data
-        self._sizes = self._data_wrapper.sizes() if sizes is None else _to_sizes(sizes)
 
         # set channel axis
         if channel_axis is not None:
@@ -318,7 +287,8 @@ class NDViewer(QWidget):
 
         # update the dimensions we are visualizing
         if visualized_dims is None:
-            visualized_dims = list(self._sizes)[-self._ndims :]
+            sizes = self._data_wrapper.sizes()
+            visualized_dims = list(sizes)[-self._ndims :]
         self.set_visualized_dims(visualized_dims)
 
         # update the range of all the sliders to match the sizes we set above
@@ -349,8 +319,9 @@ class NDViewer(QWidget):
         This is mostly here as a public way to reset the
         """
         if maxes is None:
-            maxes = self._sizes
-        maxes = _to_sizes(maxes)
+            maxes = self._data_wrapper.sizes()
+        else:
+            maxes = _to_sizes(maxes)
         self._dims_sliders.setMaxima({k: v - 1 for k, v in maxes.items()})
         if mins is not None:
             self._dims_sliders.setMinima(_to_sizes(mins))
@@ -368,7 +339,7 @@ class NDViewer(QWidget):
         self._canvas.set_ndim(ndim)
 
         # set the visibility of the last non-channel dimension
-        sizes = list(self._sizes)
+        sizes = list(self._data_wrapper.sizes())
         if self._channel_axis is not None:
             sizes = [x for x in sizes if x != self._channel_axis]
         if len(sizes) >= 3:
@@ -438,11 +409,11 @@ class NDViewer(QWidget):
         if (
             self._channel_axis is not None
             and self._channel_mode == ChannelMode.COMPOSITE
-            and self._channel_axis in self._sizes
+            and self._channel_axis in (sizes := self._data_wrapper.sizes())
         ):
             indices: list[Indices] = [
                 {**index, self._channel_axis: i}
-                for i in range(self._sizes[self._channel_axis])
+                for i in range(sizes[self._channel_axis])
             ]
         else:
             indices = [index]
@@ -485,14 +456,11 @@ class NDViewer(QWidget):
         # because the future has a reference to this widget in its _done_callbacks
         # which will prevent the widget from being garbage collected if the future
         self._last_future = None
+
         if future.cancelled():
             return
 
-        data = future.result()
-        # FIXME:
-        # `self._channel_axis: i` is a bug; we assume channel indices start at 0
-        # but the actual values used for indices are up to the user.
-        for idx, datum in data:
+        for idx, datum in future.result():
             self._update_canvas_data(datum, idx)
         self._canvas.refresh()
 
