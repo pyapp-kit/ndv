@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 from abc import abstractmethod
 from collections.abc import Hashable, Iterable, Iterator, Mapping, Sequence
@@ -81,7 +82,7 @@ class DataWrapper(Generic[ArrayT]):
         for subclass in sorted(_recurse_subclasses(cls), key=lambda x: x.PRIORITY):
             with suppress(Exception):
                 if subclass.supports(data):
-                    print(f"Using {subclass.__name__} to wrap data.")
+                    logging.debug(f"Using {subclass.__name__} to wrap {type(data)}")
                     return subclass(data)
         raise NotImplementedError(f"Don't know how to wrap type {type(data)}")
 
