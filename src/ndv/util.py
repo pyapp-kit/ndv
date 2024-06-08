@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+import sys
+from typing import TYPE_CHECKING, Any, Literal
+
+from qtpy.QtWidgets import QApplication
 
 from .viewer._viewer import NDViewer
 
 if TYPE_CHECKING:
-    from .viewer._data_wrapper import DataWrapper
+    from qtpy.QtCore import QCoreApplication
 
-    class _Executable(Protocol):
-        def exec(self) -> Any: ...
+    from .viewer._data_wrapper import DataWrapper
 
 
 def imshow(
@@ -36,7 +38,7 @@ def imshow(
     NDViewer
         The viewer window.
     """
-    app, existed = _get_app()
+    app, should_exec = _get_app()
     if cmap is not None:
         channel_mode = "composite"
         if not isinstance(cmap, (list, tuple)):
@@ -45,16 +47,18 @@ def imshow(
         channel_mode = "mono"
     viewer = NDViewer(data, colormaps=cmap, channel_mode=channel_mode)
     viewer.show()
-    if not existed:
+    viewer.raise_()
+    if should_exec:
         app.exec()
     return viewer
 
 
-def _get_app() -> tuple[_Executable, bool]:
-    from qtpy.QtWidgets import QApplication
-
-    app = QApplication.instance()
-    if not (existed := app is not None):
+def _get_app() -> tuple[QCoreApplication, bool]:
+    is_ipython = False
+    if (app := QApplication.instance()) is None:
         app = QApplication([])
+        app.setApplicationName("ndv")
+    elif (ipy := sys.modules.get("IPython")) and (shell := ipy.get_ipython()):
+        is_ipython = str(shell.active_eventloop).startswith("qt")
 
-    return app, existed
+    return app, not is_ipython

@@ -9,14 +9,12 @@
 Simple, fast-loading, asynchronous, n-dimensional viewer for Qt, with minimal dependencies.
 
 ```python
-from qtpy import QtWidgets
-from ndv import NDViewer
-from skimage import data  # just for example data here
+import ndv
 
-qapp = QtWidgets.QApplication([])
-v = NDViewer(data.cells3d())
-v.show()
-qapp.exec()
+data = ndv.data.cells3d()
+# or ndv.data.nd_sine_wave()
+# or *any* arraylike object (see support below)
+ndv.imshow(data)
 ```
 
 ![Montage](https://github.com/pyapp-kit/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
