@@ -51,13 +51,13 @@ dev = [
 ]
 
 [project.urls]
-homepage = "https://github.com/tlambert03/ndv"
-repository = "https://github.com/tlambert03/ndv"
+homepage = "https://github.com/pyapp-kit/ndv"
+repository = "https://github.com/pyapp-kit/ndv"
 
 # https://docs.astral.sh/ruff
 [tool.ruff]
 line-length = 88
-target-version = "py38"
+target-version = "py39"
 src = ["src"]
 
 # https://docs.astral.sh/ruff/rules
@@ -79,7 +79,7 @@ select = [
     "TID",  # flake8-tidy-imports
 ]
 ignore = [
-    "D401", # First line should be in imperative mood (remove to opt in)
+    "D401", # First line should be in imperative mood
 ]
 
 [tool.ruff.lint.per-file-ignores]

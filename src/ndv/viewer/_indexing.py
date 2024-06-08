@@ -5,15 +5,12 @@ from __future__ import annotations
 import sys
 import warnings
 from abc import abstractmethod
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
 from typing import (
     TYPE_CHECKING,
     Generic,
-    Hashable,
-    Iterable,
-    Mapping,
-    Sequence,
     TypeVar,
     cast,
 )
