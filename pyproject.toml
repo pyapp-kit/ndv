@@ -41,10 +41,10 @@ vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
 pygfx = ["pygfx"]
 third_party_arrays = [
-    "aiohttp",        # for zarr example
+    "aiohttp",                                 # for zarr example
     "jax[cpu]",
-    "pooch",          # for xarray example
-    "pyopencl[pocl]",
+    "pooch",                                   # for xarray example
+    "pyopencl[pocl]; sys_platform == 'linux'",
     "sparse",
     "tensorstore",
     "torch",
