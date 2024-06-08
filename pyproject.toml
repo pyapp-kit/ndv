@@ -44,21 +44,15 @@ third_party_arrays = [
     "torch",
     "jax[cpu]",
     "xarray",
-    "pooch",  # for xarray example
+    "pooch",       # for xarray example
     "tensorstore",
     "sparse",
     "dask[array]",
-    "pyopencl",
+    "pyopencl[pocl]",
     "zarr",
-    "aiohttp",  # for zarr example
+    "aiohttp",     # for zarr example
 ]
-test = [
-    "ndv[vispy,third_party_arrays]",
-    "pytest",
-    "pytest-cov",
-    "pytest-qt",
-    "imageio",
-]
+test = ["ndv[vispy]", "pytest", "pytest-cov", "pytest-qt", "imageio"]
 dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
