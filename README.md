@@ -20,7 +20,19 @@ ndv.imshow(data)
 
 ![Montage](https://github.com/pyapp-kit/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
 
-## `NDViewer`
+As an alternative to `ndv.imshow()`, you can instantiate the `ndv.NDViewer` (`QWidget` subclass) directly
+
+```python
+from qtpy.QtWidgets import QApplication
+from ndv import NDViewer
+
+app = QApplication([])
+viewer = NDViewer(data)
+viewer.show()
+app.exec()
+```
+
+## `ndv.NDViewer`
 
 - supports arbitrary number of dimensions, with 2D/3D view canvas, and sliders for all non-visible dims
 - sliders support integer as well as slice (range)-based slicing
