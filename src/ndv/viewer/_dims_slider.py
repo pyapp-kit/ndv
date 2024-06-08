@@ -19,7 +19,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from superqt import QElidingLabel, QLabeledRangeSlider
+from superqt import QLabeledRangeSlider
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
@@ -27,11 +27,11 @@ if TYPE_CHECKING:
     from collections.abc import Hashable, Mapping
     from typing import TypeAlias
 
-    from PyQt6.QtGui import QResizeEvent
+    from qtpy.QtGui import QResizeEvent
 
-    # any hashable represent a single dimension in a AND array
+    # any hashable represent a single dimension in an ND array
     DimKey: TypeAlias = Hashable
-    # any object that can be used to index a single dimension in an AND array
+    # any object that can be used to index a single dimension in an ND array
     Index: TypeAlias = int | slice
     # a mapping from dimension keys to indices (eg. {"x": 0, "y": slice(5, 10)})
     # this object is used frequently to query or set the currently displayed slice
@@ -167,7 +167,10 @@ class DimsSlider(QWidget):
         self._play_btn.toggled.connect(self._toggle_animation)
 
         self._dim_key = dimension_key
-        self._dim_label = QElidingLabel(str(dimension_key).upper())
+        self._dim_label = QLabel(str(dimension_key))
+        self._dim_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
         self._dim_label.setToolTip("Double-click to toggle slice mode")
 
         # note, this lock button only prevents the slider from updating programmatically
@@ -486,8 +489,6 @@ class DimsSliders(QWidget):
             self._invisible_dims.discard(key)
             if key in self._sliders:
                 self._current_index[key] = self._sliders[key].value()
-            else:
-                self.add_dimension(key)
         else:
             self._invisible_dims.add(key)
             self._current_index.pop(key, None)

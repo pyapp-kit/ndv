@@ -33,11 +33,25 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11"]
+
+  test-array-libs:
+    uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
+    with:
+      os: ${{ matrix.os }}
+      python-version: ${{ matrix.python-version }}
+      extras: "test,third_party_arrays"
+      coverage-upload: artifact
+      qt: pyqt6
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.9", "3.12"]
 
   upload_coverage:
     if: always()
-    needs: [test]
+    needs: [test, test-array-libs]
     uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}

@@ -40,15 +40,26 @@ pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
 pygfx = ["pygfx"]
-test = ["pytest", "pytest-cov", "pytest-qt", "dask", "vispy", "pyopengl"]
-dev = [
-    "ipython",
-    "mypy",
-    "pdbpp",      # https://github.com/pdbpp/pdbpp
-    "pre-commit",
-    "rich",       # https://github.com/Textualize/rich
-    "ruff",
+third_party_arrays = [
+    "aiohttp",                                 # for zarr example
+    "jax[cpu]",
+    "pooch",                                   # for xarray example
+    "pyopencl[pocl]; sys_platform == 'linux'",
+    "sparse",
+    "tensorstore",
+    "torch",
+    "xarray",
+    "zarr",
 ]
+test = [
+    "ndv[vispy]",
+    "dask[array]",
+    "imageio[tifffile]",
+    "pytest-cov",
+    "pytest-qt",
+    "pytest",
+]
+dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"
@@ -103,9 +114,11 @@ pretty = true
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]
+addopts = ["-v"]
 minversion = "7.0"
 testpaths = ["tests"]
 filterwarnings = ["error"]
+markers = ["allow_leaks: mark test to allow widget leaks"]
 
 # https://coverage.readthedocs.io/
 [tool.coverage.report]

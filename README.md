@@ -9,14 +9,12 @@
 Simple, fast-loading, asynchronous, n-dimensional array viewer for Qt, with minimal dependencies.
 
 ```python
-from qtpy import QtWidgets
-from ndv import NDViewer
-from skimage import data  # just for example data here
+import ndv
 
-qapp = QtWidgets.QApplication([])
-v = NDViewer(data.cells3d())
-v.show()
-qapp.exec()
+data = ndv.data.cells3d()
+# or ndv.data.nd_sine_wave()
+# or *any* arraylike object (see support below)
+ndv.imshow(data)
 ```
 
 ![Montage](https://github.com/pyapp-kit/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
@@ -27,12 +25,22 @@ qapp.exec()
 - sliders support integer as well as slice (range)-based slicing
 - colormaps provided by [cmap](https://github.com/tlambert03/cmap)
 - supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
-- supports any numpy-like duck arrays, with special support for features in:
-  - `xarray.DataArray`
+- supports any numpy-like duck arrays, including (but not limited to):
+  - `numpy.ndarray`
+  - `cupy.ndarray`
   - `dask.array.Array`
-  - `tensorstore.TensorStore`
-  - `zarr`
-  - `dask`
+  - `jax.Array`
+  - `pyopencl.array.Array`
+  - `sparse.COO`
+  - `tensorstore.TensorStore` (supports named dimensions)
+  - `torch.Tensor` (supports named dimensions)
+  - `xarray.DataArray` (supports named dimensions)
+  - `zarr` (supports named dimensions)
+- You can add support for your own storage class by subclassing `ndv.DataWrapper`
+    and implementing a couple methods. (This doesn't require modifying ndv,
+    but contributions of new wrappers are welcome!)
+
+See examples for each of these array types in [examples](./examples/)
 
 ## Installation
 
