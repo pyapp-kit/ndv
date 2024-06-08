@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from enum import Enum
 from itertools import cycle
-from typing import TYPE_CHECKING, Iterable, Literal, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import cmap
 import numpy as np
@@ -17,8 +18,9 @@ from ._indexing import DataWrapper
 from ._lut_control import LutControl
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
     from concurrent.futures import Future
-    from typing import Any, Callable, Hashable, TypeAlias
+    from typing import Any, Callable, TypeAlias
 
     from qtpy.QtGui import QCloseEvent
 

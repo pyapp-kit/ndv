@@ -1,10 +1,10 @@
 # ndv
 
-[![License](https://img.shields.io/pypi/l/ndv.svg?color=green)](https://github.com/tlambert03/ndv/raw/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/ndv.svg?color=green)](https://github.com/pyapp-kit/ndv/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/ndv.svg?color=green)](https://pypi.org/project/ndv)
 [![Python Version](https://img.shields.io/pypi/pyversions/ndv.svg?color=green)](https://python.org)
-[![CI](https://github.com/tlambert03/ndv/actions/workflows/ci.yml/badge.svg)](https://github.com/tlambert03/ndv/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/tlambert03/ndv/branch/main/graph/badge.svg)](https://codecov.io/gh/tlambert03/ndv)
+[![CI](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml/badge.svg)](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/pyapp-kit/ndv/branch/main/graph/badge.svg)](https://codecov.io/gh/pyapp-kit/ndv)
 
 Simple, fast-loading, asynchronous, n-dimensional viewer for Qt, with minimal dependencies.
 
@@ -19,7 +19,7 @@ v.show()
 qapp.exec()
 ```
 
-![Montage](https://github.com/tlambert03/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
+![Montage](https://github.com/pyapp-kit/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
 
 ## `NDViewer`
 

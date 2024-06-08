@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from qtpy.QtCore import Qt
@@ -12,6 +12,8 @@ from superqt.utils import signals_blocked
 from ._dims_slider import SS
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     import cmap
 
     from ._protocols import PImageHandle
