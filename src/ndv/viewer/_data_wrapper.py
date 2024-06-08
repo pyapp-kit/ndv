@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 
 ArrayT = TypeVar("ArrayT")
-_T = TypeVar("_T")
+_T = TypeVar("_T", bound=type)
 MAX_CHANNELS = 16
 
 # Global executor for slice requests
