@@ -41,18 +41,24 @@ vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
 pygfx = ["pygfx"]
 third_party_arrays = [
-    "torch",
+    "aiohttp",        # for zarr example
     "jax[cpu]",
-    "xarray",
-    "pooch",       # for xarray example
-    "tensorstore",
-    "sparse",
-    "dask[array]",
+    "pooch",          # for xarray example
     "pyopencl[pocl]",
+    "sparse",
+    "tensorstore",
+    "torch",
+    "xarray",
     "zarr",
-    "aiohttp",     # for zarr example
 ]
-test = ["ndv[vispy]", "pytest", "pytest-cov", "pytest-qt", "imageio[tifffile]"]
+test = [
+    "ndv[vispy]",
+    "dask[array]",
+    "imageio[tifffile]",
+    "pytest-cov",
+    "pytest-qt",
+    "pytest",
+]
 dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]

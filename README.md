@@ -28,18 +28,17 @@ qapp.exec()
 - colormaps provided by [cmap](https://github.com/tlambert03/cmap)
 - supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
 - supports any numpy-like duck arrays, including (but not limited to):
-  - `dask.array.Array`
-  - `torch.Tensor`
-  - `jax.Array`
-  - `dask.array.Array`
+  - `numpy.ndarray`
   - `cupy.ndarray`
+  - `dask.array.Array`
+  - `jax.Array`
   - `pyopencl.array.Array`
   - `sparse.COO`
-  - with special support for arrays with named dimensions:
-    - `xarray.DataArray`
-    - `tensorstore.TensorStore`
-    - `zarr`
-  - You can add support for your own storage class by subclassing `ndv.DataWrapper`
+  - `tensorstore.TensorStore` (supports named dimensions)
+  - `torch.Tensor` (supports named dimensions)
+  - `xarray.DataArray` (supports named dimensions)
+  - `zarr` (supports named dimensions)
+- You can add support for your own storage class by subclassing `ndv.DataWrapper`
     and implementing a couple methods. (This doesn't require modifying ndv,
     but contributions of new wrappers are welcome!)
 
