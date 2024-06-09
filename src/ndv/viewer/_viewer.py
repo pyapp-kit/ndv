@@ -278,7 +278,7 @@ class NDViewer(QWidget):
         """Set the datastore, and, optionally, the sizes of the data."""
         # store the data
         self._data_wrapper = DataWrapper.create(data)
-
+        print(self._data_wrapper.sizes())
         # set channel axis
         if channel_axis is not None:
             self._channel_axis = channel_axis
@@ -406,6 +406,7 @@ class NDViewer(QWidget):
         makes a request for the new data slice and queues _on_data_future_done to be
         called when the data is ready.
         """
+        print("index", index)
         if (
             self._channel_axis is not None
             and self._channel_mode == ChannelMode.COMPOSITE

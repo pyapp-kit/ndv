@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 from abc import abstractmethod
@@ -87,9 +88,10 @@ class DataWrapper(Generic[ArrayT]):
         # be automatically detected (assuming they have been imported by this point)
         for subclass in sorted(_recurse_subclasses(cls), key=lambda x: x.PRIORITY):
             with suppress(Exception):
-                if subclass.supports(data):
-                    logging.debug(f"Using {subclass.__name__} to wrap {type(data)}")
-                    return subclass(data)
+                if not subclass.supports(data):
+                    continue
+            logging.debug(f"Using {subclass.__name__} to wrap {type(data)}")
+            return subclass(data)
         raise NotImplementedError(f"Don't know how to wrap type {type(data)}")
 
     def __init__(self, data: ArrayT) -> None:
@@ -209,10 +211,27 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
         super().__init__(data)
         import tensorstore as ts
 
+        spec = self.data.spec().to_json()
+        labels: Sequence[Hashable] | None = None
         self._ts = ts
+        if (tform := spec.get("transform")) and ("input_labels" in tform):
+            labels = [str(x) for x in tform["input_labels"]]
+        elif (
+            str(spec.get("driver")).startswith("zarr")
+            and (zattrs := self.data.kvstore.read(".zattrs").result().value)
+            and isinstance((zattr_dict := json.loads(zattrs)), dict)
+            and "_ARRAY_DIMENSIONS" in zattr_dict
+        ):
+            labels = zattr_dict["_ARRAY_DIMENSIONS"]
+
+        if isinstance(labels, Sequence) and len(labels) == len(self._data.domain):
+            self._labels: list[Hashable] = [str(x) for x in labels]
+            self._data = self.data[ts.d[:].label[self._labels]]
+        else:
+            self._labels = list(range(len(self._data.domain)))
 
     def sizes(self) -> Mapping[Hashable, int]:
-        return {dim.label: dim.size for dim in self._data.domain}
+        return dict(zip(self._labels, self._data.domain.shape))
 
     def isel(self, indexers: Indices) -> np.ndarray:
         result = (

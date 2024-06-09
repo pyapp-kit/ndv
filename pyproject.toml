@@ -34,6 +34,9 @@ classifiers = [
 ]
 dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]"]
 
+[project.scripts]
+ndv = "ndv.cli:main"
+
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 pyqt = ["pyqt6"]
