@@ -434,8 +434,8 @@ class NDViewer(QWidget):
         except Exception as e:
             raise type(e)(f"Failed to index data with {index}: {e}") from e
 
-        f.add_done_callback(self._on_data_slice_ready)
         self._progress_spinner.show()
+        f.add_done_callback(self._on_data_slice_ready)
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         if self._last_future is not None:
