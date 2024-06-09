@@ -43,6 +43,12 @@ pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
 pygfx = ["pygfx"]
+io = [
+    "aicsimageio[all]",
+    "bioformats_jar",
+    "readlif",
+    "aicspylibczi",
+]
 third_party_arrays = [
     "aiohttp",                                 # for zarr example
     "jax[cpu]",
