@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 
     from qtpy.QtGui import QCloseEvent
 
+    from ._backends._protocols import PCanvas, PImageHandle
     from ._dims_slider import DimKey, Indices, Sizes
-    from ._protocols import PCanvas, PImageHandle
 
     ImgKey: TypeAlias = Hashable
     # any mapping of dimensions to sizes
@@ -167,6 +167,7 @@ class NDViewer(QWidget):
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
         self._canvas: PCanvas = get_canvas()(self._hover_info_label.setText)
+        print("Canvas", self._canvas)
         self._canvas.set_ndim(self._ndims)
 
         # the sliders that control the index of the displayed image
