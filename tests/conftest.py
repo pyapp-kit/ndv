@@ -1,6 +1,5 @@
 import gc
-from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator
 
 import pytest
 
