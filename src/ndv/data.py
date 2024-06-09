@@ -1,5 +1,7 @@
 """Sample data for testing and examples."""
 
+from __future__ import annotations
+
 import numpy as np
 
 __all__ = ["nd_sine_wave", "cells3d"]
