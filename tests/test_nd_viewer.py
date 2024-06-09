@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import dask.array as da
 import numpy as np
@@ -12,6 +12,12 @@ from ndv import NDViewer
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
+
+
+def allow_linux_widget_leaks(func: Any) -> Any:
+    if sys.platform == "linux":
+        pytest.mark.allow_leaks(func)
+    return func
 
 
 def make_lazy_array(shape: tuple[int, ...]) -> da.Array:
@@ -34,6 +40,7 @@ if not os.getenv("CI") or sys.platform == "darwin":
     BACKENDS.append("pygfx")
 
 
+@allow_linux_widget_leaks
 @pytest.mark.filterwarnings("ignore:This version of pygfx does not yet")
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
