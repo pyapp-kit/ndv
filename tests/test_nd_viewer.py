@@ -26,7 +26,7 @@ def make_lazy_array(shape: tuple[int, ...]) -> da.Array:
     return da.map_blocks(_dask_block, chunks=chunks, dtype=np.uint8)  # type: ignore
 
 
-@pytest.mark.filterwarnings("ignore:pygfx does not support additive blending")
+@pytest.mark.filterwarnings("ignore:This version of pygfx does not yet")
 @pytest.mark.parametrize("backend", ["pygfx", "vispy"])
 def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NDV_CANVAS_BACKEND", backend)
