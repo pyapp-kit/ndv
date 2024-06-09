@@ -34,6 +34,7 @@ app.exec()
 
 ## `ndv.NDViewer`
 
+- very fast import and load time
 - supports arbitrary number of dimensions, with 2D/3D view canvas, and sliders for all non-visible dims
 - sliders support integer as well as slice (range)-based slicing
 - colormaps provided by [cmap](https://github.com/tlambert03/cmap)
@@ -64,3 +65,16 @@ You will also need a Qt backend (PyQt or PySide) and one of either
 ```python
 pip install ndv[pyqt,vispy]
 ```
+
+## Motivation
+
+This package arose from the need for a way to *quickly* view multi-dimensional arrays with
+zero tolerance for long import times and/or excessive dependency lists. I want something that I can
+use to view any of the many multi-dimensional array types, out of the box, with no assumptions
+about dimensionality. I want it to work reasonably well with remote, asynchronously loaded data.
+I also want it to take advantage of things like named dimensions and categorical coordinate values
+when available. For now, it's a Qt-only widget, since that's where the need arose, but I can
+imagine a jupyter widget in the future (likely as a remote frame buffer for vispy/pygfx).
+
+I do not intend for this to grow into full-fledged application, or wrap a complete scene graph,
+though point and ROI selection would be welcome additions. 
