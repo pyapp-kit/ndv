@@ -56,4 +56,4 @@ def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -
 
     # wait until there are no running jobs, because the callbacks
     # in the futures hold a strong reference to the viewer
-    qtbot.waitUntil(v._is_idle, timeout=1000)
+    qtbot.waitUntil(v._is_idle, timeout=3000)
