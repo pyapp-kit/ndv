@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from enum import Enum
 from itertools import cycle
 from typing import TYPE_CHECKING, Literal, cast
 
@@ -11,6 +10,13 @@ import numpy as np
 from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
+
+from ndv.viewer._components import (
+    ChannelMode,
+    ChannelModeButton,
+    DimToggleButton,
+    QSpinner,
+)
 
 from ._backends import get_canvas
 from ._data_wrapper import DataWrapper
@@ -44,48 +50,6 @@ DEFAULT_COLORMAPS = [
     cmap.Colormap("gray"),
 ]
 ALL_CHANNELS = slice(None)
-
-
-class ChannelMode(str, Enum):
-    COMPOSITE = "composite"
-    MONO = "mono"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-class ChannelModeButton(QPushButton):
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        self.setCheckable(True)
-        self.toggled.connect(self.next_mode)
-
-        # set minimum width to the width of the larger string 'composite'
-        self.setMinimumWidth(92)  # magic number :/
-
-    def next_mode(self) -> None:
-        if self.isChecked():
-            self.setMode(ChannelMode.MONO)
-        else:
-            self.setMode(ChannelMode.COMPOSITE)
-
-    def mode(self) -> ChannelMode:
-        return ChannelMode.MONO if self.isChecked() else ChannelMode.COMPOSITE
-
-    def setMode(self, mode: ChannelMode) -> None:
-        # we show the name of the next mode, not the current one
-        other = ChannelMode.COMPOSITE if mode is ChannelMode.MONO else ChannelMode.MONO
-        self.setText(str(other))
-        self.setChecked(mode == ChannelMode.MONO)
-
-
-class DimToggleButton(QPushButton):
-    def __init__(self, parent: QWidget | None = None):
-        icn = QIconifyIcon("f7:view-2d", color="#333333")
-        icn.addKey("f7:view-3d", state=QIconifyIcon.State.On, color="white")
-        super().__init__(icn, "", parent)
-        self.setCheckable(True)
-        self.setChecked(True)
 
 
 class NDViewer(QWidget):
@@ -197,6 +161,8 @@ class NDViewer(QWidget):
 
         # place to display dataset summary
         self._data_info_label = QElidingLabel("", parent=self)
+        self._progress_spinner = QSpinner(self)
+
         # place to display arbitrary text
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
@@ -232,10 +198,16 @@ class NDViewer(QWidget):
         btns.addWidget(self._ndims_btn)
         btns.addWidget(self._set_range_btn)
 
+        info = QHBoxLayout()
+        info.setContentsMargins(0, 0, 0, 2)
+        info.setSpacing(0)
+        info.addWidget(self._data_info_label)
+        info.addWidget(self._progress_spinner)
+
         layout = QVBoxLayout(self)
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.addWidget(self._data_info_label)
+        layout.addLayout(info)
         layout.addWidget(self._canvas.qwidget(), 1)
         layout.addWidget(self._hover_info_label)
         layout.addWidget(self._dims_sliders)
@@ -432,6 +404,7 @@ class NDViewer(QWidget):
             raise type(e)(f"Failed to index data with {index}: {e}") from e
 
         f.add_done_callback(self._on_data_slice_ready)
+        self._progress_spinner.show()
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         if self._last_future is not None:
@@ -451,7 +424,7 @@ class NDViewer(QWidget):
         # because the future has a reference to this widget in its _done_callbacks
         # which will prevent the widget from being garbage collected if the future
         self._last_future = None
-
+        self._progress_spinner.hide()
         if future.cancelled():
             return
 
