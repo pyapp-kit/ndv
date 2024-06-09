@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def _find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None]:
+def find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None]:
     """Run after each test to ensure no widgets have been left around.
 
     When this test fails, it means that a widget being tested has an issue closing

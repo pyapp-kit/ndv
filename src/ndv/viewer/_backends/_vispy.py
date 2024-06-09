@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
@@ -23,6 +24,7 @@ DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
 class VispyImageHandle:
     def __init__(self, visual: scene.visuals.Image | scene.visuals.Volume) -> None:
         self._visual = visual
+        self._ndim = 2 if isinstance(visual, scene.visuals.Image) else 3
 
     @property
     def data(self) -> np.ndarray:
@@ -33,6 +35,13 @@ class VispyImageHandle:
 
     @data.setter
     def data(self, data: np.ndarray) -> None:
+        if not data.ndim == self._ndim:
+            warnings.warn(
+                f"Got wrong number of dimensions ({data.ndim}) for vispy "
+                f"visual of type {type(self._visual)}.",
+                stacklevel=2,
+            )
+            return
         self._visual.set_data(data)
 
     @property

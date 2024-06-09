@@ -29,8 +29,8 @@ if TYPE_CHECKING:
 
     from qtpy.QtGui import QCloseEvent
 
+    from ._backends._protocols import PCanvas, PImageHandle
     from ._dims_slider import DimKey, Indices, Sizes
-    from ._protocols import PCanvas, PImageHandle
 
     ImgKey: TypeAlias = Hashable
     # any mapping of dimensions to sizes
@@ -538,3 +538,7 @@ class NDViewer(QWidget):
             cast("QVBoxLayout", self.layout()).removeWidget(c)
             c.deleteLater()
         self._lut_ctrls.clear()
+
+    def _is_idle(self) -> bool:
+        """Return True if no futures are running. Used for testing, and debugging."""
+        return self._last_future is None
