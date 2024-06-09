@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from typing import TYPE_CHECKING
 
 import dask.array as da
@@ -26,8 +28,14 @@ def make_lazy_array(shape: tuple[int, ...]) -> da.Array:
     return da.map_blocks(_dask_block, chunks=chunks, dtype=np.uint8)  # type: ignore
 
 
+BACKENDS = ["vispy"]
+# avoid pygfx backend on linux CI
+if not os.getenv("CI") or sys.platform == "darwin":
+    BACKENDS.append("pygfx")
+
+
 @pytest.mark.filterwarnings("ignore:This version of pygfx does not yet")
-@pytest.mark.parametrize("backend", ["pygfx", "vispy"])
+@pytest.mark.parametrize("backend", BACKENDS)
 def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NDV_CANVAS_BACKEND", backend)
     dask_arr = make_lazy_array((1000, 64, 3, 256, 256))

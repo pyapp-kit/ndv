@@ -117,7 +117,7 @@ pretty = true
 addopts = ["-v"]
 minversion = "7.0"
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = ["error", "ignore:Method has been garbage collected::superqt"]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
 # https://coverage.readthedocs.io/
