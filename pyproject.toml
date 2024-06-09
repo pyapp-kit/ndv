@@ -19,13 +19,14 @@ name = "ndv"
 dynamic = ["version"]
 description = "simple nd image viewer"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "Talley Lambert", email = "talley.lambert@gmail.com" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -61,7 +62,7 @@ third_party_arrays = [
     "zarr",
 ]
 test = [
-    "ndv[vispy]",
+    "ndv[vispy,pygfx]",
     "dask[array]",
     "imageio[tifffile]",
     "pytest-cov",
@@ -77,7 +78,7 @@ repository = "https://github.com/pyapp-kit/ndv"
 # https://docs.astral.sh/ruff
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py38"
 src = ["src"]
 
 # https://docs.astral.sh/ruff/rules
@@ -126,7 +127,11 @@ pretty = true
 addopts = ["-v"]
 minversion = "7.0"
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore:Method has been garbage collected::superqt",
+    "ignore:Got wrong number of dimensions",             # occasionally happens on linux CI with vispy
+]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
 # https://coverage.readthedocs.io/

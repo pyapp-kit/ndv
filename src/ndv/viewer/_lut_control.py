@@ -12,11 +12,11 @@ from superqt.utils import signals_blocked
 from ._dims_slider import SS
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from typing import Iterable
 
     import cmap
 
-    from ._protocols import PImageHandle
+    from ._backends._protocols import PImageHandle
 
 
 class CmapCombo(QColormapComboBox):

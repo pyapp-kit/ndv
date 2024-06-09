@@ -6,10 +6,20 @@ import json
 import logging
 import sys
 from abc import abstractmethod
-from collections.abc import Container, Hashable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Container,
+    Generic,
+    Hashable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    TypeVar,
+)
 
 import numpy as np
 
