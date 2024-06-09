@@ -239,8 +239,24 @@ class NDViewer(QWidget):
         """Set the data backing the view."""
         raise AttributeError("Cannot set data directly. Use `set_data` method.")
 
-    def set_data(self, data: DataWrapper | Any) -> None:
-        """Set the datastore, and, optionally, the sizes of the data."""
+    def set_data(
+        self, data: DataWrapper | Any, *, initial_index: Indices | None = None
+    ) -> None:
+        """Set the datastore, and, optionally, the sizes of the data.
+
+        Properties
+        ----------
+        data : DataWrapper | Any
+            The data to display.  This can be any duck-like ND array, including numpy,
+            dask, xarray, jax, tensorstore, zarr, etc.  You can add support for new
+            datastores by subclassing `DataWrapper` and implementing the required
+            methods. If a `DataWrapper` instance is passed, it is used directly.
+            See `DataWrapper` for more information.
+        initial_index : Indices | None
+            The initial index to display.  This is a mapping of dimensions to integers
+            or slices that define the slice of the data to display.  If not provided,
+            the initial index will be set to the middle of the data.
+        """
         # store the data
         self._data_wrapper = DataWrapper.create(data)
 
@@ -248,14 +264,22 @@ class NDViewer(QWidget):
         self._channel_axis = self._data_wrapper.guess_channel_axis()
 
         # update the dimensions we are visualizing
-        visualized_dims = list(self._data_wrapper.sizes())[-self._ndims :]
+        sizes = self._data_wrapper.sizes()
+        visualized_dims = list(sizes)[-self._ndims :]
         self.set_visualized_dims(visualized_dims)
 
         # update the range of all the sliders to match the sizes we set above
         with signals_blocked(self._dims_sliders):
             self._update_slider_ranges()
+
         # redraw
-        self.set_current_index({})
+        if initial_index is None:
+            idx = {k: int(v // 2) for k, v in sizes.items()}
+        else:
+            if not isinstance(initial_index, dict):  # pragma: no cover
+                raise TypeError("initial_index must be a dict")
+            idx = initial_index
+        self.set_current_index(idx)
         # update the data info label
         self._data_info_label.setText(self._data_wrapper.summary_info())
 
@@ -325,7 +349,7 @@ class NDViewer(QWidget):
             self._clear_images()
             self._update_data_for_index(self._dims_sliders.value())
 
-    def set_current_index(self, index: Indices) -> None:
+    def set_current_index(self, index: Indices | None = None) -> None:
         """Set the index of the displayed image.
 
         `index` is a mapping of dimensions to integers or slices that define the slice
@@ -333,8 +357,11 @@ class NDViewer(QWidget):
         represented as `{0: 0, 1: 1, 2: slice(5, 10)}`, but dimensions can also be
         named, e.g. `{'t': 0, 'c': 1, 'z': slice(5, 10)}` if the data has named
         dimensions.
+
+        Note, calling `.set_current_index()` with no arguments will force the widget
+        to redraw the current slice.
         """
-        self._dims_sliders.setValue(index)
+        self._dims_sliders.setValue(index or {})
 
     # camelCase aliases
 
