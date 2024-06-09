@@ -83,7 +83,11 @@ class PyGFXViewerCanvas:
             # requires https://github.com/pygfx/pygfx/pull/752
             self._renderer.blend_mode = "additive"
         except ValueError:
-            warnings.warn("pygfx does not support additive blending yet.", stacklevel=2)
+            warnings.warn(
+                "This version of pygfx does not yet support additive blending.",
+                stacklevel=3,
+            )
+            self._renderer.blend_mode = "weighted_depth"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None

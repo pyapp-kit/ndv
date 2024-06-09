@@ -165,7 +165,6 @@ class NDViewer(QWidget):
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
         self._canvas: PCanvas = get_canvas()(self._hover_info_label.setText)
-        print("Canvas", self._canvas)
         self._canvas.set_ndim(self._ndims)
 
         # the sliders that control the index of the displayed image

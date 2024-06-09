@@ -26,9 +26,10 @@ def make_lazy_array(shape: tuple[int, ...]) -> da.Array:
     return da.map_blocks(_dask_block, chunks=chunks, dtype=np.uint8)  # type: ignore
 
 
+@pytest.mark.filterwarnings("ignore:pygfx does not support additive blending")
 @pytest.mark.parametrize("backend", ["pygfx", "vispy"])
 def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CANVAS_BACKEND", backend)
+    monkeypatch.setenv("NDV_CANVAS_BACKEND", backend)
     dask_arr = make_lazy_array((1000, 64, 3, 256, 256))
     v = NDViewer(dask_arr)
     qtbot.addWidget(v)
