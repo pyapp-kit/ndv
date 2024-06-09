@@ -208,7 +208,7 @@ class DimsSlider(QWidget):
         layout.addWidget(self._pos_label)
         layout.addWidget(self._out_of_label)
         layout.addWidget(self._lock_btn)
-        self.setMinimumHeight(22)
+        self.setMinimumHeight(26)
 
     def resizeEvent(self, a0: QResizeEvent | None) -> None:
         if isinstance(par := self.parent(), DimsSliders):
