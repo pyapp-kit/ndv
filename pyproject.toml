@@ -117,7 +117,11 @@ pretty = true
 addopts = ["-v"]
 minversion = "7.0"
 testpaths = ["tests"]
-filterwarnings = ["error", "ignore:Method has been garbage collected::superqt"]
+filterwarnings = [
+    "error",
+    "ignore:Method has been garbage collected::superqt",
+    "ignore:Got wrong number of dimensions",             # occasionally happens on linux CI with vispy
+]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
 # https://coverage.readthedocs.io/
