@@ -24,8 +24,7 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping
-    from typing import TypeAlias
+    from typing import Hashable, Mapping, TypeAlias
 
     from qtpy.QtGui import QResizeEvent
 

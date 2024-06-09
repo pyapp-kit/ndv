@@ -12,7 +12,7 @@ from superqt.utils import signals_blocked
 from ._dims_slider import SS
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from typing import Iterable
 
     import cmap
 

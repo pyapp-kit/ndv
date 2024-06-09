@@ -23,9 +23,8 @@ from ._dims_slider import DimsSliders
 from ._lut_control import LutControl
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Iterable, Sequence
     from concurrent.futures import Future
-    from typing import Any, Callable, TypeAlias
+    from typing import Any, Callable, Hashable, Iterable, Sequence, TypeAlias
 
     from qtpy.QtGui import QCloseEvent
 
