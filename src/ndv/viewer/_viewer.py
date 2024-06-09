@@ -513,6 +513,10 @@ class NDViewer(QWidget):
             c.deleteLater()
         self._lut_ctrls.clear()
 
+    def _is_idle(self) -> bool:
+        """Return True if no futures are running. Used for testing, and debugging."""
+        return self._last_future is None
+
 
 def _to_sizes(sizes: SizesLike | None) -> Sizes:
     """Coerce `sizes` to a {dimKey -> int} mapping."""
