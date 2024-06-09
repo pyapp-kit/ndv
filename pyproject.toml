@@ -52,7 +52,7 @@ third_party_arrays = [
     "zarr",
 ]
 test = [
-    "ndv[vispy]",
+    "ndv[vispy,pygfx]",
     "dask[array]",
     "imageio[tifffile]",
     "pytest-cov",
