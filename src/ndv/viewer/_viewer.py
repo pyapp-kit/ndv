@@ -258,6 +258,9 @@ class NDViewer(QWidget):
         """
         # store the data
         self._data_wrapper = DataWrapper.create(data)
+        from ndv._chunking import Slicer
+
+        self._slicer = Slicer(self._data_wrapper, chunks=(1, 1, 64, 47))
 
         # set channel axis
         self._channel_axis = self._data_wrapper.guess_channel_axis()
@@ -438,17 +441,20 @@ class NDViewer(QWidget):
         print("channel_axis", self._channel_axis)
         print("channel_mode", self._channel_mode)
 
-        indices = self._build_requests(index)
-        if self._last_future:
-            self._last_future.cancel()
+        self._data_wrapper.to_conventional(index)
+        self._slicer.request_index(index, self._on_data_slice_ready)
 
-        try:
-            self._last_future = f = self._data_wrapper.isel_async(indices)
-        except Exception as e:
-            raise type(e)(f"Failed to index data with {index}: {e}") from e
+        # indices = self._build_requests(index)
+        # if self._last_future:
+        #     self._last_future.cancel()
 
-        self._progress_spinner.show()
-        f.add_done_callback(self._on_data_slice_ready)
+        # try:
+        #     self._last_future = f = self._data_wrapper.isel_async(indices)
+        # except Exception as e:
+        #     raise type(e)(f"Failed to index data with {index}: {e}") from e
+
+        # self._progress_spinner.show()
+        # f.add_done_callback(self._on_data_slice_ready)
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         if self._last_future is not None:
@@ -464,6 +470,9 @@ class NDViewer(QWidget):
 
         Connected to the future returned by _isel.
         """
+        offset = tuple(int(getattr(sl, "start", sl)) for sl in future.idx)[-2:]
+        self._update_canvas_data(future.data, offset)
+        return
         # NOTE: removing the reference to the last future here is important
         # because the future has a reference to this widget in its _done_callbacks
         # which will prevent the widget from being garbage collected if the future
@@ -476,20 +485,25 @@ class NDViewer(QWidget):
             self._update_canvas_data(datum, idx)
         self._canvas.refresh()
 
-    def _update_canvas_data(self, data: np.ndarray, index: Indices) -> None:
+    def _update_canvas_data(self, data: np.ndarray, offset: list[int]) -> None:
+        # def _update_canvas_data(self, data: np.ndarray, index: Indices) -> None:
         """Actually update the image handle(s) with the (sliced) data.
 
         By this point, data should be sliced from the underlying datastore.  Any
         dimensions remaining that are more than the number of visualized dimensions
         (currently just 2D) will be reduced using max intensity projection (currently).
         """
-        imkey = self._image_key(index)
+        # imkey = self._image_key(index)
+        imkey = 0
+        print(offset)
         datum = self._reduce_data_for_display(data)
-        if handles := self._img_handles[imkey]:
+        if handles := self._img_handles[offset]:
             for handle in handles:
+                print("updating handle")
                 handle.data = datum
-            if ctrl := self._lut_ctrls.get(imkey, None):
-                ctrl.update_autoscale()
+                handle.clim = (0, 45000)
+            # if ctrl := self._lut_ctrls.get(imkey, None):
+            # ctrl.update_autoscale()
         else:
             cm = (
                 next(self._cmap_cycle)
@@ -497,11 +511,14 @@ class NDViewer(QWidget):
                 else GRAYS
             )
             if datum.ndim == 2:
-                handles.append(self._canvas.add_image(datum, cmap=cm))
+                handle = self._canvas.add_image(datum, cmap=cm, offset=offset)
+                handle.clim = (0, 45000)
+                handles.append(handle)
             elif datum.ndim == 3:
                 handles.append(self._canvas.add_volume(datum, cmap=cm))
             if imkey not in self._lut_ctrls:
-                ch_index = index.get(self._channel_axis, 0)
+                # ch_index = index.get(self._channel_axis, 0)
+                ch_index = 0
                 self._lut_ctrls[imkey] = c = LutControl(
                     f"Ch {ch_index}",
                     handles,

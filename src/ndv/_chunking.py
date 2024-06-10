@@ -1,7 +1,9 @@
 from concurrent.futures import Future, ThreadPoolExecutor
+from functools import partial
 from itertools import product
 from types import EllipsisType
 from typing import (
+    Callable,
     Deque,
     Hashable,
     Iterable,
@@ -52,7 +54,7 @@ class Slicer:
     ) -> None:
         self.chunks = chunks
         self.data_wrapper: DataWrapper | None = data_wrapper
-        self.executor = ThreadPoolExecutor()
+        self.executor = ThreadPoolExecutor(max_workers=4)
         self.pending_futures: Deque[Future[Response]] = Deque()
 
     def __del__(self) -> None:
@@ -67,7 +69,7 @@ class Slicer:
         data = self.data_wrapper[idx]
         return Response(idx=idx, data=data)
 
-    def request_index(self, index: Indices) -> None:
+    def request_index(self, index: Indices, func: Callable) -> None:
         if self.data_wrapper is None:
             return
         idx = self.data_wrapper.to_conventional(index)
@@ -75,16 +77,21 @@ class Slicer:
             subchunks: Iterable[tuple[int | slice, ...]] = [idx]
         else:
             shape = self.data_wrapper.data.shape
-            subchunks = iter_chunk_aligned_slices(shape, self.chunks, idx)
+            subchunks = sorted(
+                iter_chunk_aligned_slices(shape, self.chunks, idx),
+                key=lambda x: center_distance_key(x, shape),
+            )
         for chunk_idx in subchunks:
             future = self.executor.submit(self._request_chunk_sync, chunk_idx)
             self.pending_futures.append(future)
-            future.add_done_callback(self._on_chunk_ready)
+            future.add_done_callback(partial(self._on_chunk_ready, func))
 
-    def _on_chunk_ready(self, future: Future[Response]) -> None:
+    def _on_chunk_ready(self, func: Callable, future: Future[Response]) -> None:
         chunk = future.result()
         # process the chunk data
-        print(chunk.idx, chunk.data.shape)
+
+        # print(start, chunk.data.squeeze().shape)
+        func(chunk)
         self.pending_futures.remove(future)
 
 
@@ -216,3 +223,26 @@ def iter_chunk_aligned_slices(
         else:
             # Only add this combination of slices if all dimensions are valid
             yield tuple(chunk_slices)
+
+
+def slice_center(s, dim_size):
+    """Calculate the center of a slice based on its start and stop attributes."""
+    # For integer slices, center is the integer itself.
+    if isinstance(s, int):
+        return s
+    # For slice objects, calculate the middle point.
+    start = s.start if s.start is not None else 0
+    stop = s.stop if s.stop is not None else dim_size
+    return (start + stop) / 2
+
+
+def center_distance_key(slice_tuple, shape):
+    """Calculate the Euclidean distance from the center of the slices to the center of the shape."""
+    shape_center = [dim / 2 for dim in shape]
+    slice_centers = [slice_center(s, dim) for s, dim in zip(slice_tuple, shape)]
+
+    # Calculate Euclidean distance from the slice centers to the shape center
+    distance = np.sqrt(
+        sum((sc - cc) ** 2 for sc, cc in zip(slice_centers, shape_center))
+    )
+    return distance

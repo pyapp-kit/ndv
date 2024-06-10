@@ -132,12 +132,19 @@ class VispyViewerCanvas:
         self._canvas.update()
 
     def add_image(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        offset: tuple[int, ...] = (),
     ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         img = scene.visuals.Image(data, parent=self._view.scene)
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
+
+        if offset:
+            img.transform = scene.STTransform(translate=offset[::-1])
+
         if data is not None:
             self._current_shape, prev_shape = data.shape, self._current_shape
             if not prev_shape:
