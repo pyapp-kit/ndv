@@ -8,6 +8,7 @@ from typing import (
     Any,
     Deque,
     Hashable,
+    Literal,
     Mapping,
     NamedTuple,
     Sequence,
@@ -68,7 +69,7 @@ class Chunker:
         self.executor.shutdown(cancel_futures=cancel_futures, wait=wait)
 
     def _request_chunk_sync(
-        self, idx: tuple[int | slice, ...], channel_axis: int | None
+        self, idx: tuple[int | slice, ...], channel_axis: int | None, ndims: int
     ) -> ChunkResponse:
         # idx is guaranteed to have length equal to the number of dimensions
         if channel_axis is not None:
@@ -79,28 +80,33 @@ class Chunker:
             channel_index = -1
 
         data = self.data_wrapper[idx]  # type: ignore [index]
-        data = _reduce_data_for_display(data, 2)
+        data = _reduce_data_for_display(data, ndims)
         # FIXME: temporary
         # this needs to be aware of nvisible dimensions
         try:
-            offset = tuple(int(getattr(sl, "start", sl)) for sl in idx)[-2:]
+            offset = tuple(int(getattr(sl, "start", sl)) for sl in idx)[-3:]
         except TypeError:
-            offset = (0, 0)
+            offset = (0, 0, 0)
 
         return ChunkResponse(
             idx=idx, data=data, offset=offset, channel_index=channel_index
         )
 
-    def request_index(self, index: Indices, cancel_existing: bool = True) -> None:
+    def request_index(
+        self, index: Indices, *, cancel_existing: bool = True, ndims: Literal[2, 3] = 2
+    ) -> None:
         if cancel_existing:
             for future in list(self.pending_futures):
                 future.cancel()
 
+        # TODO: see if we can get the channel_axis logic back to the viewer/request side
+
         if self.data_wrapper is None:
             return
         idx = self.data_wrapper.to_conventional(index)
-
-        if (chunks := self.chunks) is None:
+        chunks = self.chunks
+        multi_channel = isinstance(index.get(self.channel_axis), slice)
+        if chunks is None and not multi_channel:
             subchunks: Iterable[tuple[int | slice, ...]] = [idx]
         else:
             shape = self.data_wrapper.data.shape
@@ -111,6 +117,9 @@ class Chunker:
             # we never chunk the channel axis
             if isinstance(chunks, int):
                 _chunks = [chunks] * len(shape)
+            elif chunks is None:
+                # hack FIXME
+                _chunks = [100000] * len(shape)
             else:
                 _chunks = list(chunks)
             if self.channel_axis is not None:
@@ -128,7 +137,7 @@ class Chunker:
         self._notification_sent = False
         for chunk_idx in subchunks:
             future = self.executor.submit(
-                self._request_chunk_sync, chunk_idx, self.channel_axis
+                self._request_chunk_sync, chunk_idx, self.channel_axis, ndims
             )
             self.pending_futures.append(future)
             future.add_done_callback(self._on_chunk_ready)

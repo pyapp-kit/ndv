@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Mapping, cast
 
 import numpy as np
 from qtpy.QtCore import Qt
@@ -35,13 +35,14 @@ class CmapCombo(QColormapComboBox):
 class LutControl(QWidget):
     def __init__(
         self,
+        channel: Mapping[Any, PImageHandle],
         name: str = "",
-        handles: Iterable[PImageHandle] = (),
         parent: QWidget | None = None,
         cmaplist: Iterable[Any] = (),
+        cmap: cmap.Colormap | None = None,
     ) -> None:
         super().__init__(parent)
-        self._handles = handles
+        self._channel = channel
         self._name = name
 
         self._visible = QCheckBox(name)
@@ -50,10 +51,12 @@ class LutControl(QWidget):
 
         self._cmap = CmapCombo()
         self._cmap.currentColormapChanged.connect(self._on_cmap_changed)
-        for handle in handles:
+        for handle in channel.values():
             self._cmap.addColormap(handle.cmap)
         for color in cmaplist:
             self._cmap.addColormap(color)
+        if cmap is not None:
+            self._cmap.setCurrentColormap(cmap)
 
         self._clims = QLabeledRangeSlider(Qt.Orientation.Horizontal)
         self._clims.setStyleSheet(SS)
@@ -84,36 +87,36 @@ class LutControl(QWidget):
 
     def _on_clims_changed(self, clims: tuple[float, float]) -> None:
         self._auto_clim.setChecked(False)
-        for handle in self._handles:
+        for handle in self._channel.values():
             handle.clim = clims
 
     def _on_visible_changed(self, visible: bool) -> None:
-        for handle in self._handles:
+        for handle in self._channel.values():
             handle.visible = visible
         if visible:
             self.update_autoscale()
 
     def _on_cmap_changed(self, cmap: cmap.Colormap) -> None:
-        for handle in self._handles:
+        for handle in self._channel.values():
             handle.cmap = cmap
 
     def update_autoscale(self) -> None:
         if (
             not self._auto_clim.isChecked()
             or not self._visible.isChecked()
-            or not self._handles
+            or not self._channel
         ):
             return
 
         # find the min and max values for the current channel
         clims = [np.inf, -np.inf]
-        for handle in self._handles:
+        for handle in self._channel.values():
             clims[0] = min(clims[0], np.nanmin(handle.data))
             clims[1] = max(clims[1], np.nanmax(handle.data))
 
         mi, ma = tuple(int(x) for x in clims)
         if mi != ma:
-            for handle in self._handles:
+            for handle in self._channel.values():
                 handle.clim = (mi, ma)
 
             # set the slider values to the new clims

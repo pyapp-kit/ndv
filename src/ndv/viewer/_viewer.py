@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from itertools import cycle
-from typing import TYPE_CHECKING, Literal, Sequence, cast
+from typing import TYPE_CHECKING, Iterator, Literal, Mapping, Sequence, cast
 
 import cmap
 from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
@@ -18,18 +17,19 @@ from ndv.viewer._components import (
 )
 
 from ._backends import get_canvas
+from ._backends._protocols import PImageHandle
 from ._data_wrapper import DataWrapper
 from ._dims_slider import DimsSliders
+from ._lut_control import LutControl
 
 if TYPE_CHECKING:
-    from concurrent.futures import Future
     from typing import Any, Hashable, Iterable, TypeAlias
 
+    import numpy as np
     from qtpy.QtGui import QCloseEvent
 
-    from ._backends._protocols import PCanvas, PImageHandle
+    from ._backends._protocols import PCanvas
     from ._dims_slider import DimKey, Indices, Sizes
-    from ._lut_control import LutControl
 
     ImgKey: TypeAlias = Hashable
     # any mapping of dimensions to sizes
@@ -47,7 +47,31 @@ DEFAULT_COLORMAPS = [
     cmap.Colormap("cubehelix"),
     cmap.Colormap("gray"),
 ]
-ALL_CHANNELS = slice(None)
+MONO_CHANNEL = -999999
+
+
+class Channel(Mapping[tuple, PImageHandle]):
+    def __init__(
+        self, ch_key: int, canvas: PCanvas, cmap: cmap.Colormap = GRAYS
+    ) -> None:
+        self.ch_key = ch_key
+        self._handles: dict[Any, PImageHandle] = {}
+        self.cmap = cmap
+
+    def __getitem__(self, key: tuple) -> PImageHandle:
+        return self._handles[key]
+
+    def __setitem__(self, key: tuple, value: PImageHandle) -> None:
+        self._handles[key] = value
+
+    def __iter__(self) -> Iterator[tuple]:
+        yield from self._handles
+
+    def __len__(self) -> int:
+        return len(self._handles)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._handles
 
 
 class NDViewer(QWidget):
@@ -111,7 +135,7 @@ class NDViewer(QWidget):
         *,
         colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
         parent: QWidget | None = None,
-        channel_axis: DimKey | None = None,
+        channel_axis: int | None = None,
         channel_mode: ChannelMode | str = ChannelMode.MONO,
     ):
         super().__init__(parent=parent)
@@ -119,16 +143,16 @@ class NDViewer(QWidget):
         # ATTRIBUTES ----------------------------------------------------
 
         # mapping of key to a list of objects that control image nodes in the canvas
-        self._img_handles: defaultdict[int, dict[tuple, PImageHandle]] = defaultdict(
-            dict
-        )
+        self._channels: dict[int, Channel] = {}
 
         # mapping of same keys to the LutControl objects control image display props
-        self._lut_ctrls: dict[ImgKey, LutControl] = {}
-        # the set of dimensions we are currently visualizing (e.g. XY)
+        self._lut_ctrls: dict[int, LutControl] = {}
+
+        # the set of dimensions we are currently visualizing (e.g. (-2, -1) for 2D)
         # this is used to control which dimensions have sliders and the behavior
         # of isel when selecting data from the datastore
         self._visualized_dims: set[DimKey] = set()
+
         # the axis that represents the channels in the data
         self._channel_axis = channel_axis
         self._channel_mode: ChannelMode = None  # type: ignore # set in set_channel_mode
@@ -138,8 +162,6 @@ class NDViewer(QWidget):
         else:
             self._cmaps = DEFAULT_COLORMAPS
         self._cmap_cycle = cycle(self._cmaps)
-        # the last future that was created by _request_data_for_index
-        self._last_future: Future | None = None
 
         # number of dimensions to display
         self._ndims: Literal[2, 3] = 2
@@ -268,13 +290,14 @@ class NDViewer(QWidget):
             the initial index will be set to the middle of the data.
         """
         # store the data
+        self._clear_images()
+
         self._data_wrapper = DataWrapper.create(data)
         self._chunker.data_wrapper = self._data_wrapper
         if chunks := self._data_wrapper.chunks():
             # temp hack ... always group non-visible channels
             chunks = list(chunks)
             chunks[:-2] = (1000,) * len(chunks[:-2])
-            print(chunks)
             self._chunker.chunks = tuple(chunks)
 
         # set channel axis
@@ -298,6 +321,7 @@ class NDViewer(QWidget):
                 raise TypeError("initial_index must be a dict")
             idx = initial_index
         self.set_current_index(idx)
+
         # update the data info label
         self._data_info_label.setText(self._data_wrapper.summary_info())
 
@@ -329,7 +353,7 @@ class NDViewer(QWidget):
             self._dims_sliders.set_dimension_visible(dim3, True if ndim == 2 else False)
 
         # clear image handles and redraw
-        if self._img_handles:
+        if self._channels:
             self._clear_images()
             self._request_data_for_index(self._dims_sliders.value())
 
@@ -363,7 +387,7 @@ class NDViewer(QWidget):
                 self._channel_axis, mode != ChannelMode.COMPOSITE
             )
 
-        if self._img_handles:
+        if self._channels:
             self._clear_images()
             self._request_data_for_index(self._dims_sliders.value())
 
@@ -430,79 +454,79 @@ class NDViewer(QWidget):
         makes a request for the new data slice and queues _on_data_future_done to be
         called when the data is ready.
         """
-        print(f"\n--------\nrequesting index {index}")
+        print(f"\n--------\nrequesting index {index}", self._channel_axis)
+        if (
+            self._channel_mode == ChannelMode.COMPOSITE
+            and self._channel_axis is not None
+        ):
+            index = {**index, self._channel_axis: slice(None)}
         self._progress_spinner.show()
-        self._chunker.request_index(index)
+        # TODO: don't request channels not being displayed
+        # TODO: don't request if the data is already in the cache
+        self._chunker.request_index(index, ndims=self._ndims)
 
     @ensure_main_thread  # type: ignore
-    def _draw_chunk(self, response: ChunkResponse) -> None:
+    def _draw_chunk(self, chunk: ChunkResponse) -> None:
         """Actually update the image handle(s) with the (sliced) data.
 
         By this point, data should be sliced from the underlying datastore.  Any
         dimensions remaining that are more than the number of visualized dimensions
         (currently just 2D) will be reduced using max intensity projection (currently).
         """
-        if response is RequestFinished:  # fix typing
-            print(">>>>>>>>>>>>> RequestFinished")
+        if chunk is RequestFinished:  # fix typing
             self._progress_spinner.hide()
+            for lut in self._lut_ctrls.values():
+                lut.update_autoscale()
             return
 
         if self._channel_mode == ChannelMode.MONO:
-            channel_key = -1
+            ch_key = MONO_CHANNEL
         else:
-            channel_key = response.channel_index
-        offset = response.offset
-        datum = response.data
-        if (
-            channel_handles := self._img_handles[channel_key]
-        ) and offset in channel_handles:
-            handle = channel_handles[offset]
-            handle.data = datum
+            ch_key = chunk.channel_index
+
+        # TODO: Channel object creation could be moved.
+        # having it here is the laziest... but means that the order of arrival
+        # of the chunks will determine the order of the channels in the LUTS
+        # (without additional logic to sort them by index, etc.)
+        if (channel := self._channels.get(ch_key)) is None:
+            channel = self._create_channel(ch_key)
+
+        data = chunk.data
+        if (offset := chunk.offset) in channel:
+            channel[offset].data = data
         else:
-            cm = DEFAULT_COLORMAPS[channel_key]  # TODO
-            if datum.ndim == 2:
-                handle = self._canvas.add_image(datum, cmap=cm, offset=offset)
-                handle.clim = (0, 100)
-                channel_handles[offset] = handle
-            else:
-                raise NotImplementedError("Volume rendering not yet supported")
+            print(f"{data.ndim=}")
+            if data.ndim == 2:
+                _offset2 = (offset[-2], offset[-1]) if offset else None
+                handle = self._canvas.add_image(data, offset=_offset2)
+            elif data.ndim == 3:
+                _offset3 = (offset[-3], offset[-2], offset[-1]) if offset else None
+                handle = self._canvas.add_volume(data, offset=_offset3)
+            handle.cmap = channel.cmap
+            channel[offset] = handle
         self._canvas.refresh()
 
-        # if handles := self._img_handles[offset]:
-        #     for handle in handles:
-        #         handle.data = datum
-        #         handle.clim = (0, 45000)
-        #     # if ctrl := self._lut_ctrls.get(imkey, None):
-        #     # ctrl.update_autoscale()
-        # else:
-        #     cm = (
-        #         next(self._cmap_cycle)
-        #         if self._channel_mode == ChannelMode.COMPOSITE
-        #         else GRAYS
-        #     )
-        #     if datum.ndim == 2:
-        #         handle = self._canvas.add_image(datum, cmap=cm, offset=offset)
-        #         handle.clim = (0, 45000)
-        #         handles.append(handle)
-        #     elif datum.ndim == 3:
-        #         handles.append(self._canvas.add_volume(datum, cmap=cm))
-        #     if imkey not in self._lut_ctrls:
-        #         # ch_index = index.get(self._channel_axis, 0)
-        #         ch_index = 0
-        #         self._lut_ctrls[imkey] = c = LutControl(
-        #             f"Ch {ch_index}",
-        #             handles,
-        #             self,
-        #             cmaplist=self._cmaps + DEFAULT_COLORMAPS,
-        #         )
-        #         self._lut_drop.addWidget(c)
+    def _create_channel(self, ch_key: int) -> Channel:
+        # improve this
+        cmap = GRAYS if ch_key == MONO_CHANNEL else next(self._cmap_cycle)
+
+        self._channels[ch_key] = channel = Channel(ch_key, self._canvas, cmap=cmap)
+        self._lut_ctrls[ch_key] = lut = LutControl(
+            channel,
+            f"Ch {ch_key}",
+            self,
+            cmaplist=self._cmaps + DEFAULT_COLORMAPS,
+            cmap=cmap,
+        )
+        self._lut_drop.addWidget(lut)
+        return channel
 
     def _clear_images(self) -> None:
         """Remove all images from the canvas."""
-        for handles in self._img_handles.values():
+        for handles in self._channels.values():
             for handle in handles.values():
                 handle.remove()
-        self._img_handles.clear()
+        self._channels.clear()
 
         # clear the current LutControls as well
         for c in self._lut_ctrls.values():

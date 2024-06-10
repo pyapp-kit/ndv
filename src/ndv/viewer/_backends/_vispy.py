@@ -135,7 +135,7 @@ class VispyViewerCanvas:
         self,
         data: np.ndarray | None = None,
         cmap: cmap.Colormap | None = None,
-        offset: tuple[int, ...] = (),
+        offset: tuple[float, float] | None = None,  # (Y, X)
     ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         img = scene.visuals.Image(data, parent=self._view.scene)
@@ -155,13 +155,19 @@ class VispyViewerCanvas:
         return handle
 
     def add_volume(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        offset: tuple[float, float, float] | None = None,  # (Z, Y, X)
     ) -> VispyImageHandle:
         vol = scene.visuals.Volume(
             data, parent=self._view.scene, interpolation="nearest"
         )
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
+        if offset:
+            vol.transform = scene.STTransform(translate=offset[::-1])
+
         if data is not None:
             self._current_shape, prev_shape = data.shape, self._current_shape
             if len(prev_shape) != 3:
