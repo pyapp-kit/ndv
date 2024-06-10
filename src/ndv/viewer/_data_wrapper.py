@@ -129,6 +129,13 @@ class DataWrapper(Generic[ArrayT]):
         """
         raise NotImplementedError
 
+    def __getitem__(self, index: tuple[int | slice, ...]) -> np.ndarray:
+        return self._data[index]
+
+    def to_conventional(self, indexers: Indices) -> tuple[int | slice, ...]:
+        """Convert named indices to a tuple of integers and slices."""
+        return tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
+
     def isel_async(
         self, indexers: list[Indices]
     ) -> Future[Iterable[tuple[Indices, np.ndarray]]]:
@@ -245,8 +252,15 @@ class ArrayLikeWrapper(DataWrapper, Generic[ArrayT]):
     PRIORITY = 100
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        idx = tuple(indexers.get(k, slice(None)) for k in range(len(self._data.shape)))
-        return self._asarray(self._data[idx])
+        idx = []
+        for k in range(len(self._data.shape)):
+            i = indexers.get(k, slice(None))
+            if isinstance(i, int):
+                idx.extend([i, None])
+            else:
+                idx.append(i)
+
+        return self._asarray(self._data[tuple(idx)])
 
     def _asarray(self, data: npt.ArrayLike) -> np.ndarray:
         return np.asarray(data)

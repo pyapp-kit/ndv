@@ -273,7 +273,7 @@ class NDViewer(QWidget):
 
         # redraw
         if initial_index is None:
-            idx = {k: int(v // 2) for k, v in sizes.items()}
+            idx = {k: int(v // 2) for k, v in sizes.items() if k not in visualized_dims}
         else:
             if not isinstance(initial_index, dict):  # pragma: no cover
                 raise TypeError("initial_index must be a dict")
@@ -400,34 +400,48 @@ class NDViewer(QWidget):
             return val
         return 0
 
-    def _update_data_for_index(self, index: Indices) -> None:
-        """Retrieve data for `index` from datastore and update canvas image(s).
-
-        This will pull the data from the datastore using the given index, and update
-        the image handle(s) with the new data.  This method is *asynchronous*.  It
-        makes a request for the new data slice and queues _on_data_future_done to be
-        called when the data is ready.
-        """
-        if (
-            self._channel_axis is not None
-            and self._channel_mode == ChannelMode.COMPOSITE
-            and self._channel_axis in (sizes := self._data_wrapper.sizes())
-        ):
+    def _build_requests(self, index: Indices) -> list[Indices]:
+        # receives an unordered mapping of dimension keys to int | slice
+        # for example {1: 0, 2: 128, 3: 128, 0: 38}
+        # returns a list of indices to request from the datastore that takes
+        # into account the channel axis, channel mode, and whether 2d or 3d mode.
+        sizes = self._data_wrapper.sizes()
+        if self._channel_mode == ChannelMode.COMPOSITE and self._channel_axis in sizes:
             indices: list[Indices] = [
                 {**index, self._channel_axis: i}
                 for i in range(sizes[self._channel_axis])
             ]
         else:
             indices = [index]
+        # don't request any dimensions that are not visualized
+        for idx in indices:
+            for k in self._visualized_dims:
+                idx.pop(k, None)
 
+        return indices
+
+    def _update_data_for_index(self, index: Indices) -> None:
+        """Retrieve data for `index` from datastore and update canvas image(s).
+
+        This is the first step in updating the displayed image, it is triggered by
+        the valueChanged signal from the sliders.
+
+        This will pull the data from the datastore using the given index, and update
+        the image handle(s) with the new data.  This method is *asynchronous*.  It
+        makes a request for the new data slice and queues _on_data_future_done to be
+        called when the data is ready.
+        """
+        print("\n\n-----------------")
+        print("update_data_for_index", index)
+        print("visualized_dims", self._visualized_dims)
+        print("sizes", self._data_wrapper.sizes())
+        print("channel_axis", self._channel_axis)
+        print("channel_mode", self._channel_mode)
+
+        indices = self._build_requests(index)
         if self._last_future:
             self._last_future.cancel()
 
-        # don't request any dimensions that are not visualized
-        indices = [
-            {k: v for k, v in idx.items() if k not in self._visualized_dims}
-            for idx in indices
-        ]
         try:
             self._last_future = f = self._data_wrapper.isel_async(indices)
         except Exception as e:
