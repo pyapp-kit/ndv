@@ -1,25 +1,28 @@
+from __future__ import annotations
+
+import math
 from concurrent.futures import Future, ThreadPoolExecutor
-from functools import partial
 from itertools import product
 from types import EllipsisType
 from typing import (
-    Callable,
+    TYPE_CHECKING,
+    Any,
     Deque,
     Hashable,
-    Iterable,
-    Iterator,
     Mapping,
     NamedTuple,
     Sequence,
-    TypeAlias,
     cast,
 )
 
-import cmap
 import numpy as np
-from attr import dataclass
+from rich import print
 
-from .viewer._data_wrapper import DataWrapper
+if TYPE_CHECKING:
+    from collections import deque
+    from typing import Callable, Iterable, Iterator, TypeAlias
+
+    from .viewer._data_wrapper import DataWrapper
 
 # any hashable represent a single dimension in an ND array
 DimKey: TypeAlias = Hashable
@@ -32,101 +35,177 @@ Indices: TypeAlias = Mapping[DimKey, Index]
 Sizes: TypeAlias = Mapping[DimKey, int]
 
 
-@dataclass
-class ChannelSetting:
-    visible: bool = True
-    colormap: cmap.Colormap | str = "gray"
-    clims: tuple[float, float] | None = None
-    gamma: float = 1
-    auto_clim: bool = False
+class ChunkResponse(NamedTuple):
+    idx: tuple[int | slice, ...]  # index that was requested
+    data: np.ndarray  # the data that was returned
+    offset: tuple[int, ...]  # offset of the data in the full array (derived from idx)
+    channel_index: int = -1
 
 
-class Response(NamedTuple):
-    idx: tuple[int | slice, ...]
-    data: np.ndarray
+RequestFinished = object()
 
 
-class Slicer:
+class Chunker:
     def __init__(
         self,
         data_wrapper: DataWrapper | None = None,
         chunks: int | tuple[int, ...] | None = None,
+        on_ready: Callable[[ChunkResponse], Any] | None = None,
     ) -> None:
         self.chunks = chunks
         self.data_wrapper: DataWrapper | None = data_wrapper
         self.executor = ThreadPoolExecutor(max_workers=4)
-        self.pending_futures: Deque[Future[Response]] = Deque()
+        self.pending_futures: deque[Future[ChunkResponse]] = Deque()
+        self.on_ready = on_ready
+        self.channel_axis: int | None = None
 
     def __del__(self) -> None:
-        self.executor.shutdown(cancel_futures=True, wait=True)
+        self.shutdown()
 
     def shutdown(self) -> None:
-        self.executor.shutdown(wait=True)
+        self.executor.shutdown(cancel_futures=True, wait=True)
 
-    def _request_chunk_sync(self, idx: tuple[int | slice, ...]) -> Response:
-        if self.data_wrapper is None:
-            raise ValueError("No data wrapper set")
-        data = self.data_wrapper[idx]
-        return Response(idx=idx, data=data)
+    def _request_chunk_sync(
+        self, idx: tuple[int | slice, ...], channel_axis: int | None
+    ) -> ChunkResponse:
+        # idx is guaranteed to have length equal to the number of dimensions
+        if channel_axis is not None:
+            channel_index = idx[channel_axis]
+            if isinstance(channel_index, slice):
+                channel_index = channel_index.start
+        else:
+            channel_index = -1
 
-    def request_index(self, index: Indices, func: Callable) -> None:
+        data = self.data_wrapper[idx]  # type: ignore [index]
+        data = _reduce_data_for_display(data, 2)
+        # FIXME: temporary
+        # this needs to be aware of nvisible dimensions
+        try:
+            offset = tuple(int(getattr(sl, "start", sl)) for sl in idx)[-2:]
+        except TypeError:
+            offset = (0, 0)
+
+        import time
+
+        time.sleep(0.02)
+        return ChunkResponse(
+            idx=idx, data=data, offset=offset, channel_index=channel_index
+        )
+
+    def request_index(self, index: Indices, cancel_existing: bool = True) -> None:
+        if cancel_existing:
+            for future in list(self.pending_futures):
+                future.cancel()
+
         if self.data_wrapper is None:
             return
         idx = self.data_wrapper.to_conventional(index)
-        if self.chunks is None:
+
+        if (chunks := self.chunks) is None:
             subchunks: Iterable[tuple[int | slice, ...]] = [idx]
         else:
             shape = self.data_wrapper.data.shape
+
+            # we never chunk the channel axis
+            if isinstance(chunks, int):
+                _chunks = [chunks] * len(shape)
+            else:
+                _chunks = list(chunks)
+            if self.channel_axis is not None:
+                _chunks[self.channel_axis] = 1
+
+            # TODO: allow the viewer to pass a center coord, to load chunks
+            # preferentially around that point
             subchunks = sorted(
-                iter_chunk_aligned_slices(shape, self.chunks, idx),
-                key=lambda x: center_distance_key(x, shape),
+                iter_chunk_aligned_slices(shape, _chunks, idx),
+                key=lambda x: distance_from_coord(x, shape),
             )
+        # print("Requesting index:", idx)
+        # print("subchunks", subchunks)
+        # print()
         for chunk_idx in subchunks:
-            future = self.executor.submit(self._request_chunk_sync, chunk_idx)
+            future = self.executor.submit(
+                self._request_chunk_sync, chunk_idx, self.channel_axis
+            )
             self.pending_futures.append(future)
-            future.add_done_callback(partial(self._on_chunk_ready, func))
+            future.add_done_callback(self._on_chunk_ready)
 
-    def _on_chunk_ready(self, func: Callable, future: Future[Response]) -> None:
-        chunk = future.result()
-        # process the chunk data
-
-        # print(start, chunk.data.squeeze().shape)
-        func(chunk)
+    def _on_chunk_ready(self, future: Future[ChunkResponse]) -> None:
         self.pending_futures.remove(future)
+        if future.cancelled():
+            return
+        if err := future.exception():
+            print(f"{type(err).__name__}: in chunk request: {err}")
+            return
+        if self.on_ready is not None:
+            self.on_ready(future.result())
+            if not self.pending_futures:
+                # FIXME: this emits multiple times sometimes
+                # Fix typing
+                self.on_ready(RequestFinished)
 
 
-def _axis_chunks(total_length: int, chunk_size: int) -> tuple[int, ...]:
-    """Break `total_length` into chunks of `chunk_size` plus remainder.
+def _reduce_data_for_display(
+    data: np.ndarray, ndims: int, reductor: Callable[..., np.ndarray] = np.max
+) -> np.ndarray:
+    """Reduce the number of dimensions in the data for display.
 
-    Examples
-    --------
-    >>> _axis_chunks(10, 3)
-    (3, 3, 3, 1)
+    This function takes a data array and reduces the number of dimensions to
+    the max allowed for display. The default behavior is to reduce the smallest
+    dimensions, using np.max.  This can be improved in the future.
+
+    This also coerces 64-bit data to 32-bit data.
     """
-    sequence = (chunk_size,) * (total_length // chunk_size)
-    if remainder := total_length % chunk_size:
-        sequence += (remainder,)
-    return sequence
+    # TODO
+    # - allow dimensions to control how they are reduced (as opposed to just max)
+    # - for better way to determine which dims need to be reduced (currently just
+    #   the smallest dims)
+    data = data.squeeze()
+    if extra_dims := data.ndim - ndims:
+        shapes = sorted(enumerate(data.shape), key=lambda x: x[1])
+        smallest_dims = tuple(i for i, _ in shapes[:extra_dims])
+        data = reductor(data, axis=smallest_dims)
+
+    if data.dtype.itemsize > 4:  # More than 32 bits
+        if np.issubdtype(data.dtype, np.integer):
+            data = data.astype(np.int32)
+        else:
+            data = data.astype(np.float32)
+    return data
 
 
-def _shape_chunks(
-    shape: tuple[int, ...], chunks: int | tuple[int, ...]
-) -> tuple[tuple[int, ...], ...]:
-    """Break `shape` into chunks of `chunks` along each axis.
+# def _axis_chunks(total_length: int, chunk_size: int) -> tuple[int, ...]:
+#     """Break `total_length` into chunks of `chunk_size` plus remainder.
 
-    Examples
-    --------
-    >>> _shape_chunks((10, 10, 10), 3)
-    ((3, 3, 3, 1), (3, 3, 3, 1), (3, 3, 3, 1))
-    """
-    if isinstance(chunks, int):
-        chunks = (chunks,) * len(shape)
-    elif isinstance(chunks, Sequence):
-        if len(chunks) != len(shape):
-            raise ValueError("Length of `chunks` must match length of `shape`")
-    else:
-        raise TypeError("`chunks` must be an int or sequence of ints")
-    return tuple(_axis_chunks(length, chunk) for length, chunk in zip(shape, chunks))
+#     Examples
+#     --------
+#     >>> _axis_chunks(10, 3)
+#     (3, 3, 3, 1)
+#     """
+#     sequence = (chunk_size,) * (total_length // chunk_size)
+#     if remainder := total_length % chunk_size:
+#         sequence += (remainder,)
+#     return sequence
+
+
+# def _shape_chunks(
+#     shape: tuple[int, ...], chunks: int | tuple[int, ...]
+# ) -> tuple[tuple[int, ...], ...]:
+#     """Break `shape` into chunks of `chunks` along each axis.
+
+#     Examples
+#     --------
+#     >>> _shape_chunks((10, 10, 10), 3)
+#     ((3, 3, 3, 1), (3, 3, 3, 1), (3, 3, 3, 1))
+#     """
+#     if isinstance(chunks, int):
+#         chunks = (chunks,) * len(shape)
+#     elif isinstance(chunks, Sequence):
+#         if len(chunks) != len(shape):
+#             raise ValueError("Length of `chunks` must match length of `shape`")
+#     else:
+#         raise TypeError("`chunks` must be an int or sequence of ints")
+#     return tuple(_axis_chunks(length, chunk) for length, chunk in zip(shape, chunks))
 
 
 def _slice2range(sl: slice | int, dim_size: int) -> range:
@@ -145,8 +224,8 @@ def _slice2range(sl: slice | int, dim_size: int) -> range:
 
 
 def iter_chunk_aligned_slices(
-    shape: tuple[int, ...],
-    chunks: int | tuple[int, ...],
+    shape: Sequence[int],
+    chunks: Sequence[int],
     slices: tuple[int | slice | EllipsisType, ...],
 ) -> Iterator[tuple[slice, ...]]:
     """Yield chunk-aligned slices for a given shape and slices.
@@ -185,8 +264,6 @@ def iter_chunk_aligned_slices(
     """
     # Make chunks same length as shape if single int
     ndim = len(shape)
-    if isinstance(chunks, int):
-        chunks = (chunks,) * ndim
     if any(x == 0 for x in chunks):
         raise ValueError("Chunk size must be greater than zero")
 
@@ -225,24 +302,22 @@ def iter_chunk_aligned_slices(
             yield tuple(chunk_slices)
 
 
-def slice_center(s, dim_size):
+def slice_center(s: slice | int, dim_size: int) -> float:
     """Calculate the center of a slice based on its start and stop attributes."""
-    # For integer slices, center is the integer itself.
     if isinstance(s, int):
         return s
-    # For slice objects, calculate the middle point.
-    start = s.start if s.start is not None else 0
-    stop = s.stop if s.stop is not None else dim_size
+    start = float(s.start) if s.start is not None else 0
+    stop = float(s.stop) if s.stop is not None else dim_size
     return (start + stop) / 2
 
 
-def center_distance_key(slice_tuple, shape):
-    """Calculate the Euclidean distance from the center of the slices to the center of the shape."""
-    shape_center = [dim / 2 for dim in shape]
-    slice_centers = [slice_center(s, dim) for s, dim in zip(slice_tuple, shape)]
-
-    # Calculate Euclidean distance from the slice centers to the shape center
-    distance = np.sqrt(
-        sum((sc - cc) ** 2 for sc, cc in zip(slice_centers, shape_center))
-    )
-    return distance
+def distance_from_coord(
+    slice_tuple: tuple[slice | int, ...],
+    shape: tuple[int, ...],
+    coord: Iterable[float] = (),  # defaults to center of shape
+) -> float:
+    """Euclidean distance from the center of an nd slice to the center of shape."""
+    if not coord:
+        coord = (dim / 2 for dim in shape)
+    slice_centers = (slice_center(s, dim) for s, dim in zip(slice_tuple, shape))
+    return math.hypot(*(sc - cc for sc, cc in zip(slice_centers, coord)))

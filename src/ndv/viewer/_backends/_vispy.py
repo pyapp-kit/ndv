@@ -192,6 +192,7 @@ class VispyViewerCanvas:
         is_3d = isinstance(self._camera, scene.ArcballCamera)
         if is_3d:
             self._camera._quaternion = DEFAULT_QUATERNION
+        print("Setting range", x, y, z, margin)
         self._view.camera.set_range(x=x, y=y, z=z, margin=margin)
         if is_3d:
             max_size = max(self._current_shape)
