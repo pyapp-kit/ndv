@@ -25,7 +25,6 @@ from ._lut_control import LutControl
 if TYPE_CHECKING:
     from typing import Any, Hashable, Iterable, TypeAlias
 
-    import numpy as np
     from qtpy.QtGui import QCloseEvent
 
     from ._backends._protocols import PCanvas
