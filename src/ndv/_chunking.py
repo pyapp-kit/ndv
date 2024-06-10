@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from concurrent.futures import Future, ThreadPoolExecutor
 from itertools import product
-from types import EllipsisType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -20,6 +19,7 @@ from rich import print
 
 if TYPE_CHECKING:
     from collections import deque
+    from types import EllipsisType
     from typing import Callable, Iterable, Iterator, TypeAlias
 
     from .viewer._data_wrapper import DataWrapper
@@ -42,7 +42,8 @@ class ChunkResponse(NamedTuple):
     channel_index: int = -1
 
 
-RequestFinished = object()
+# sentinel value
+RequestFinished = ChunkResponse((), np.empty(0), ())
 
 
 class Chunker:
@@ -58,12 +59,13 @@ class Chunker:
         self.pending_futures: deque[Future[ChunkResponse]] = Deque()
         self.on_ready = on_ready
         self.channel_axis: int | None = None
+        self._notification_sent = True
 
     def __del__(self) -> None:
         self.shutdown()
 
-    def shutdown(self) -> None:
-        self.executor.shutdown(cancel_futures=True, wait=True)
+    def shutdown(self, cancel_futures: bool = True, wait: bool = True) -> None:
+        self.executor.shutdown(cancel_futures=cancel_futures, wait=wait)
 
     def _request_chunk_sync(
         self, idx: tuple[int | slice, ...], channel_axis: int | None
@@ -85,9 +87,6 @@ class Chunker:
         except TypeError:
             offset = (0, 0)
 
-        import time
-
-        time.sleep(0.02)
         return ChunkResponse(
             idx=idx, data=data, offset=offset, channel_index=channel_index
         )
@@ -106,6 +105,9 @@ class Chunker:
         else:
             shape = self.data_wrapper.data.shape
 
+            # TODO
+            # we should *only* chunk along visualized axes ...
+
             # we never chunk the channel axis
             if isinstance(chunks, int):
                 _chunks = [chunks] * len(shape)
@@ -120,9 +122,10 @@ class Chunker:
                 iter_chunk_aligned_slices(shape, _chunks, idx),
                 key=lambda x: distance_from_coord(x, shape),
             )
-        # print("Requesting index:", idx)
-        # print("subchunks", subchunks)
-        # print()
+        print("Requesting index:", idx)
+        print("subchunks", subchunks)
+        print()
+        self._notification_sent = False
         for chunk_idx in subchunks:
             future = self.executor.submit(
                 self._request_chunk_sync, chunk_idx, self.channel_axis
@@ -139,9 +142,9 @@ class Chunker:
             return
         if self.on_ready is not None:
             self.on_ready(future.result())
-            if not self.pending_futures:
-                # FIXME: this emits multiple times sometimes
+            if not self.pending_futures and not self._notification_sent:
                 # Fix typing
+                self._notification_sent = True
                 self.on_ready(RequestFinished)
 
 
@@ -159,12 +162,11 @@ def _reduce_data_for_display(
     # TODO
     # - allow dimensions to control how they are reduced (as opposed to just max)
     # - for better way to determine which dims need to be reduced (currently just
-    #   the smallest dims)
+    #   the first extra dims)
     data = data.squeeze()
     if extra_dims := data.ndim - ndims:
-        shapes = sorted(enumerate(data.shape), key=lambda x: x[1])
-        smallest_dims = tuple(i for i, _ in shapes[:extra_dims])
-        data = reductor(data, axis=smallest_dims)
+        axis = tuple(range(extra_dims))
+        data = reductor(data, axis=axis)
 
     if data.dtype.itemsize > 4:  # More than 32 bits
         if np.issubdtype(data.dtype, np.integer):
@@ -172,40 +174,6 @@ def _reduce_data_for_display(
         else:
             data = data.astype(np.float32)
     return data
-
-
-# def _axis_chunks(total_length: int, chunk_size: int) -> tuple[int, ...]:
-#     """Break `total_length` into chunks of `chunk_size` plus remainder.
-
-#     Examples
-#     --------
-#     >>> _axis_chunks(10, 3)
-#     (3, 3, 3, 1)
-#     """
-#     sequence = (chunk_size,) * (total_length // chunk_size)
-#     if remainder := total_length % chunk_size:
-#         sequence += (remainder,)
-#     return sequence
-
-
-# def _shape_chunks(
-#     shape: tuple[int, ...], chunks: int | tuple[int, ...]
-# ) -> tuple[tuple[int, ...], ...]:
-#     """Break `shape` into chunks of `chunks` along each axis.
-
-#     Examples
-#     --------
-#     >>> _shape_chunks((10, 10, 10), 3)
-#     ((3, 3, 3, 1), (3, 3, 3, 1), (3, 3, 3, 1))
-#     """
-#     if isinstance(chunks, int):
-#         chunks = (chunks,) * len(shape)
-#     elif isinstance(chunks, Sequence):
-#         if len(chunks) != len(shape):
-#             raise ValueError("Length of `chunks` must match length of `shape`")
-#     else:
-#         raise TypeError("`chunks` must be an int or sequence of ints")
-#     return tuple(_axis_chunks(length, chunk) for length, chunk in zip(shape, chunks))
 
 
 def _slice2range(sl: slice | int, dim_size: int) -> range:
@@ -226,7 +194,7 @@ def _slice2range(sl: slice | int, dim_size: int) -> range:
 def iter_chunk_aligned_slices(
     shape: Sequence[int],
     chunks: Sequence[int],
-    slices: tuple[int | slice | EllipsisType, ...],
+    slices: Sequence[int | slice | EllipsisType],
 ) -> Iterator[tuple[slice, ...]]:
     """Yield chunk-aligned slices for a given shape and slices.
 
@@ -241,15 +209,31 @@ def iter_chunk_aligned_slices(
         The full slices to apply to the array. Ellipsis is supported to
         represent multiple slices.
 
+    Returns
+    -------
+    Iterator[tuple[slice, ...]]
+        An iterator of chunk-aligned slices.
+
+    Raises
+    ------
+    ValueError
+        If the length of `chunks`, `shape`, and `slices` do not match, or any chunks
+        are zero.
+    IndexError
+        If more than one Ellipsis is present in `slices`.
+
     Examples
     --------
-    >>> list(iter_chunk_aligned_slices((6, 6), 4, (slice(1, 4), ...)))
+    >>> list(iter_chunk_aligned_slices(shape=(6, 6), chunks=4, (slice(1, 4), ...)))
     [
         (slice(1, 4, None), slice(0, 4, None)),
         (slice(1, 4, None), slice(4, 6, None)),
     ]
 
-    >>> list(iter_chunk_aligned_slices((10, 9), (4, 3), (slice(3, 9), slice(1, None))))
+    >>> x = iter_chunk_aligned_slices(
+    ...     shape=(10, 9), chunks=(4, 3), slices=(slice(3, 9), slice(1, None))
+    ... )
+    >>> list(x)
     [
         (slice(3, 4, None), slice(1, 3, None)),
         (slice(3, 4, None), slice(3, 6, None)),
@@ -267,19 +251,23 @@ def iter_chunk_aligned_slices(
     if any(x == 0 for x in chunks):
         raise ValueError("Chunk size must be greater than zero")
 
-    if any(isinstance(sl, EllipsisType) for sl in slices):
+    if num_ellipsis := slices.count(Ellipsis):
+        if num_ellipsis > 1:
+            raise IndexError("an index can only have a single ellipsis ('...')")
         # Replace Ellipsis with multiple slices
-        if slices.count(Ellipsis) > 1:
-            raise ValueError("Only one Ellipsis is allowed")
         el_idx = slices.index(Ellipsis)
         n_remaining = ndim - len(slices) + 1
-        slices = slices[:el_idx] + (slice(None),) * n_remaining + slices[el_idx + 1 :]
+        slices = (
+            tuple(slices[:el_idx])
+            + (slice(None),) * n_remaining
+            + tuple(slices[el_idx + 1 :])
+        )
+    slices = cast(tuple[int | slice, ...], slices)  # now we have no Ellipsis
 
     if not (len(chunks) == ndim == len(slices)):
         raise ValueError("Length of `chunks`, `shape`, and `slices` must match")
 
     # Create ranges for each dimension based on the slices provided
-    slices = cast(tuple[int | slice, ...], slices)
     ranges = [_slice2range(sl, dim) for sl, dim in zip(slices, shape)]
 
     # Generate indices for each dimension that align with chunks
@@ -321,3 +309,37 @@ def distance_from_coord(
         coord = (dim / 2 for dim in shape)
     slice_centers = (slice_center(s, dim) for s, dim in zip(slice_tuple, shape))
     return math.hypot(*(sc - cc for sc, cc in zip(slice_centers, coord)))
+
+
+# def _axis_chunks(total_length: int, chunk_size: int) -> tuple[int, ...]:
+#     """Break `total_length` into chunks of `chunk_size` plus remainder.
+
+#     Examples
+#     --------
+#     >>> _axis_chunks(10, 3)
+#     (3, 3, 3, 1)
+#     """
+#     sequence = (chunk_size,) * (total_length // chunk_size)
+#     if remainder := total_length % chunk_size:
+#         sequence += (remainder,)
+#     return sequence
+
+
+# def _shape_chunks(
+#     shape: tuple[int, ...], chunks: int | tuple[int, ...]
+# ) -> tuple[tuple[int, ...], ...]:
+#     """Break `shape` into chunks of `chunks` along each axis.
+
+#     Examples
+#     --------
+#     >>> _shape_chunks((10, 10, 10), 3)
+#     ((3, 3, 3, 1), (3, 3, 3, 1), (3, 3, 3, 1))
+#     """
+#     if isinstance(chunks, int):
+#         chunks = (chunks,) * len(shape)
+#     elif isinstance(chunks, Sequence):
+#         if len(chunks) != len(shape):
+#             raise ValueError("Length of `chunks` must match length of `shape`")
+#     else:
+#         raise TypeError("`chunks` must be an int or sequence of ints")
+#     return tuple(_axis_chunks(length, chunk) for length, chunk in zip(shape, chunks))

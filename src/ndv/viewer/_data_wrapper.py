@@ -132,8 +132,16 @@ class DataWrapper(Generic[ArrayT]):
     def __getitem__(self, index: tuple[int | slice, ...]) -> np.ndarray:
         return self._data[index]
 
+    def chunks(self) -> tuple[int, ...] | int | None:
+        if hasattr(self._data, "chunks"):
+            return self._data.chunks
+        return None
+
     def to_conventional(self, indexers: Indices) -> tuple[int | slice, ...]:
         """Convert named indices to a tuple of integers and slices."""
+        if hasattr(self, "_name2index"):
+            indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
+
         return tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
 
     def isel_async(
@@ -142,14 +150,14 @@ class DataWrapper(Generic[ArrayT]):
         """Asynchronous version of isel."""
         return _EXECUTOR.submit(lambda: [(idx, self.isel(idx)) for idx in indexers])
 
-    def guess_channel_axis(self) -> Hashable | None:
+    def guess_channel_axis(self) -> int | None:
         """Return the (best guess) axis name for the channel dimension."""
         # for arrays with labeled dimensions,
         # see if any of the dimensions are named "channel"
-        for dimkey, val in self.sizes().items():
+        for i, (dimkey, val) in enumerate(self.sizes().items()):
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
-                    return dimkey
+                    return i
 
         # for shaped arrays, use the smallest dimension as the channel axis
         shape = getattr(self._data, "shape", None)

@@ -73,13 +73,13 @@ class NDViewer(QWidget):
       with the `_dims_sliders.value()` method.  To programmatically set the current
       position, use the `setIndex` method. This will set the values of the sliders,
       which in turn will trigger the display of the new slice via the
-      `_update_data_for_index` method.
-    - `_update_data_for_index` is an asynchronous method that retrieves the data for
+      `_request_data_for_index` method.
+    - `_request_data_for_index` is an asynchronous method that retrieves the data for
       the given index from the datastore (using `_isel`) and queues the
-      `_on_data_slice_ready` method to be called when the data is ready. The logic
+      `_draw_chunk` method to be called when the data is ready. The logic
       for extracting data from the datastore is defined in `_data_wrapper.py`, which
       handles idiosyncrasies of different datastores (e.g. xarray, tensorstore, etc).
-    - `_on_data_slice_ready` is called when the data is ready, and updates the image.
+    - `_draw_chunk` is called when the data is ready, and updates the image.
       Note that if the slice is multidimensional, the data will be reduced to 2D using
       max intensity projection (and double-clicking on any given dimension slider will
       turn it into a range slider allowing a projection to be made over that dimension).
@@ -138,7 +138,7 @@ class NDViewer(QWidget):
         else:
             self._cmaps = DEFAULT_COLORMAPS
         self._cmap_cycle = cycle(self._cmaps)
-        # the last future that was created by _update_data_for_index
+        # the last future that was created by _request_data_for_index
         self._last_future: Future | None = None
 
         # number of dimensions to display
@@ -148,8 +148,8 @@ class NDViewer(QWidget):
             # IMPORTANT
             # chunking here will determine how non-visualized dims are reduced
             # so chunkshape will need to change based on the set of visualized dims
-            chunks=(1000, 1000, 64, 32),
-            on_ready=self._on_data_slice_ready,
+            chunks=32,
+            on_ready=self._draw_chunk,
         )
 
         # WIDGETS ----------------------------------------------------
@@ -180,7 +180,7 @@ class NDViewer(QWidget):
         # the sliders that control the index of the displayed image
         self._dims_sliders = DimsSliders(self)
         self._dims_sliders.valueChanged.connect(
-            qthrottled(self._update_data_for_index, 20, leading=True)
+            qthrottled(self._request_data_for_index, 20, leading=True)
         )
 
         self._lut_drop = QCollapsible("LUTs", self)
@@ -270,6 +270,12 @@ class NDViewer(QWidget):
         # store the data
         self._data_wrapper = DataWrapper.create(data)
         self._chunker.data_wrapper = self._data_wrapper
+        if chunks := self._data_wrapper.chunks():
+            # temp hack ... always group non-visible channels
+            chunks = list(chunks)
+            chunks[:-2] = (1000,) * len(chunks[:-2])
+            print(chunks)
+            self._chunker.chunks = tuple(chunks)
 
         # set channel axis
         self._channel_axis = self._data_wrapper.guess_channel_axis()
@@ -325,7 +331,7 @@ class NDViewer(QWidget):
         # clear image handles and redraw
         if self._img_handles:
             self._clear_images()
-            self._update_data_for_index(self._dims_sliders.value())
+            self._request_data_for_index(self._dims_sliders.value())
 
     def set_channel_mode(self, mode: ChannelMode | str | None = None) -> None:
         """Set the mode for displaying the channels.
@@ -359,7 +365,7 @@ class NDViewer(QWidget):
 
         if self._img_handles:
             self._clear_images()
-            self._update_data_for_index(self._dims_sliders.value())
+            self._request_data_for_index(self._dims_sliders.value())
 
     def set_current_index(self, index: Indices | None = None) -> None:
         """Set the index of the displayed image.
@@ -413,7 +419,7 @@ class NDViewer(QWidget):
             return val
         return 0
 
-    def _update_data_for_index(self, index: Indices) -> None:
+    def _request_data_for_index(self, index: Indices) -> None:
         """Retrieve data for `index` from datastore and update canvas image(s).
 
         This is the first step in updating the displayed image, it is triggered by
@@ -428,44 +434,8 @@ class NDViewer(QWidget):
         self._progress_spinner.show()
         self._chunker.request_index(index)
 
-        # indices = self._build_requests(index)
-        # if self._last_future:
-        #     self._last_future.cancel()
-
-        # try:
-        #     self._last_future = f = self._data_wrapper.isel_async(indices)
-        # except Exception as e:
-        #     raise type(e)(f"Failed to index data with {index}: {e}") from e
-
-        # self._progress_spinner.show()
-        # f.add_done_callback(self._on_data_slice_ready)
-
-    def closeEvent(self, a0: QCloseEvent | None) -> None:
-        self._chunker.shutdown()
-        super().closeEvent(a0)
-
     @ensure_main_thread  # type: ignore
-    def _on_data_slice_ready(self, response: ChunkResponse) -> None:
-        """Update the displayed image for the given index.
-
-        Connected to the future returned by _isel.
-        """
-        self._update_canvas_data(response)
-        return
-        # NOTE: removing the reference to the last future here is important
-        # because the future has a reference to this widget in its _done_callbacks
-        # which will prevent the widget from being garbage collected if the future
-        self._last_future = None
-        self._progress_spinner.hide()
-        if future.cancelled():
-            return
-
-        for idx, datum in future.result():
-            self._update_canvas_data(datum, idx)
-        self._canvas.refresh()
-
-    def _update_canvas_data(self, response: ChunkResponse) -> None:
-        # def _update_canvas_data(self, data: np.ndarray, index: Indices) -> None:
+    def _draw_chunk(self, response: ChunkResponse) -> None:
         """Actually update the image handle(s) with the (sliced) data.
 
         By this point, data should be sliced from the underlying datastore.  Any
@@ -473,6 +443,7 @@ class NDViewer(QWidget):
         (currently just 2D) will be reduced using max intensity projection (currently).
         """
         if response is RequestFinished:  # fix typing
+            print(">>>>>>>>>>>>> RequestFinished")
             self._progress_spinner.hide()
             return
 
@@ -482,17 +453,16 @@ class NDViewer(QWidget):
             channel_key = response.channel_index
         offset = response.offset
         datum = response.data
-
         if (
             channel_handles := self._img_handles[channel_key]
         ) and offset in channel_handles:
             handle = channel_handles[offset]
             handle.data = datum
         else:
-            cm = DEFAULT_COLORMAPS[channel_key]
+            cm = DEFAULT_COLORMAPS[channel_key]  # TODO
             if datum.ndim == 2:
                 handle = self._canvas.add_image(datum, cmap=cm, offset=offset)
-                handle.clim = (0, 45000)
+                handle.clim = (0, 100)
                 channel_handles[offset] = handle
             else:
                 raise NotImplementedError("Volume rendering not yet supported")
@@ -542,4 +512,8 @@ class NDViewer(QWidget):
 
     def _is_idle(self) -> bool:
         """Return True if no futures are running. Used for testing, and debugging."""
-        return self._last_future is None
+        return bool(self._chunker.pending_futures)
+
+    def closeEvent(self, a0: QCloseEvent | None) -> None:
+        self._chunker.shutdown()
+        super().closeEvent(a0)
