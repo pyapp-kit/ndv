@@ -13,6 +13,7 @@ class PImageHandle(Protocol):
     def data(self) -> np.ndarray: ...
     @data.setter
     def data(self, data: np.ndarray) -> None: ...
+    def set_data(self, data: np.ndarray, offset: tuple) -> None: ...
     @property
     def visible(self) -> bool: ...
     @visible.setter
@@ -44,11 +45,9 @@ class PCanvas(Protocol):
         self,
         data: np.ndarray | None = ...,
         cmap: cmap.Colormap | None = ...,
-        offset: tuple[float, float] | None = None,  # (Y, X)
     ) -> PImageHandle: ...
     def add_volume(
         self,
         data: np.ndarray | None = ...,
         cmap: cmap.Colormap | None = ...,
-        offset: tuple[float, float, float] | None = ...,  # (Z, Y, X)
     ) -> PImageHandle: ...

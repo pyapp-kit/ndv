@@ -85,9 +85,12 @@ class Chunker:
         # this needs to be aware of nvisible dimensions
         try:
             offset = tuple(int(getattr(sl, "start", sl)) for sl in idx)[-3:]
+            offset = (idx[0].start, idx[2].start, idx[3].start)
         except TypeError:
             offset = (0, 0, 0)
+        import time
 
+        time.sleep(0.05)
         return ChunkResponse(
             idx=idx, data=data, offset=offset, channel_index=channel_index
         )

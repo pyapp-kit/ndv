@@ -44,6 +44,10 @@ class VispyImageHandle:
             return
         self._visual.set_data(data)
 
+    def set_data(self, data: np.ndarray, offset: tuple) -> None:
+        print("Setting data", data.shape, offset)
+        self._visual._texture._set_data(data, offset=offset)
+
     @property
     def visible(self) -> bool:
         return bool(self._visual.visible)
@@ -161,7 +165,11 @@ class VispyViewerCanvas:
         offset: tuple[float, float, float] | None = None,  # (Z, Y, X)
     ) -> VispyImageHandle:
         vol = scene.visuals.Volume(
-            data, parent=self._view.scene, interpolation="nearest"
+            data,
+            parent=self._view.scene,
+            interpolation="nearest",
+            texture_format="auto",
+            clim=(0, 40000),
         )
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True

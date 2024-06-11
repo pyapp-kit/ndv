@@ -1,9 +1,19 @@
 from __future__ import annotations
 
 from itertools import cycle
-from typing import TYPE_CHECKING, Iterator, Literal, Mapping, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Hashable,
+    Literal,
+    MutableSequence,
+    Sequence,
+    SupportsIndex,
+    cast,
+    overload,
+)
 
 import cmap
+import numpy as np
 from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
@@ -23,7 +33,7 @@ from ._dims_slider import DimsSliders
 from ._lut_control import LutControl
 
 if TYPE_CHECKING:
-    from typing import Any, Hashable, Iterable, TypeAlias
+    from typing import Any, Iterable, TypeAlias
 
     from qtpy.QtGui import QCloseEvent
 
@@ -49,28 +59,40 @@ DEFAULT_COLORMAPS = [
 MONO_CHANNEL = -999999
 
 
-class Channel(Mapping[tuple, PImageHandle]):
-    def __init__(
-        self, ch_key: int, canvas: PCanvas, cmap: cmap.Colormap = GRAYS
-    ) -> None:
+class Channel(MutableSequence[PImageHandle]):
+    def __init__(self, ch_key: int, cmap: cmap.Colormap = GRAYS) -> None:
         self.ch_key = ch_key
-        self._handles: dict[Any, PImageHandle] = {}
+        self._handles: list[PImageHandle] = []
         self.cmap = cmap
 
-    def __getitem__(self, key: tuple) -> PImageHandle:
-        return self._handles[key]
+    @overload
+    def __getitem__(self, i: int) -> PImageHandle: ...
+    @overload
+    def __getitem__(self, i: slice) -> list[PImageHandle]: ...
+    def __getitem__(self, i: int | slice) -> PImageHandle | list[PImageHandle]:
+        return self._handles[i]
 
-    def __setitem__(self, key: tuple, value: PImageHandle) -> None:
-        self._handles[key] = value
+    @overload
+    def __setitem__(self, i: SupportsIndex, value: PImageHandle) -> None: ...
+    @overload
+    def __setitem__(self, i: slice, value: Iterable[PImageHandle]) -> None: ...
+    def __setitem__(
+        self, i: SupportsIndex | slice, value: PImageHandle | Iterable[PImageHandle]
+    ) -> None:
+        self._handles[i] = value  # type: ignore
 
-    def __iter__(self) -> Iterator[tuple]:
-        yield from self._handles
+    @overload
+    def __delitem__(self, i: int) -> None: ...
+    @overload
+    def __delitem__(self, i: slice) -> None: ...
+    def __delitem__(self, i: int | slice) -> None:
+        del self._handles[i]
 
     def __len__(self) -> int:
         return len(self._handles)
 
-    def __contains__(self, key: object) -> bool:
-        return key in self._handles
+    def insert(self, i: int, value: PImageHandle) -> None:
+        self._handles.insert(i, value)
 
 
 class NDViewer(QWidget):
@@ -169,7 +191,7 @@ class NDViewer(QWidget):
             # IMPORTANT
             # chunking here will determine how non-visualized dims are reduced
             # so chunkshape will need to change based on the set of visualized dims
-            chunks=32,
+            chunks=(20, 100, 32, 32),
             on_ready=self._draw_chunk,
         )
 
@@ -483,33 +505,31 @@ class NDViewer(QWidget):
         else:
             ch_key = chunk.channel_index
 
+        data = chunk.data
+        if data.ndim == 2:
+            return
         # TODO: Channel object creation could be moved.
         # having it here is the laziest... but means that the order of arrival
         # of the chunks will determine the order of the channels in the LUTS
         # (without additional logic to sort them by index, etc.)
-        if (channel := self._channels.get(ch_key)) is None:
-            channel = self._create_channel(ch_key)
+        if (handles := self._channels.get(ch_key)) is None:
+            handles = self._create_channel(ch_key)
 
-        data = chunk.data
-        if (offset := chunk.offset) in channel:
-            channel[offset].data = data
-        else:
-            print(f"{data.ndim=}")
+        if not handles:
             if data.ndim == 2:
-                _offset2 = (offset[-2], offset[-1]) if offset else None
-                handle = self._canvas.add_image(data, offset=_offset2)
+                handles.append(self._canvas.add_image(data, cmap=handles.cmap))
             elif data.ndim == 3:
-                _offset3 = (offset[-3], offset[-2], offset[-1]) if offset else None
-                handle = self._canvas.add_volume(data, offset=_offset3)
-            handle.cmap = channel.cmap
-            channel[offset] = handle
+                empty = np.empty((60, 256, 256), dtype=np.uint16)
+                handles.append(self._canvas.add_volume(empty, cmap=handles.cmap))
+
+        handles[0].set_data(data, chunk.offset)
         self._canvas.refresh()
 
     def _create_channel(self, ch_key: int) -> Channel:
         # improve this
         cmap = GRAYS if ch_key == MONO_CHANNEL else next(self._cmap_cycle)
 
-        self._channels[ch_key] = channel = Channel(ch_key, self._canvas, cmap=cmap)
+        self._channels[ch_key] = channel = Channel(ch_key, cmap=cmap)
         self._lut_ctrls[ch_key] = lut = LutControl(
             channel,
             f"Ch {ch_key}",
@@ -523,7 +543,7 @@ class NDViewer(QWidget):
     def _clear_images(self) -> None:
         """Remove all images from the canvas."""
         for handles in self._channels.values():
-            for handle in handles.values():
+            for handle in handles:
                 handle.remove()
         self._channels.clear()
 
