@@ -44,8 +44,11 @@ class VispyImageHandle:
             return
         self._visual.set_data(data)
 
+    def clear(self) -> None:
+        offset = (0,) * self.data.ndim
+        self.set_data(np.zeros(self.data.shape, dtype=self.data.dtype), offset)
+
     def set_data(self, data: np.ndarray, offset: tuple) -> None:
-        print("Setting data", data.shape, offset)
         self._visual._texture._set_data(data, offset=offset)
 
     @property
@@ -169,7 +172,6 @@ class VispyViewerCanvas:
             parent=self._view.scene,
             interpolation="nearest",
             texture_format="auto",
-            clim=(0, 40000),
         )
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
@@ -206,7 +208,6 @@ class VispyViewerCanvas:
         is_3d = isinstance(self._camera, scene.ArcballCamera)
         if is_3d:
             self._camera._quaternion = DEFAULT_QUATERNION
-        print("Setting range", x, y, z, margin)
         self._view.camera.set_range(x=x, y=y, z=z, margin=margin)
         if is_3d:
             max_size = max(self._current_shape)

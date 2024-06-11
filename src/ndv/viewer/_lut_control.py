@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     import cmap
 
-    from ._backends._protocols import PImageHandle
+    from ._backends.protocols import PImageHandle
 
 
 class CmapCombo(QColormapComboBox):

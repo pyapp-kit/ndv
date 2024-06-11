@@ -188,24 +188,24 @@ def _reduce_data_for_display(
     return data
 
 
-def _slice2range(sl: slice | int, dim_size: int) -> range:
+def _slice2range(sl: slice | int, dim_size: int) -> tuple[int, int]:
     """Convert slice to range, handling single int as well.
 
     Examples
     --------
     >>> _slice2range(3, 10)
-    range(3, 4)
+    (3, 4)
     """
     if isinstance(sl, int):
-        return range(sl, sl + 1)
+        return (sl, sl + 1)
     start = 0 if sl.start is None else max(sl.start, 0)
     stop = dim_size if sl.stop is None else min(sl.stop, dim_size)
-    return range(start, stop)
+    return (start, stop)
 
 
 def iter_chunk_aligned_slices(
     shape: Sequence[int],
-    chunks: Sequence[int],
+    chunks: int | Sequence[int],
     slices: Sequence[int | slice | EllipsisType],
 ) -> Iterator[tuple[slice, ...]]:
     """Yield chunk-aligned slices for a given shape and slices.
@@ -236,7 +236,9 @@ def iter_chunk_aligned_slices(
 
     Examples
     --------
-    >>> list(iter_chunk_aligned_slices(shape=(6, 6), chunks=4, (slice(1, 4), ...)))
+    >>> list(
+    ...     iter_chunk_aligned_slices(shape=(6, 6), chunks=4, slices=(slice(1, 4), ...))
+    ... )
     [
         (slice(1, 4, None), slice(0, 4, None)),
         (slice(1, 4, None), slice(4, 6, None)),
@@ -260,6 +262,8 @@ def iter_chunk_aligned_slices(
     """
     # Make chunks same length as shape if single int
     ndim = len(shape)
+    if isinstance(chunks, int):
+        chunks = (chunks,) * ndim
     if any(x == 0 for x in chunks):
         raise ValueError("Chunk size must be greater than zero")
 
@@ -284,16 +288,17 @@ def iter_chunk_aligned_slices(
 
     # Generate indices for each dimension that align with chunks
     aligned_ranges = (
-        range(r.start - (r.start % ch), r.stop, ch) for r, ch in zip(ranges, chunks)
+        range(start - (start % chunk_size), stop, chunk_size)
+        for (start, stop), chunk_size in zip(ranges, chunks)
     )
 
     # Create all combinations of these aligned ranges
     for indices in product(*aligned_ranges):
         chunk_slices = []
-        for idx, rng, ch in zip(indices, ranges, chunks):
+        for idx, (start, stop), ch in zip(indices, ranges, chunks):
             # Calculate the actual slice for each dimension
-            start = max(rng.start, idx)
-            stop = min(rng.stop, idx + ch)
+            start = max(start, idx)
+            stop = min(stop, idx + ch)
             if start >= stop:  # Skip empty slices
                 break
             chunk_slices.append(slice(start, stop))

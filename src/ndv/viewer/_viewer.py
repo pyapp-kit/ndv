@@ -27,7 +27,7 @@ from ndv.viewer._components import (
 )
 
 from ._backends import get_canvas
-from ._backends._protocols import PImageHandle
+from ._backends.protocols import PImageHandle
 from ._data_wrapper import DataWrapper
 from ._dims_slider import DimsSliders
 from ._lut_control import LutControl
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
     from qtpy.QtGui import QCloseEvent
 
-    from ._backends._protocols import PCanvas
+    from ._backends.protocols import PCanvas
     from ._dims_slider import DimKey, Indices, Sizes
 
     ImgKey: TypeAlias = Hashable

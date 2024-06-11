@@ -1,11 +1,11 @@
 import numpy as np
 
 import ndv
-from ndv._chunking import Slicer
+from ndv._chunking import Chunker
 
 data = np.random.rand(10, 3, 8, 5, 128, 128)
 wrapper = ndv.DataWrapper.create(data)
-slicer = Slicer(wrapper, chunks=(5, 1, 2, 2, 64, 34))
+slicer = Chunker(wrapper, chunks=(5, 1, 2, 2, 64, 34))
 
 index = {0: 2, 1: 2, 2: 0, 3: 4}
 idx = wrapper.to_conventional(index)

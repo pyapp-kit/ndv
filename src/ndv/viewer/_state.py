@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Mapping, Protocol, Sequence
+from typing import TYPE_CHECKING, Literal, Mapping, Protocol, Sequence
 
 import numpy as np
 
@@ -60,64 +60,12 @@ class ViewerState:
     # default colormap to use for channel [0, 1, 2, ...]
     colormap_options: Sequence[cmap._colormap.ColorStopsLike] = ("gray",)
 
+    @property
+    def ndim(self) -> Literal[2, 3]:
+        return 2 if len(self.visualized_indices) == 2 else 3
+
 
 class Reducer(Protocol):
     def __call__(
         self, data: np.ndarray, /, *, axis: int | tuple[int, ...] | None
     ) -> np.ndarray | float: ...
-
-
-class NDViewer:
-    def __init__(self, data: Any, state: ViewerState | None) -> None:
-        self._state = state or ViewerState()
-        if data is not None:
-            self.set_data(data)
-
-    @property
-    def data(self) -> Any:
-        raise NotImplementedError
-
-    def set_data(self, data: Any) -> None: ...
-
-    @property
-    def state(self) -> ViewerState:
-        return self._state
-
-    def set_state(self, state: ViewerState) -> None:
-        # validate...
-        self._state = state
-
-    def set_visualized_indices(self, indices: tuple[DimKey, DimKey]) -> None:
-        """Set which indices are visualized."""
-        if self._state.channel_index in indices:
-            raise ValueError(
-                f"channel index ({self._state.channel_index!r}) cannot be in visualized"
-                f"indices: {indices}"
-            )
-        self._state.visualized_indices = indices
-        self.refresh()
-
-    def set_channel_index(self, index: DimKey | None) -> None:
-        """Set the channel index."""
-        if index in self._state.visualized_indices:
-            # consider alternatives to raising.
-            # e.g. if len(visualized_indices) == 3, then we could pop index
-            raise ValueError(
-                f"channel index ({index!r}) cannot be in visualized indices: "
-                f"{self._state.visualized_indices}"
-            )
-        self._state.channel_index = index
-        self.refresh()
-
-    def set_current_index(self, index: Mapping[DimKey, Index]) -> None:
-        """Set the currentl displayed index."""
-        self._state.current_index = index
-        self.refresh()
-
-    def refresh(self) -> None:
-        """Refresh the viewer."""
-        index = self._state.current_index
-        self._chunker.request_index(index)
-
-    @ensure_main_thread  # type: ignore
-    def _draw_chunk(self, chunk: ChunkResponse) -> None:
