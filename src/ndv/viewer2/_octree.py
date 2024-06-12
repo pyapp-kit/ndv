@@ -1,4 +1,4 @@
-from typing import Any, Generic, Iterator, NamedTuple, TypeVar
+from typing import Generic, Iterator, NamedTuple, TypeVar
 
 MAX_DEPTH = 8
 
