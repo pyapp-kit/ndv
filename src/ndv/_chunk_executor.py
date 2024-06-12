@@ -204,20 +204,21 @@ def indexers_to_conventional_slice(
     return tuple(indexers.get(k, slice(None)) for k in range(ndim))
 
 
-def _slice2range(sl: SupportsIndex | slice, dim_size: int) -> tuple[int, int]:
-    """Convert slice to range, handling single int as well.
+def _slice_indices(sl: SupportsIndex | slice, dim_size: int) -> tuple[int, int, int]:
+    """Convert slice to range arguments, handling single int as well.
 
     Examples
     --------
     >>> _slice2range(3, 10)
-    (3, 4)
+    (3, 4, 1)
+    >>> _slice2range(slice(1, 4), 10)
+    (1, 4, 1)
+    >>> _slice2range(slice(1, None), 10)
+    (1, 10, 1)
     """
-    if not isinstance(sl, slice):
-        idx = sl.__index__()
-        return (idx, idx + 1)
-    start = 0 if sl.start is None else max(sl.start, 0)
-    stop = dim_size if sl.stop is None else min(sl.stop, dim_size)
-    return (start, stop)
+    if isinstance(sl, slice):
+        return sl.indices(dim_size)
+    return (sl.__index__(), sl.__index__() + 1, 1)
 
 
 def iter_chunk_aligned_slices(
@@ -307,24 +308,24 @@ def iter_chunk_aligned_slices(
         slices = slices + (slice(None),) * (ndim - len(slices))
 
     # Create ranges for each dimension based on the slices provided
-    ranges = [_slice2range(sl, dim) for sl, dim in zip(slices, shape)]
+    ranges = [_slice_indices(sl, dim) for sl, dim in zip(slices, shape)]
 
     # Generate indices for each dimension that align with chunks
     aligned_ranges = (
         range(start - (start % chunk_size), stop, chunk_size)
-        for (start, stop), chunk_size in zip(ranges, chunks)
+        for (start, stop, _), chunk_size in zip(ranges, chunks)
     )
 
     # Create all combinations of these aligned ranges
     for indices in product(*aligned_ranges):
         chunk_slices = []
-        for idx, (start, stop), ch in zip(indices, ranges, chunks):
+        for idx, (start, stop, step), ch in zip(indices, ranges, chunks):
             # Calculate the actual slice for each dimension
             start = max(start, idx)
             stop = min(stop, idx + ch)
             if start >= stop:  # Skip empty slices
                 break
-            chunk_slices.append(slice(start, stop))
+            chunk_slices.append(slice(start, stop, step))
         else:
             # Only add this combination of slices if all dimensions are valid
             yield tuple(chunk_slices)

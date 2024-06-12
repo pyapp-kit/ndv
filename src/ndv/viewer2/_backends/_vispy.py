@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
 import vispy
+import vispy.gloo
 import vispy.scene
 import vispy.visuals
 from superqt.utils import qthrottled
@@ -14,6 +15,8 @@ from vispy.util.quaternion import Quaternion
 
 if TYPE_CHECKING:
     import cmap
+    import vispy.gloo.glir
+    import vispy.gloo.texture
     from qtpy.QtWidgets import QWidget
     from vispy.scene.events import SceneMouseEvent
 
@@ -22,9 +25,9 @@ DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
 
 
 class VispyImageHandle:
-    def __init__(self, visual: scene.visuals.Image | scene.visuals.Volume) -> None:
+    def __init__(self, visual: scene.Image | scene.Volume) -> None:
         self._visual = visual
-        self._ndim = 2 if isinstance(visual, scene.visuals.Image) else 3
+        self._ndim = 2 if isinstance(visual, scene.Image) else 3
 
     @property
     def data(self) -> np.ndarray:
@@ -43,6 +46,25 @@ class VispyImageHandle:
             )
             return
         self._visual.set_data(data)
+
+    def clear(self) -> None:
+        offset = (0,) * self.data.ndim
+        self.directly_set_texture_offset(
+            np.zeros(self.data.shape, dtype=self.data.dtype), offset
+        )
+
+    def directly_set_texture_offset(self, data: np.ndarray, offset: tuple) -> None:
+        """LOW-LEVEL: Set the texture data at offset directly.
+
+        We are bypassing all data transformations and checks here, so data *must* be
+        the correct shape and dtype.
+        """
+        if self._ndim == 3:
+            if data.ndim == 3:
+                data = data.reshape((*data.shape, 1))
+            texture = cast("vispy.gloo.texture.Texture3D", self._visual._texture)
+            queue = cast("vispy.gloo.glir.GlirQueue", texture._glir)
+            queue.command("DATA", texture._id, offset, data)
 
     @property
     def visible(self) -> bool:
@@ -132,12 +154,19 @@ class VispyViewerCanvas:
         self._canvas.update()
 
     def add_image(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        offset: tuple[float, float] | None = None,  # (Y, X)
     ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         img = scene.visuals.Image(data, parent=self._view.scene)
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
+
+        if offset:
+            img.transform = scene.STTransform(translate=offset[::-1])
+
         if data is not None:
             self._current_shape, prev_shape = data.shape, self._current_shape
             if not prev_shape:
@@ -148,13 +177,22 @@ class VispyViewerCanvas:
         return handle
 
     def add_volume(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        offset: tuple[float, float, float] | None = None,  # (Z, Y, X)
     ) -> VispyImageHandle:
         vol = scene.visuals.Volume(
-            data, parent=self._view.scene, interpolation="nearest"
+            data,
+            parent=self._view.scene,
+            interpolation="nearest",
+            texture_format="auto",
         )
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
+        if offset:
+            vol.transform = scene.STTransform(translate=offset[::-1])
+
         if data is not None:
             self._current_shape, prev_shape = data.shape, self._current_shape
             if len(prev_shape) != 3:

@@ -6,12 +6,12 @@ from superqt import ensure_main_thread
 from superqt.utils import qthrottled
 
 from ndv._chunk_executor import Chunker, ChunkFuture
-from ndv.viewer._backends import get_canvas
-from ndv.viewer._dims_slider import DimsSliders
-from ndv.viewer._state import ViewerState
+from ndv.viewer2._backends import get_canvas
+from ndv.viewer2._dims_slider import DimsSliders
+from ndv.viewer2._state import ViewerState
 
 if TYPE_CHECKING:
-    from ndv.viewer._backends.protocols import PCanvas, PImageHandle
+    from ndv.viewer2._backends.protocols import PCanvas, PImageHandle
 
 
 class NDViewer(QWidget):
@@ -72,7 +72,7 @@ class NDViewer(QWidget):
 
         # determine chunk shape
         # only visualized dimensions are chunked
-        chunk_size = 64  # TODO: pick bettter
+        chunk_size = 128  # TODO: pick bettter
         chunk_shape: list[int | None] = [None] * ndim
         visualized = [self._norm_index(dim) for dim in self._state.visualized_indices]
         for dim in range(ndim):
@@ -87,7 +87,6 @@ class NDViewer(QWidget):
         if not index:
             return
 
-        print("requesting data for index", index, chunk_shape)
         # clear existing handles
         for handle in self._channels.values():
             handle.clear()
@@ -137,6 +136,8 @@ class NDViewer(QWidget):
             print("err in clim: ", e)
             handle.clim = (0, 5000)
 
+        print(">>draw:")
+        print(f"  data: {data.shape} @ {offset}")
         handle.directly_set_texture_offset(data, offset)
         self._canvas.refresh()
 

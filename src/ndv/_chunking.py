@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from types import EllipsisType
     from typing import Callable, Iterable, Iterator, TypeAlias
 
-    from .viewer._data_wrapper import DataWrapper
+    from .viewer2._data_wrapper import DataWrapper
 
 # any hashable represent a single dimension in an ND array
 DimKey: TypeAlias = Hashable

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import sys
+import warnings
 from abc import abstractmethod
-from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
 from typing import (
     TYPE_CHECKING,
@@ -13,7 +13,6 @@ from typing import (
     Container,
     Generic,
     Hashable,
-    Iterable,
     Iterator,
     Mapping,
     Sequence,
@@ -58,7 +57,7 @@ ArrayT = TypeVar("ArrayT")
 _T = TypeVar("_T", bound=type)
 
 # Global executor for slice requests
-_EXECUTOR = ThreadPoolExecutor(max_workers=2)
+# _EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 
 def _recurse_subclasses(cls: _T) -> Iterator[_T]:
@@ -102,13 +101,6 @@ class DataWrapper(Generic[ArrayT]):
                     return subclass(data)
         raise NotImplementedError(f"Don't know how to wrap type {type(data)}")
 
-    def __init__(self, data: ArrayT) -> None:
-        self._data = data
-
-    @property
-    def data(self) -> ArrayT:
-        return self._data
-
     @classmethod
     @abstractmethod
     def supports(cls, obj: Any) -> bool:
@@ -119,38 +111,74 @@ class DataWrapper(Generic[ArrayT]):
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def isel(self, indexers: Indices) -> np.ndarray:
-        """Select a slice from a data store using (possibly) named indices.
+    def __init__(self, data: ArrayT) -> None:
+        self._data = data
+        self._name2index: dict[str, int] = {}
+        if names := self.dimension_names():
+            self._name2index = {name: i for i, name in enumerate(names)}
 
-        This follows the xarray-style indexing, where indexers is a mapping of
-        dimension names to indices or slices.  Subclasses should implement this
-        method to return a numpy array.
-        """
-        raise NotImplementedError
+    @property
+    def data(self) -> ArrayT:
+        return self._data
 
-    def isel_async(
-        self, indexers: list[Indices]
-    ) -> Future[Iterable[tuple[Indices, np.ndarray]]]:
-        """Asynchronous version of isel."""
-        return _EXECUTOR.submit(lambda: [(idx, self.isel(idx)) for idx in indexers])
+    # @abstractmethod
+    # def isel(self, indexers: Indices) -> np.ndarray:
+    #     """Select a slice from a data store using (possibly) named indices.
 
-    def guess_channel_axis(self) -> Hashable | None:
+    #     This follows the xarray-style indexing, where indexers is a mapping of
+    #     dimension names to indices or slices.  Subclasses should implement this
+    #     method to return a numpy array.
+    #     """
+    #     raise NotImplementedError
+
+    def shape(self) -> tuple[int, ...]:
+        return self._data.shape  # type: ignore
+
+    def __getitem__(self, index: tuple[int | slice, ...]) -> np.ndarray:
+        # reimplement in subclasses
+        return np.asarray(self._data[index])  # type: ignore [index]
+
+    def chunks(self) -> tuple[int, ...] | int | None:
+        if chunks := getattr(self._data, "chunks", None):
+            if isinstance(chunks, Sequence) and all(isinstance(x, int) for x in chunks):
+                return tuple(chunks)
+            warnings.warn(
+                f"Unexpected chunks attribute: {chunks!r}. Ignoring.", stacklevel=2
+            )
+        return None
+
+    def dimension_names(self) -> tuple[str, ...] | None:
+        """Return the names of the dimensions of the data."""
+        return None
+
+    def to_conventional(self, indexers: Indices) -> tuple[int | slice, ...]:
+        """Convert named indices to a tuple of integers and slices."""
+        _indexers = {self._name2index.get(str(k), k): v for k, v in indexers.items()}
+        return tuple(_indexers.get(k, slice(None)) for k in range(len(self.shape())))
+
+    # def isel_async(
+    #     self, indexers: list[Indices]
+    # ) -> Future[Iterable[tuple[Indices, np.ndarray]]]:
+    #     """Asynchronous version of isel."""
+    #     return _EXECUTOR.submit(lambda: [(idx, self.isel(idx)) for idx in indexers])
+
+    def guess_channel_axis(self) -> int | None:
         """Return the (best guess) axis name for the channel dimension."""
         # for arrays with labeled dimensions,
         # see if any of the dimensions are named "channel"
-        for dimkey, val in self.sizes().items():
-            if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
-                if val <= self.MAX_CHANNELS:
-                    return dimkey
+        shape = self.shape()
+        if names := self.dimension_names():
+            for ax, name in enumerate(names):
+                if (
+                    name.lower() in self.COMMON_CHANNEL_NAMES
+                    and shape[ax] <= self.MAX_CHANNELS
+                ):
+                    return ax
 
         # for shaped arrays, use the smallest dimension as the channel axis
-        shape = getattr(self._data, "shape", None)
-        if isinstance(shape, Sequence):
-            with suppress(ValueError):
-                smallest_dim = min(shape)
-                if smallest_dim <= self.MAX_CHANNELS:
-                    return shape.index(smallest_dim)
+        with suppress(ValueError):
+            if (smallest_dim := min(shape)) <= self.MAX_CHANNELS:
+                return shape.index(smallest_dim)
         return None
 
     def save_as_zarr(self, save_loc: str | Path) -> None:
@@ -164,13 +192,10 @@ class DataWrapper(Generic[ArrayT]):
         (`dims` is used by xarray, `names` is used by torch, etc...). If no labels
         are found, the dimensions are just named by their integer index.
         """
-        shape = getattr(self._data, "shape", None)
-        if not isinstance(shape, Sequence) or not all(
-            isinstance(x, int) for x in shape
-        ):
-            raise NotImplementedError(f"Cannot determine sizes for {type(self._data)}")
-        dims = range(len(shape))
-        return {dim: int(size) for dim, size in zip(dims, shape)}
+        shape = self.shape()
+        if (names := self.dimension_names()) and len(names) == len(shape):
+            return dict(zip(names, shape))
+        return dict(enumerate(shape))
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""
@@ -245,8 +270,15 @@ class ArrayLikeWrapper(DataWrapper, Generic[ArrayT]):
     PRIORITY = 100
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        idx = tuple(indexers.get(k, slice(None)) for k in range(len(self._data.shape)))
-        return self._asarray(self._data[idx])
+        idx = []
+        for k in range(len(self._data.shape)):
+            i = indexers.get(k, slice(None))
+            if isinstance(i, int):
+                idx.extend([i, None])
+            else:
+                idx.append(i)
+
+        return self._asarray(self._data[tuple(idx)])
 
     def _asarray(self, data: npt.ArrayLike) -> np.ndarray:
         return np.asarray(data)

@@ -9,23 +9,23 @@ def test_iter_chunk_aligned_slices() -> None:
         shape=(10, 9), chunks=(4, 3), slices=np.index_exp[3:9, 1:None]
     )
     assert list(x) == [
-        (slice(3, 4, None), slice(1, 3, None)),
-        (slice(3, 4, None), slice(3, 6, None)),
-        (slice(3, 4, None), slice(6, 9, None)),
-        (slice(4, 8, None), slice(1, 3, None)),
-        (slice(4, 8, None), slice(3, 6, None)),
-        (slice(4, 8, None), slice(6, 9, None)),
-        (slice(8, 9, None), slice(1, 3, None)),
-        (slice(8, 9, None), slice(3, 6, None)),
-        (slice(8, 9, None), slice(6, 9, None)),
+        (slice(3, 4, 1), slice(1, 3, 1)),
+        (slice(3, 4, 1), slice(3, 6, 1)),
+        (slice(3, 4, 1), slice(6, 9, 1)),
+        (slice(4, 8, 1), slice(1, 3, 1)),
+        (slice(4, 8, 1), slice(3, 6, 1)),
+        (slice(4, 8, 1), slice(6, 9, 1)),
+        (slice(8, 9, 1), slice(1, 3, 1)),
+        (slice(8, 9, 1), slice(3, 6, 1)),
+        (slice(8, 9, 1), slice(6, 9, 1)),
     ]
 
     # this one tests that slices doesn't need to be the same length as shape
     # ... is added at the end
     y = iter_chunk_aligned_slices(shape=(6, 6), chunks=4, slices=np.index_exp[1:4])
     assert list(y) == [
-        (slice(1, 4, None), slice(0, 4, None)),
-        (slice(1, 4, None), slice(4, 6, None)),
+        (slice(1, 4, 1), slice(0, 4, 1)),
+        (slice(1, 4, 1), slice(4, 6, 1)),
     ]
 
     # this tests ellipsis in the middle
@@ -33,8 +33,8 @@ def test_iter_chunk_aligned_slices() -> None:
         shape=(3, 3, 3), chunks=2, slices=np.index_exp[1, ..., :2]
     )
     assert list(z) == [
-        (slice(1, 2, None), slice(0, 2, None), slice(0, 2, None)),
-        (slice(1, 2, None), slice(2, 3, None), slice(0, 2, None)),
+        (slice(1, 2, 1), slice(0, 2, 1), slice(0, 2, 1)),
+        (slice(1, 2, 1), slice(2, 3, 1), slice(0, 2, 1)),
     ]
 
 
@@ -57,7 +57,7 @@ def test_chunker() -> None:
     new = np.empty_like(data2[0])
     for future in futures:
         result = future.result()
-        new[result.array_location[1:]] = result.data
+        new[result.location[1:]] = result.data
     npt.assert_array_equal(new, data2[0])
 
 

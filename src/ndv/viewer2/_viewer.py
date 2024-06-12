@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from itertools import cycle
-from typing import TYPE_CHECKING, Literal, cast
+from typing import (
+    TYPE_CHECKING,
+    Hashable,
+    Literal,
+    MutableSequence,
+    Sequence,
+    SupportsIndex,
+    cast,
+    overload,
+)
 
 import cmap
 import numpy as np
@@ -10,7 +18,8 @@ from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidge
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
 
-from ndv.viewer._components import (
+from ndv._chunking import Chunker, ChunkResponse, RequestFinished
+from ndv.viewer2._components import (
     ChannelMode,
     ChannelModeButton,
     DimToggleButton,
@@ -18,17 +27,17 @@ from ndv.viewer._components import (
 )
 
 from ._backends import get_canvas
+from ._backends.protocols import PImageHandle
 from ._data_wrapper import DataWrapper
 from ._dims_slider import DimsSliders
 from ._lut_control import LutControl
 
 if TYPE_CHECKING:
-    from concurrent.futures import Future
-    from typing import Any, Callable, Hashable, Iterable, Sequence, TypeAlias
+    from typing import Any, Iterable, TypeAlias
 
     from qtpy.QtGui import QCloseEvent
 
-    from ._backends._protocols import PCanvas, PImageHandle
+    from ._backends.protocols import PCanvas
     from ._dims_slider import DimKey, Indices, Sizes
 
     ImgKey: TypeAlias = Hashable
@@ -47,7 +56,43 @@ DEFAULT_COLORMAPS = [
     cmap.Colormap("cubehelix"),
     cmap.Colormap("gray"),
 ]
-ALL_CHANNELS = slice(None)
+MONO_CHANNEL = -999999
+
+
+class Channel(MutableSequence[PImageHandle]):
+    def __init__(self, ch_key: int, cmap: cmap.Colormap = GRAYS) -> None:
+        self.ch_key = ch_key
+        self._handles: list[PImageHandle] = []
+        self.cmap = cmap
+
+    @overload
+    def __getitem__(self, i: int) -> PImageHandle: ...
+    @overload
+    def __getitem__(self, i: slice) -> list[PImageHandle]: ...
+    def __getitem__(self, i: int | slice) -> PImageHandle | list[PImageHandle]:
+        return self._handles[i]
+
+    @overload
+    def __setitem__(self, i: SupportsIndex, value: PImageHandle) -> None: ...
+    @overload
+    def __setitem__(self, i: slice, value: Iterable[PImageHandle]) -> None: ...
+    def __setitem__(
+        self, i: SupportsIndex | slice, value: PImageHandle | Iterable[PImageHandle]
+    ) -> None:
+        self._handles[i] = value  # type: ignore
+
+    @overload
+    def __delitem__(self, i: int) -> None: ...
+    @overload
+    def __delitem__(self, i: slice) -> None: ...
+    def __delitem__(self, i: int | slice) -> None:
+        del self._handles[i]
+
+    def __len__(self) -> int:
+        return len(self._handles)
+
+    def insert(self, i: int, value: PImageHandle) -> None:
+        self._handles.insert(i, value)
 
 
 class NDViewer(QWidget):
@@ -73,13 +118,13 @@ class NDViewer(QWidget):
       with the `_dims_sliders.value()` method.  To programmatically set the current
       position, use the `setIndex` method. This will set the values of the sliders,
       which in turn will trigger the display of the new slice via the
-      `_update_data_for_index` method.
-    - `_update_data_for_index` is an asynchronous method that retrieves the data for
+      `_request_data_for_index` method.
+    - `_request_data_for_index` is an asynchronous method that retrieves the data for
       the given index from the datastore (using `_isel`) and queues the
-      `_on_data_slice_ready` method to be called when the data is ready. The logic
+      `_draw_chunk` method to be called when the data is ready. The logic
       for extracting data from the datastore is defined in `_data_wrapper.py`, which
       handles idiosyncrasies of different datastores (e.g. xarray, tensorstore, etc).
-    - `_on_data_slice_ready` is called when the data is ready, and updates the image.
+    - `_draw_chunk` is called when the data is ready, and updates the image.
       Note that if the slice is multidimensional, the data will be reduced to 2D using
       max intensity projection (and double-clicking on any given dimension slider will
       turn it into a range slider allowing a projection to be made over that dimension).
@@ -111,7 +156,7 @@ class NDViewer(QWidget):
         *,
         colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
         parent: QWidget | None = None,
-        channel_axis: DimKey | None = None,
+        channel_axis: int | None = None,
         channel_mode: ChannelMode | str = ChannelMode.MONO,
     ):
         super().__init__(parent=parent)
@@ -119,13 +164,16 @@ class NDViewer(QWidget):
         # ATTRIBUTES ----------------------------------------------------
 
         # mapping of key to a list of objects that control image nodes in the canvas
-        self._img_handles: defaultdict[ImgKey, list[PImageHandle]] = defaultdict(list)
+        self._channels: dict[int, Channel] = {}
+
         # mapping of same keys to the LutControl objects control image display props
-        self._lut_ctrls: dict[ImgKey, LutControl] = {}
-        # the set of dimensions we are currently visualizing (e.g. XY)
+        self._lut_ctrls: dict[int, LutControl] = {}
+
+        # the set of dimensions we are currently visualizing (e.g. (-2, -1) for 2D)
         # this is used to control which dimensions have sliders and the behavior
         # of isel when selecting data from the datastore
         self._visualized_dims: set[DimKey] = set()
+
         # the axis that represents the channels in the data
         self._channel_axis = channel_axis
         self._channel_mode: ChannelMode = None  # type: ignore # set in set_channel_mode
@@ -135,11 +183,17 @@ class NDViewer(QWidget):
         else:
             self._cmaps = DEFAULT_COLORMAPS
         self._cmap_cycle = cycle(self._cmaps)
-        # the last future that was created by _update_data_for_index
-        self._last_future: Future | None = None
 
         # number of dimensions to display
         self._ndims: Literal[2, 3] = 2
+        self._chunker = Chunker(
+            None,
+            # IMPORTANT
+            # chunking here will determine how non-visualized dims are reduced
+            # so chunkshape will need to change based on the set of visualized dims
+            chunks=(20, 100, 32, 32),
+            on_ready=self._draw_chunk,
+        )
 
         # WIDGETS ----------------------------------------------------
 
@@ -169,7 +223,7 @@ class NDViewer(QWidget):
         # the sliders that control the index of the displayed image
         self._dims_sliders = DimsSliders(self)
         self._dims_sliders.valueChanged.connect(
-            qthrottled(self._update_data_for_index, 20, leading=True)
+            qthrottled(self._request_data_for_index, 20, leading=True)
         )
 
         self._lut_drop = QCollapsible("LUTs", self)
@@ -257,10 +311,19 @@ class NDViewer(QWidget):
             the initial index will be set to the middle of the data.
         """
         # store the data
+        self._clear_images()
+
         self._data_wrapper = DataWrapper.create(data)
+        self._chunker.data_wrapper = self._data_wrapper
+        if chunks := self._data_wrapper.chunks():
+            # temp hack ... always group non-visible channels
+            chunks = list(chunks)
+            chunks[:-2] = (1000,) * len(chunks[:-2])
+            self._chunker.chunks = tuple(chunks)
 
         # set channel axis
         self._channel_axis = self._data_wrapper.guess_channel_axis()
+        self._chunker.channel_axis = self._channel_axis
 
         # update the dimensions we are visualizing
         sizes = self._data_wrapper.sizes()
@@ -273,12 +336,13 @@ class NDViewer(QWidget):
 
         # redraw
         if initial_index is None:
-            idx = {k: int(v // 2) for k, v in sizes.items()}
+            idx = {k: int(v // 2) for k, v in sizes.items() if k not in visualized_dims}
         else:
             if not isinstance(initial_index, dict):  # pragma: no cover
                 raise TypeError("initial_index must be a dict")
             idx = initial_index
         self.set_current_index(idx)
+
         # update the data info label
         self._data_info_label.setText(self._data_wrapper.summary_info())
 
@@ -310,9 +374,9 @@ class NDViewer(QWidget):
             self._dims_sliders.set_dimension_visible(dim3, True if ndim == 2 else False)
 
         # clear image handles and redraw
-        if self._img_handles:
+        if self._channels:
             self._clear_images()
-            self._update_data_for_index(self._dims_sliders.value())
+            self._request_data_for_index(self._dims_sliders.value())
 
     def set_channel_mode(self, mode: ChannelMode | str | None = None) -> None:
         """Set the mode for displaying the channels.
@@ -344,9 +408,9 @@ class NDViewer(QWidget):
                 self._channel_axis, mode != ChannelMode.COMPOSITE
             )
 
-        if self._img_handles:
+        if self._channels:
             self._clear_images()
-            self._update_data_for_index(self._dims_sliders.value())
+            self._request_data_for_index(self._dims_sliders.value())
 
     def set_current_index(self, index: Indices | None = None) -> None:
         """Set the index of the displayed image.
@@ -400,137 +464,88 @@ class NDViewer(QWidget):
             return val
         return 0
 
-    def _update_data_for_index(self, index: Indices) -> None:
+    def _request_data_for_index(self, index: Indices) -> None:
         """Retrieve data for `index` from datastore and update canvas image(s).
+
+        This is the first step in updating the displayed image, it is triggered by
+        the valueChanged signal from the sliders.
 
         This will pull the data from the datastore using the given index, and update
         the image handle(s) with the new data.  This method is *asynchronous*.  It
         makes a request for the new data slice and queues _on_data_future_done to be
         called when the data is ready.
         """
+        print(f"\n--------\nrequesting index {index}", self._channel_axis)
         if (
-            self._channel_axis is not None
-            and self._channel_mode == ChannelMode.COMPOSITE
-            and self._channel_axis in (sizes := self._data_wrapper.sizes())
+            self._channel_mode == ChannelMode.COMPOSITE
+            and self._channel_axis is not None
         ):
-            indices: list[Indices] = [
-                {**index, self._channel_axis: i}
-                for i in range(sizes[self._channel_axis])
-            ]
-        else:
-            indices = [index]
-
-        if self._last_future:
-            self._last_future.cancel()
-
-        # don't request any dimensions that are not visualized
-        indices = [
-            {k: v for k, v in idx.items() if k not in self._visualized_dims}
-            for idx in indices
-        ]
-        try:
-            self._last_future = f = self._data_wrapper.isel_async(indices)
-        except Exception as e:
-            raise type(e)(f"Failed to index data with {index}: {e}") from e
-
+            index = {**index, self._channel_axis: slice(None)}
         self._progress_spinner.show()
-        f.add_done_callback(self._on_data_slice_ready)
-
-    def closeEvent(self, a0: QCloseEvent | None) -> None:
-        if self._last_future is not None:
-            self._last_future.cancel()
-            self._last_future = None
-        super().closeEvent(a0)
+        # TODO: don't request channels not being displayed
+        # TODO: don't request if the data is already in the cache
+        self._chunker.request_index(index, ndims=self._ndims)
 
     @ensure_main_thread  # type: ignore
-    def _on_data_slice_ready(
-        self, future: Future[Iterable[tuple[Indices, np.ndarray]]]
-    ) -> None:
-        """Update the displayed image for the given index.
-
-        Connected to the future returned by _isel.
-        """
-        # NOTE: removing the reference to the last future here is important
-        # because the future has a reference to this widget in its _done_callbacks
-        # which will prevent the widget from being garbage collected if the future
-        self._last_future = None
-        self._progress_spinner.hide()
-        if future.cancelled():
-            return
-
-        for idx, datum in future.result():
-            self._update_canvas_data(datum, idx)
-        self._canvas.refresh()
-
-    def _update_canvas_data(self, data: np.ndarray, index: Indices) -> None:
+    def _draw_chunk(self, chunk: ChunkResponse) -> None:
         """Actually update the image handle(s) with the (sliced) data.
 
         By this point, data should be sliced from the underlying datastore.  Any
         dimensions remaining that are more than the number of visualized dimensions
         (currently just 2D) will be reduced using max intensity projection (currently).
         """
-        imkey = self._image_key(index)
-        datum = self._reduce_data_for_display(data)
-        if handles := self._img_handles[imkey]:
-            for handle in handles:
-                handle.data = datum
-            if ctrl := self._lut_ctrls.get(imkey, None):
-                ctrl.update_autoscale()
+        if chunk is RequestFinished:  # fix typing
+            self._progress_spinner.hide()
+            for lut in self._lut_ctrls.values():
+                lut.update_autoscale()
+            return
+
+        if self._channel_mode == ChannelMode.MONO:
+            ch_key = MONO_CHANNEL
         else:
-            cm = (
-                next(self._cmap_cycle)
-                if self._channel_mode == ChannelMode.COMPOSITE
-                else GRAYS
-            )
-            if datum.ndim == 2:
-                handles.append(self._canvas.add_image(datum, cmap=cm))
-            elif datum.ndim == 3:
-                handles.append(self._canvas.add_volume(datum, cmap=cm))
-            if imkey not in self._lut_ctrls:
-                ch_index = index.get(self._channel_axis, 0)
-                self._lut_ctrls[imkey] = c = LutControl(
-                    f"Ch {ch_index}",
-                    handles,
-                    self,
-                    cmaplist=self._cmaps + DEFAULT_COLORMAPS,
-                )
-                self._lut_drop.addWidget(c)
+            ch_key = chunk.channel_index
 
-    def _reduce_data_for_display(
-        self, data: np.ndarray, reductor: Callable[..., np.ndarray] = np.max
-    ) -> np.ndarray:
-        """Reduce the number of dimensions in the data for display.
+        data = chunk.data
+        if data.ndim == 2:
+            return
+        # TODO: Channel object creation could be moved.
+        # having it here is the laziest... but means that the order of arrival
+        # of the chunks will determine the order of the channels in the LUTS
+        # (without additional logic to sort them by index, etc.)
+        if (handles := self._channels.get(ch_key)) is None:
+            handles = self._create_channel(ch_key)
 
-        This function takes a data array and reduces the number of dimensions to
-        the max allowed for display. The default behavior is to reduce the smallest
-        dimensions, using np.max.  This can be improved in the future.
+        if not handles:
+            if data.ndim == 2:
+                handles.append(self._canvas.add_image(data, cmap=handles.cmap))
+            elif data.ndim == 3:
+                empty = np.empty((60, 256, 256), dtype=np.uint16)
+                handles.append(self._canvas.add_volume(empty, cmap=handles.cmap))
 
-        This also coerces 64-bit data to 32-bit data.
-        """
-        # TODO
-        # - allow dimensions to control how they are reduced (as opposed to just max)
-        # - for better way to determine which dims need to be reduced (currently just
-        #   the smallest dims)
-        data = data.squeeze()
-        visualized_dims = self._ndims
-        if extra_dims := data.ndim - visualized_dims:
-            shapes = sorted(enumerate(data.shape), key=lambda x: x[1])
-            smallest_dims = tuple(i for i, _ in shapes[:extra_dims])
-            data = reductor(data, axis=smallest_dims)
+        handles[0].set_data(data, chunk.offset)
+        self._canvas.refresh()
 
-        if data.dtype.itemsize > 4:  # More than 32 bits
-            if np.issubdtype(data.dtype, np.integer):
-                data = data.astype(np.int32)
-            else:
-                data = data.astype(np.float32)
-        return data
+    def _create_channel(self, ch_key: int) -> Channel:
+        # improve this
+        cmap = GRAYS if ch_key == MONO_CHANNEL else next(self._cmap_cycle)
+
+        self._channels[ch_key] = channel = Channel(ch_key, cmap=cmap)
+        self._lut_ctrls[ch_key] = lut = LutControl(
+            channel,
+            f"Ch {ch_key}",
+            self,
+            cmaplist=self._cmaps + DEFAULT_COLORMAPS,
+            cmap=cmap,
+        )
+        self._lut_drop.addWidget(lut)
+        return channel
 
     def _clear_images(self) -> None:
         """Remove all images from the canvas."""
-        for handles in self._img_handles.values():
+        for handles in self._channels.values():
             for handle in handles:
                 handle.remove()
-        self._img_handles.clear()
+        self._channels.clear()
 
         # clear the current LutControls as well
         for c in self._lut_ctrls.values():
@@ -540,4 +555,8 @@ class NDViewer(QWidget):
 
     def _is_idle(self) -> bool:
         """Return True if no futures are running. Used for testing, and debugging."""
-        return self._last_future is None
+        return bool(self._chunker.pending_futures)
+
+    def closeEvent(self, a0: QCloseEvent | None) -> None:
+        self._chunker.shutdown()
+        super().closeEvent(a0)
