@@ -217,19 +217,42 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
 
     def __init__(self, data: Any) -> None:
         super().__init__(data)
+        import json
+
         import tensorstore as ts
 
         self._ts = ts
 
+        spec = self.data.spec().to_json()
+        labels: Sequence[Hashable] | None = None
+        self._ts = ts
+        if (tform := spec.get("transform")) and ("input_labels" in tform):
+            labels = [str(x) for x in tform["input_labels"]]
+        elif (
+            str(spec.get("driver")).startswith("zarr")
+            and (zattrs := self.data.kvstore.read(".zattrs").result().value)
+            and isinstance((zattr_dict := json.loads(zattrs)), dict)
+            and "_ARRAY_DIMENSIONS" in zattr_dict
+        ):
+            labels = zattr_dict["_ARRAY_DIMENSIONS"]
+
+        if isinstance(labels, Sequence) and len(labels) == len(self._data.domain):
+            self._labels: list[Hashable] = [str(x) for x in labels]
+            self._data = self.data[ts.d[:].label[self._labels]]
+        else:
+            self._labels = list(range(len(self._data.domain)))
+
     def sizes(self) -> Mapping[Hashable, int]:
-        return {dim.label: dim.size for dim in self._data.domain}
+        return dict(zip(self._labels, self._data.domain.shape))
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        result = (
-            self._data[self._ts.d[tuple(indexers)][tuple(indexers.values())]]
-            .read()
-            .result()
-        )
+        if not indexers:
+            slc = slice(None)
+        else:
+            labels, values = zip(*indexers.items())
+            origins = (0,) * len(labels)
+            slc = self._ts.d[labels].translate_to[origins][values]
+        result = self._data[slc].read().result()
         return np.asarray(result)
 
     @classmethod
