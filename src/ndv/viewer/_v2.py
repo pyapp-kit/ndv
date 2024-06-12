@@ -3,9 +3,11 @@ from typing import TYPE_CHECKING, Any, Mapping
 import numpy as np
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 from superqt import ensure_main_thread
+from superqt.utils import qthrottled
 
 from ndv._chunk_executor import Chunker, ChunkFuture
 from ndv.viewer._backends import get_canvas
+from ndv.viewer._dims_slider import DimsSliders
 from ndv.viewer._state import ViewerState
 
 if TYPE_CHECKING:
@@ -22,10 +24,17 @@ class NDViewer(QWidget):
         self._canvas: PCanvas = get_canvas()(lambda x: None)
         self._canvas.set_ndim(self._state.ndim)
 
+        # the sliders that control the index of the displayed image
+        self._dims_sliders = DimsSliders(self)
+        self._dims_sliders.valueChanged.connect(
+            qthrottled(self._request_data_for_index, 20, leading=True)
+        )
+
         layout = QVBoxLayout(self)
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(self._canvas.qwidget(), 1)
+        layout.addWidget(self._dims_sliders, 0)
 
         if data is not None:
             self.set_data(data)
@@ -35,6 +44,9 @@ class NDViewer(QWidget):
 
     def set_data(self, data: Any) -> None:
         self._data = data
+        self._dims_sliders.setMaxima(
+            {i: data.shape[i] - 1 for i in range(len(data.shape))}
+        )
 
     def set_current_index(self, index: Mapping[int | str, int | slice]) -> None:
         """Set the currentl displayed index."""
@@ -68,14 +80,17 @@ class NDViewer(QWidget):
                 chunk_shape[dim] = chunk_size
 
         index = {self._norm_index(k): v for k, v in index.items()}
-        print("--------")
-        print("chunk shape", chunk_shape)
-        print("index", index)
+        for v in visualized:
+            if isinstance(index.get(v), int):
+                del index[v]
 
+        if not index:
+            return
+
+        print("requesting data for index", index, chunk_shape)
         # clear existing handles
         for handle in self._channels.values():
             handle.clear()
-
         for future in self._chunker.request_chunks(
             data=self._data,
             index=index,
@@ -115,11 +130,15 @@ class NDViewer(QWidget):
             empty = np.empty(texture_shape, dtype=chunk.data.dtype)
             self._channels[channel_index] = handle = self._canvas.add_volume(empty)
 
-        mi, ma = handle.clim
-        handle.clim = (min(mi, np.min(data)), max(ma, np.max(data)))
-        handle.set_data(data, offset)
+        try:
+            mi, ma = handle.clim
+            handle.clim = (min(mi, np.min(data)), max(ma, np.max(data)))
+        except Exception as e:
+            print("err in clim: ", e)
+            handle.clim = (0, 5000)
+
+        handle.directly_set_texture_offset(data, offset)
         self._canvas.refresh()
-        print("drawn chunk")
 
         # # of the chunks will determine the order of the channels in the LUTS
         # # (without additional logic to sort them by index, etc.)
