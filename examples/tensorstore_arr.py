@@ -8,21 +8,15 @@ except ImportError:
 
 import ndv
 
-data = ndv.data.cells3d()
-
 ts_array = ts.open(
     {
-        "driver": "zarr",
-        "kvstore": {"driver": "memory"},
-        "transform": {
-            # tensorstore supports labeled dimensions
-            "input_labels": ["z", "c", "y", "x"],
+        "driver": "n5",
+        "kvstore": {
+            "driver": "s3",
+            "bucket": "janelia-cosem-datasets",
+            "path": "jrc_hela-3/jrc_hela-3.n5/labels/er-mem_pred/s4/",
         },
     },
-    create=True,
-    shape=data.shape,
-    dtype=data.dtype,
 ).result()
-ts_array[:] = ndv.data.cells3d()
-
-ndv.imshow(ts_array)
+ts_array = ts_array[ts.d[:].label["z", "y", "x"]]
+ndv.imshow(ts_array[ts.d[("y", "x", "z")].transpose[:]])
