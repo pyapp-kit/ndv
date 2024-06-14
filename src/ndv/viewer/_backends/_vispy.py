@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+import weakref
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
@@ -15,6 +16,7 @@ from vispy.util.quaternion import Quaternion
 if TYPE_CHECKING:
     import cmap
     from qtpy.QtWidgets import QWidget
+    from superqt.utils._throttler import ThrottledCallable
     from vispy.scene.events import SceneMouseEvent
 
 turn = np.sin(np.pi / 4)
@@ -92,8 +94,7 @@ class VispyViewerCanvas:
     def __init__(self, set_info: Callable[[str], None]) -> None:
         self._set_info = set_info
         self._canvas = scene.SceneCanvas()
-        self._on_mouse_move_throttled = qthrottled(self._on_mouse_move, 60)
-        self._canvas.events.mouse_move.connect(self._on_mouse_move_throttled)
+        self._canvas.events.mouse_move.connect(self._make_throttled_on_mouse_move())
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
@@ -220,3 +221,15 @@ class VispyViewerCanvas:
                     value = f"{value:.2f}"
                 text += f" {c}: {value}"
         self._set_info(text)
+
+    def _make_throttled_on_mouse_move(
+        self,
+    ) -> ThrottledCallable[[SceneMouseEvent], None]:
+        self_ref = weakref.ref(self)
+
+        def throttled_mouse_move(event: SceneMouseEvent) -> None:
+            self = self_ref()
+            if self is not None:
+                self._on_mouse_move(event)
+
+        return qthrottled(throttled_mouse_move, timeout=60)

@@ -552,8 +552,8 @@ class NDViewer(QWidget):
 
         def _throttled_func(index: Indices) -> None:
             _self = self_ref()
-            if _self is None:
-                return None
-            return _self._update_data_for_index(index)
+            if _self is not None:
+                _self._update_data_for_index(index)
+            return None
 
         return qthrottled(_throttled_func, 20, leading=True)
