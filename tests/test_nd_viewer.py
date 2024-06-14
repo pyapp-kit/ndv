@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any, Iterator
 import dask.array as da
 import numpy as np
 import pytest
+from qtpy.QtCore import QEvent, QPointF, Qt
+from qtpy.QtGui import QMouseEvent
 
 from ndv import NDViewer
 
@@ -64,7 +66,20 @@ def test_ndviewer(qtbot: QtBot, viewer: NDViewer) -> None:
     viewer.set_current_index({0: 2, 1: 0, 2: 1})
 
 
-def test_hover_info(qtbot: QtBot, viewer: NDViewer) -> None:
-    data = np.empty((4, 3, 32, 32), dtype=np.uint8)
-    viewer.set_data(data)
+@pytest.mark.allow_leaks
+def test_hover_info(qtbot: QtBot) -> None:
+    data = np.ones((4, 3, 32, 32), dtype=np.uint8)
+    viewer = NDViewer(data)
+    qtbot.addWidget(viewer)
+    viewer.show()
     qtbot.waitUntil(viewer._is_idle, timeout=1000)
+    mouse_event = QMouseEvent(
+        QEvent.Type.MouseMove,
+        QPointF(200, 200),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    viewer.eventFilter(viewer._qcanvas, mouse_event)
+    info_text = viewer._hover_info_label.text()
+    assert info_text.endswith("0: 1")

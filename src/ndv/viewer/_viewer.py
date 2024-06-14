@@ -564,15 +564,13 @@ class NDViewer(QWidget):
         # here is where we get a chance to intercept mouse events before passing them
         # to the canvas. Return `True` to prevent the event from being passed to
         # the backend widget.
-        if event.type() == QEvent.Type.MouseMove:
+        if event.type() == QEvent.Type.MouseMove and obj is self._qcanvas:
             self._update_hover_info(cast("QMouseEvent", event).position())
         return False
 
-    @qthrottled(timeout=50)  # type: ignore [misc]
     def _update_hover_info(self, point: QPointF) -> None:
         """Update text of hover_info_label with data value(s) at point."""
-        x, y, z = self._canvas.canvas_to_world((point.x(), point.y()))
-
+        x, y, _z = self._canvas.canvas_to_world((point.x(), point.y()))
         # TODO: handle 3D data
         if (x < 0 or y < 0) or self._ndims == 3:
             self._hover_info_label.setText("")
