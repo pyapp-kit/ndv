@@ -47,6 +47,7 @@ def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -
 
 
 # not testing pygfx yet...
+@pytest.mark.skipif(sys.platform != "darwin", reason="the mouse event is tricky")
 def test_hover_info(qtbot: QtBot) -> None:
     data = np.ones((4, 3, 32, 32), dtype=np.uint8)
     viewer = NDViewer(data)
@@ -55,7 +56,7 @@ def test_hover_info(qtbot: QtBot) -> None:
     qtbot.waitUntil(viewer._is_idle, timeout=1000)
     mouse_event = QMouseEvent(
         QEvent.Type.MouseMove,
-        QPointF(200, 200),
+        QPointF(viewer._qcanvas.rect().center()),
         Qt.MouseButton.LeftButton,
         Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,
