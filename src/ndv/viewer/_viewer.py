@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from collections import defaultdict
 from itertools import cycle
 from typing import TYPE_CHECKING, Literal, cast
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Hashable, Iterable, Sequence, TypeAlias
 
     from qtpy.QtGui import QCloseEvent
+    from superqt.utils._throttler import ThrottledCallable
 
     from ._backends._protocols import PCanvas, PImageHandle
     from ._dims_slider import DimKey, Indices, Sizes
@@ -168,8 +170,9 @@ class NDViewer(QWidget):
 
         # the sliders that control the index of the displayed image
         self._dims_sliders = DimsSliders(self)
+
         self._dims_sliders.valueChanged.connect(
-            qthrottled(self._update_data_for_index, 20, leading=True)
+            self._make_throttled_update_data_for_index()
         )
 
         self._lut_drop = QCollapsible("LUTs", self)
@@ -541,3 +544,16 @@ class NDViewer(QWidget):
     def _is_idle(self) -> bool:
         """Return True if no futures are running. Used for testing, and debugging."""
         return self._last_future is None
+
+    def _make_throttled_update_data_for_index(
+        self,
+    ) -> ThrottledCallable[[Indices], None]:
+        self_ref = weakref.ref(self)
+
+        def _throttled_func(index: Indices) -> None:
+            _self = self_ref()
+            if _self is None:
+                return None
+            return _self._update_data_for_index(index)
+
+        return qthrottled(_throttled_func, 20, leading=True)

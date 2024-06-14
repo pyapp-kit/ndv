@@ -92,7 +92,8 @@ class VispyViewerCanvas:
     def __init__(self, set_info: Callable[[str], None]) -> None:
         self._set_info = set_info
         self._canvas = scene.SceneCanvas()
-        self._canvas.events.mouse_move.connect(qthrottled(self._on_mouse_move, 60))
+        self._on_mouse_move_throttled = qthrottled(self._on_mouse_move, 60)
+        self._canvas.events.mouse_move.connect(self._on_mouse_move_throttled)
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
