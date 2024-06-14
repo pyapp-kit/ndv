@@ -141,8 +141,10 @@ exclude_lines = [
     "pass",
 ]
 
+
 [tool.coverage.run]
 source = ["ndv"]
+omit = ["src/ndv/viewer/_backends/_protocols.py"]
 
 [tool.check-manifest]
 ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
