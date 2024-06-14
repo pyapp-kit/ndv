@@ -109,7 +109,7 @@ class NDViewer(QWidget):
 
     def __init__(
         self,
-        data: DataWrapper | Any,
+        data: DataWrapper | Any | None = None,
         *,
         colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
         parent: QWidget | None = None,

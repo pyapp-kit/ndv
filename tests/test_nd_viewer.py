@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 import dask.array as da
 import numpy as np
@@ -40,20 +40,31 @@ if not os.getenv("CI") or sys.platform == "darwin":
     BACKENDS.append("pygfx")
 
 
-@allow_linux_widget_leaks
-@pytest.mark.filterwarnings("ignore:This version of pygfx does not yet")
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("NDV_CANVAS_BACKEND", backend)
-    dask_arr = make_lazy_array((1000, 64, 3, 256, 256))
-    v = NDViewer(dask_arr)
+@pytest.fixture(params=BACKENDS)
+def viewer(
+    qtbot: QtBot, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[NDViewer]:
+    monkeypatch.setenv("NDV_CANVAS_BACKEND", request.param)
+    v = NDViewer()
     qtbot.addWidget(v)
-    v.show()
-    qtbot.waitUntil(v._is_idle, timeout=1000)
-    v.set_ndim(3)
-    v.set_channel_mode("composite")
-    v.set_current_index({0: 100, 1: 10, 2: 1})
-
+    yield v
     # wait until there are no running jobs, because the callbacks
     # in the futures hold a strong reference to the viewer
     qtbot.waitUntil(v._is_idle, timeout=3000)
+
+
+@allow_linux_widget_leaks
+def test_ndviewer(qtbot: QtBot, viewer: NDViewer) -> None:
+    data = np.empty((4, 3, 2, 32, 32), dtype=np.uint8)
+    viewer.set_data(data)
+    viewer.show()
+    qtbot.waitUntil(viewer._is_idle, timeout=1000)
+    viewer.set_ndim(3)
+    viewer.set_channel_mode("composite")
+    viewer.set_current_index({0: 2, 1: 0, 2: 1})
+
+
+def test_hover_info(qtbot: QtBot, viewer: NDViewer) -> None:
+    data = np.empty((4, 3, 32, 32), dtype=np.uint8)
+    viewer.set_data(data)
+    qtbot.waitUntil(viewer._is_idle, timeout=1000)

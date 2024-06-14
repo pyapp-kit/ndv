@@ -121,7 +121,10 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore:Method has been garbage collected::superqt",
-    "ignore:Got wrong number of dimensions",             # occasionally happens on linux CI with vispy
+    # occasionally happens on linux CI with vispy
+    "ignore:Got wrong number of dimensions",
+    # requires pygfx > 0.2.0
+    "ignore:This version of pygfx does not yet support additive blending",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
