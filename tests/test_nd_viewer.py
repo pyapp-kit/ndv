@@ -28,11 +28,10 @@ if not os.getenv("CI") or sys.platform == "darwin":
 
 
 @allow_linux_widget_leaks
-@pytest.mark.filterwarnings("ignore:This version of pygfx does not yet")
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NDV_CANVAS_BACKEND", backend)
-    dask_arr = np.ones((4, 3, 2, 32, 32), dtype=np.uint8)
+    dask_arr = np.empty((4, 3, 2, 32, 32), dtype=np.uint8)
     v = NDViewer(dask_arr)
     qtbot.addWidget(v)
     v.show()
