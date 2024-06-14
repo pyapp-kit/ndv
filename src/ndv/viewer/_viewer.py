@@ -559,7 +559,7 @@ class NDViewer(QWidget):
     def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
         """Event filter installed on the canvas to handle mouse events."""
         if event is None:
-            return False
+            return False  # pragma: no cover
 
         # here is where we get a chance to intercept mouse events before passing them
         # to the canvas. Return `True` to prevent the event from being passed to
@@ -572,7 +572,7 @@ class NDViewer(QWidget):
         """Update text of hover_info_label with data value(s) at point."""
         x, y, _z = self._canvas.canvas_to_world((point.x(), point.y()))
         # TODO: handle 3D data
-        if (x < 0 or y < 0) or self._ndims == 3:
+        if (x < 0 or y < 0) or self._ndims == 3:  # pragma: no cover
             self._hover_info_label.setText("")
             return
 
