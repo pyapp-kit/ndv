@@ -60,6 +60,7 @@ test = [
     "pytest-qt",
     "pytest",
 ]
+benchmarks = ["ndv[vispy,pyqt6]", "pytest", "pytest-codspeed"]
 dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
