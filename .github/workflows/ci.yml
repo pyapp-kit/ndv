@@ -67,7 +67,7 @@ jobs:
 
       - name: install
         run: |
-          python -m pip install .[test,pyqt]
+          python -m pip install .[test,pyside]
           python -m pip install pytest-codspeed
 
       - name: Run benchmarks
