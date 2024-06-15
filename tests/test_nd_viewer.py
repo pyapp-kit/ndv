@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import textwrap
-import time
 from typing import TYPE_CHECKING, Any
 
 import dask.array as da
@@ -64,13 +63,16 @@ def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -
 
 def test_time_to_show() -> None:
     script = """
-    import ndv, numpy, unittest.mock
+    import numpy, unittest.mock
+    from time import perf_counter
+    data = numpy.random.rand(16, 16, 16)
     with unittest.mock.patch("qtpy.QtWidgets.QApplication.exec"):
-        ndv.imshow(numpy.empty((16, 16, 16)))
+        start = perf_counter()
+        import ndv
+        ndv.imshow(data)
+        end = perf_counter()
+    print(end - start)
     """
-    cmd = ["python", "-c", textwrap.dedent(script)]
-    start = time.perf_counter()
-    subprocess.check_call(cmd)
-    end = time.perf_counter()
-    total = end - start
-    assert total < 1.5, "Viewer took too long to show up"
+    output = subprocess.check_output(["python", "-c", textwrap.dedent(script)])
+    time = float(output.decode().strip())
+    assert time < 1, "Viewer took too long to show up"
