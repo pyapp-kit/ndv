@@ -56,7 +56,6 @@ test = [
     "ndv[vispy,pygfx]",
     "dask[array]",
     "imageio[tifffile]",
-    "pytest-cov",
     "pytest-qt",
     "pytest",
 ]

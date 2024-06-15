@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
 import sys
 from abc import abstractmethod
@@ -59,6 +60,11 @@ _T = TypeVar("_T", bound=type)
 
 # Global executor for slice requests
 _EXECUTOR = ThreadPoolExecutor(max_workers=2)
+
+
+@atexit.register
+def _cleanup_executor() -> None:
+    _EXECUTOR.shutdown(wait=True, cancel_futures=True)
 
 
 def _recurse_subclasses(cls: _T) -> Iterator[_T]:

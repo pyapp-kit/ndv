@@ -33,10 +33,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: tlambert03/setup-qt-libs@v1
       - uses: pyvista/setup-headless-display-action@v2
         with:
           qt: true
+      
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y libxcb-xinput0
 
       - uses: actions/setup-python@v4
         with:
@@ -50,7 +52,22 @@ jobs:
           python -m pip install .[test,pyqt]
 
       - name: 🧪 Run Tests
-        run: pytest --color=yes --cov --cov-report=xml --cov-report=term-missing
+        run: coverage run -p -m pytest --color=yes
+
+      - name: Generate UUID
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "UUID=$(powershell -Command "[guid]::NewGuid().ToString()")" >> $GITHUB_ENV
+          else
+            echo "UUID=$(uuidgen)" >> $GITHUB_ENV
+          fi
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: covreport-${{ matrix.platform }}-py${{ matrix.python-version }}-${{ env.UUID }}
+          path: ./.coverage*
 
   test-array-libs:
     uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
