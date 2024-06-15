@@ -361,7 +361,9 @@ class DimsSliders(QWidget):
     Maintains the global current index and emits a signal when it changes.
     """
 
-    valueChanged = Signal(dict)  # dict is of type Indices
+    # valueChanged is actually a signal that emits a dict of {dim_key -> index}
+    # but pyside removes the contents of the dict! so we use object instead
+    valueChanged = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
