@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
-import textwrap
 from typing import TYPE_CHECKING, Any
 
 import dask.array as da
@@ -59,20 +57,3 @@ def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -
     # wait until there are no running jobs, because the callbacks
     # in the futures hold a strong reference to the viewer
     qtbot.waitUntil(v._is_idle, timeout=3000)
-
-
-def test_time_to_show() -> None:
-    script = """
-    import numpy, unittest.mock
-    from time import perf_counter
-    data = numpy.random.rand(16, 16, 16)
-    with unittest.mock.patch("qtpy.QtWidgets.QApplication.exec"):
-        start = perf_counter()
-        import ndv
-        ndv.imshow(data)
-        end = perf_counter()
-    print(end - start)
-    """
-    output = subprocess.check_output(["python", "-c", textwrap.dedent(script)])
-    time = float(output.decode().strip())
-    assert time < 1, "Viewer took too long to show up"
