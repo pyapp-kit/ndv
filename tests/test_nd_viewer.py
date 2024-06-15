@@ -62,4 +62,4 @@ def test_hover_info(qtbot: QtBot) -> None:
     )
     viewer.eventFilter(viewer._qcanvas, mouse_event)
     info_text = viewer._hover_info_label.text()
-    assert info_text.endswith("0: 1")
+    assert info_text.endswith("0: 1.00")
