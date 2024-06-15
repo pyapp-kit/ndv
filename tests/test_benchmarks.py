@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest.mock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -20,11 +20,10 @@ def _show_viewer(data: np.ndarray) -> None:
     ndv.imshow(data)
 
 
-def test_time_to_show(benchmark: BenchmarkFixture) -> None:
+def test_time_to_show(benchmark: BenchmarkFixture, qapp: Any) -> None:
     data = np.random.randint(0, 255, size=(10, 256, 256), dtype=np.uint8)
     for k in list(sys.modules):
-        if k.startswith(("ndv", "PyQt5", "PySide2", "PySide6", "PyQt6", "superqt")):
+        if k.startswith(("ndv", "superqt")):
             del sys.modules[k]
-
-    with unittest.mock.patch("qtpy.QtWidgets.QApplication.exec"):
+    with unittest.mock.patch.object(qapp, "exec"):
         benchmark.pedantic(_show_viewer, (data,), iterations=1, rounds=1)
