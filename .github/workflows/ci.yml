@@ -33,13 +33,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: pyvista/setup-headless-display-action@v2
         with:
           qt: true
+      # strangely, this lib is in headless-display-action, but doesn't get installed
       - if: runner.os == 'Linux'
-        run: sudo apt-get install -y   libxcb-xinput0 
-        # x11-utils libegl1-mesa libdbus-1-3 libxcb-cursor0
+        run: sudo apt-get install -y libxcb-cursor0
+
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
