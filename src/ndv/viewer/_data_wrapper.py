@@ -205,7 +205,8 @@ class XarrayWrapper(DataWrapper["xr.DataArray"]):
     """Wrapper for xarray DataArray objects."""
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        return np.asarray(self._data.isel(indexers))
+        with self._lock:
+            return np.asarray(self._data.isel(indexers))
 
     def sizes(self) -> Mapping[Hashable, int]:
         return {k: int(v) for k, v in self._data.sizes.items()}
@@ -260,8 +261,9 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
             labels, values = zip(*indexers.items())
             origins = (0,) * len(labels)
             slc = self._ts.d[labels].translate_to[origins][values]
-        result = self._data[slc].read().result()
-        return np.asarray(result)
+        with self._lock:
+            result = self._data[slc].read().result()
+            return np.asarray(result)
 
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[ts.TensorStore]:
@@ -316,8 +318,11 @@ class DaskWrapper(DataWrapper["da.Array"]):
     """Wrapper for dask array objects."""
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        idx = tuple(indexers.get(k, slice(None)) for k in range(len(self._data.shape)))
-        return np.asarray(self._data[idx].compute())
+        with self._lock:
+            idx = tuple(
+                indexers.get(k, slice(None)) for k in range(len(self._data.shape))
+            )
+            return np.asarray(self._data[idx].compute())
 
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[da.Array]:
@@ -385,8 +390,9 @@ class ZarrArrayWrapper(ArrayLikeWrapper["zarr.Array"]):
 
     def isel(self, indexers: Indices) -> np.ndarray:
         # convert possibly named indices to integer indices
-        real_indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
-        return super().isel(real_indexers)
+        with self._lock:
+            real_indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
+            return super().isel(real_indexers)
 
 
 class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
@@ -408,10 +414,13 @@ class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
 
     def isel(self, indexers: Indices) -> np.ndarray:
         # convert possibly named indices to integer indices
-        real_indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
-        # convert to tuple of slices
-        idx = tuple(real_indexers.get(i, slice(None)) for i in range(self.data.ndim))
-        return self.data[idx].numpy(force=True)  # type: ignore [no-any-return]
+        with self._lock:
+            real_indexers = {self._name2index.get(k, k): v for k, v in indexers.items()}
+            # convert to tuple of slices
+            idx = tuple(
+                real_indexers.get(i, slice(None)) for i in range(self.data.ndim)
+            )
+            return self.data[idx].numpy(force=True)  # type: ignore [no-any-return]
 
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[torch.Tensor]:
