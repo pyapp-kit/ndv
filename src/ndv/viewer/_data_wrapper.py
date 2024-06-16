@@ -5,6 +5,7 @@ from __future__ import annotations
 import atexit
 import logging
 import sys
+import threading
 from abc import abstractmethod
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
@@ -110,6 +111,7 @@ class DataWrapper(Generic[ArrayT]):
 
     def __init__(self, data: ArrayT) -> None:
         self._data = data
+        self._lock = threading.Lock()
 
     @property
     def data(self) -> ArrayT:
@@ -274,8 +276,11 @@ class ArrayLikeWrapper(DataWrapper, Generic[ArrayT]):
     PRIORITY = 100
 
     def isel(self, indexers: Indices) -> np.ndarray:
-        idx = tuple(indexers.get(k, slice(None)) for k in range(len(self._data.shape)))
-        return self._asarray(self._data[idx])
+        with self._lock:
+            idx = tuple(
+                indexers.get(k, slice(None)) for k in range(len(self._data.shape))
+            )
+            return self._asarray(self._data[idx])
 
     def _asarray(self, data: npt.ArrayLike) -> np.ndarray:
         return np.asarray(data)
