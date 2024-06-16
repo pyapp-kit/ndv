@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Mapping, Protocol, cast
+from typing import TYPE_CHECKING, Iterable, Literal, Mapping, NamedTuple, Protocol, cast
+from venv import logger
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
+    import cmap
     from cmap._colormap import ColorStopsLike
 
 # The Term "Axis" is used when referring to a specific dimension of an array
@@ -52,8 +56,8 @@ class ArrayDisplayModel:
     """
 
     @property
-    def n_visible_dims(self) -> Literal[2, 3]:
-        """Number of dims is derived from the length of `visible_dims`."""
+    def n_visible_axes(self) -> Literal[2, 3]:
+        """Number of dims is derived from the length of `visible_axes`."""
         return cast(Literal[2, 3], len(self.visible_axes))
 
     # INDEXING AND REDUCTION
@@ -67,7 +71,7 @@ class ArrayDisplayModel:
     be slice(None), meaning it is up to the controller of this model to restrict
     indices to an efficient range for retrieval.
 
-    If the number of non-singleton axes is greater than `n_visible_dims`,
+    If the number of non-singleton axes is greater than `n_visible_axes`,
     then reducers are used to reduce the data along the remaining axes.
 
     NOTE: In terms of requesting data, there is a slight "delocalization" of state here
@@ -89,7 +93,7 @@ class ArrayDisplayModel:
     The implication of setting channel_axis is that *all* elements along the channel
     dimension are shown, with different LUTs applied to each channel.
 
-    NOTE: it is an error for channel_axis to be in visible_dims (or ignore it?)
+    NOTE: it is an error for channel_axis to be in `visible_axes` (or ignore it?)
 
     If None, then a single lookup table is used for all channels (`luts[None]`)
     """
@@ -138,6 +142,28 @@ class LUT:
     """
 
 
+class Texture:
+    """A thing representing a backend Texture that can be updated with new data."""
+
+    def set_data(self, data: np.ndarray, offset: tuple[int, int, int] | None):
+        """Update the texture with new data.
+
+        If offset is None, then the entire texture is replaced.
+        """
+
+    def set_clims(self, clims: tuple[float, float]):
+        """Set the contrast limits for the texture."""
+
+    def set_gamma(self, gamma: float):
+        """Set the gamma correction for the texture."""
+
+    def set_cmap(self, cmap: cmap.Colormap):
+        """Set the colormap for the texture."""
+
+    def set_visible(self, visible: bool):
+        """Set the visibility of the texture."""
+
+
 class ArrayViewer:
     """View on an ArrayDisplayModel."""
 
@@ -146,50 +172,180 @@ class ArrayViewer:
     def __init__(self, model: ArrayDisplayModel | None = None):
         self.model = model or ArrayDisplayModel()
 
-        model.visible_axes.changed.connect(self._on_visible_dims_changed)
-        model.current_index.changed.connect(self._on_current_index_changed)
-        model.channel_axis.changed.connect(self._on_channel_axis_changed)
+        # async executor for requesting data
+        self.chunker = Chunker()
 
+        # handles to all textures draw on the canvas
+        self._textures: dict[int | None, Texture] = {}
+
+        # connect model events
+        model.current_index.changed.connect(self._view_index)
+        model.visible_axes.changed.connect(self._on_visible_axes_changed)
+        model.channel_axis.changed.connect(self._on_channel_axis_changed)
         model.luts.changed.connect(self._on_luts_changed)
 
     def set_data(self, data: DataWrapper) -> None:
         """Prepare model for new data and update viewer."""
         self.data = data
+
         # when new data is assigned, we ensure that the model is consistent
-        self.model = reconcile_model_with_data(self.model, data)
+        for key, value in reconcile_model_with_data(self.model, self.data).items():
+            # block events
+            setattr(self.model, key, value)
+
+        # what else? <<<<<<<<<<<<<<
+
         self.redraw()
 
-    def _on_visible_dims_changed(
-        self, visible_dims: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
+    def _on_visible_axes_changed(
+        self, axes: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
     ):
-        pass
-
-    def _on_current_index_changed(self, index: Mapping[AxisKey, int | slice]):
-        pass
+        # we're switching from 2D to 3D or vice versa
+        # clear all of the visuals and redraw
+        self.clear()
+        self.redraw()
 
     def _on_channel_axis_changed(self, channel_axis: AxisKey | None):
-        pass
+        if channel_axis is None:
+            # we're turning off "composite" mode.
+            # All data now uses the lut defined at self.model.luts[None]
+            ...
+        else:
+            # we're turning on "composite" mode.
+            ...
 
     def _on_luts_changed(self, event):
+        # it's unclear what this event structure will be, and it will likely
+        # be multiple methods, for each field on the LUT class.
+        # but we need to update all textures in the corresponding channel with the
+        # new LUTs
+
+        channel = ...
+        self._textures[channel].set_clims(...)  # etc.
+        ...
+
+    def _view_index(self, index: Mapping[AxisKey, int | slice]):
+        """Request data at the given index and queue it for display.
+
+        This is the main method that gets called when the index changes (either via
+        sliders or programmatically).  It is responsible for sending requests for
+        data to the chunker.
+        """
+        bounds = self._bounds_for_index(index)
+        pixel_ratio = self._current_pixel_ratio()
+
+        # Existing data within the area that is going to be updated should be cleared
+        # However it should only be cleared if the new data represents a different
+        # spatial region of the data (i.e. if the bounds are the same, then the data
+        # should not be cleared, but may be updated if the pixel ratio has changed)
+        # here is where an octree-like structure would be useful to determine which
+        # chunks need to be invalidated.
+
+        # request chunks from the data source and queue the callback
+        for future in self.chunker.request_chunks(self.data, bounds, pixel_ratio):
+            future.add_done_callback(self._on_chunk_ready)
+
+    def _bounds_for_index(self, index: Mapping[AxisKey, int | slice]) -> Bounds:
+        """Return the bounds of the data to be displayed at the given index.
+
+        This method is responsible for converting the index into a set of bounds
+        that can be used to request data from the data source.
+
+        In addition to the `index` in will need to take into account:
+        - the `visible_axes` of the model
+        - the `channel_axis` of the model
+        - any channels that are not visible
+
+        TODO:
+        open question is exactly what form the Bounds should take. Should it be
+        mapping of `{AxisKey: Bound}`? (which allows the data to worry about indexing)
+        or a `tuple[Bound, ...]` (where we've already chosen the axes)?
+        """
+
+    def _current_pixel_ratio(self) -> float:
+        """Return the ratio of data/world pixels to canvas pixels.
+
+        This will depend on the current zoom level, the size of the canvas, and the
+        shape of the data.
+
+        A pixel ratio greater than 1 means that there are more data pixels than
+        canvas pixels, and that the data may be safely downsampled if desired.
+        """
+        pass
+
+    def _on_chunk_ready(self, future: Future[ChunkResponse]):
+        if future.cancelled():
+            return
+        try:
+            chunk = future.result()
+        except Exception as e:
+            logger.debug(f"Error retrieving chunk: {e}")
+            return
+
+        self._update_data_at_offset(chunk.data, chunk.offset, chunk.channel)
+
+    def _update_data_at_offset(
+        self, data: np.ndarray, offset: tuple[int, int], channel: int | None = None
+    ):
+        """Update the texture at the given offset and channel."""
+        self._textures[channel].set_data(data, offset)
+
+    def clear(self):
+        """Erase all visuals."""
         pass
 
     def redraw(self):
         """Redraw the current view."""
         self._view_index(self.model.current_index)
 
-    def _view_index(self, index: Mapping[AxisKey, int | slice]):
-        """Request data and display it at the given index."""
-        pass
+
+Bound = tuple[int, int]
+Bounds = tuple[Bound, ...]
 
 
-def reconcile_model_with_data(
-    model: ArrayDisplayModel, data: DataWrapper
-) -> ArrayDisplayModel:
-    """Ensure that the model is consistent with the data, returning a new model.
+class Chunker:
+    """Something backed by an async executor that can request chunks of data."""
+
+    def request_chunks(
+        self,
+        data: DataWrapper,
+        bounds: tuple[tuple[int, int], ...],
+        pixel_ratio: float,
+        *,
+        cancel_pending_futures: bool = False,
+    ) -> Iterable[Future]:
+        """Request chunks of data from the data source.
+
+        Note, the DataWrapper is responsible for converting the bounds into
+        chunks, and may use the pixel ratio to determine the scale/resolution
+        from which to request data.
+
+        TODO: we need a mechanism for multi-resolution datasets to send "quick" chunks
+        at a lower resolution level while they load the full resolution data. (It's fine
+        for `request_chunks` to return multiple futures for the same chunk).  But we
+        also need a way to avoid requesting lower resolution data if higher resolution
+        has already been loaded.
+        """
+
+
+class ChunkResponse(NamedTuple):
+    """Response from a Chunker including data at a specific offset."""
+
+    # data for a single chunk
+    data: np.ndarray
+    # position of the chunk in texture
+    offset: tuple[int, int] | tuple[int, int, int]
+    # channel to which this chunk belongs
+    # (not sure about this one...)
+    channel: int | None = None
+
+
+def reconcile_model_with_data(model: ArrayDisplayModel, data: DataWrapper) -> dict:
+    """Ensure that the model is consistent with the data, returning data for new model.
 
     This method should be called whenever the data is changed, and should
     ensure that the model is consistent with the data.  This includes
-    ensuring that the `visible_dims` are valid, that the `current_index` is
+    ensuring that the `visible_axes` are valid, that the `current_index` is
     within the bounds of the data, and that the `channel_axis` is valid.
     """
     shape = data.shape
@@ -231,10 +387,10 @@ def reconcile_model_with_data(
             except (KeyError, IndexError):
                 del luts[key]
 
-    return type(model)(
-        visible_axes=visible_axes,
-        current_index=current_index,
-        reducers=model.reducers,
-        channel_axis=channel_axis,
-        luts=luts,
-    )
+    return {
+        "visible_axes": visible_axes,
+        "current_index": current_index,
+        "reducers": model.reducers,
+        "channel_axis": channel_axis,
+        "luts": luts,
+    }
