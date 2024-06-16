@@ -317,14 +317,16 @@ class Chunker:
         """Request chunks of data from the data source.
 
         Note, the DataWrapper is responsible for converting the bounds into
-        chunks, and may use the pixel ratio to determine the scale/resolution
-        from which to request data.
+        chunks.  It may use the pixel ratio to determine the scale/resolution
+        from which to request data.  It can use it's own chunking scheme to deliver
+        the data in the most efficient way possible; in other words, the data source
+        takes priority when deciding chunking boundaries.
 
         TODO: we need a mechanism for multi-resolution datasets to send "quick" chunks
-        at a lower resolution level while they load the full resolution data. (It's fine
-        for `request_chunks` to return multiple futures for the same chunk).  But we
-        also need a way to avoid requesting lower resolution data if higher resolution
-        has already been loaded.
+        at a lower resolution level while they load the full resolution data. It's
+        already fine for `request_chunks` to return multiple futures for the same chunk,
+        but we also need a way to avoid requesting lower resolution data if higher
+        resolution has already been loaded.
         """
 
 
