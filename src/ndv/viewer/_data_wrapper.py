@@ -65,7 +65,7 @@ _EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 @atexit.register
 def _cleanup_executor() -> None:
-    _EXECUTOR.shutdown(wait=True, cancel_futures=True)
+    _EXECUTOR.shutdown(wait=False)
 
 
 def _recurse_subclasses(cls: _T) -> Iterator[_T]:
