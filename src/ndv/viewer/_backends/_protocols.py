@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     import cmap
@@ -29,7 +29,7 @@ class PImageHandle(Protocol):
 
 
 class PCanvas(Protocol):
-    def __init__(self, set_info: Callable[[str], None]) -> None: ...
+    def __init__(self) -> None: ...
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     def set_range(
         self,
@@ -46,3 +46,8 @@ class PCanvas(Protocol):
     def add_volume(
         self, data: np.ndarray | None = ..., cmap: cmap.Colormap | None = ...
     ) -> PImageHandle: ...
+
+    def canvas_to_world(
+        self, pos_xy: tuple[float, float]
+    ) -> tuple[float, float, float]:
+        """Map XY canvas position (pixels) to XYZ coordinate in world space."""
