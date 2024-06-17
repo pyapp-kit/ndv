@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal, cast
 
 import cmap
 import numpy as np
+from qtpy.QtCore import QEvent
 from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
@@ -17,7 +18,7 @@ from ndv.viewer._components import (
     QSpinner,
 )
 
-from ._backends import get_canvas
+from ._backends import get_canvas_class
 from ._data_wrapper import DataWrapper
 from ._dims_slider import DimsSliders
 from ._lut_control import LutControl
@@ -26,7 +27,8 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
     from typing import Any, Callable, Hashable, Iterable, Sequence, TypeAlias
 
-    from qtpy.QtGui import QCloseEvent
+    from qtpy.QtCore import QObject, QPointF
+    from qtpy.QtGui import QCloseEvent, QMouseEvent
 
     from ._backends._protocols import PCanvas, PImageHandle
     from ._dims_slider import DimKey, Indices, Sizes
@@ -107,7 +109,7 @@ class NDViewer(QWidget):
 
     def __init__(
         self,
-        data: DataWrapper | Any,
+        data: DataWrapper | Any | None = None,
         *,
         colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
         parent: QWidget | None = None,
@@ -163,8 +165,20 @@ class NDViewer(QWidget):
         # place to display arbitrary text
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
-        self._canvas: PCanvas = get_canvas()(self._hover_info_label.setText)
+        self._canvas: PCanvas = get_canvas_class()()
         self._canvas.set_ndim(self._ndims)
+        self._qcanvas = self._canvas.qwidget()
+
+        # Install an event filter so we can intercept mouse/key events
+        if hasattr(self._qcanvas, "_subwidget"):
+            # HACK:
+            # this is a hack for the pygfx backend, which wraps the canvas in another
+            # widget that controls all events.
+            # We could technically add another method to PCanvas to get the "filterable"
+            # widget... but we'll just do this for now.
+            self._qcanvas._subwidget.installEventFilter(self)
+        else:
+            self._qcanvas.installEventFilter(self)
 
         # the sliders that control the index of the displayed image
         self._dims_sliders = DimsSliders(self)
@@ -207,7 +221,7 @@ class NDViewer(QWidget):
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(info_widget)
-        layout.addWidget(self._canvas.qwidget(), 1)
+        layout.addWidget(self._qcanvas, 1)
         layout.addWidget(self._hover_info_label)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._lut_drop)
@@ -543,3 +557,51 @@ class NDViewer(QWidget):
     def _is_idle(self) -> bool:
         """Return True if no futures are running. Used for testing, and debugging."""
         return self._last_future is None
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        """Event filter installed on the canvas to handle mouse events."""
+        if event is None:
+            return False  # pragma: no cover
+
+        # here is where we get a chance to intercept mouse events before passing them
+        # to the canvas. Return `True` to prevent the event from being passed to
+        # the backend widget.
+        if event.type() == QEvent.Type.MouseMove and obj is self._qcanvas:
+            self._update_hover_info(cast("QMouseEvent", event).position())
+        return False
+
+    def _update_hover_info(self, point: QPointF) -> None:
+        """Update text of hover_info_label with data value(s) at point."""
+        x, y, _z = self._canvas.canvas_to_world((point.x(), point.y()))
+        # TODO: handle 3D data
+        if (x < 0 or y < 0) or self._ndims == 3:  # pragma: no cover
+            self._hover_info_label.setText("")
+            return
+
+        x = int(x)
+        y = int(y)
+        text = f"[{y}, {x}]"
+        for n, handles in enumerate(self._img_handles.values()):
+            channels = []
+            for handle in handles:
+                try:
+                    # here, we're retrieving the value from the in-memory data
+                    # stored by the backend visual, rather than querying the data itself
+                    # this is a quick workaround to get the value without having to
+                    # worry about higher dimensions in the data source (since the
+                    # texture has already been reduced to 2D). But a more complete
+                    # implementation would gather the full current nD index and query
+                    # the data source directly.
+                    value = handle.data[y, x]
+                    if isinstance(value, (np.floating, float)):
+                        value = f"{value:.2f}"
+                    channels.append(f" {n}: {value}")
+                except IndexError:
+                    # we're out of bounds
+                    # if we eventually have multiple image sources with different
+                    # extents, this will need to be handled.  here, we just skip
+                    self._hover_info_label.setText("")
+                    return
+                break  # only getting one handle per channel
+            text += ",".join(channels)
+        self._hover_info_label.setText(text)

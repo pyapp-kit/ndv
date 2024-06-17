@@ -72,8 +72,7 @@ class _QWgpuCanvas(QWgpuCanvas):
 class PyGFXViewerCanvas:
     """pygfx-based canvas wrapper."""
 
-    def __init__(self, set_info: Callable[[str], None]) -> None:
-        self._set_info = set_info
+    def __init__(self) -> None:
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
@@ -211,25 +210,9 @@ class PyGFXViewerCanvas:
     def _animate(self) -> None:
         self._renderer.render(self._scene, self._camera)
 
-    # def _on_mouse_move(self, event: SceneMouseEvent) -> None:
-    #     """Mouse moved on the canvas, display the pixel value and position."""
-    #     images = []
-    #     # Get the images the mouse is over
-    #     seen = set()
-    #     while visual := self._canvas.visual_at(event.pos):
-    #         if isinstance(visual, scene.visuals.Image):
-    #             images.append(visual)
-    #         visual.interactive = False
-    #         seen.add(visual)
-    #     for visual in seen:
-    #         visual.interactive = True
-    #     if not images:
-    #         return
-
-    #     tform = images[0].get_transform("canvas", "visual")
-    #     px, py, *_ = (int(x) for x in tform.map(event.pos))
-    #     text = f"[{py}, {px}]"
-    #     for c, img in enumerate(images):
-    #         with suppress(IndexError):
-    #             text += f" c{c}: {img._data[py, px]}"
-    #     self._set_info(text)
+    def canvas_to_world(
+        self, pos_xy: tuple[float, float]
+    ) -> tuple[float, float, float]:
+        """Map XY canvas position (pixels) to XYZ coordinate in world space."""
+        # TODO
+        return (-1, -1, -1)
