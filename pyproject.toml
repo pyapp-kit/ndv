@@ -48,6 +48,7 @@ third_party_arrays = [
     "pyopencl[pocl]; sys_platform == 'linux'",
     "sparse",
     "tensorstore",
+    "numpy<2.0",                               # for tensorstore (at least)
     "torch",
     "xarray",
     "zarr",
