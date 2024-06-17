@@ -209,11 +209,13 @@ class NDViewer(QWidget):
         btns.addWidget(self._ndims_btn)
         btns.addWidget(self._set_range_btn)
 
-        info = QHBoxLayout()
+        info_widget = QWidget()
+        info = QHBoxLayout(info_widget)
         info.setContentsMargins(0, 0, 0, 2)
         info.setSpacing(0)
         info.addWidget(self._data_info_label)
         info.addWidget(self._progress_spinner)
+        info_widget.setFixedHeight(16)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(2)
