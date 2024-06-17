@@ -2,20 +2,18 @@ from __future__ import annotations
 
 import warnings
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Callable, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 import vispy
 import vispy.scene
 import vispy.visuals
-from superqt.utils import qthrottled
 from vispy import scene
 from vispy.util.quaternion import Quaternion
 
 if TYPE_CHECKING:
     import cmap
     from qtpy.QtWidgets import QWidget
-    from vispy.scene.events import SceneMouseEvent
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
@@ -89,10 +87,8 @@ class VispyViewerCanvas:
     could be swapped in if needed as long as they implement the same interface).
     """
 
-    def __init__(self, set_info: Callable[[str], None]) -> None:
-        self._set_info = set_info
+    def __init__(self) -> None:
         self._canvas = scene.SceneCanvas()
-        self._canvas.events.mouse_move.connect(qthrottled(self._on_mouse_move, 60))
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
@@ -190,32 +186,8 @@ class VispyViewerCanvas:
             max_size = max(self._current_shape)
             self._camera.scale_factor = max_size + 6
 
-    def _on_mouse_move(self, event: SceneMouseEvent) -> None:
-        """Mouse moved on the canvas, display the pixel value and position."""
-        images = []
-        # Get the images the mouse is over
-        # FIXME: this is narsty ... there must be a better way to do this
-        seen = set()
-        try:
-            while visual := self._canvas.visual_at(event.pos):
-                if isinstance(visual, scene.visuals.Image):
-                    images.append(visual)
-                visual.interactive = False
-                seen.add(visual)
-        except Exception:
-            return
-        for visual in seen:
-            visual.interactive = True
-        if not images:
-            return
-
-        tform = images[0].get_transform("canvas", "visual")
-        px, py, *_ = (int(x) for x in tform.map(event.pos))
-        text = f"[{py}, {px}]"
-        for c, img in enumerate(reversed(images)):
-            with suppress(IndexError):
-                value = img._data[py, px]
-                if isinstance(value, (np.floating, float)):
-                    value = f"{value:.2f}"
-                text += f" {c}: {value}"
-        self._set_info(text)
+    def canvas_to_world(
+        self, pos_xy: tuple[float, float]
+    ) -> tuple[float, float, float]:
+        """Map XY canvas position (pixels) to XYZ coordinate in world space."""
+        return self._view.camera.transform.imap(pos_xy)[:3]  # type: ignore [no-any-return]
