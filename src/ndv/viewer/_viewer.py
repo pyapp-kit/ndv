@@ -276,7 +276,8 @@ class NDViewer(QWidget):
         # store the data
         self._data_wrapper = DataWrapper.create(data)
         # set channel axis
-        self._channel_axis = self._data_wrapper.guess_channel_axis()
+        if self._channel_axis is None:
+            self._channel_axis = self._data_wrapper.guess_channel_axis()
 
         # update the dimensions we are visualizing
         sizes = self._data_wrapper.sizes()
