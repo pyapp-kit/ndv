@@ -220,7 +220,7 @@ class NDViewer(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.addLayout(info)
+        layout.addWidget(info_widget)
         layout.addWidget(self._qcanvas, 1)
         layout.addWidget(self._hover_info_label)
         layout.addWidget(self._dims_sliders)
