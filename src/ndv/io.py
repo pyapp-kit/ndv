@@ -118,20 +118,19 @@ def _array_path(path: str | Path, level: int = 0) -> str:
         with suppress(TypeError):
             zattrs = json.loads(z.store.get(".zattrs"))
             if "multiscales" in zattrs:
-                datasets = zattrs["multiscales"][0]["datasets"]
-                _found = []
-                for n, dset in enumerate(datasets):
+                levels: list[str] = []
+                for dset in zattrs["multiscales"][0]["datasets"]:
                     if "path" in dset:
-                        if n == level:
-                            return f'/{dset["path"]}'
-                        else:
-                            _found.append(dset["path"])
+                        levels.append(dset["path"])
+                if levels:
+                    return "/" + levels[level]
+
         arrays = list(z.array_keys())
         if arrays:
             return f"/{arrays[0]}"
 
-    if level != 0 and _found:
+    if level != 0 and levels:
         raise ValueError(
-            f"Could not find a dataset with level {level} in the group. Found: {_found}"
+            f"Could not find a dataset with level {level} in the group. Found: {levels}"
         )
     raise ValueError("Could not find an array or multiscales information in the group.")
