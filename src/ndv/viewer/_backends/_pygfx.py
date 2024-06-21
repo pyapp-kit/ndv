@@ -69,29 +69,17 @@ class PyGFXImageHandle:
 class _QWgpuCanvas(QWgpuCanvas):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        # Every event we want to intercept in the viewer
-        # Must be "ignored" here
-        self._subwidget.mousePressEvent = self._run_and_ignore(
-            self._subwidget.mousePressEvent
-        )
-        self._subwidget.mouseMoveEvent = self._run_and_ignore(
-            self._subwidget.mouseMoveEvent
-        )
-        self._subwidget.mouseReleaseEvent = self._run_and_ignore(
-            self._subwidget.mouseReleaseEvent
-        )
+        self._sup_mouse_event = self._subwidget._mouse_event
+        self._subwidget._mouse_event = self._mouse_event
 
     def sizeHint(self) -> QSize:
         return QSize(512, 512)
 
-    def _run_and_ignore(self, old: Callable) -> Callable:
-        def new(event: QEvent) -> None:
-            # Process the event like normal
-            old(event)
-            # Then
-            event.ignore()
-
-        return new
+    def _mouse_event(
+        self, event_type: str, event: QEvent, *args: Any, **kwargs: Any
+    ) -> None:
+        self._sup_mouse_event(event_type, event, *args, **kwargs)
+        event.ignore()
 
 
 class PyGFXViewerCanvas:
