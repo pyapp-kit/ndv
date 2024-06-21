@@ -227,6 +227,8 @@ class PyGFXViewerCanvas:
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
+        # Code adapted from:
+        # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR395
         viewport = pygfx.Viewport.from_viewport_or_renderer(self._renderer)
         if not viewport.is_inside(*pos_xy):
             return (-1, -1, -1)
