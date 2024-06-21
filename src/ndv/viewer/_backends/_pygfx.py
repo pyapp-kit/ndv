@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
 import pygfx
+import pylinalg as la
 from qtpy.QtCore import QSize
 from wgpu.gui.qt import QWgpuCanvas
 
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     import cmap
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
+    from qtpy.QtCore import QEvent
     from qtpy.QtWidgets import QWidget
 
 
@@ -65,8 +67,19 @@ class PyGFXImageHandle:
 
 
 class _QWgpuCanvas(QWgpuCanvas):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._sup_mouse_event = self._subwidget._mouse_event
+        self._subwidget._mouse_event = self._mouse_event
+
     def sizeHint(self) -> QSize:
         return QSize(512, 512)
+
+    def _mouse_event(
+        self, event_type: str, event: QEvent, *args: Any, **kwargs: Any
+    ) -> None:
+        self._sup_mouse_event(event_type, event, *args, **kwargs)
+        event.ignore()
 
 
 class PyGFXViewerCanvas:
@@ -214,5 +227,33 @@ class PyGFXViewerCanvas:
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
-        # TODO
-        return (-1, -1, -1)
+        # Code adapted from:
+        # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR395
+        viewport = pygfx.Viewport.from_viewport_or_renderer(self._renderer)
+        if not viewport.is_inside(*pos_xy):
+            return (-1, -1, -1)
+
+        # Get position relative to viewport
+        pos_rel = (
+            pos_xy[0] - viewport.rect[0],
+            pos_xy[1] - viewport.rect[1],
+        )
+
+        vs = viewport.logical_size
+
+        # Convert position to NDC
+        x = pos_rel[0] / vs[0] * 2 - 1
+        y = -(pos_rel[1] / vs[1] * 2 - 1)
+        pos_ndc = (x, y, 0)
+
+        if self._camera:
+            pos_ndc += la.vec_transform(
+                self._camera.world.position, self._camera.camera_matrix
+            )
+            pos_world = la.vec_unproject(pos_ndc[:2], self._camera.camera_matrix)
+
+            # NB In vispy, (0.5,0.5) is a center of an image pixel, while in pygfx
+            # (0,0) is the center. We conform to vispy's standard.
+            return (pos_world[0] + 0.5, pos_world[1] + 0.5, pos_world[2] + 0.5)
+        else:
+            return (-1, -1, -1)

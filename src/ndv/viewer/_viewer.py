@@ -170,15 +170,7 @@ class NDViewer(QWidget):
         self._qcanvas = self._canvas.qwidget()
 
         # Install an event filter so we can intercept mouse/key events
-        if hasattr(self._qcanvas, "_subwidget"):
-            # HACK:
-            # this is a hack for the pygfx backend, which wraps the canvas in another
-            # widget that controls all events.
-            # We could technically add another method to PCanvas to get the "filterable"
-            # widget... but we'll just do this for now.
-            self._qcanvas._subwidget.installEventFilter(self)
-        else:
-            self._qcanvas.installEventFilter(self)
+        self._qcanvas.installEventFilter(self)
 
         # the sliders that control the index of the displayed image
         self._dims_sliders = DimsSliders(self)
