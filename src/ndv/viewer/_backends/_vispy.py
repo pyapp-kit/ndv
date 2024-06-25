@@ -3,20 +3,266 @@ from __future__ import annotations
 import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
+from weakref import WeakKeyDictionary
 
+import cmap
 import numpy as np
 import vispy
 import vispy.scene
 import vispy.visuals
+from qtpy.QtCore import Qt
 from vispy import scene
+from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
 if TYPE_CHECKING:
-    import cmap
+    from typing import Callable, Sequence
+
     from qtpy.QtWidgets import QWidget
+
+    from ._protocols import CanvasElement
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
+
+
+class Handle(scene.visuals.Markers):
+    """A Marker that allows specific ROI alterations."""
+
+    def __init__(
+        self,
+        parent: EditableROI,
+        on_move: Callable[[Sequence[float]], None] | None = None,
+        cursor: Qt.CursorShape
+        | Callable[[Sequence[float]], Qt.CursorShape] = Qt.CursorShape.SizeAllCursor,
+    ) -> None:
+        super().__init__(parent=parent)
+        self.unfreeze()
+        self.parent = parent
+        # on_move function(s)
+        self.on_move: list[Callable[[Sequence[float]], None]] = []
+        if on_move:
+            self.on_move.append(on_move)
+        # cusror preference function
+        if isinstance(cursor, Qt.CursorShape):
+            self._cursor_at = cast(
+                "Callable[[Sequence[float]], Qt.CursorShape]", lambda _: cursor
+            )
+        else:
+            self._cursor_at = cursor
+        self._selected = False
+        # NB VisPy asks that the data is a 2D array
+        self._pos = np.array([[0, 0]], dtype=np.float32)
+        self.interactive = True
+        self.freeze()
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        pass
+
+    def move(self, pos: Sequence[float]) -> None:
+        for func in self.on_move:
+            func(pos)
+
+    @property
+    def pos(self) -> Sequence[float]:
+        return cast("Sequence[float]", self._pos[0, :])
+
+    @pos.setter
+    def pos(self, pos: Sequence[float]) -> None:
+        self._pos[:] = pos[:2]
+        self.set_data(self._pos)
+
+    @property
+    def selected(self) -> bool:
+        return self._selected
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        self._selected = selected
+        self.parent.selected = selected
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return self._cursor_at(self.pos)
+
+
+class EditableROI(scene.visuals.Polygon):
+    """Base Class defining behavior all editable ROIs should have."""
+
+    @property
+    def vertices(self) -> Sequence[Sequence[float]]:
+        raise NotImplementedError("Must be implemented in subclass")
+
+    @vertices.setter
+    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
+        raise NotImplementedError("Must be implemented in subclass")
+
+    @property
+    def selected(self) -> bool:
+        raise NotImplementedError("Must be implemented in subclass")
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        raise NotImplementedError("Must be implemented in subclass")
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        raise NotImplementedError("Must be implemented in subclass")
+
+    def move(self, pos: Sequence[float]) -> None:
+        raise NotImplementedError("Must be implemented in subclass")
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        raise NotImplementedError("Must be implemented in subclass")
+
+
+class RectangularROI(scene.visuals.Rectangle, EditableROI):
+    """A VisPy Rectangle visual whose attributes can be edited."""
+
+    def __init__(
+        self,
+        parent: scene.visuals.Visual,
+        center: list[float] | None = None,
+        width: float = 1e-6,
+        height: float = 1e-6,
+    ) -> None:
+        if center is None:
+            center = [0, 0]
+        scene.visuals.Rectangle.__init__(
+            self, center=center, width=width, height=height, radius=0, parent=parent
+        )
+        self.unfreeze()
+        self.parent = parent
+        self.interactive = True
+
+        self._handles = [
+            Handle(
+                self,
+                on_move=self.move_top_left,
+                cursor=self._handle_cursor_pref,
+            ),
+            Handle(
+                self,
+                on_move=self.move_top_right,
+                cursor=self._handle_cursor_pref,
+            ),
+            Handle(
+                self,
+                on_move=self.move_bottom_right,
+                cursor=self._handle_cursor_pref,
+            ),
+            Handle(
+                self,
+                on_move=self.move_bottom_left,
+                cursor=self._handle_cursor_pref,
+            ),
+        ]
+
+        # drag_reference defines the offset between where the user clicks and the center
+        # of the rectangle
+        self.drag_reference = [0.0, 0.0]
+        self.interactive = True
+        self._selected = False
+        self.freeze()
+
+    def _handle_cursor_pref(self, handle_pos: Sequence[float]) -> Qt.CursorShape:
+        # Bottom left handle
+        if handle_pos[0] < self.center[0] and handle_pos[1] < self.center[1]:
+            return Qt.CursorShape.SizeFDiagCursor
+        # Top right handle
+        if handle_pos[0] > self.center[0] and handle_pos[1] > self.center[1]:
+            return Qt.CursorShape.SizeFDiagCursor
+        # Top left, bottom right
+        return Qt.CursorShape.SizeBDiagCursor
+
+    def move_top_left(self, pos: Sequence[float]) -> None:
+        self._handles[3].pos = [pos[0], self._handles[3].pos[1]]
+        self._handles[0].pos = pos
+        self._handles[1].pos = [self._handles[1].pos[0], pos[1]]
+        self.redraw()
+
+    def move_top_right(self, pos: Sequence[float]) -> None:
+        self._handles[0].pos = [self._handles[0].pos[0], pos[1]]
+        self._handles[1].pos = pos
+        self._handles[2].pos = [pos[0], self._handles[2].pos[1]]
+        self.redraw()
+
+    def move_bottom_right(self, pos: Sequence[float]) -> None:
+        self._handles[1].pos = [pos[0], self._handles[1].pos[1]]
+        self._handles[2].pos = pos
+        self._handles[3].pos = [self._handles[3].pos[0], pos[1]]
+        self.redraw()
+
+    def move_bottom_left(self, pos: Sequence[float]) -> None:
+        self._handles[2].pos = [self._handles[2].pos[0], pos[1]]
+        self._handles[3].pos = pos
+        self._handles[0].pos = [pos[0], self._handles[0].pos[1]]
+        self.redraw()
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return Qt.CursorShape.SizeAllCursor
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        self.drag_reference = [
+            pos[0] - self.center[0],
+            pos[1] - self.center[1],
+        ]
+
+    def redraw(self) -> None:
+        left, top, *_ = self._handles[0].pos
+        right, bottom, *_ = self._handles[2].pos
+
+        self.center = [(left + right) / 2, (top + bottom) / 2]
+        self.width = max(abs(left - right), 1e-6)
+        self.height = max(abs(top - bottom), 1e-6)
+
+    def move(self, pos: Sequence[float]) -> None:
+        new_center = [
+            pos[0] - self.drag_reference[0],
+            pos[1] - self.drag_reference[1],
+        ]
+        old_center = self.center
+        # TODO: Simplify
+        for h in self._handles:
+            existing_pos = h.pos
+            h.pos = [
+                existing_pos[0] + new_center[0] - old_center[0],
+                existing_pos[1] + new_center[1] - old_center[1],
+            ]
+        self.center = new_center
+
+    @property
+    def selected(self) -> bool:
+        return self._selected
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        self._selected = selected
+        for h in self._handles:
+            h.visible = selected
+
+    @property
+    def vertices(self) -> Sequence[Sequence[float]]:
+        return [h.pos for h in self._handles]
+
+    @vertices.setter
+    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
+        if len(vertices) != 4 or any(len(v) != 2 for v in vertices):
+            raise Exception("Only 2D rectangles are currently supported")
+        is_aligned = (
+            vertices[0][1] == vertices[1][1]
+            and vertices[1][0] == vertices[2][0]
+            and vertices[2][1] == vertices[3][1]
+            and vertices[3][0] == vertices[0][0]
+        )
+        if not is_aligned:
+            raise Exception(
+                "Only rectangles aligned with the axes are currently supported"
+            )
+
+        # Update each handle
+        for i, handle in enumerate(self._handles):
+            handle.pos = vertices[i]
+        # Redraw
+        self.redraw()
 
 
 class VispyImageHandle:
@@ -51,6 +297,18 @@ class VispyImageHandle:
         self._visual.visible = visible
 
     @property
+    def can_select(self) -> bool:
+        return False
+
+    @property
+    def selected(self) -> bool:
+        return False
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        raise NotImplementedError("Images cannot be selected")
+
+    @property
     def clim(self) -> Any:
         return self._visual.clim
 
@@ -76,8 +334,128 @@ class VispyImageHandle:
     def transform(self, transform: np.ndarray) -> None:
         raise NotImplementedError
 
+    def start_move(self, pos: Sequence[float]) -> None:
+        pass
+
+    def move(self, pos: Sequence[float]) -> None:
+        pass
+
     def remove(self) -> None:
         self._visual.parent = None
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return None
+
+
+# FIXME: Unfortunate naming :)
+class VispyHandleHandle:
+    def __init__(self, handle: Handle, parent: CanvasElement) -> None:
+        self._handle = handle
+        self._parent = parent
+
+    @property
+    def visible(self) -> bool:
+        return cast("bool", self._handle.visible)
+
+    @visible.setter
+    def visible(self, visible: bool) -> None:
+        self._handle.visible = visible
+
+    @property
+    def can_select(self) -> bool:
+        return True
+
+    @property
+    def selected(self) -> bool:
+        return self._handle.selected
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        self._handle.selected = selected
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        self._handle.start_move(pos)
+
+    def move(self, pos: Sequence[float]) -> None:
+        self._handle.move(pos)
+
+    def remove(self) -> None:
+        self._parent.remove()
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return self._handle.cursor_at(pos)
+
+
+class VispyRoiHandle:
+    def __init__(self, roi: EditableROI) -> None:
+        self._roi = roi
+
+    @property
+    def vertices(self) -> Sequence[Sequence[float]]:
+        return self._roi.vertices
+
+    @vertices.setter
+    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
+        self._roi.vertices = vertices
+
+    @property
+    def visible(self) -> bool:
+        return bool(self._roi.visible)
+
+    @visible.setter
+    def visible(self, visible: bool) -> None:
+        self._roi.visible = visible
+
+    @property
+    def can_select(self) -> bool:
+        return True
+
+    @property
+    def selected(self) -> bool:
+        return self._roi.selected
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        self._roi.selected = selected
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        self._roi.start_move(pos)
+
+    def move(self, pos: Sequence[float]) -> None:
+        self._roi.move(pos)
+
+    @property
+    def color(self) -> Any:
+        return self._roi.color
+
+    @color.setter
+    def color(self, color: Any | None = None) -> None:
+        if color is None:
+            color = cmap.Color("transparent")
+        if not isinstance(color, cmap.Color):
+            color = cmap.Color(color)
+        # NB: To enable dragging the shape within the border,
+        # we require a positive alpha.
+        alpha = max(color.alpha, 1e-6)
+        self._roi.color = Color(color.hex, alpha=alpha)
+
+    @property
+    def border_color(self) -> Any:
+        return self._roi.border_color
+
+    @border_color.setter
+    def border_color(self, color: Any | None = None) -> None:
+        if color is None:
+            color = cmap.Color("yellow")
+        if not isinstance(color, cmap.Color):
+            color = cmap.Color(color)
+        self._roi.border_color = Color(color.hex, alpha=color.alpha)
+
+    def remove(self) -> None:
+        self._roi.parent = None
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return self._roi.cursor_at(pos)
 
 
 class VispyViewerCanvas:
@@ -95,6 +473,8 @@ class VispyViewerCanvas:
         central_wdg: scene.Widget = self._canvas.central_widget
         self._view: scene.ViewBox = central_wdg.add_view()
         self._ndim: Literal[2, 3] | None = None
+
+        self._elements: WeakKeyDictionary = WeakKeyDictionary()
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -139,6 +519,7 @@ class VispyViewerCanvas:
             if not prev_shape:
                 self.set_range()
         handle = VispyImageHandle(img)
+        self._elements[img] = handle
         if cmap is not None:
             handle.cmap = cmap
         return handle
@@ -156,8 +537,29 @@ class VispyViewerCanvas:
             if len(prev_shape) != 3:
                 self.set_range()
         handle = VispyImageHandle(vol)
+        self._elements[vol] = handle
         if cmap is not None:
             handle.cmap = cmap
+        return handle
+
+    def add_roi(
+        self,
+        vertices: list[tuple[float, float]] | None = None,
+        color: Any | None = None,
+        border_color: Any | None = None,
+    ) -> VispyRoiHandle:
+        """Add a new Rectangular ROI node to the scene."""
+        roi = RectangularROI(
+            parent=self._view.scene,
+        )
+        handle = VispyRoiHandle(roi)
+        self._elements[roi] = handle
+        for h in roi._handles:
+            self._elements[h] = VispyHandleHandle(h, handle)
+        if vertices:
+            handle.vertices = vertices
+        handle.color = color
+        handle.border_color = border_color
         return handle
 
     def set_range(
@@ -190,4 +592,12 @@ class VispyViewerCanvas:
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
-        return self._view.camera.transform.imap(pos_xy)[:3]  # type: ignore [no-any-return]
+        return self._view.scene.transform.imap(pos_xy)[:3]  # type: ignore [no-any-return]
+
+    def elements_at(self, pos_xy: tuple[float, float, float]) -> list[CanvasElement]:
+        elements = []
+        visuals = self._canvas.visuals_at(pos_xy[:2])
+        for vis in visuals:
+            if (handle := self._elements.get(vis)) is not None:
+                elements.append(handle)
+        return elements

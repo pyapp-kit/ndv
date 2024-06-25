@@ -2,19 +2,33 @@ from __future__ import annotations
 
 import warnings
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
+from weakref import WeakKeyDictionary
 
+import cmap
 import numpy as np
 import pygfx
 import pylinalg as la
-from qtpy.QtCore import QSize
+from qtpy.QtCore import QSize, Qt
 from wgpu.gui.qt import QWgpuCanvas
 
 if TYPE_CHECKING:
-    import cmap
+    from typing import Sequence
+
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
     from qtpy.QtCore import QEvent
     from qtpy.QtWidgets import QWidget
+
+    from ._protocols import CanvasElement
+
+
+def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:
+    return bool(
+        bounding_box[0, 0] + 0.5 <= pos[0]
+        and pos[0] <= bounding_box[1, 0] + 0.5
+        and bounding_box[0, 1] + 0.5 <= pos[1]
+        and pos[1] <= bounding_box[1, 1] + 0.5
+    )
 
 
 class PyGFXImageHandle:
@@ -43,6 +57,18 @@ class PyGFXImageHandle:
         self._render()
 
     @property
+    def can_select(self) -> bool:
+        return False
+
+    @property
+    def selected(self) -> bool:
+        return False
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        raise NotImplementedError("Images cannot be selected")
+
+    @property
     def clim(self) -> Any:
         return self._material.clim
 
@@ -61,9 +87,313 @@ class PyGFXImageHandle:
         self._material.map = cmap.to_pygfx()
         self._render()
 
+    def start_move(self, pos: Sequence[float]) -> None:
+        pass
+
+    def move(self, pos: Sequence[float]) -> None:
+        pass
+
     def remove(self) -> None:
         if (par := self._image.parent) is not None:
             par.remove(self._image)
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return None
+
+
+class PyGFXRoiHandle(pygfx.WorldObject):
+    _render: Callable = lambda _: None
+
+    def __init__(self, render: Callable, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, *kwargs)
+        self._fill = self._create_fill()
+        if self._fill:
+            self.add(self._fill)
+        self._outline = self._create_outline()
+        if self._outline:
+            self.add(self._outline)
+        self._handles = self._create_handles()
+        if self._handles:
+            self.add(self._handles)
+
+        self._render = render
+
+    def _create_fill(self) -> pygfx.Mesh | None:
+        # To be implemented by subclasses needing a fill
+        return None
+
+    def _create_outline(self) -> pygfx.Line | None:
+        # To be implemented by subclasses needing an outline
+        return None
+
+    def _create_handles(self) -> pygfx.Points | None:
+        # To be implemented by subclasses needing handles
+        return None
+
+    @property
+    def vertices(self) -> Sequence[Sequence[float]]:
+        # To be implemented by subclasses
+        raise NotImplementedError("Must be implemented in subclasses")
+
+    @vertices.setter
+    def vertices(self, data: Sequence[Sequence[float]]) -> None:
+        # To be implemented by subclasses
+        raise NotImplementedError("Must be implemented in subclasses")
+
+    @property
+    def visible(self) -> bool:
+        if self._outline:
+            return bool(self._outline.visible)
+        if self._fill:
+            return bool(self._fill.visible)
+        # Nothing to see
+        return False
+
+    @visible.setter
+    def visible(self, visible: bool) -> None:
+        if fill := getattr(self, "_fill", None):
+            fill.visible = visible
+        if outline := getattr(self, "_outline", None):
+            outline.visible = visible
+        if handles := getattr(self, "_handles", None):
+            handles.visible = self.selected
+        self._render()
+
+    @property
+    def can_select(self) -> bool:
+        return True
+
+    @property
+    def selected(self) -> bool:
+        if self._handles:
+            return bool(self._handles.visible)
+        # Can't be selected without handles
+        return False
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        if self._handles:
+            self._handles.visible = selected
+
+    @property
+    def color(self) -> Any:
+        if self._fill:
+            return cmap.Color(self._fill.material.color)
+        return cmap.Color("transparent")
+
+    @color.setter
+    def color(self, color: cmap.Color | None = None) -> None:
+        if self._fill:
+            if color is None:
+                color = cmap.Color("transparent")
+            if not isinstance(color, cmap.Color):
+                color = cmap.Color(color)
+            self._fill.material.color = color.rgba
+            self._render()
+
+    @property
+    def border_color(self) -> Any:
+        if self._outline:
+            return cmap.Color(self._outline.material.color)
+        return cmap.Color("transparent")
+
+    @border_color.setter
+    def border_color(self, color: cmap.Color | None = None) -> None:
+        if self._outline:
+            if color is None:
+                color = cmap.Color("yellow")
+            if not isinstance(color, cmap.Color):
+                color = cmap.Color(color)
+            self._outline.material.color = color.rgba
+            self._render()
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        # To be implemented by subclasses
+        raise NotImplementedError("Must be implemented in subclasses")
+
+    def move(self, pos: Sequence[float]) -> None:
+        # To be implemented by subclasses
+        raise NotImplementedError("Must be implemented in subclasses")
+
+    def remove(self) -> None:
+        if (par := self.parent) is not None:
+            par.remove(self)
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        # To be implemented by subclasses
+        raise NotImplementedError("Must be implemented in subclasses")
+
+
+class RectangularROIHandle(PyGFXRoiHandle):
+    def __init__(
+        self, render: Callable, canvas_to_world: Callable, *args: Any, **kwargs: Any
+    ) -> None:
+        self._point_rad = 5  # PIXELS
+        self._positions: np.ndarray = np.zeros((5, 3), dtype=np.float32)
+
+        super().__init__(render, *args, *kwargs)
+        self._canvas_to_world = canvas_to_world
+
+        # drag_reference defines the offset between where the user clicks and the center
+        # of the rectangle
+        self._drag_idx: int | None = None
+        self._offset = np.zeros((5, 2))
+        self._on_drag = [
+            self._move_handle_0,
+            self._move_handle_1,
+            self._move_handle_2,
+            self._move_handle_3,
+        ]
+
+    @property
+    def vertices(self) -> Sequence[Sequence[float]]:
+        # Buffer object
+        return [p[:2] for p in self._positions]
+
+    @vertices.setter
+    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
+        if len(vertices) != 4 or any(len(v) != 2 for v in vertices):
+            raise Exception("Only 2D rectangles are currently supported")
+        is_aligned = (
+            vertices[0][1] == vertices[1][1]
+            and vertices[1][0] == vertices[2][0]
+            and vertices[2][1] == vertices[3][1]
+            and vertices[3][0] == vertices[0][0]
+        )
+        if not is_aligned:
+            raise Exception(
+                "Only rectangles aligned with the axes are currently supported"
+            )
+
+        # Update each handle
+        self._positions[:-1, :2] = vertices
+        self._positions[-1, :2] = vertices[0]
+        self._refresh()
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        self._drag_idx = self._handle_hover_idx(pos)
+
+        if self._drag_idx is None:
+            self._offset[:, :] = self._positions[:, :2] - pos[:2]
+
+    def move(self, pos: Sequence[float]) -> None:
+        if self._drag_idx is not None:
+            self._on_drag[self._drag_idx](pos)
+        else:
+            # TODO: We could potentially do this smarter via transforms
+            self._positions[:, :2] = self._offset[:, :2] + pos[:2]
+        self._refresh()
+
+    def _move_handle_0(self, pos: Sequence[float]) -> None:
+        # NB pygfx requires (idx 0) = (idx 4)
+        self._positions[0, :2] = pos[:2]
+        self._positions[4, :2] = pos[:2]
+
+        self._positions[3, 0] = pos[0]
+        self._positions[1, 1] = pos[1]
+
+    def _move_handle_1(self, pos: Sequence[float]) -> None:
+        self._positions[1, :2] = pos[:2]
+
+        self._positions[2, 0] = pos[0]
+        # NB pygfx requires (idx 0) = (idx 4)
+        self._positions[0, 1] = pos[1]
+        self._positions[4, 1] = pos[1]
+
+    def _move_handle_2(self, pos: Sequence[float]) -> None:
+        self._positions[2, :2] = pos[:2]
+
+        self._positions[1, 0] = pos[0]
+        self._positions[3, 1] = pos[1]
+
+    def _move_handle_3(self, pos: Sequence[float]) -> None:
+        self._positions[3, :2] = pos[:2]
+
+        # NB pygfx requires (idx 0) = (idx 4)
+        self._positions[0, 0] = pos[0]
+        self._positions[4, 0] = pos[0]
+        self._positions[2, 1] = pos[1]
+
+    def _create_fill(self) -> pygfx.Mesh | None:
+        fill = pygfx.Mesh(
+            geometry=pygfx.Geometry(
+                positions=self._positions,
+                indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
+            ),
+            material=pygfx.MeshBasicMaterial(color=(0, 0, 0, 0)),
+        )
+        return fill
+
+    def _create_outline(self) -> pygfx.Line | None:
+        outline = pygfx.Line(
+            geometry=pygfx.Geometry(
+                positions=self._positions,
+                indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
+            ),
+            material=pygfx.LineMaterial(color=(0, 0, 0, 0)),
+        )
+        return outline
+
+    def _create_handles(self) -> pygfx.Points | None:
+        geometry = pygfx.Geometry(positions=self._positions[:-1])
+        handles = pygfx.Points(
+            geometry=geometry,
+            # FIXME Size in pixels is not ideal for selection.
+            # TODO investigate what size_mode = vertex does...
+            material=pygfx.PointsMaterial(color=(1, 1, 1), size=2 * self._point_rad),
+        )
+
+        # NB: Default bounding box for points does not consider the radius of
+        # those points. We need to HACK it for handle selection
+        def get_handle_bb(old: Callable[[], np.ndarray]) -> Callable[[], np.ndarray]:
+            def new_get_bb() -> np.ndarray:
+                bb = old().copy()
+                bb[0, :2] -= self._point_rad
+                bb[1, :2] += self._point_rad
+                return bb
+
+            return new_get_bb
+
+        geometry.get_bounding_box = get_handle_bb(geometry.get_bounding_box)
+        return handles
+
+    def _refresh(self) -> None:
+        if self._fill:
+            self._fill.geometry.positions.data[:, :] = self._positions
+            self._fill.geometry.positions.update_range()
+        if self._outline:
+            self._outline.geometry.positions.data[:, :] = self._positions
+            self._outline.geometry.positions.update_range()
+        if self._handles:
+            self._handles.geometry.positions.data[:, :] = self._positions[:-1]
+            self._handles.geometry.positions.update_range()
+        self._render()
+
+    def _handle_hover_idx(self, pos: Sequence[float]) -> int | None:
+        # FIXME: Ideally, Renderer.get_pick_info would do this for us. But it
+        # seems broken.
+        for i, p in enumerate(self._positions[:-1]):
+            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= self._point_rad**2:
+                return i
+        return None
+
+    def cursor_at(self, canvas_pos: Sequence[float]) -> Qt.CursorShape | None:
+        # Convert canvas -> world
+        world_pos = self._canvas_to_world(canvas_pos)
+        # Step 1: Check if over handle
+        if (idx := self._handle_hover_idx(world_pos)) is not None:
+            if np.array_equal(
+                self._positions[idx], self._positions.min(axis=0)
+            ) or np.array_equal(self._positions[idx], self._positions.max(axis=0)):
+                return Qt.CursorShape.SizeFDiagCursor
+            return Qt.CursorShape.SizeBDiagCursor
+
+        # Step 2: Check if over ROI
+        if self._outline:
+            roi_bb = self._outline.geometry.get_bounding_box()
+            if _is_inside(roi_bb, world_pos):
+                return Qt.CursorShape.SizeAllCursor
+        return None
 
 
 class _QWgpuCanvas(QWgpuCanvas):
@@ -71,15 +401,19 @@ class _QWgpuCanvas(QWgpuCanvas):
         super().__init__(*args, **kwargs)
         self._sup_mouse_event = self._subwidget._mouse_event
         self._subwidget._mouse_event = self._mouse_event
+        self._filter: Any | None = None
 
     def sizeHint(self) -> QSize:
         return QSize(512, 512)
 
+    def installEventFilter(self, filter: Any) -> None:
+        self._filter = filter
+
     def _mouse_event(
         self, event_type: str, event: QEvent, *args: Any, **kwargs: Any
     ) -> None:
-        self._sup_mouse_event(event_type, event, *args, **kwargs)
-        event.ignore()
+        if self._filter and not self._filter.eventFilter(self, event):
+            self._sup_mouse_event(event_type, event, *args, **kwargs)
 
 
 class PyGFXViewerCanvas:
@@ -104,6 +438,8 @@ class PyGFXViewerCanvas:
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None
         self._ndim: Literal[2, 3] | None = None
+
+        self._elements: WeakKeyDictionary = WeakKeyDictionary()
 
     def qwidget(self) -> QWidget:
         return cast("QWidget", self._canvas)
@@ -163,6 +499,7 @@ class PyGFXViewerCanvas:
         handle = PyGFXImageHandle(image, self.refresh)
         if cmap is not None:
             handle.cmap = cmap
+        self._elements[image] = handle
         return handle
 
     def add_volume(
@@ -187,6 +524,25 @@ class PyGFXViewerCanvas:
         handle = PyGFXImageHandle(vol, self.refresh)
         if cmap is not None:
             handle.cmap = cmap
+        self._elements[vol] = handle
+        return handle
+
+    def add_roi(
+        self,
+        vertices: list[tuple[float, float]] | None = None,
+        color: cmap.Color | None = None,
+        border_color: cmap.Color | None = None,
+    ) -> PyGFXRoiHandle:
+        """Add a new Rectangular ROI node to the scene."""
+        handle = RectangularROIHandle(self.refresh, self.canvas_to_world)
+        handle.visible = False
+        self._scene.add(handle)
+        if vertices:
+            handle.vertices = vertices
+        handle.color = color
+        handle.border_color = border_color
+
+        self._elements[handle] = handle
         return handle
 
     def set_range(
@@ -257,3 +613,16 @@ class PyGFXViewerCanvas:
             return (pos_world[0] + 0.5, pos_world[1] + 0.5, pos_world[2] + 0.5)
         else:
             return (-1, -1, -1)
+
+    def elements_at(self, pos: Sequence[float]) -> list[CanvasElement]:
+        """Obtains all elements located at pos."""
+        # FIXME: Ideally, Renderer.get_pick_info would do this and
+        # canvas_to_world for us. But it seems broken.
+        elements: list[CanvasElement] = []
+        pos = self.canvas_to_world((pos[0], pos[1]))
+        for c in self._scene.children:
+            bb = c.get_bounding_box()
+            if _is_inside(bb, pos):
+                element = cast("CanvasElement", self._elements.get(c))
+                elements.append(element)
+        return elements

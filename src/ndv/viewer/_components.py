@@ -64,3 +64,11 @@ class ChannelModeButton(QPushButton):
         other = ChannelMode.COMPOSITE if mode is ChannelMode.MONO else ChannelMode.MONO
         self.setText(str(other))
         self.setChecked(mode == ChannelMode.MONO)
+
+
+class ROIButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setToolTip("Add ROI")
+        self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
