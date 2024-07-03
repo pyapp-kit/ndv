@@ -15,19 +15,46 @@ class CanvasElement(Protocol):
     """Protocol defining an interactive element on the Canvas."""
 
     @property
-    def visible(self) -> bool: ...
+    def visible(self) -> bool:
+        """Defines whether the element is visible on the canvas."""
+
     @visible.setter
-    def visible(self, visible: bool) -> None: ...
+    def visible(self, visible: bool) -> None:
+        """Sets element visibility."""
+
     @property
-    def can_select(self) -> bool: ...
+    def can_select(self) -> bool:
+        """Defines whether the element can be selected."""
+
     @property
-    def selected(self) -> bool: ...
+    def selected(self) -> bool:
+        """Returns element selection status."""
+
     @selected.setter
-    def selected(self, selected: bool) -> None: ...
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None: ...
-    def start_move(self, pos: Sequence[float]) -> None: ...
-    def move(self, pos: Sequence[float]) -> None: ...
-    def remove(self) -> None: ...
+    def selected(self, selected: bool) -> None:
+        """Sets element selection status."""
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        """Returns the element's cursor preference at the provided position."""
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        """
+        Behavior executed at the beginning of a "move" operation.
+
+        In layman's terms, this is the behavior executed during the the "click"
+        of a "click-and-drag".
+        """
+
+    def move(self, pos: Sequence[float]) -> None:
+        """
+        Behavior executed throughout a "move" operation.
+
+        In layman's terms, this is the behavior executed during the "drag"
+        of a "click-and-drag".
+        """
+
+    def remove(self) -> None:
+        """Removes the element from the canvas."""
 
 
 class PImageHandle(CanvasElement, Protocol):
