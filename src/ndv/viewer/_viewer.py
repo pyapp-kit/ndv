@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Literal, cast
 import cmap
 import numpy as np
 from qtpy.QtCore import QEvent, Qt
+from qtpy.QtGui import QMouseEvent
 from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Hashable, Iterable, Sequence, TypeAlias
 
     from qtpy.QtCore import QObject
-    from qtpy.QtGui import QCloseEvent, QKeyEvent, QMouseEvent
+    from qtpy.QtGui import QCloseEvent, QKeyEvent
 
     from ._backends._protocols import CanvasElement, PCanvas, PImageHandle, PRoiHandle
     from ._dims_slider import DimKey, Indices, Sizes
@@ -148,24 +149,6 @@ class NDViewer(QWidget):
         self._selection: CanvasElement | None = None
         # ROI
         self._roi: PRoiHandle | None = None
-
-        # List of functions to be invoked on a canvas mouse press
-        # This list can be altered as necessary during execution
-        self._on_mouse_press: list[Callable[[QMouseEvent], bool]] = [
-            self._select_element,
-        ]
-        # List of functions to be invoked on a canvas mouse movement
-        # This list can be altered as necessary during execution
-        self._on_mouse_move: list[Callable[[QMouseEvent], bool]] = [
-            self._move_selection,
-            self._update_hover_info,
-            self._update_cursor,
-        ]
-        # List of functions to be invoked on a canvas mouse release
-        # This list can be altered as necessary during execution
-        self._on_mouse_release: list[Callable[[QMouseEvent], bool]] = [
-            self._update_roi_button,
-        ]
 
         # WIDGETS ----------------------------------------------------
 
@@ -458,22 +441,10 @@ class NDViewer(QWidget):
         # using method to swallow the parameter passed by _set_range_btn.clicked
         self._canvas.set_range()
 
-    # FIXME: This is ugly
-    def _on_first_mouse_press(self, event: QMouseEvent) -> bool:
-        if self._roi:
-            ev_pos = event.position()
-            pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
-            self._roi.move(pos)
-            self._roi.visible = True
-        return False
-
     def _on_add_roi_clicked(self, checked: bool) -> None:
         if checked:
             # Add new roi
             self.set_roi()
-            self._on_mouse_press.insert(0, self._on_first_mouse_press)
-        else:
-            self._on_mouse_press.remove(self._on_first_mouse_press)
 
     def _image_key(self, index: Indices) -> ImgKey:
         """Return the key for image handle(s) corresponding to `index`."""
@@ -634,24 +605,40 @@ class NDViewer(QWidget):
         # here is where we get a chance to intercept mouse events before passing them
         # to the canvas. Return `True` to prevent the event from being passed to
         # the backend widget.
-        intercepted = False
-        if event.type() == QEvent.Type.MouseButtonPress and obj is self._qcanvas:
-            ev = cast("QMouseEvent", event)
-            for func in self._on_mouse_press:
-                intercepted |= func(ev)
-        if event.type() == QEvent.Type.MouseMove and obj is self._qcanvas:
-            ev = cast("QMouseEvent", event)
-            for func in self._on_mouse_move:
-                intercepted |= func(ev)
-        if event.type() == QEvent.Type.MouseButtonRelease and obj is self._qcanvas:
-            ev = cast("QMouseEvent", event)
-            for func in self._on_mouse_release:
-                intercepted |= func(ev)
-        if event.type() == QEvent.Type.KeyPress and obj is self._qcanvas:
-            self.keyPressEvent(cast("QKeyEvent", event))
-        return intercepted
+        intercept = False
+        if obj is self._qcanvas:
+            if isinstance(event, QMouseEvent):
+                intercept |= self._canvas_mouse_event(event)
+            if event.type() == QEvent.Type.KeyPress:
+                self.keyPressEvent(cast("QKeyEvent", event))
+        return intercept
 
-    def _select_element(self, event: QMouseEvent) -> bool:
+    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
+        intercept = False
+        if ev.type() == QEvent.Type.MouseButtonPress:
+            if self._add_roi_btn.isChecked():
+                intercept |= self._begin_roi(ev)
+            intercept |= self._press_element(ev)
+            return intercept
+        if ev.type() == QEvent.Type.MouseMove:
+            intercept = self._move_selection(ev)
+            intercept |= self._update_hover_info(ev)
+            intercept |= self._update_cursor(ev)
+            return intercept
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            return self._update_roi_button(ev)
+        return False
+
+    # FIXME: This is ugly
+    def _begin_roi(self, event: QMouseEvent) -> bool:
+        if self._roi:
+            ev_pos = event.position()
+            pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
+            self._roi.move(pos)
+            self._roi.visible = True
+        return False
+
+    def _press_element(self, event: QMouseEvent) -> bool:
         ev_pos = (event.position().x(), event.position().y())
         pos = self._canvas.canvas_to_world(ev_pos)
         # TODO why does the canvas need this point untransformed??

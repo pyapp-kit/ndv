@@ -31,7 +31,7 @@ class Handle(scene.visuals.Markers):
 
     def __init__(
         self,
-        parent: EditableROI,
+        parent: RectangularROI,
         on_move: Callable[[Sequence[float]], None] | None = None,
         cursor: Qt.CursorShape
         | Callable[[Sequence[float]], Qt.CursorShape] = Qt.CursorShape.SizeAllCursor,
@@ -85,36 +85,7 @@ class Handle(scene.visuals.Markers):
         return self._cursor_at(self.pos)
 
 
-class EditableROI(scene.visuals.Polygon):
-    """Base Class defining behavior all editable ROIs should have."""
-
-    @property
-    def vertices(self) -> Sequence[Sequence[float]]:
-        raise NotImplementedError("Must be implemented in subclass")
-
-    @vertices.setter
-    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
-        raise NotImplementedError("Must be implemented in subclass")
-
-    @property
-    def selected(self) -> bool:
-        raise NotImplementedError("Must be implemented in subclass")
-
-    @selected.setter
-    def selected(self, selected: bool) -> None:
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def move(self, pos: Sequence[float]) -> None:
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
-        raise NotImplementedError("Must be implemented in subclass")
-
-
-class RectangularROI(scene.visuals.Rectangle, EditableROI):
+class RectangularROI(scene.visuals.Rectangle):
     """A VisPy Rectangle visual whose attributes can be edited."""
 
     def __init__(
@@ -197,15 +168,6 @@ class RectangularROI(scene.visuals.Rectangle, EditableROI):
         self._handles[0].pos = [pos[0], self._handles[0].pos[1]]
         self.redraw()
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
-        return Qt.CursorShape.SizeAllCursor
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        self.drag_reference = [
-            pos[0] - self.center[0],
-            pos[1] - self.center[1],
-        ]
-
     def redraw(self) -> None:
         left, top, *_ = self._handles[0].pos
         right, bottom, *_ = self._handles[2].pos
@@ -214,30 +176,9 @@ class RectangularROI(scene.visuals.Rectangle, EditableROI):
         self.width = max(abs(left - right), 1e-6)
         self.height = max(abs(top - bottom), 1e-6)
 
-    def move(self, pos: Sequence[float]) -> None:
-        new_center = [
-            pos[0] - self.drag_reference[0],
-            pos[1] - self.drag_reference[1],
-        ]
-        old_center = self.center
-        # TODO: Simplify
-        for h in self._handles:
-            existing_pos = h.pos
-            h.pos = [
-                existing_pos[0] + new_center[0] - old_center[0],
-                existing_pos[1] + new_center[1] - old_center[1],
-            ]
-        self.center = new_center
-
-    @property
-    def selected(self) -> bool:
-        return self._selected
-
-    @selected.setter
-    def selected(self, selected: bool) -> None:
-        self._selected = selected
-        for h in self._handles:
-            h.visible = selected
+    # --------------------- EditableROI interface --------------------------
+    # In the future, if any other objects implement these same methods, this
+    # could be extracted into an ABC.
 
     @property
     def vertices(self) -> Sequence[Sequence[float]]:
@@ -263,6 +204,42 @@ class RectangularROI(scene.visuals.Rectangle, EditableROI):
             handle.pos = vertices[i]
         # Redraw
         self.redraw()
+
+    @property
+    def selected(self) -> bool:
+        return self._selected
+
+    @selected.setter
+    def selected(self, selected: bool) -> None:
+        self._selected = selected
+        for h in self._handles:
+            h.visible = selected
+
+    def start_move(self, pos: Sequence[float]) -> None:
+        self.drag_reference = [
+            pos[0] - self.center[0],
+            pos[1] - self.center[1],
+        ]
+
+    def move(self, pos: Sequence[float]) -> None:
+        new_center = [
+            pos[0] - self.drag_reference[0],
+            pos[1] - self.drag_reference[1],
+        ]
+        old_center = self.center
+        # TODO: Simplify
+        for h in self._handles:
+            existing_pos = h.pos
+            h.pos = [
+                existing_pos[0] + new_center[0] - old_center[0],
+                existing_pos[1] + new_center[1] - old_center[1],
+            ]
+        self.center = new_center
+
+    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+        return Qt.CursorShape.SizeAllCursor
+
+    # ------------------- End EditableROI interface -------------------------
 
 
 class VispyImageHandle:
@@ -387,7 +364,7 @@ class VispyHandleHandle:
 
 
 class VispyRoiHandle:
-    def __init__(self, roi: EditableROI) -> None:
+    def __init__(self, roi: RectangularROI) -> None:
         self._roi = roi
 
     @property
@@ -549,9 +526,7 @@ class VispyViewerCanvas:
         border_color: Any | None = None,
     ) -> VispyRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
-        roi = RectangularROI(
-            parent=self._view.scene,
-        )
+        roi = RectangularROI(parent=self._view.scene)
         handle = VispyRoiHandle(roi)
         self._elements[roi] = handle
         for h in roi._handles:

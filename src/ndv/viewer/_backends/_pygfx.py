@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
-    from qtpy.QtCore import QEvent
     from qtpy.QtWidgets import QWidget
 
     from ._protocols import CanvasElement
@@ -399,21 +398,25 @@ class RectangularROIHandle(PyGFXRoiHandle):
 class _QWgpuCanvas(QWgpuCanvas):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._sup_mouse_event = self._subwidget._mouse_event
-        self._subwidget._mouse_event = self._mouse_event
-        self._filter: Any | None = None
+        # self._sup_mouse_event = self._subwidget._mouse_event
+        # self._subwidget._mouse_event = self._mouse_event
+
+    def installEventFilter(self, filter: Any) -> None:
+        print("installing filter")
+        super().installEventFilter(filter)
+        self._subwidget.installEventFilter(filter)
 
     def sizeHint(self) -> QSize:
         return QSize(512, 512)
 
-    def installEventFilter(self, filter: Any) -> None:
-        self._filter = filter
-
-    def _mouse_event(
-        self, event_type: str, event: QEvent, *args: Any, **kwargs: Any
-    ) -> None:
-        if self._filter and not self._filter.eventFilter(self, event):
-            self._sup_mouse_event(event_type, event, *args, **kwargs)
+    # def _mouse_event(
+    #     self, event_type: str, event: QEvent, *args: Any, **kwargs: Any
+    # ) -> None:
+    #     breakpoint()
+    #     self.eventFilter()
+    #     ...
+    #     # if self._filter and not self._filter.eventFilter(self, event):
+    #     #     self._sup_mouse_event(event_type, event, *args, **kwargs)
 
 
 class PyGFXViewerCanvas:
