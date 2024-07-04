@@ -331,7 +331,7 @@ class RectangularROIHandle(PyGFXRoiHandle):
                 positions=self._positions,
                 indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
             ),
-            material=pygfx.LineMaterial(color=(0, 0, 0, 0)),
+            material=pygfx.LineMaterial(thickness=1, color=(0, 0, 0, 0)),
         )
         return outline
 
@@ -341,7 +341,7 @@ class RectangularROIHandle(PyGFXRoiHandle):
             geometry=geometry,
             # FIXME Size in pixels is not ideal for selection.
             # TODO investigate what size_mode = vertex does...
-            material=pygfx.PointsMaterial(color=(1, 1, 1), size=2 * self._point_rad),
+            material=pygfx.PointsMaterial(color=(1, 1, 1), size=1.5 * self._point_rad),
         )
 
         # NB: Default bounding box for points does not consider the radius of
