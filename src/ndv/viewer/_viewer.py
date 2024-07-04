@@ -607,7 +607,7 @@ class NDViewer(QWidget):
         # the backend widget.
         intercept = False
         # use children in case backend has a subwidget stealing events.
-        if obj in self._qcanvas.children():
+        if obj is self._qcanvas or obj in (self._qcanvas.children()):
             if isinstance(event, QMouseEvent):
                 intercept |= self._canvas_mouse_event(event)
             if event.type() == QEvent.Type.KeyPress:
