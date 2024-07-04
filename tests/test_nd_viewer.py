@@ -39,6 +39,11 @@ def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -
     v.set_ndim(3)
     v.set_channel_mode("composite")
     v.set_current_index({0: 2, 1: 1, 2: 1})
+    v.set_roi(
+        [(10, 10), (30, 10), (30, 30), (10, 30)],
+        color="blue",
+        border_color="light blue",
+    )
 
     # wait until there are no running jobs, because the callbacks
     # in the futures hold a strong reference to the viewer
