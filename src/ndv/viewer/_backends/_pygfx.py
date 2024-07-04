@@ -11,6 +11,8 @@ import pylinalg as la
 from qtpy.QtCore import QSize, Qt
 from wgpu.gui.qt import QWgpuCanvas
 
+from ._protocols import PCanvas
+
 if TYPE_CHECKING:
     from typing import Sequence
 
@@ -396,37 +398,21 @@ class RectangularROIHandle(PyGFXRoiHandle):
 
 
 class _QWgpuCanvas(QWgpuCanvas):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        # self._sup_mouse_event = self._subwidget._mouse_event
-        # self._subwidget._mouse_event = self._mouse_event
-
     def installEventFilter(self, filter: Any) -> None:
-        print("installing filter")
-        super().installEventFilter(filter)
         self._subwidget.installEventFilter(filter)
 
     def sizeHint(self) -> QSize:
-        return QSize(512, 512)
-
-    # def _mouse_event(
-    #     self, event_type: str, event: QEvent, *args: Any, **kwargs: Any
-    # ) -> None:
-    #     breakpoint()
-    #     self.eventFilter()
-    #     ...
-    #     # if self._filter and not self._filter.eventFilter(self, event):
-    #     #     self._sup_mouse_event(event_type, event, *args, **kwargs)
+        return QSize(self.width(), self.height())
 
 
-class PyGFXViewerCanvas:
+class PyGFXViewerCanvas(PCanvas):
     """pygfx-based canvas wrapper."""
 
     def __init__(self) -> None:
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
-        self._canvas = _QWgpuCanvas(size=(512, 512))
+        self._canvas = _QWgpuCanvas(size=(600, 600))
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
         try:
             # requires https://github.com/pygfx/pygfx/pull/752
@@ -532,7 +518,7 @@ class PyGFXViewerCanvas:
 
     def add_roi(
         self,
-        vertices: list[tuple[float, float]] | None = None,
+        vertices: Sequence[tuple[float, float]] | None = None,
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
     ) -> PyGFXRoiHandle:
@@ -617,12 +603,12 @@ class PyGFXViewerCanvas:
         else:
             return (-1, -1, -1)
 
-    def elements_at(self, pos: Sequence[float]) -> list[CanvasElement]:
+    def elements_at(self, pos_xy: tuple[float, float]) -> list[CanvasElement]:
         """Obtains all elements located at pos."""
         # FIXME: Ideally, Renderer.get_pick_info would do this and
         # canvas_to_world for us. But it seems broken.
         elements: list[CanvasElement] = []
-        pos = self.canvas_to_world((pos[0], pos[1]))
+        pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
             bb = c.get_bounding_box()
             if _is_inside(bb, pos):

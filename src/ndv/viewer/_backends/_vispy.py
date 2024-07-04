@@ -15,6 +15,8 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
+from ._protocols import PCanvas
+
 if TYPE_CHECKING:
     from typing import Callable, Sequence
 
@@ -435,7 +437,7 @@ class VispyRoiHandle:
         return self._roi.cursor_at(pos)
 
 
-class VispyViewerCanvas:
+class VispyViewerCanvas(PCanvas):
     """Vispy-based viewer for data.
 
     All vispy-specific code is encapsulated in this class (and non-vispy canvases
@@ -443,7 +445,7 @@ class VispyViewerCanvas:
     """
 
     def __init__(self) -> None:
-        self._canvas = scene.SceneCanvas()
+        self._canvas = scene.SceneCanvas(size=(600, 600))
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
@@ -521,9 +523,9 @@ class VispyViewerCanvas:
 
     def add_roi(
         self,
-        vertices: list[tuple[float, float]] | None = None,
-        color: Any | None = None,
-        border_color: Any | None = None,
+        vertices: Sequence[tuple[float, float]] | None = None,
+        color: cmap.Color | None = None,
+        border_color: cmap.Color | None = None,
     ) -> VispyRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         roi = RectangularROI(parent=self._view.scene)
@@ -569,9 +571,9 @@ class VispyViewerCanvas:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
         return self._view.scene.transform.imap(pos_xy)[:3]  # type: ignore [no-any-return]
 
-    def elements_at(self, pos_xy: tuple[float, float, float]) -> list[CanvasElement]:
+    def elements_at(self, pos_xy: tuple[float, float]) -> list[CanvasElement]:
         elements = []
-        visuals = self._canvas.visuals_at(pos_xy[:2])
+        visuals = self._canvas.visuals_at(pos_xy)
         for vis in visuals:
             if (handle := self._elements.get(vis)) is not None:
                 elements.append(handle)

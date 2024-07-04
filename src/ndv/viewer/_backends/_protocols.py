@@ -110,10 +110,10 @@ class PCanvas(Protocol):
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
 
-    def elements_at(self, pos_xy: Sequence[float]) -> list[CanvasElement]: ...
+    def elements_at(self, pos_xy: tuple[float, float]) -> list[CanvasElement]: ...
     def add_roi(
         self,
-        vertices: Sequence[Sequence[float]] | None = ...,
-        color: Any = ...,
-        border_color: Any | None = ...,
+        vertices: Sequence[tuple[float, float]] | None = None,
+        color: cmap.Color | None = None,
+        border_color: cmap.Color | None = None,
     ) -> PRoiHandle: ...
