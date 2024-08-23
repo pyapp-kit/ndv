@@ -560,7 +560,7 @@ class NDViewer(QWidget):
                 # HACK:
                 # this is a temporary "better than nothing" to persist LUT control
                 # state for a given channel across instances of LutControl widget.
-                # we need a better model, detatched from the view/widget to manage this.
+                # we need a better model, detached from the view/widget to manage this.
                 if imkey in self._lut_ctrl_state:
                     c._set_state(self._lut_ctrl_state[imkey])
                 self._lut_drop.addWidget(c)
@@ -606,7 +606,7 @@ class NDViewer(QWidget):
             # HACK:
             # this is a temporary "better than nothing" to persist LUT control
             # state for a given channel across instances of LutControl widget.
-            # we need a better model, detatched from the view/widget to manage this.
+            # we need a better model, detached from the view/widget to manage this.
             self._lut_ctrl_state[k] = c._get_state()
             cast("QVBoxLayout", self.layout()).removeWidget(c)
             c.deleteLater()
