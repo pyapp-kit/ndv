@@ -446,7 +446,6 @@ class VispyViewerCanvas(PCanvas):
 
     def __init__(self) -> None:
         self._canvas = scene.SceneCanvas(size=(600, 600))
-        self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
         central_wdg: scene.Widget = self._canvas.central_widget
@@ -493,12 +492,10 @@ class VispyViewerCanvas(PCanvas):
         img = scene.visuals.Image(data, parent=self._view.scene)
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
-        if data is not None:
-            self._current_shape, prev_shape = data.shape, self._current_shape
-            if not prev_shape:
-                self.set_range()
         handle = VispyImageHandle(img)
         self._elements[img] = handle
+        if data is not None:
+            self.set_range()
         if cmap is not None:
             handle.cmap = cmap
         return handle
@@ -511,12 +508,10 @@ class VispyViewerCanvas(PCanvas):
         )
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
-        if data is not None:
-            self._current_shape, prev_shape = data.shape, self._current_shape
-            if len(prev_shape) != 3:
-                self.set_range()
         handle = VispyImageHandle(vol)
         self._elements[vol] = handle
+        if data is not None:
+            self.set_range()
         if cmap is not None:
             handle.cmap = cmap
         return handle
@@ -535,6 +530,7 @@ class VispyViewerCanvas(PCanvas):
             self._elements[h] = VispyHandleHandle(h, handle)
         if vertices:
             handle.vertices = vertices
+            self.set_range()
         handle.color = color
         handle.border_color = border_color
         return handle
@@ -550,19 +546,37 @@ class VispyViewerCanvas(PCanvas):
 
         When called with no arguments, the range is set to the full extent of the data.
         """
-        if len(self._current_shape) >= 2:
-            if x is None:
-                x = (0, self._current_shape[-1])
-            if y is None:
-                y = (0, self._current_shape[-2])
-        if z is None and len(self._current_shape) == 3:
-            z = (0, self._current_shape[-3])
+        _x = [0.0, 0.0]
+        _y = [0.0, 0.0]
+        _z = [0.0, 0.0]
+
+        for handle in self._elements.values():
+            if isinstance(handle, VispyImageHandle):
+                shape = handle.data.shape
+                _x[1] = max(_x[1], shape[0])
+                _y[1] = max(_y[1], shape[1])
+                if len(shape) > 2:
+                    _z[1] = max(_z[1], shape[2])
+            elif isinstance(handle, VispyRoiHandle):
+                for v in handle.vertices:
+                    _x[0] = min(_x[0], v[0])
+                    _x[1] = max(_x[1], v[0])
+                    _y[0] = min(_y[0], v[1])
+                    _y[1] = max(_y[1], v[1])
+                    if len(v) > 2:
+                        _z[0] = min(_z[0], v[2])
+                        _z[1] = max(_z[1], v[2])
+
+        x = cast(tuple[float, float], _x) if x is None else x
+        y = cast(tuple[float, float], _y) if y is None else y
+        z = cast(tuple[float, float], _z) if z is None else z
+
         is_3d = isinstance(self._camera, scene.ArcballCamera)
         if is_3d:
             self._camera._quaternion = DEFAULT_QUATERNION
         self._view.camera.set_range(x=x, y=y, z=z, margin=margin)
         if is_3d:
-            max_size = max(self._current_shape)
+            max_size = max(x[1], y[1], z[1])
             self._camera.scale_factor = max_size + 6
 
     def canvas_to_world(

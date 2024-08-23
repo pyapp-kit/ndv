@@ -438,22 +438,8 @@ class NDViewer(QWidget):
             self._dims_sliders.set_dimension_visible(dim, False)
 
     def _on_set_range_clicked(self) -> None:
-        x = [0.0, 0.0]
-        y = [0.0, 0.0]
-        z = [0.0, 0.0]
-        for handles in self._img_handles.values():
-            for handle in handles:
-                shape = handle.data.shape
-                x[1] = max(x[1], shape[0])
-                y[1] = max(y[1], shape[1])
-                if len(shape) > 2:
-                    z[1] = max(z[1], shape[2])
-
-        self._canvas.set_range(
-            x=cast(tuple[float, float], tuple(x)),
-            y=cast(tuple[float, float], tuple(y)),
-            z=cast(tuple[float, float], tuple(z)),
-        )
+        # using method to swallow the parameter passed by _set_range_btn.clicked
+        self._canvas.set_range()
 
     def _on_add_roi_clicked(self, checked: bool) -> None:
         if checked:
