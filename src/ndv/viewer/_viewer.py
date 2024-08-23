@@ -293,12 +293,15 @@ class NDViewer(QWidget):
 
         # redraw
         if initial_index is None:
-            idx = {k: int(v // 2) for k, v in sizes.items()}
+            idx = self._dims_sliders.value() or {
+                k: int(v // 2) for k, v in sizes.items()
+            }
         else:
             if not isinstance(initial_index, dict):  # pragma: no cover
                 raise TypeError("initial_index must be a dict")
             idx = initial_index
-        self.set_current_index(idx)
+        with signals_blocked(self._dims_sliders):
+            self.set_current_index(idx)
         # update the data info label
         self._data_info_label.setText(self._data_wrapper.summary_info())
         self.refresh()
