@@ -39,6 +39,7 @@ class LutControl(QWidget):
         handles: Iterable[PImageHandle] = (),
         parent: QWidget | None = None,
         cmaplist: Iterable[Any] = (),
+        auto_clim: bool = True,
     ) -> None:
         super().__init__(parent)
         self._handles = handles
@@ -67,7 +68,7 @@ class LutControl(QWidget):
         self._auto_clim = QPushButton("Auto")
         self._auto_clim.setMaximumWidth(42)
         self._auto_clim.setCheckable(True)
-        self._auto_clim.setChecked(True)
+        self._auto_clim.setChecked(auto_clim)
         self._auto_clim.toggled.connect(self.update_autoscale)
 
         layout = QHBoxLayout(self)
@@ -78,6 +79,20 @@ class LutControl(QWidget):
         layout.addWidget(self._auto_clim)
 
         self.update_autoscale()
+
+    def _get_state(self) -> dict[str, Any]:
+        return {
+            "visible": self._visible.isChecked(),
+            "cmap": self._cmap.currentColormap(),
+            "clims": self._clims.value(),
+            "auto_clim": self._auto_clim.isChecked(),
+        }
+
+    def _set_state(self, state: dict[str, Any]) -> None:
+        self._visible.setChecked(state["visible"])
+        self._cmap.setCurrentColormap(state["cmap"])
+        self._clims.setValue(state["clims"])
+        self._auto_clim.setChecked(state["auto_clim"])
 
     def autoscaleChecked(self) -> bool:
         return cast("bool", self._auto_clim.isChecked())
@@ -112,12 +127,11 @@ class LutControl(QWidget):
             clims[1] = max(clims[1], np.nanmax(handle.data))
 
         mi, ma = tuple(int(x) for x in clims)
-        if mi != ma:
-            for handle in self._handles:
-                handle.clim = (mi, ma)
+        for handle in self._handles:
+            handle.clim = (mi, ma)
 
-            # set the slider values to the new clims
-            with signals_blocked(self._clims):
-                self._clims.setMinimum(min(mi, self._clims.minimum()))
-                self._clims.setMaximum(max(ma, self._clims.maximum()))
-                self._clims.setValue((mi, ma))
+        # set the slider values to the new clims
+        with signals_blocked(self._clims):
+            self._clims.setMinimum(min(mi, self._clims.minimum()))
+            self._clims.setMaximum(max(ma, self._clims.maximum()))
+            self._clims.setValue((mi, ma))

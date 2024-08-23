@@ -126,6 +126,7 @@ class NDViewer(QWidget):
         self._img_handles: defaultdict[ImgKey, list[PImageHandle]] = defaultdict(list)
         # mapping of same keys to the LutControl objects control image display props
         self._lut_ctrls: dict[ImgKey, LutControl] = {}
+        self._lut_ctrl_state: dict[ImgKey, dict] = {}
         # the set of dimensions we are currently visualizing (e.g. XY)
         # this is used to control which dimensions have sliders and the behavior
         # of isel when selecting data from the datastore
@@ -300,6 +301,7 @@ class NDViewer(QWidget):
         self.set_current_index(idx)
         # update the data info label
         self._data_info_label.setText(self._data_wrapper.summary_info())
+        self.refresh()
 
     def set_roi(
         self,
@@ -355,8 +357,7 @@ class NDViewer(QWidget):
 
         # clear image handles and redraw
         if self._img_handles:
-            self._clear_images()
-            self._update_data_for_index(self._dims_sliders.value())
+            self.refresh()
 
     def set_channel_mode(self, mode: ChannelMode | str | None = None) -> None:
         """Set the mode for displaying the channels.
@@ -389,8 +390,12 @@ class NDViewer(QWidget):
             )
 
         if self._img_handles:
-            self._clear_images()
-            self._update_data_for_index(self._dims_sliders.value())
+            self.refresh()
+
+    def refresh(self) -> None:
+        """Refresh the canvas."""
+        self._clear_images()
+        self._update_data_for_index(self._dims_sliders.value())
 
     def set_current_index(self, index: Indices | None = None) -> None:
         """Set the index of the displayed image.
@@ -549,6 +554,12 @@ class NDViewer(QWidget):
                     self,
                     cmaplist=self._cmaps + DEFAULT_COLORMAPS,
                 )
+                # HACK:
+                # this is a temporary "better than nothing" to persist LUT control
+                # state for a given channel across instances of LutControl widget.
+                # we need a better model, detatched from the view/widget to manage this.
+                if imkey in self._lut_ctrl_state:
+                    c._set_state(self._lut_ctrl_state[imkey])
                 self._lut_drop.addWidget(c)
 
     def _reduce_data_for_display(
@@ -588,7 +599,12 @@ class NDViewer(QWidget):
         self._img_handles.clear()
 
         # clear the current LutControls as well
-        for c in self._lut_ctrls.values():
+        for k, c in self._lut_ctrls.items():
+            # HACK:
+            # this is a temporary "better than nothing" to persist LUT control
+            # state for a given channel across instances of LutControl widget.
+            # we need a better model, detatched from the view/widget to manage this.
+            self._lut_ctrl_state[k] = c._get_state()
             cast("QVBoxLayout", self.layout()).removeWidget(c)
             c.deleteLater()
         self._lut_ctrls.clear()
