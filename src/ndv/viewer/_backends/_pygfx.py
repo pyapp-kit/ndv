@@ -32,12 +32,23 @@ def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:
     )
 
 
+# TODO Combine with similar function in _vispy.py
+def _coerce_rgb(data: np.ndarray | None) -> np.ndarray | None:
+    if data is not None and data.ndim == 3:
+        # PyGFX expects (A)RGB data to be X, Y, C
+        for i, s in enumerate(data.shape):
+            if s in [3, 4]:
+                return np.moveaxis(data, i, -1)
+    return data
+
+
 class PyGFXImageHandle:
     def __init__(self, image: pygfx.Image | pygfx.Volume, render: Callable) -> None:
         self._image = image
         self._render = render
         self._grid = cast("Texture", image.geometry.grid)
         self._material = cast("ImageBasicMaterial", image.material)
+        self._cmap = cmap.Colormap("gray")
 
     @property
     def data(self) -> np.ndarray:
@@ -45,7 +56,7 @@ class PyGFXImageHandle:
 
     @data.setter
     def data(self, data: np.ndarray) -> None:
-        self._grid.data[:] = data
+        self._grid.data[:] = _coerce_rgb(data)
         self._grid.update_range((0, 0, 0), self._grid.size)
 
     @property
@@ -85,7 +96,9 @@ class PyGFXImageHandle:
     @cmap.setter
     def cmap(self, cmap: cmap.Colormap) -> None:
         self._cmap = cmap
-        self._material.map = cmap.to_pygfx()
+        # RGB image special case
+        if self.data.ndim != 3:
+            self._material.map = cmap.to_pygfx()
         self._render()
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -409,7 +422,6 @@ class PyGFXViewerCanvas(PCanvas):
     """pygfx-based canvas wrapper."""
 
     def __init__(self) -> None:
-        self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
         self._canvas = _QWgpuCanvas(size=(600, 600))
@@ -470,6 +482,7 @@ class PyGFXViewerCanvas(PCanvas):
         self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
     ) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
+        data = _coerce_rgb(data)
         tex = pygfx.Texture(data, dim=2)
         image = pygfx.Image(
             pygfx.Geometry(grid=tex),
@@ -479,9 +492,7 @@ class PyGFXViewerCanvas(PCanvas):
         self._scene.add(image)
 
         if data is not None:
-            self._current_shape, prev_shape = data.shape, self._current_shape
-            if not prev_shape:
-                self.set_range()
+            self.set_range()
 
         # FIXME: I suspect there are more performant ways to refresh the canvas
         # look into it.
@@ -504,9 +515,7 @@ class PyGFXViewerCanvas(PCanvas):
 
         if data is not None:
             vol.local_position = [-0.5 * i for i in data.shape[::-1]]
-            self._current_shape, prev_shape = data.shape, self._current_shape
-            if len(prev_shape) != 3:
-                self.set_range()
+            self.set_range()
 
         # FIXME: I suspect there are more performant ways to refresh the canvas
         # look into it.

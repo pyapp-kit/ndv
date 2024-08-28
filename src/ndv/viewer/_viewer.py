@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections import defaultdict
 from itertools import cycle
 from typing import TYPE_CHECKING, Literal, cast
@@ -14,7 +15,7 @@ from superqt.utils import qthrottled, signals_blocked
 
 from ndv.viewer._components import (
     ChannelMode,
-    ChannelModeButton,
+    ChannelModeCombo,
     DimToggleButton,
     QSpinner,
     ROIButton,
@@ -23,7 +24,7 @@ from ndv.viewer._components import (
 from ._backends import get_canvas_class
 from ._data_wrapper import DataWrapper
 from ._dims_slider import DimsSliders
-from ._lut_control import LutControl
+from ._lut_control import LutControl, RGBAControl
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Iterable, Sequence
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
     ImgKey: TypeAlias = Hashable
     # any mapping of dimensions to sizes
     SizesLike: TypeAlias = Sizes | Iterable[int | tuple[DimKey, int] | Sequence]
+    ChannelModeStr: TypeAlias = Literal["mono", "composite", "rgb", "rgba", "auto"]
 
 MID_GRAY = "#888888"
 GRAYS = cmap.Colormap("gray")
@@ -117,7 +119,7 @@ class NDViewer(QWidget):
         colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
         parent: QWidget | None = None,
         channel_axis: DimKey | None = None,
-        channel_mode: ChannelMode | str = ChannelMode.MONO,
+        channel_mode: ChannelMode | ChannelModeStr = ChannelMode.MONO,
     ):
         super().__init__(parent=parent)
 
@@ -136,6 +138,7 @@ class NDViewer(QWidget):
         # the axis that represents the channels in the data
         self._channel_axis = channel_axis
         self._channel_mode: ChannelMode = None  # type: ignore # set in set_channel_mode
+        self._allow_rgb: bool = False
         # colormaps that will be cycled through when displaying composite images
         if colormaps is not None:
             self._cmaps = [cmap.Colormap(c) for c in colormaps]
@@ -156,8 +159,8 @@ class NDViewer(QWidget):
         # WIDGETS ----------------------------------------------------
 
         # the button that controls the display mode of the channels
-        self._channel_mode_btn = ChannelModeButton(self)
-        self._channel_mode_btn.clicked.connect(self.set_channel_mode)
+        self._channel_mode_combo = ChannelModeCombo(self, self._allow_rgb)
+        self._channel_mode_combo.currentEnumChanged.connect(self.set_channel_mode)
         # button to reset the zoom of the canvas
         self._set_range_btn = QPushButton(
             QIconifyIcon("fluent:full-screen-maximize-24-filled"), "", self
@@ -210,7 +213,7 @@ class NDViewer(QWidget):
         btns.setContentsMargins(0, 0, 0, 0)
         btns.setSpacing(0)
         btns.addStretch()
-        btns.addWidget(self._channel_mode_btn)
+        btns.addWidget(self._channel_mode_combo)
         btns.addWidget(self._ndims_btn)
         btns.addWidget(self._set_range_btn)
         btns.addWidget(self._add_roi_btn)
@@ -235,8 +238,11 @@ class NDViewer(QWidget):
 
         # SETUP ------------------------------------------------------
 
-        self.set_channel_mode(channel_mode)
         self.set_data(data)
+
+        if channel_mode == "auto":
+            channel_mode = self._guess_channel_mode(colormaps, data)
+        self.set_channel_mode(channel_mode)
 
     # ------------------- PUBLIC API ----------------------------
     @property
@@ -280,23 +286,37 @@ class NDViewer(QWidget):
             the initial index will be set to the middle of the data.
         """
         # clear current data
+        self._data_wrapper = None
+        self._clear_images()
+        # NB This is particularly important to be done on every set_data call
+        # because when going from a N+M-dimensional image to an N-dimensional
+        # image, we need to remove the sliders for dims N+1, N+2, ...
+        self._dims_sliders.clear()
+        self._data_info_label.setText("")
         if data is None:
-            self._data_wrapper = None
-            self._clear_images()
-            self._dims_sliders.clear()
-            self._data_info_label.setText("")
             return
 
         # store the data
-        self._data_wrapper = DataWrapper.create(data)
+        self._data_wrapper: DataWrapper = DataWrapper.create(data)  # type: ignore
+
+        # update the dimensions we are visualizing
+        sizes = dict(self._data_wrapper.sizes().items())
 
         # set channel axis
         self._channel_axis = self._data_wrapper.guess_channel_axis()
+        self._allow_rgb = self._channel_axis is not None and sizes[
+            self._channel_axis
+        ] in [3, 4]
+        self._channel_mode_combo.allow_rgba(self._allow_rgb)
 
-        # update the dimensions we are visualizing
-        sizes = self._data_wrapper.sizes()
-        visualized_dims = list(sizes)[-self._ndims :]
-        self.set_visualized_dims(visualized_dims)
+        visualized_dims = list(sizes)
+        # Channel axis should never be a visualized dimension
+        # This axis could be at the end (common for RGB)
+        # or at the front (common for high-dim data)
+        if self._channel_axis is not None:
+            visualized_dims.remove(self._channel_axis)
+        # By convention, visualize the final dimensions
+        self.set_visualized_dims(visualized_dims[-self._ndims :])
 
         # update the range of all the sliders to match the sizes we set above
         with signals_blocked(self._dims_sliders):
@@ -388,21 +408,27 @@ class NDViewer(QWidget):
         mode : ChannelMode | str | None
             The mode to set, must be one of 'composite' or 'mono'.
         """
-        # bool may happen when called from the button clicked signal
-        if mode is None or isinstance(mode, bool):
-            mode = self._channel_mode_btn.mode()
+        if mode is None:
+            mode = self._channel_mode_combo.currentEnum()
         else:
             mode = ChannelMode(mode)
-            self._channel_mode_btn.setMode(mode)
+            if mode == ChannelMode.RGBA and not self._allow_rgb:
+                warnings.warn(
+                    "Cannot set_channel_mode to RGBA without RGBA data!",
+                    stacklevel=2,
+                )
+                return
+            self._channel_mode_combo.setCurrentEnum(mode)
         if mode == self._channel_mode:
             return
 
-        self._channel_mode = mode
+        self._channel_mode = cast(ChannelMode, mode)
         self._cmap_cycle = cycle(self._cmaps)  # reset the colormap cycle
         if self._channel_axis is not None:
             # set the visibility of the channel slider
             self._dims_sliders.set_dimension_visible(
-                self._channel_axis, mode != ChannelMode.COMPOSITE
+                self._channel_axis,
+                mode not in [ChannelMode.COMPOSITE, ChannelMode.RGBA],
             )
 
         self.refresh()
@@ -436,6 +462,21 @@ class NDViewer(QWidget):
 
     # ------------------- PRIVATE METHODS ----------------------------
 
+    def _guess_channel_mode(
+        self,
+        colormaps: Iterable[cmap._colormap.ColorStopsLike] | None = None,
+        data: DataWrapper | Any | None = None,
+    ) -> ChannelMode:
+        # Users who provider colormaps generally expect composite images
+        if colormaps is not None:
+            return ChannelMode.COMPOSITE
+        # Data shaped [Y, X, 3] or [Y, X, 4], are usually RGB images
+        if (shape := getattr(data, "shape", None)) is not None:
+            if shape[-1] in [3, 4]:
+                return ChannelMode.RGBA
+        # Default
+        return ChannelMode.MONO
+
     def _toggle_3d(self) -> None:
         self.set_ndim(3 if self._ndims == 2 else 2)
 
@@ -457,8 +498,14 @@ class NDViewer(QWidget):
         self._dims_sliders.setMaxima({k: v - 1 for k, v in maxes.items()})
 
         # FIXME: this needs to be moved and made user-controlled
-        for dim in list(maxes.keys())[-self._ndims :]:
+        for dim in self._visualized_dims:
             self._dims_sliders.set_dimension_visible(dim, False)
+
+        if self._channel_axis is not None:
+            self._dims_sliders.set_dimension_visible(
+                self._channel_axis,
+                self._channel_mode not in [ChannelMode.RGBA, ChannelMode.COMPOSITE],
+            )
 
     def _on_set_range_clicked(self) -> None:
         # using method to swallow the parameter passed by _set_range_btn.clicked
@@ -488,15 +535,22 @@ class NDViewer(QWidget):
         """
         if self._data_wrapper is None:
             return
+        indices: list[Indices]
         if (
             self._channel_axis is not None
             and self._channel_mode == ChannelMode.COMPOSITE
             and self._channel_axis in (sizes := self._data_wrapper.sizes())
         ):
-            indices: list[Indices] = [
+            indices = [
                 {**index, self._channel_axis: i}
                 for i in range(sizes[self._channel_axis])
             ]
+        elif (
+            self._channel_axis is not None
+            and self._channel_mode == ChannelMode.RGBA
+            and self._channel_axis in (sizes := self._data_wrapper.sizes())
+        ):
+            indices = [{k: v for k, v in index.items() if k != self._channel_axis}]
         else:
             indices = [index]
 
@@ -562,13 +616,18 @@ class NDViewer(QWidget):
                 if self._channel_mode == ChannelMode.COMPOSITE
                 else GRAYS
             )
-            if datum.ndim == 2:
+            if datum.ndim == 2 or self._channel_mode == ChannelMode.RGBA:
                 handles.append(self._canvas.add_image(datum, cmap=cm))
             elif datum.ndim == 3:
                 handles.append(self._canvas.add_volume(datum, cmap=cm))
             if imkey not in self._lut_ctrls:
+                cls = (
+                    RGBAControl
+                    if self._channel_mode == ChannelMode.RGBA
+                    else LutControl
+                )
                 ch_index = index.get(self._channel_axis, 0)
-                self._lut_ctrls[imkey] = c = LutControl(
+                self._lut_ctrls[imkey] = c = cls(
                     f"Ch {ch_index}",
                     handles,
                     self,
@@ -598,9 +657,12 @@ class NDViewer(QWidget):
         # - for better way to determine which dims need to be reduced (currently just
         #   the smallest dims)
         data = data.squeeze()
-        visualized_dims = self._ndims
-        if extra_dims := data.ndim - visualized_dims:
+        if extra_dims := data.ndim - len(self._visualized_dims):
             shapes = sorted(enumerate(data.shape), key=lambda x: x[1])
+            # Preserve channels in RGB mode
+            if self._channel_mode == ChannelMode.RGBA:
+                shapes = [s for s in shapes if s[0] != self._channel_axis]
+                extra_dims -= 1
             smallest_dims = tuple(i for i, _ in shapes[:extra_dims])
             data = reductor(data, axis=smallest_dims)
 

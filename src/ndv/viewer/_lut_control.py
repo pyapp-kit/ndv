@@ -135,3 +135,20 @@ class LutControl(QWidget):
             self._clims.setMinimum(min(mi, self._clims.minimum()))
             self._clims.setMaximum(max(ma, self._clims.maximum()))
             self._clims.setValue((mi, ma))
+
+
+class RGBAControl(LutControl):
+    def __init__(
+        self,
+        name: str = "",
+        handles: Iterable[PImageHandle] = (),
+        parent: QWidget | None = None,
+        cmaplist: Iterable[Any] = (),
+        auto_clim: bool = True,
+    ) -> None:
+        super().__init__("RGB", handles, parent, cmaplist, auto_clim)
+        self._cmap.setVisible(False)
+
+    def _on_cmap_changed(self, cmap: cmap.Colormap) -> None:
+        # NB: No-op
+        pass
