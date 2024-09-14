@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Literal, cast
 
 import cmap
 import numpy as np
-from qtpy.QtCore import QEvent
+from qtpy.QtCore import QEvent, Qt
+from qtpy.QtGui import QMouseEvent
 from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
@@ -17,6 +18,7 @@ from ndv.viewer._components import (
     ChannelModeButton,
     DimToggleButton,
     QSpinner,
+    ROIButton,
 )
 
 from ._backends import get_canvas_class
@@ -28,10 +30,10 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
     from typing import Any, Callable, Hashable, Iterable, Sequence, TypeAlias
 
-    from qtpy.QtCore import QObject, QPointF
-    from qtpy.QtGui import QCloseEvent, QMouseEvent
+    from qtpy.QtCore import QObject
+    from qtpy.QtGui import QCloseEvent, QKeyEvent
 
-    from ._backends._protocols import PCanvas, PImageHandle
+    from ._backends._protocols import CanvasElement, PCanvas, PImageHandle, PRoiHandle
     from ._dims_slider import DimKey, Indices, Sizes
 
     ImgKey: TypeAlias = Hashable
@@ -144,6 +146,11 @@ class NDViewer(QWidget):
         # number of dimensions to display
         self._ndims: Literal[2, 3] = 2
 
+        # Canvas selection
+        self._selection: CanvasElement | None = None
+        # ROI
+        self._roi: PRoiHandle | None = None
+
         # WIDGETS ----------------------------------------------------
 
         # the button that controls the display mode of the channels
@@ -154,6 +161,9 @@ class NDViewer(QWidget):
             QIconifyIcon("fluent:full-screen-maximize-24-filled"), "", self
         )
         self._set_range_btn.clicked.connect(self._on_set_range_clicked)
+        # button to draw ROIs
+        self._add_roi_btn = ROIButton()
+        self._add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         # button to change number of displayed dimensions
         self._ndims_btn = DimToggleButton(self)
@@ -171,15 +181,7 @@ class NDViewer(QWidget):
         self._qcanvas = self._canvas.qwidget()
 
         # Install an event filter so we can intercept mouse/key events
-        if hasattr(self._qcanvas, "_subwidget"):
-            # HACK:
-            # this is a hack for the pygfx backend, which wraps the canvas in another
-            # widget that controls all events.
-            # We could technically add another method to PCanvas to get the "filterable"
-            # widget... but we'll just do this for now.
-            self._qcanvas._subwidget.installEventFilter(self)
-        else:
-            self._qcanvas.installEventFilter(self)
+        self._qcanvas.installEventFilter(self)
 
         # the sliders that control the index of the displayed image
         self._dims_sliders = DimsSliders(self)
@@ -209,6 +211,7 @@ class NDViewer(QWidget):
         btns.addWidget(self._channel_mode_btn)
         btns.addWidget(self._ndims_btn)
         btns.addWidget(self._set_range_btn)
+        btns.addWidget(self._add_roi_btn)
 
         info_widget = QWidget()
         info = QHBoxLayout(info_widget)
@@ -298,6 +301,31 @@ class NDViewer(QWidget):
         self.set_current_index(idx)
         # update the data info label
         self._data_info_label.setText(self._data_wrapper.summary_info())
+
+    def set_roi(
+        self,
+        vertices: list[tuple[float, float]] | None = None,
+        color: Any = None,
+        border_color: Any = None,
+    ) -> None:
+        """Set the properties of the ROI overlaid on the displayed data.
+
+        Properties
+        ----------
+        vertices : list[tuple[float, float]] | None
+            The vertices of the ROI.
+        color : str, tuple, list, array, Color, or int
+            The fill color.  Can be any "ColorLike".
+        border_color : str, tuple, list, array, Color, or int
+            The border color.  Can be any "ColorLike".
+        """
+        # Remove the old ROI
+        if self._roi:
+            self._roi.remove()
+
+        self._roi = self._canvas.add_roi(
+            vertices=vertices, color=color, border_color=border_color
+        )
 
     def set_visualized_dims(self, dims: Iterable[DimKey]) -> None:
         """Set the dimensions that will be visualized.
@@ -392,6 +420,12 @@ class NDViewer(QWidget):
     def _toggle_3d(self) -> None:
         self.set_ndim(3 if self._ndims == 2 else 2)
 
+        # Disable ROIs in 3D (for now)
+        self._add_roi_btn.setEnabled(self._ndims == 2)
+        # FIXME: When toggling 2D again, ROIs cannot be selected
+        if self._roi:
+            self._roi.visible = self._ndims == 2
+
     def _update_slider_ranges(self) -> None:
         """Set the maximum values of the sliders.
 
@@ -407,6 +441,11 @@ class NDViewer(QWidget):
     def _on_set_range_clicked(self) -> None:
         # using method to swallow the parameter passed by _set_range_btn.clicked
         self._canvas.set_range()
+
+    def _on_add_roi_clicked(self, checked: bool) -> None:
+        if checked:
+            # Add new roi
+            self.set_roi()
 
     def _image_key(self, index: Indices) -> ImgKey:
         """Return the key for image handle(s) corresponding to `index`."""
@@ -571,21 +610,98 @@ class NDViewer(QWidget):
         # here is where we get a chance to intercept mouse events before passing them
         # to the canvas. Return `True` to prevent the event from being passed to
         # the backend widget.
-        if event.type() == QEvent.Type.MouseMove and obj is self._qcanvas:
-            self._update_hover_info(cast("QMouseEvent", event).position())
+        intercept = False
+        # use children in case backend has a subwidget stealing events.
+        if obj is self._qcanvas or obj in (self._qcanvas.children()):
+            if isinstance(event, QMouseEvent):
+                intercept |= self._canvas_mouse_event(event)
+            if event.type() == QEvent.Type.KeyPress:
+                self.keyPressEvent(cast("QKeyEvent", event))
+        return intercept
+
+    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
+        intercept = False
+        if ev.type() == QEvent.Type.MouseButtonPress:
+            if self._add_roi_btn.isChecked():
+                intercept |= self._begin_roi(ev)
+            intercept |= self._press_element(ev)
+            return intercept
+        if ev.type() == QEvent.Type.MouseMove:
+            intercept = self._move_selection(ev)
+            intercept |= self._update_hover_info(ev)
+            intercept |= self._update_cursor(ev)
+            return intercept
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            return self._update_roi_button(ev)
         return False
 
-    def _update_hover_info(self, point: QPointF) -> None:
+    # FIXME: This is ugly
+    def _begin_roi(self, event: QMouseEvent) -> bool:
+        if self._roi:
+            ev_pos = event.position()
+            pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
+            self._roi.move(pos)
+            self._roi.visible = True
+        return False
+
+    def _press_element(self, event: QMouseEvent) -> bool:
+        ev_pos = (event.position().x(), event.position().y())
+        pos = self._canvas.canvas_to_world(ev_pos)
+        # TODO why does the canvas need this point untransformed??
+        elements = self._canvas.elements_at(ev_pos)
+        # Deselect prior selection before editing new selection
+        if self._selection:
+            self._selection.selected = False
+        for e in elements:
+            if e.can_select:
+                e.start_move(pos)
+                # Select new selection
+                self._selection = e
+                self._selection.selected = True
+                return False
+        return False
+
+    def _move_selection(self, event: QMouseEvent) -> bool:
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            if self._selection and self._selection.selected:
+                ev_pos = event.pos()
+                pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
+                self._selection.move(pos)
+                # If we are moving the object, we don't want to move the camera
+                return True
+        return False
+
+    def _update_cursor(self, event: QMouseEvent) -> bool:
+        # Avoid changing the cursor when dragging
+        if event.buttons() != Qt.MouseButton.NoButton:
+            return False
+        # When "creating" a ROI, use CrossCursor
+        if self._add_roi_btn.isChecked():
+            self._qcanvas.setCursor(Qt.CursorShape.CrossCursor)
+            return False
+        # If any local elements have a preference, use it
+        pos = (event.pos().x(), event.pos().y())
+        for e in self._canvas.elements_at(pos):
+            if (pref := e.cursor_at(pos)) is not None:
+                self._qcanvas.setCursor(pref)
+                return False
+        # Otherwise, normal cursor
+        self._qcanvas.setCursor(Qt.CursorShape.ArrowCursor)
+        return False
+
+    def _update_hover_info(self, event: QMouseEvent) -> bool:
         """Update text of hover_info_label with data value(s) at point."""
+        point = event.pos()
         x, y, _z = self._canvas.canvas_to_world((point.x(), point.y()))
         # TODO: handle 3D data
         if (x < 0 or y < 0) or self._ndims == 3:  # pragma: no cover
             self._hover_info_label.setText("")
-            return
+            return False
 
         x = int(x)
         y = int(y)
         text = f"[{y}, {x}]"
+        # TODO: Can we use self._canvas.elements_at?
         for n, handles in enumerate(self._img_handles.values()):
             channels = []
             for handle in handles:
@@ -606,7 +722,20 @@ class NDViewer(QWidget):
                     # if we eventually have multiple image sources with different
                     # extents, this will need to be handled.  here, we just skip
                     self._hover_info_label.setText("")
-                    return
+                    return False
                 break  # only getting one handle per channel
             text += ",".join(channels)
         self._hover_info_label.setText(text)
+        return False
+
+    def keyPressEvent(self, a0: QKeyEvent | None) -> None:
+        if a0 is None:
+            return
+        if a0.key() == Qt.Key.Key_Delete and self._selection is not None:
+            self._selection.remove()
+            self._selection = None
+
+    def _update_roi_button(self, event: QMouseEvent) -> bool:
+        if self._add_roi_btn.isChecked():
+            self._add_roi_btn.click()
+        return False
