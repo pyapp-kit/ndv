@@ -18,7 +18,8 @@ from vispy.util.quaternion import Quaternion
 from ._protocols import PCanvas
 
 if TYPE_CHECKING:
-    from typing import Callable, Sequence
+    from collections.abc import Sequence
+    from typing import Callable
 
     from qtpy.QtWidgets import QWidget
 

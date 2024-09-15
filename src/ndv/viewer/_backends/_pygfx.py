@@ -14,7 +14,7 @@ from wgpu.gui.qt import QWgpuCanvas
 from ._protocols import PCanvas
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from collections.abc import Sequence
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
