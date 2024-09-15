@@ -126,6 +126,7 @@ filterwarnings = [
     "ignore:Got wrong number of dimensions",
     # requires pygfx > 0.2.0
     "ignore:This version of pygfx does not yet support additive blending",
+    "ignore:Unable to import recommended hash",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
