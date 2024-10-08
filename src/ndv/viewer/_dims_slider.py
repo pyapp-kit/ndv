@@ -24,7 +24,8 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 if TYPE_CHECKING:
-    from typing import Hashable, Mapping, TypeAlias
+    from collections.abc import Hashable, Mapping
+    from typing import TypeAlias
 
     from qtpy.QtGui import QResizeEvent
 
@@ -505,6 +506,13 @@ class DimsSliders(QWidget):
             return
         cast("QVBoxLayout", self.layout()).removeWidget(slider)
         slider.deleteLater()
+
+    def clear(self) -> None:
+        """Remove all dimensions from the DimsSliders widget."""
+        for key in list(self._sliders):
+            self.remove_dimension(key)
+        self._current_index = {}
+        self._invisible_dims = set()
 
     def _on_dim_slider_value_changed(self, key: DimKey, value: Index) -> None:
         self._current_index[key] = value
