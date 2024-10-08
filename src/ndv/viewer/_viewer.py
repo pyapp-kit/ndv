@@ -122,6 +122,7 @@ class NDViewer(QWidget):
         super().__init__(parent=parent)
 
         # ATTRIBUTES ----------------------------------------------------
+        self._data_wrapper: DataWrapper | None = None
 
         # mapping of key to a list of objects that control image nodes in the canvas
         self._img_handles: defaultdict[ImgKey, list[PImageHandle]] = defaultdict(list)
@@ -235,8 +236,7 @@ class NDViewer(QWidget):
         # SETUP ------------------------------------------------------
 
         self.set_channel_mode(channel_mode)
-        if data is not None:
-            self.set_data(data)
+        self.set_data(data)
 
     # ------------------- PUBLIC API ----------------------------
     @property
@@ -245,13 +245,15 @@ class NDViewer(QWidget):
         return self._dims_sliders
 
     @property
-    def data_wrapper(self) -> DataWrapper:
+    def data_wrapper(self) -> DataWrapper | None:
         """Return the DataWrapper object around the datastore."""
         return self._data_wrapper
 
     @property
     def data(self) -> Any:
         """Return the data backing the view."""
+        if self._data_wrapper is None:
+            return None
         return self._data_wrapper.data
 
     @data.setter
@@ -277,6 +279,14 @@ class NDViewer(QWidget):
             or slices that define the slice of the data to display.  If not provided,
             the initial index will be set to the middle of the data.
         """
+        # clear current data
+        if data is None:
+            self._data_wrapper = None
+            self._clear_images()
+            self._dims_sliders.clear()
+            self._data_info_label.setText("")
+            return
+
         # store the data
         self._data_wrapper = DataWrapper.create(data)
 
@@ -351,6 +361,9 @@ class NDViewer(QWidget):
         self._ndims = ndim
         self._canvas.set_ndim(ndim)
 
+        if self._data_wrapper is None:
+            return
+
         # set the visibility of the last non-channel dimension
         sizes = list(self._data_wrapper.sizes())
         if self._channel_axis is not None:
@@ -360,8 +373,7 @@ class NDViewer(QWidget):
             self._dims_sliders.set_dimension_visible(dim3, True if ndim == 2 else False)
 
         # clear image handles and redraw
-        if self._img_handles:
-            self.refresh()
+        self.refresh()
 
     def set_channel_mode(self, mode: ChannelMode | str | None = None) -> None:
         """Set the mode for displaying the channels.
@@ -393,8 +405,7 @@ class NDViewer(QWidget):
                 self._channel_axis, mode != ChannelMode.COMPOSITE
             )
 
-        if self._img_handles:
-            self.refresh()
+        self.refresh()
 
     def refresh(self) -> None:
         """Refresh the canvas."""
@@ -439,6 +450,9 @@ class NDViewer(QWidget):
 
         If `sizes` is not provided, sizes will be inferred from the datastore.
         """
+        if self._data_wrapper is None:
+            return
+
         maxes = self._data_wrapper.sizes()
         self._dims_sliders.setMaxima({k: v - 1 for k, v in maxes.items()})
 
@@ -472,6 +486,8 @@ class NDViewer(QWidget):
         makes a request for the new data slice and queues _on_data_future_done to be
         called when the data is ready.
         """
+        if self._data_wrapper is None:
+            return
         if (
             self._channel_axis is not None
             and self._channel_mode == ChannelMode.COMPOSITE
