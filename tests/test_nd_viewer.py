@@ -27,6 +27,16 @@ if not os.getenv("CI") or sys.platform == "darwin":
     BACKENDS.append("pygfx")
 
 
+def test_empty_viewer(qtbot: QtBot) -> None:
+    viewer = NDViewer()
+    qtbot.add_widget(viewer)
+    viewer.refresh()
+    viewer.set_data(np.random.rand(4, 3, 32, 32))
+    assert isinstance(viewer.data, np.ndarray)
+    viewer.set_data(None)
+    assert viewer.data is None
+
+
 @allow_linux_widget_leaks
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
