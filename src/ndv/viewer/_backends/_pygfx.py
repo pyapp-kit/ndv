@@ -561,6 +561,23 @@ class PyGFXViewerCanvas(PCanvas):
         cam.zoom = 1 - margin
         self.refresh()
 
+    def zoom(self, factor: float | tuple, center: tuple | None = None):
+        """
+        Zoom in (or out) at the given center.
+
+        Parameters
+        ----------
+        factor : float or tuple
+            Fraction by which the scene should be zoomed (e.g. a factor of 2
+            causes the scene to appear twice as large).
+        center : tuple of 2-4 elements
+            The center of the view. If not given or None, use the
+            current center.
+        """
+        cam = self._camera
+        cam.zoom *= factor
+        self.refresh()
+
     def refresh(self) -> None:
         self._canvas.update()
         self._canvas.request_draw(self._animate)
