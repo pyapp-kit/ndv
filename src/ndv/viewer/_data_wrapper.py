@@ -134,19 +134,15 @@ class DataWrapper(Generic[ArrayT]):
         """Return the (best guess) axis name for the channel dimension."""
         # for arrays with labeled dimensions,
         # see if any of the dimensions are named "channel"
-        for dimkey, val in self.sizes().items():
+        sizes = self.sizes()
+        for dimkey, val in sizes.items():
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
                     return dimkey
 
         # for shaped arrays, use the smallest dimension as the channel axis
-        shape = getattr(self._data, "shape", None)
-        if isinstance(shape, Sequence):
-            with suppress(ValueError):
-                smallest_dim = min(shape)
-                if smallest_dim <= self.MAX_CHANNELS:
-                    return shape.index(smallest_dim)
-        return None
+        min_key = min(sizes, key=sizes.get)  # type: ignore
+        return min_key if sizes[min_key] <= self.MAX_CHANNELS else None
 
     def save_as_zarr(self, save_loc: str | Path) -> None:
         raise NotImplementedError("save_as_zarr not implemented for this data type.")
