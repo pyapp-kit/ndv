@@ -299,6 +299,11 @@ class NDViewer(QWidget):
         # store the data
         self._data_wrapper: DataWrapper = DataWrapper.create(data)  # type: ignore
 
+        # update the range of all the sliders to match the sizes we set above
+        maxes = self._data_wrapper.sizes()
+        with signals_blocked(self._dims_sliders):
+            self._dims_sliders.setMaxima({k: v - 1 for k, v in maxes.items()})
+
         # update the dimensions we are visualizing
         sizes = dict(self._data_wrapper.sizes().items())
 
@@ -317,10 +322,6 @@ class NDViewer(QWidget):
             visualized_dims.remove(self._channel_axis)
         # By convention, visualize the final dimensions
         self.set_visualized_dims(visualized_dims[-self._ndims :])
-
-        # update the range of all the sliders to match the sizes we set above
-        with signals_blocked(self._dims_sliders):
-            self._update_slider_ranges()
 
         # redraw
         if initial_index is None:
@@ -372,6 +373,11 @@ class NDViewer(QWidget):
             self._dims_sliders.set_dimension_visible(d, d not in self._visualized_dims)
         for d in self._visualized_dims:
             self._dims_sliders.set_dimension_visible(d, False)
+        if self._channel_axis is not None:
+            self._dims_sliders.set_dimension_visible(
+                self._channel_axis,
+                self._channel_mode not in [ChannelMode.COMPOSITE, ChannelMode.RGBA],
+            )
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:
         """Set the number of dimensions to display."""
@@ -485,27 +491,6 @@ class NDViewer(QWidget):
         # FIXME: When toggling 2D again, ROIs cannot be selected
         if self._roi:
             self._roi.visible = self._ndims == 2
-
-    def _update_slider_ranges(self) -> None:
-        """Set the maximum values of the sliders.
-
-        If `sizes` is not provided, sizes will be inferred from the datastore.
-        """
-        if self._data_wrapper is None:
-            return
-
-        maxes = self._data_wrapper.sizes()
-        self._dims_sliders.setMaxima({k: v - 1 for k, v in maxes.items()})
-
-        # FIXME: this needs to be moved and made user-controlled
-        for dim in self._visualized_dims:
-            self._dims_sliders.set_dimension_visible(dim, False)
-
-        if self._channel_axis is not None:
-            self._dims_sliders.set_dimension_visible(
-                self._channel_axis,
-                self._channel_mode not in [ChannelMode.RGBA, ChannelMode.COMPOSITE],
-            )
 
     def _on_set_range_clicked(self) -> None:
         # using method to swallow the parameter passed by _set_range_btn.clicked
