@@ -2,21 +2,13 @@
 # Distributed under the (new) BSD License. See LICENSE.txt for more info.
 
 from collections.abc import Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    Optional,
-    TypedDict,
-    Unpack,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, Unpack, cast
 
 import numpy as np
 from vispy import scene
 
 if TYPE_CHECKING:
-
+    # just here cause vispy has poor type hints
     class Grid(scene.Grid):
         def add_view(
             self,
@@ -25,7 +17,8 @@ if TYPE_CHECKING:
             row_span: int = 1,
             col_span: int = 1,
             **kwargs: Any,
-        ) -> scene.ViewBox: ...
+        ) -> scene.ViewBox:
+            super().add_view(...)
 
         def add_widget(
             self,
@@ -35,7 +28,8 @@ if TYPE_CHECKING:
             row_span: int = 1,
             col_span: int = 1,
             **kwargs: Any,
-        ) -> scene.Widget: ...
+        ) -> scene.Widget:
+            super().add_widget(...)
 
 
 __all__ = ["PlotWidget"]
@@ -49,6 +43,19 @@ class WidgetKwargs(TypedDict, total=False):
     bgcolor: str
     padding: float
     margin: float
+
+
+class LabelKwargs(TypedDict, total=False):
+    text: str
+    color: str
+    bold: bool
+    italic: bool
+    face: str
+    font_size: float
+    rotation: float
+    method: str
+    depth_test: bool
+    pos: tuple[float, float]
 
 
 class PlotWidget(scene.Widget):
@@ -77,14 +84,18 @@ class PlotWidget(scene.Widget):
         **widget_kwargs: Unpack[WidgetKwargs],
     ) -> None:
         self._fg_color = fg_color
-        self.visuals: list[scene.VisualNode] = []
+        self._visuals: list[scene.VisualNode] = []
         super().__init__(**widget_kwargs)
         self.unfreeze()
         self.grid = cast("Grid", self.add_grid(spacing=0, margin=10))
 
-        self.show_xaxis = True
-        self.show_yaxis = True
-        self.axis_kwargs = {
+        title_kwargs = {"font_size": 14, "color": "w"}
+        label_kwargs = {"font_size": 10, "color": "w"}
+        self._title = scene.Label(str(title), **title_kwargs)
+        self._xlabel = scene.Label(str(xlabel), **label_kwargs)
+        self._ylabel = scene.Label(str(ylabel), rotation=-90, **label_kwargs)
+
+        axis_kwargs = {
             "text_color": "w",
             "axis_color": "w",
             "tick_color": "w",
@@ -95,101 +106,111 @@ class PlotWidget(scene.Widget):
             "minor_tick_length": 2,
             "major_tick_length": 5,
             "axis_width": 1,
-            "axis_font_size": 9,
+            "axis_font_size": 10,
         }
-        self.title_kwargs = {"font_size": 16, "color": "#ff0000"}
-        self.title = scene.Label(str(title), **self.title_kwargs)
-        self.xlabel = scene.Label(str(xlabel))
-        self.ylabel = scene.Label(str(ylabel), rotation=-90)
+        self.yaxis = scene.AxisWidget(orientation="left", **axis_kwargs)
+        self.xaxis = scene.AxisWidget(orientation="bottom", **axis_kwargs)
 
-        # CONFIGURE 2D
-        #         c0        c1      c2      c3       c4
-        #     +---------+-------+-------+-------+---------+
-        #  r0 |         |               | title |         |
-        #     | ------- +-------+-------+-------+ ------- |
-        #  r1 | padding | ylabel| yaxis | view  | padding |
-        #     | ------- +-------+-------+-------+ ------- |
-        #  r2 |         |               | xaxis |         |
-        #     |         +---------------+-------+         |
-        #  r3 |         |               | xlabel|         |
-        #     |---------+---------------+-------+---------|
-        #  r4 |                         |padding|         |
-        #     +---------+---------------+-------+---------+
+        # 2D Plot layout:
+        #
         #         c0        c1      c2      c3      c4      c5         c6
-        #     +---------+-------+-------+-------+-------+---------+---------+
-        #  r0 |         |                       | title |         |         |
-        #     |         +-----------------------+-------+---------+         |
-        #  r1 |         |                       | cbar  |         |         |
-        #     | ------- +-------+-------+-------+-------+---------+ ------- |
-        #  r2 | padding | cbar  | ylabel| yaxis |  view | cbar    | padding |
-        #     | ------- +-------+-------+-------+-------+---------+ ------- |
-        #  r3 |         |                       | xaxis |         |         |
-        #     |         +-----------------------+-------+---------+         |
-        #  r4 |         |                       | xlabel|         |         |
-        #     |         +-----------------------+-------+---------+         |
-        #  r5 |         |                       | cbar  |         |         |
-        #     |---------+-----------------------+-------+---------+---------|
-        #  r6 |                                 |padding|                   |
-        #     +---------+-----------------------+-------+---------+---------+
+        #     +----------+-------+-------+-------+---------+---------+-----------+
+        #  r0 |          |                       |  title  |         |           |
+        #     |          +-----------------------+---------+---------+           |
+        #  r1 |          |                       |  cbar   |         |           |
+        #     |----------+-------+-------+-------+---------+---------+ ----------|
+        #  r2 | pad_left | cbar  | ylabel| yaxis |  view   | cbar    | pad_right |
+        #     |----------+-------+-------+-------+---------+---------+ ----------|
+        #  r3 |          |                       |  xaxis  |         |           |
+        #     |          +-----------------------+---------+---------+           |
+        #  r4 |          |                       |  xlabel |         |           |
+        #     |          +-----------------------+---------+---------+           |
+        #  r5 |          |                       |  cbar   |         |           |
+        #     |---------+------------------------+---------+---------+-----------|
+        #  r6 |                                 | pad_bottom |                   |
+        #     +---------+------------------------+---------+---------+-----------+
 
-        # PADDING
-        self.padding_right = self.grid.add_widget(None, row=2, col=6)
-        self.padding_right.width_min = 1
-        self.padding_right.width_max = 5
-        self.padding_bottom = self.grid.add_widget(None, row=6, col=4)
-        self.padding_bottom.height_min = 1
-        self.padding_bottom.height_max = 3
+        self._grid_wdg: dict[str, scene.Widget] = {}
+        for name, row, col, widget in [
+            ("pad_left", 2, 0, None),
+            ("pad_right", 2, 6, None),
+            ("pad_bottom", 6, 4, None),
+            ("title", 0, 4, self._title),
+            ("cbar_top", 1, 4, None),
+            ("cbar_left", 2, 1, None),
+            ("cbar_right", 2, 5, None),
+            ("cbar_bottom", 5, 4, None),
+            ("yaxis", 2, 3, self.yaxis),
+            ("xaxis", 3, 4, self.xaxis),
+            ("xlabel", 4, 4, self._xlabel),
+            ("ylabel", 2, 2, self._ylabel),
+        ]:
+            self._grid_wdg[name] = wdg = self.grid.add_widget(widget, row=row, col=col)
+            if name.startswith(("cbar", "pad")):
+                if "left" in name or "right" in name:
+                    wdg.width_max = 2
+                else:
+                    wdg.height_max = 2
 
-        # TITLE
-        self.title_widget = self.grid.add_widget(self.title, row=0, col=4)
-        self.title_widget.height_min = self.title_widget.height_max = (
-            30 if self.title.text else 5
-        )
+        # The main view into which plots are added
+        self._view = self.grid.add_view(row=2, col=4)
 
-        # COLORBARS
-        self.cbar_top = self.grid.add_widget(None, row=1, col=4)
-        self.cbar_top.height_max = 0
-        self.cbar_left = self.grid.add_widget(None, row=2, col=1)
-        self.cbar_left.width_max = 0
-        self.cbar_right = self.grid.add_widget(None, row=2, col=5)
-        self.cbar_right.width_max = 0
-        self.cbar_bottom = self.grid.add_widget(None, row=5, col=4)
-        self.cbar_bottom.height_max = 0
-
-        # Y AXIS
-        self.yaxis = scene.AxisWidget(orientation="left", **self.axis_kwargs)
-        self.yaxis_widget = self.grid.add_widget(self.yaxis, row=2, col=3)
-        if self.show_yaxis:
-            self.yaxis_widget.width_max = 30
-            self.ylabel_widget = self.grid.add_widget(self.ylabel, row=2, col=2)
-            self.ylabel_widget.width_max = 10 if self.ylabel.text else 1
-            self.padding_left = self.grid.add_widget(None, row=2, col=0)
-            self.padding_left.width_min = 1
-            self.padding_left.width_max = 10
-        else:
-            self.yaxis.visible = False
-            self.yaxis.width_max = 1
-            self.padding_left = self.grid.add_widget(None, row=2, col=0, col_span=3)
-            self.padding_left.width_min = 1
-            self.padding_left.width_max = 5
-
-        # X AXIS
-        self.xaxis = scene.AxisWidget(orientation="bottom", **self.axis_kwargs)
-        self.xaxis_widget = self.grid.add_widget(self.xaxis, row=3, col=4)
-        self.xaxis_widget.height_max = 20 if self.show_xaxis else 0
-        self.xlabel_widget = self.grid.add_widget(self.xlabel, row=4, col=4)
-        self.xlabel_widget.height_max = 10 if self.xlabel.text else 0
+        # FIXME: this is a mess of hardcoded values... not sure whether they will work
+        # cross-platform.  Note that `width_max` and `height_max` of 2 is actually
+        # *less* visible than 0 for some reason.  They should also be extracted into
+        # some sort of `hide/show` logic for each component
+        self._grid_wdg["yaxis"].width_max = 30
+        self._grid_wdg["pad_left"].width_max = 20
+        self._grid_wdg["xaxis"].height_max = 20
+        self.ylabel = ylabel
+        self.xlabel = xlabel
+        self.title = title
 
         # VIEWBOX (this has to go last, see vispy #1748)
-        self._view = self.grid.add_view(row=2, col=4, border_color=None, bgcolor=None)
         self.camera = self._view.camera = PanZoom1DCamera(lock_axis)
-
+        # this has to come after camera is set
         self.xaxis.link_view(self._view)
         self.yaxis.link_view(self._view)
-
         self.freeze()
 
+    @property
+    def title(self) -> str:
+        """The title label."""
+        return self._title.text  # type: ignore [no-any-return]
+
+    @title.setter
+    def title(self, text: str) -> None:
+        """Set the title of the plot."""
+        self._title.text = text
+        wdg = self._grid_wdg["title"]
+        wdg.height_min = wdg.height_max = 30 if text else 2
+
+    @property
+    def xlabel(self) -> str:
+        """The x-axis label."""
+        return self._xlabel.text  # type: ignore [no-any-return]
+
+    @xlabel.setter
+    def xlabel(self, text: str) -> None:
+        """Set the x-axis label."""
+        self._xlabel.text = text
+        wdg = self._grid_wdg["xlabel"]
+        wdg.height_min = wdg.height_max = 40 if text else 2
+
+    @property
+    def ylabel(self) -> str:
+        """The y-axis label."""
+        return self._ylabel.text  # type: ignore [no-any-return]
+
+    @ylabel.setter
+    def ylabel(self, text: str) -> None:
+        """Set the x-axis label."""
+        self._ylabel.text = text
+        wdg = self._grid_wdg["ylabel"]
+        wdg.width_min = wdg.width_max = 20 if text else 2
+
     def lock_axis(self, axis: Literal["x", "y", None]) -> None:
+        """Prevent panning and zooming along a particular axis."""
         self.camera._axis = axis
         self.camera.set_range()
 
@@ -197,114 +218,58 @@ class PlotWidget(scene.Widget):
         self,
         data: np.ndarray,
         bins: int | np.ndarray = 10,
-        color: str = "w",
+        color: str | tuple[float, ...] = "w",
         orientation: Literal["h", "w"] = "h",
     ) -> scene.Histogram:
-        """Calculate and show a histogram of data.
-
-        Parameters
-        ----------
-        data : array-like
-            Data to histogram. Currently only 1D data is supported.
-        bins : int | array-like
-            Number of bins, or bin edges.
-        color : instance of Color
-            Color of the histogram.
-        orientation : {'h', 'v'}
-            Orientation of the histogram.
-
-        Returns
-        -------
-        hist : instance of Polygon
-            The histogram polygon.
-        """
+        """Calculate and show a histogram of data."""
+        # TODO: extract histogram calculation to a separate function
+        # and make it possible to directly accept counts and bin_edges
         hist = scene.Histogram(data, bins, color, orientation)
         self._view.add(hist)
         self.camera.set_range()
         return hist
 
-    # def plot(
-    #     self,
-    #     data,
-    #     color="k",
-    #     symbol=None,
-    #     line_kind="-",
-    #     width=1.0,
-    #     marker_size=10.0,
-    #     edge_color="k",
-    #     face_color="b",
-    #     edge_width=1.0,
-    #     title=None,
-    #     xlabel=None,
-    #     ylabel=None,
-    #     connect="strip",
-    # ):
-    #     """Plot a series of data using lines and markers.
+    def plot(
+        self,
+        data: np.ndarray,
+        *,
+        color: str = "k",
+        symbol: str | None = None,
+        line_kind: str = "-",
+        width: float = 1.0,
+        marker_size: float = 10.0,
+        edge_color: str = "k",
+        face_color: str = "b",
+        edge_width: float = 1.0,
+        title: str | None = None,
+        xlabel: str | None = None,
+        ylabel: str | None = None,
+        connect: str | np.ndarray = "strip",
+    ) -> scene.LinePlot:
+        """Plot a series of data using lines and markers."""
+        line = scene.LinePlot(
+            data,
+            connect=connect,
+            color=color,
+            symbol=symbol,
+            line_kind=line_kind,
+            width=width,
+            marker_size=marker_size,
+            edge_color=edge_color,
+            face_color=face_color,
+            edge_width=edge_width,
+        )
+        self._view.add(line)
+        self.camera.set_range()
+        self._visuals.append(line)
 
-    #     Parameters
-    #     ----------
-    #     data : array | two arrays
-    #         Arguments can be passed as ``(Y,)``, ``(X, Y)`` or
-    #         ``np.array((X, Y))``.
-    #     color : instance of Color
-    #         Color of the line.
-    #     symbol : str
-    #         Marker symbol to use.
-    #     line_kind : str
-    #         Kind of line to draw. For now, only solid lines (``'-'``)
-    #         are supported.
-    #     width : float
-    #         Line width.
-    #     marker_size : float
-    #         Marker size. If `size == 0` markers will not be shown.
-    #     edge_color : instance of Color
-    #         Color of the marker edge.
-    #     face_color : instance of Color
-    #         Color of the marker face.
-    #     edge_width : float
-    #         Edge width of the marker.
-    #     title : str | None
-    #         The title string to be displayed above the plot
-    #     xlabel : str | None
-    #         The label to display along the bottom axis
-    #     ylabel : str | None
-    #         The label to display along the left axis.
-    #     connect : str | array
-    #         Determines which vertices are connected by lines.
-
-    #     Returns
-    #     -------
-    #     line : instance of LinePlot
-    #         The line plot.
-
-    #     See Also
-    #     --------
-    #     LinePlot
-    #     """
-    #     line = scene.LinePlot(
-    #         data,
-    #         connect=connect,
-    #         color=color,
-    #         symbol=symbol,
-    #         line_kind=line_kind,
-    #         width=width,
-    #         marker_size=marker_size,
-    #         edge_color=edge_color,
-    #         face_color=face_color,
-    #         edge_width=edge_width,
-    #     )
-    #     self._view.add(line)
-    #     self._view.camera.set_range()
-    #     self.visuals.append(line)
-
-    #     if title is not None:
-    #         self.title.text = title
-    #     if xlabel is not None:
-    #         self.xlabel.text = xlabel
-    #     if ylabel is not None:
-    #         self.ylabel.text = ylabel
-
-    #     return line
+        if title is not None:
+            self._title.text = title
+        if xlabel is not None:
+            self._xlabel.text = xlabel
+        if ylabel is not None:
+            self._ylabel.text = ylabel
+        return line
 
 
 class PanZoom1DCamera(scene.cameras.PanZoomCamera):
