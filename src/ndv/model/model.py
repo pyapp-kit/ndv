@@ -1,7 +1,6 @@
 """General model for ndv."""
 
 import warnings
-from contextlib import suppress
 from typing import (
     Annotated,
     Any,
@@ -20,7 +19,7 @@ from typing import (
 import numpy as np
 import numpy.typing as npt
 from cmap import Colormap
-from psygnal import Signal, SignalInstance
+from psygnal import SignalGroupDescriptor
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -72,7 +71,7 @@ class ReducerType(Reducer):
     """Reducer type for pydantic."""
 
     @classmethod
-    def __get_pydantic_core_schema__(cls, source: Any) -> Any:
+    def __get_pydantic_core_schema__(cls, source: Any, handler: Any) -> Any:
         """Get the Pydantic schema for this object."""
         from pydantic_core import core_schema
 
@@ -107,7 +106,7 @@ class _NDVModel(BaseModel):
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
 
 
-def _validate_reducers(v: Any) -> Mapping[AxisKey | None, ReducerType]:
+def _validate_reducers(v: Any) -> Any:
     if not isinstance(v, Mapping):
         v = {None: v}
     if "None" in v:
@@ -151,21 +150,12 @@ class LUTModel(_NDVModel):
     autoscale: bool | tuple[float, float] = (0, 1)
 
 
-def _validate_lutmap(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        value = dict(value)
-        if "None" in value:
-            value[None] = value.pop("None")
-        for key in list(value):
-            with suppress(TypeError):
-                if isinstance(key, str) and key.isdigit():
-                    value[int(key)] = value.pop(key)
-    return value
+class LutMap(ValidatedDict[CoordIndex | None, LUTModel]):
+    """Lookup table mapping for pydantic."""
 
-
-LutMap = Annotated[
-    ValidatedDict[CoordIndex | None, LUTModel], BeforeValidator(_validate_lutmap)
-]
+    @classmethod
+    def cls_default(cls) -> LUTModel:
+        return LUTModel()
 
 
 class ArrayDisplayModel(_NDVModel):
@@ -207,21 +197,11 @@ class ArrayDisplayModel(_NDVModel):
 
     visible_axes: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey] = (-2, -1)
     current_index: ValidatedDict[AxisKey, int | Slice] = Field(default_factory=dict)
-    reducers: Reducers = "max"  # type: ignore
+    reducers: Reducers = np.max
     channel_axis: AxisKey | None = None
-    luts: LutMap = Field(default_factory=lambda: {None: LUTModel()})
+    luts: LutMap = Field(default_factory=LutMap)
 
-    visible_axes_changed: ClassVar[Signal] = Signal(tuple)
-    channel_axis_changed: ClassVar[Signal] = Signal(int)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if event := getattr(self, f"{name}_changed", None):
-            before = getattr(self, name)
-            super().__setattr__(name, value)
-            if (after := getattr(self, name)) != before:
-                cast("SignalInstance", event).emit(after)
-        else:
-            super().__setattr__(name, value)
+    events: ClassVar[SignalGroupDescriptor] = SignalGroupDescriptor()
 
     @computed_field
     def n_visible_axes(self) -> Literal[2, 3]:

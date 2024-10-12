@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 _KT = TypeVar("_KT")
 _VT = TypeVar("_VT")
 _VT_co = TypeVar("_VT_co", covariant=True)
+_NULL = object()
 
 
 class SupportsKeysAndGetItem(Protocol[_KT, _VT_co]):
@@ -96,6 +97,7 @@ class ValidatedDict(MutableMapping[_KT, _VT]):
         self._key_validator = key_validator
         self._value_validator = value_validator
         self._validate_lookup = validate_lookup
+        self._default: _VT = self.cls_default()
         _d = {}
         for k, v in dict(*args, **kwargs).items():
             if self._key_validator is not None:
@@ -105,12 +107,24 @@ class ValidatedDict(MutableMapping[_KT, _VT]):
             _d[k] = v
         self._dict: dict[_KT, _VT] = _d
 
+    @classmethod
+    def cls_default(cls) -> _VT:
+        return _NULL
+
+    def __missing__(self, key: _KT) -> _VT:
+        if self._default is not _NULL:
+            return self._default
+        raise KeyError(key)
+
     # ---------------- abstract interface ----------------
 
     def __getitem__(self, key: _KT) -> _VT:
         if self._validate_lookup:
             key = self._validate_key(key)
-        return self._dict[key]
+        try:
+            return self._dict[key]
+        except KeyError:
+            return self.__missing__(key)
 
     # def __setitem__(self, key: _KT, value: _VT) -> None:
     def __setitem__(self, key: Any, value: Any) -> None:
@@ -142,7 +156,7 @@ class ValidatedDict(MutableMapping[_KT, _VT]):
     def update(self, m: Iterable[tuple[_KT, _VT]], /, **kwargs: _VT) -> None: ...
     @overload
     def update(self, **kwargs: _VT) -> None: ...
-    def update(self, *args, **kwargs: _VT) -> None:
+    def update(self, *args: Any, **kwargs: _VT) -> None:
         self.update_started.emit()
         super().update(*args, **kwargs)
         self.update_finished.emit()
@@ -172,7 +186,7 @@ class ValidatedDict(MutableMapping[_KT, _VT]):
         return lambda x: x
 
     def __repr__(self) -> str:
-        return f"V({self._dict!r})"
+        return f"{type(self).__name__}({self._dict!r})"
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -201,7 +215,7 @@ class ValidatedDict(MutableMapping[_KT, _VT]):
         # define function that creates new instance during assignment
         # passing in the validator functions.
         def _new(*args: Any, **kwargs: Any) -> ValidatedDict[_KT, _VT]:
-            return cls(
+            return cls(  # type: ignore
                 *args,
                 key_validator=validate_key,
                 value_validator=validate_value,
