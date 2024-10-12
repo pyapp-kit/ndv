@@ -1,13 +1,13 @@
 """General model for ndv."""
 
 import warnings
+from contextlib import suppress
 from typing import (
     Annotated,
     Any,
     Callable,
     ClassVar,
     Literal,
-    Mapping,
     Protocol,
     Self,
     Sequence,
@@ -22,15 +22,15 @@ from cmap import Colormap
 from psygnal import SignalGroupDescriptor
 from pydantic import (
     BaseModel,
-    BeforeValidator,
     ConfigDict,
     Field,
     PlainValidator,
     computed_field,
     model_validator,
 )
+from pydantic_core import core_schema
 
-from ._mapping import ValidatedDict
+from ._mapping import ValidatedEventedDict
 
 _ShapeLike = SupportsIndex | Sequence[SupportsIndex]
 
@@ -41,17 +41,29 @@ _ShapeLike = SupportsIndex | Sequence[SupportsIndex]
 # we leave it to the DataWrapper to convert `AxisKey -> AxisIndex`
 AxisIndex: TypeAlias = int
 AxisLabel: TypeAlias = str
-AxisKey: TypeAlias = AxisIndex | AxisLabel
+
+
+def _maybe_int(val: Any) -> Any:
+    # prefer integers, but allow strings
+    with suppress(ValueError):
+        val = int(float(val))
+    return val
+
+
+AxisKey: TypeAlias = Annotated[AxisIndex | AxisLabel, PlainValidator(_maybe_int)]
 
 # a specific position along a dimension
 CoordIndex: TypeAlias = int | str
 
 
 def _to_slice(val: Any) -> slice:
+    # slices are returned as is
     if isinstance(val, slice):
         return val
+    # single integers are converted to slices starting at that index
     if isinstance(val, int):
         return slice(val, val + 1)
+    # sequences are interpreted as arguments to the slice constructor
     if isinstance(val, Sequence) and not isinstance(val, str):
         return slice(*(int(x) if x is not None else None for x in val))
     raise TypeError(f"Expected int or slice, got {type(val)}")
@@ -61,62 +73,70 @@ Slice = Annotated[slice, PlainValidator(_to_slice)]
 
 
 class Reducer(Protocol):
-    """Function to reduce an array along an axis."""
+    """Function to reduce an array along an axis.
 
-    def __call__(self, a: npt.ArrayLike, axis: _ShapeLike | None = ...) -> Any:
+    A reducer is any function that takes an array-like, and an optional axis argument,
+    and returns a reduced array.  Examples include `np.max`, `np.mean`, etc.
+    """
+
+    def __call__(self, a: npt.ArrayLike, axis: _ShapeLike = ...) -> npt.ArrayLike:
         """Reduce an array along an axis."""
 
 
+def _str_to_callable(obj: Any) -> Callable:
+    """Deserialize a callable from a string."""
+    if isinstance(obj, str):
+        # e.g. "numpy.max" -> numpy.max
+        try:
+            mod_name, qual_name = obj.rsplit(".", 1)
+            mod = __import__(mod_name, fromlist=[qual_name])
+            obj = getattr(mod, qual_name)
+        except Exception:
+            try:
+                # fallback to numpy
+                # e.g. "max" -> numpy.max
+                obj = getattr(np, obj)
+            except Exception:
+                raise
+
+    if not callable(obj):
+        raise TypeError(f"Expected a callable or string, got {type(obj)}")
+    return cast("Callable", obj)
+
+
+def _callable_to_str(obj: str | Callable) -> str:
+    """Serialize a callable to a string."""
+    if isinstance(obj, str):
+        return obj
+    # e.g. numpy.max -> "numpy.max"
+    return f"{obj.__module__}.{obj.__qualname__}"
+
+
 class ReducerType(Reducer):
-    """Reducer type for pydantic."""
+    """Reducer type for pydantic.
+
+    This just provides a pydantic core schema for a generic callable that accepts an
+    array and an axis argument and returns an array (of reduced dimensionality).
+    This serializes/deserializes the callable as a string (module.qualname).
+    """
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source: Any, handler: Any) -> Any:
         """Get the Pydantic schema for this object."""
-        from pydantic_core import core_schema
-
-        def decode(obj: Any) -> Callable:
-            if isinstance(obj, str):
-                try:
-                    mod_name, qual_name = obj.rsplit(".", 1)
-                    mod = __import__(mod_name, fromlist=[qual_name])
-                    obj = getattr(mod, qual_name)
-                except Exception:
-                    try:
-                        obj = getattr(np, obj)
-                    except Exception:
-                        raise
-
-            if callable(obj):
-                return cast("Callable", obj)
-            raise TypeError(f"Expected a callable or string, got {type(obj)}")
-
-        @core_schema.plain_serializer_function_ser_schema
-        def ser_schema(obj: Callable) -> str:
-            return obj.__module__ + "." + obj.__qualname__
-
+        ser_schema = core_schema.plain_serializer_function_ser_schema(_callable_to_str)
         return core_schema.no_info_before_validator_function(
-            decode,
+            _str_to_callable,
+            # using callable_schema() would be more correct, but prevents dumping schema
             core_schema.any_schema(),
             serialization=ser_schema,
         )
 
 
 class _NDVModel(BaseModel):
+    """Base eventd model for NDV models."""
+
     model_config = ConfigDict(validate_assignment=True, validate_default=True)
-
-
-def _validate_reducers(v: Any) -> Any:
-    if not isinstance(v, Mapping):
-        v = {None: v}
-    if "None" in v:
-        v[None] = v.pop("None")
-    return v
-
-
-Reducers = Annotated[
-    ValidatedDict[AxisKey | None, ReducerType], BeforeValidator(_validate_reducers)
-]
+    events: ClassVar[SignalGroupDescriptor] = SignalGroupDescriptor()
 
 
 class LUTModel(_NDVModel):
@@ -136,30 +156,46 @@ class LUTModel(_NDVModel):
     gamma : float
         Gamma correction for this channel. By default, 1.0.
     autoscale : bool | tuple[float, float]
-        Whether to autoscale the colormap.
+        Whether/how to autoscale the colormap.
+        If `False`, then autoscaling is disabled.
+        If `True` or `(0, 1)` then autoscale using the min/max of the data.
         If a tuple, then the first element is the lower quantile and the second element
-        is the upper quantile.  If `True` or `(0, 1)` (np.min(), np.max()) should be
-        used, otherwise, use np.quantile.  Nan values should be ignored (n.b. nanmax is
-        slower and should only be used if necessary).
+        is the upper quantile.
+        If a callable, then it should be a function that takes an array and returns a
+        tuple of (min, max) values to use for scaling.
+
+        NaN values should be ignored (n.b. nanmax is slower and should only be used if
+        necessary).
     """
 
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
     clims: tuple[float, float] | None = None
     gamma: float = 1.0
-    autoscale: bool | tuple[float, float] = (0, 1)
+    autoscale: (
+        bool | tuple[float, float] | Callable[[npt.ArrayLike], tuple[float, float]]
+    ) = (0, 1)
+
+    @model_validator(mode="before")
+    def _validate_model(cls, v: Any) -> Any:
+        # cast bare string/colormap inputs to cmap declaration
+        if isinstance(v, (str, Colormap)):
+            return {"cmap": v}
+        return v
 
 
-class LutMap(ValidatedDict[CoordIndex | None, LUTModel]):
-    """Lookup table mapping for pydantic."""
-
-    @classmethod
-    def cls_default(cls) -> LUTModel:
-        return LUTModel()
+# map of axis to index/slice ... i.e. the current subset of data being displayed
+IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
+# map of index along channel axis to LUTModel object
+LutMap: TypeAlias = ValidatedEventedDict[CoordIndex | None, LUTModel]
+# map of axis to reducer
+Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
 
 
 class ArrayDisplayModel(_NDVModel):
     """Model of how to display an array.
+
+    In the following types, `AxisKey` can be either an integer index or a string label.
 
     Parameters
     ----------
@@ -196,12 +232,15 @@ class ArrayDisplayModel(_NDVModel):
     """
 
     visible_axes: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey] = (-2, -1)
-    current_index: ValidatedDict[AxisKey, int | Slice] = Field(default_factory=dict)
-    reducers: Reducers = np.max
+    current_index: IndexMap = Field(default_factory=IndexMap)
     channel_axis: AxisKey | None = None
-    luts: LutMap = Field(default_factory=LutMap)
 
-    events: ClassVar[SignalGroupDescriptor] = SignalGroupDescriptor()
+    # map of axis to reducer
+    reducers: Reducers = Field(default_factory=Reducers)
+    default_reducer: ReducerType = "numpy.max"  # type: ignore [assignment]  # FIXME
+    # map of index along channel axis to LUTModel object
+    luts: LutMap = Field(default_factory=LutMap)
+    default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
 
     @computed_field
     def n_visible_axes(self) -> Literal[2, 3]:
@@ -210,6 +249,7 @@ class ArrayDisplayModel(_NDVModel):
 
     @model_validator(mode="after")
     def _validate_model(self) -> Self:
+        # prevent channel_axis from being in visible_axes
         if self.channel_axis in self.visible_axes:
             warnings.warn(
                 f"Channel_axis cannot be in visible_axes. "
