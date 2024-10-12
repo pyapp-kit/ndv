@@ -1,6 +1,7 @@
 """General model for ndv."""
 
 import warnings
+from collections.abc import Sequence
 from contextlib import suppress
 from typing import (
     Annotated,
@@ -10,7 +11,6 @@ from typing import (
     Literal,
     Protocol,
     Self,
-    Sequence,
     SupportsIndex,
     TypeAlias,
     cast,
