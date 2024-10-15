@@ -1,6 +1,6 @@
 from rich import print
 
-from ndv.model.model import ArrayDisplayModel
+from ndv.models._array_display_model import ArrayDisplayModel
 
 m = ArrayDisplayModel()
 print(m)

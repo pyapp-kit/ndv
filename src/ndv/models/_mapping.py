@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, MutableMapping
+from contextlib import suppress
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -35,8 +36,7 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
     item_added = Signal(str, object)  # key, new_value
     item_removed = Signal(str, object)  # key, old_value
     item_changed = Signal(str, object, object)  # key, new_value, old_value
-    update_started = Signal()
-    update_finished = Signal()
+    value_changed = Signal()
 
     # long ugly overloads to support all possible ways to initialize a ValidatedDict
     @overload
@@ -125,22 +125,32 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
         value = self._validate_value(value)
         before = self._dict.get(key, _NULL)
         self._dict[key] = value
+        # if the value is the same as before, try to exit early without emitting signals
+        # but catch exceptions that may be raised during __eq__ (like numpy)
         if before is not _NULL:
+            with suppress(Exception):
+                if before == value:
+                    return
             self.item_changed.emit(key, value, before)
         else:
             self.item_added.emit(key, value)
+        self.value_changed.emit()
 
     def __delitem__(self, key: _KT) -> None:
         if self._validate_lookup:
             key = self._validate_key(key)
+        # TODO: maybe add removing signal (before actual removal) if needed
         item = self._dict.pop(key)
         self.item_removed.emit(key, item)
+        self.value_changed.emit()
 
     def __len__(self) -> int:
         return len(self._dict)
 
     def __iter__(self) -> Iterator[_KT]:
         return iter(self._dict)
+
+    # batch operations, with a single value_changed  -------------------------------
 
     @overload
     def update(self, m: SupportsKeysAndGetItem[_KT, _VT], /, **kwargs: _VT) -> None: ...
@@ -149,10 +159,24 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
     @overload
     def update(self, **kwargs: _VT) -> None: ...
     def update(self, *args: Any, **kwargs: _VT) -> None:  # type: ignore[misc]
-        # TODO: perhaps collect signals and emit them all at once at the end
-        self.update_started.emit()
-        super().update(*args, **kwargs)
-        self.update_finished.emit()
+        """Update the dictionary with the key/value pairs from the mapping or iterable.
+
+        only emit a single value_changed signal at the end.
+        """
+        with self.value_changed.blocked():
+            super().update(*args, **kwargs)
+        # TODO: only emit if anything was caught
+        self.value_changed.emit()
+
+    def clear(self) -> None:
+        """Clear the dictionary.
+
+        only emit a single value_changed signal at the end.
+        """
+        with self.value_changed.blocked():
+            super().clear()
+        # TODO: only emit if anything was caught
+        self.value_changed.emit()
 
     # -----------------------------------------------------
 
