@@ -1,5 +1,5 @@
-from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Iterable, cast
+from collections.abc import Hashable, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from qtpy.QtCore import Qt, Signal
 from qtpy.QtWidgets import QFormLayout, QSlider, QVBoxLayout, QWidget
@@ -156,7 +156,6 @@ class Viewer(QWidget):
     ) -> None:
         self._update_visible_sliders()
         self._canvas.set_ndim(self.model.n_visible_axes)
-
 
     def _update_visible_sliders(self) -> None:
         """Hide sliders corresponding to "visible" axes."""
