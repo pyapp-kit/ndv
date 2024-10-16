@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class NDVModel(BaseModel):
-    """Base eventd model for NDV models."""
+    """Base evented model for NDV models."""
 
     model_config = ConfigDict(
         validate_assignment=True,

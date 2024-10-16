@@ -151,6 +151,23 @@ class DataWrapper(Generic[ArrayT]):
     def save_as_zarr(self, save_loc: str | Path) -> None:
         raise NotImplementedError("save_as_zarr not implemented for this data type.")
 
+    @property
+    def dims(self) -> Sequence[Hashable]:
+        if hasattr(self._data, "dims"):
+            return self._data.dims
+        return range(len(self._data.shape))
+
+    @property
+    def coords(self) -> Mapping[Hashable, Sequence[Any]]:
+        if hasattr(self._data, "coords"):
+            return self._data.coords
+        shape = getattr(self._data, "shape", None)
+        if not isinstance(shape, Sequence) or not all(
+            isinstance(x, int) for x in shape
+        ):
+            raise NotImplementedError(f"Cannot determine shape of {type(self._data)}")
+        return {k: range(v) for k, v in enumerate(shape)}
+
     def sizes(self) -> Sizes:
         """Return a mapping of {dimkey: size} for the data.
 
@@ -159,13 +176,7 @@ class DataWrapper(Generic[ArrayT]):
         (`dims` is used by xarray, `names` is used by torch, etc...). If no labels
         are found, the dimensions are just named by their integer index.
         """
-        shape = getattr(self._data, "shape", None)
-        if not isinstance(shape, Sequence) or not all(
-            isinstance(x, int) for x in shape
-        ):
-            raise NotImplementedError(f"Cannot determine sizes for {type(self._data)}")
-        dims = range(len(shape))
-        return {dim: int(size) for dim, size in zip(dims, shape)}
+        return {ax: len(c) for ax, c in self.coords.items()}
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""

@@ -32,7 +32,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
 ]
-dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]"]
+dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]", "pydantic", "psygnal"]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
