@@ -34,12 +34,16 @@ def _maybe_int(val: Any) -> Any:
 def _to_slice(val: Any) -> slice:
     # slices are returned as is
     if isinstance(val, slice):
+        if not all(
+            isinstance(i, (int, type(None))) for i in (val.start, val.stop, val.step)
+        ):
+            raise TypeError(f"Slice start/stop/step must all be integers: {val!r}")
         return val
     # single integers are converted to slices starting at that index
     if isinstance(val, int):
         return slice(val, val + 1)
     # sequences are interpreted as arguments to the slice constructor
-    if isinstance(val, Sequence) and not isinstance(val, str):
+    if isinstance(val, Sequence):
         return slice(*(int(x) if x is not None else None for x in val))
     raise TypeError(f"Expected int or slice, got {type(val)}")
 
