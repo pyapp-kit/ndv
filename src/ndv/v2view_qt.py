@@ -10,7 +10,7 @@ from .viewer._backends import get_canvas_class
 from .viewer._backends._protocols import PImageHandle
 
 
-class ViewerView(QWidget):
+class QViewerView(QWidget):
     currentIndexChanged = Signal()
 
     def __init__(self, parent: QWidget | None = None):

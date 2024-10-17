@@ -8,6 +8,7 @@ from abc import abstractmethod
 from collections.abc import Container, Hashable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -23,12 +24,14 @@ if TYPE_CHECKING:
 
     import dask.array as da
     import numpy.typing as npt
+    import pydantic_core
     import pyopencl.array as cl_array
     import sparse
     import tensorstore as ts
     import torch
     import xarray as xr
     import zarr
+    from pydantic import GetCoreSchemaHandler
     from torch._tensor import Tensor
 
     from ._dims_slider import Index, Indices, Sizes
@@ -151,6 +154,9 @@ class DataWrapper(Generic[ArrayT]):
     def save_as_zarr(self, save_loc: str | Path) -> None:
         raise NotImplementedError("save_as_zarr not implemented for this data type.")
 
+    # TODO: we need a way for DataWrapper to be able to say that the dims/coords
+    # have changed (essentially, that the shape of the data has changed)
+    # among other things, this would allow the canonicalized_axis_map to be cleared
     @property
     def dims(self) -> Sequence[Hashable]:
         if hasattr(self._data, "dims"):
@@ -197,6 +203,31 @@ class DataWrapper(Generic[ArrayT]):
         if nbytes := getattr(self._data, "nbytes", 0) / 1e6:
             info += f", {nbytes:.2f}MB"
         return info
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: type, handler: GetCoreSchemaHandler
+    ) -> pydantic_core.CoreSchema:
+        from pydantic_core import core_schema
+
+        return core_schema.any_schema()
+
+    # TODO: this needs to be cleared when data.dims changes
+    @cached_property
+    def canonicalized_axis_map(self) -> Mapping[Hashable, int]:
+        """Create a mapping of ALL valid axis keys to canonicalized keys.
+
+        This can be used later to quickly map any valid axis key
+        (axis label, positive int, or negative int) to a positive integer index.
+        """
+        axis_index: dict[Hashable, int] = {}
+        dims: Sequence[Hashable] = self.dims
+        ndims = len(dims)
+        for i, dim in enumerate(dims):
+            axis_index[dim] = i  # map dimension label to positive index
+            axis_index[i] = i  # map positive integer index to itself
+            axis_index[-(ndims - i)] = i  # map negative integer index to positive index
+        return axis_index
 
 
 class XarrayWrapper(DataWrapper["xr.DataArray"]):

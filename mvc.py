@@ -1,13 +1,14 @@
-import numpy as np
 from qtpy.QtWidgets import QApplication
 
+from ndv.data import cells3d
 from ndv.v2ctl import ViewerController
-from ndv.v2view import ViewerView
+from ndv.v2view_qt import QViewerView
 
 app = QApplication([])
 
-viewer = ViewerController(ViewerView())  # ultimately, this will be the public api
+viewer = ViewerController(QViewerView())  # ultimately, this will be the public api
 model = viewer.model
-viewer.data = np.random.rand(96, 64, 128).astype(np.float32)
+viewer.data = cells3d()
 viewer.view.show()  # temp
+viewer.model.default_lut.cmap = "green"
 app.exec()
