@@ -213,10 +213,10 @@ class Viewer(QWidget):
             return
         idx_request = self._current_index_request()
         data = self._data_wrapper.isel(idx_request)
-
         if hdl := getattr(self, "_handle", None):
             hdl.remove()
         self._handle = self._canvas.add_image(data)
+        self._canvas.set_range()
 
     def _on_channel_axis_changed(self, value: AxisKey) -> None:
         print("Channel axis changed:", value)

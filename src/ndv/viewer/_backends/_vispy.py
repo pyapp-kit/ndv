@@ -547,6 +547,9 @@ class VispyViewerCanvas(PCanvas):
 
         When called with no arguments, the range is set to the full extent of the data.
         """
+        # temporary
+        self._camera.set_range()
+        return
         _x = [0.0, 0.0]
         _y = [0.0, 0.0]
         _z = [0.0, 0.0]
