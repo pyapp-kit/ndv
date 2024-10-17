@@ -210,7 +210,10 @@ class DataWrapper(Generic[ArrayT]):
     ) -> pydantic_core.CoreSchema:
         from pydantic_core import core_schema
 
-        return core_schema.any_schema()
+        return core_schema.no_info_before_validator_function(
+            function=cls.create,
+            schema=core_schema.any_schema(),
+        )
 
     # TODO: this needs to be cleared when data.dims changes
     @cached_property

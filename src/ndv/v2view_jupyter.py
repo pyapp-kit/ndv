@@ -18,6 +18,9 @@ class JupyterViewerView:
         self._canvas.set_ndim(2)
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
+        # `qwidget` is obviously a misnomer here.  it works, because vispy is smart
+        # enough to return a widget that ipywidgets can display in the appropriate
+        # context, but we should be managing that more explicitly ourselves.
         self.layout = widgets.VBox([self._canvas.qwidget(), self._slider_box])
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
@@ -34,7 +37,7 @@ class JupyterViewerView:
                 max=_coords.stop - 1,
                 step=_coords.step,
                 description=str(axis),
-                continuous_update=False,
+                continuous_update=True,
                 orientation="horizontal",
             )
             sld.observe(self.on_slider_change, "value")

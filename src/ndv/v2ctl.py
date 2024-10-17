@@ -1,15 +1,13 @@
 from collections.abc import Container, Hashable, Mapping, Sequence
-from typing import Annotated, Any, Protocol, TypeAlias
+from typing import Any, Protocol
 
 from psygnal import SignalInstance
-from pydantic import BeforeValidator, Field
+from pydantic import Field
 
 from .models._array_display_model import ArrayDisplayModel, AxisKey
 from .models._base_model import NDVModel
 from .viewer._backends._protocols import PImageHandle
 from .viewer._data_wrapper import DataWrapper
-
-DataWrapperType: TypeAlias = Annotated[DataWrapper, BeforeValidator(DataWrapper.create)]
 
 
 class DataDisplayModel(NDVModel):
@@ -21,7 +19,7 @@ class DataDisplayModel(NDVModel):
     """
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
-    data: DataWrapperType | None = None
+    data: DataWrapper | None = None
 
     def _canonicalize_axis_key(self, axis: Hashable) -> int:
         """Return positive index for AxisKey (which can be +/- int or label)."""
@@ -141,7 +139,7 @@ class ViewerController:
         _connect = "connect" if connect else "disconnect"
 
         for obj, callback in [
-            # (model.events.visible_axes, self._on_visible_axes_changed),
+            (model.events.visible_axes, self._on_visible_axes_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_current_index_changed),
             # (model.events.channel_axis, self._on_channel_axis_changed),
@@ -181,4 +179,8 @@ class ViewerController:
         self._handle.cmap = self.model.default_lut.cmap
 
     def _on_luts_changed(self) -> None:
+        self._update_canvas()
+
+    def _on_visible_axes_changed(self) -> None:
+        self._update_visible_sliders()
         self._update_canvas()
