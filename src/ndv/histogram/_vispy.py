@@ -1,14 +1,21 @@
 # Copyright (c) Vispy Development Team. All Rights Reserved.
 # Distributed under the (new) BSD License. See LICENSE.txt for more info.
+from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack, cast
 
 import numpy as np
+from qtpy.QtCore import Qt
 from vispy import scene
+
+from ndv.histogram._view import HistogramView
 
 if TYPE_CHECKING:
     # just here cause vispy has poor type hints
+    from collections.abc import Sequence
+
+    import cmap
+
     class Grid(scene.Grid):
         def add_view(
             self,
@@ -31,6 +38,7 @@ if TYPE_CHECKING:
         ) -> scene.Widget:
             super().add_widget(...)
 
+    from vispy.scene.events import SceneMouseEvent
 
 __all__ = ["PlotWidget"]
 
@@ -214,63 +222,6 @@ class PlotWidget(scene.Widget):
         self.camera._axis = axis
         self.camera.set_range()
 
-    def histogram(
-        self,
-        data: np.ndarray,
-        bins: int | np.ndarray = 10,
-        color: str | tuple[float, ...] = "w",
-        orientation: Literal["h", "w"] = "h",
-    ) -> scene.Histogram:
-        """Calculate and show a histogram of data."""
-        # TODO: extract histogram calculation to a separate function
-        # and make it possible to directly accept counts and bin_edges
-        hist = scene.Histogram(data, bins, color, orientation)
-        self._view.add(hist)
-        self.camera.set_range()
-        return hist
-
-    def plot(
-        self,
-        data: np.ndarray,
-        *,
-        color: str = "k",
-        symbol: str | None = None,
-        line_kind: str = "-",
-        width: float = 1.0,
-        marker_size: float = 10.0,
-        edge_color: str = "k",
-        face_color: str = "b",
-        edge_width: float = 1.0,
-        title: str | None = None,
-        xlabel: str | None = None,
-        ylabel: str | None = None,
-        connect: str | np.ndarray = "strip",
-    ) -> scene.LinePlot:
-        """Plot a series of data using lines and markers."""
-        line = scene.LinePlot(
-            data,
-            connect=connect,
-            color=color,
-            symbol=symbol,
-            line_kind=line_kind,
-            width=width,
-            marker_size=marker_size,
-            edge_color=edge_color,
-            face_color=face_color,
-            edge_width=edge_width,
-        )
-        self._view.add(line)
-        self.camera.set_range()
-        self._visuals.append(line)
-
-        if title is not None:
-            self._title.text = title
-        if xlabel is not None:
-            self._xlabel.text = xlabel
-        if ylabel is not None:
-            self._ylabel.text = ylabel
-        return line
-
 
 class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     def __init__(
@@ -290,7 +241,7 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     def zoom(
         self,
         factor: float | tuple[float, float],
-        center: Optional[tuple[float, ...]] = None,
+        center: tuple[float, ...] | None = None,
     ) -> None:
         if self.axis_index is None:
             super().zoom(factor, center=center)
@@ -318,3 +269,300 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         margin: float = 0,  # different default from super()
     ) -> None:
         super().set_range(x, y, z, margin)
+
+
+class VispyHistogramView(scene.SceneCanvas, HistogramView):
+    def __init__(self, parent: Any = None) -> None:
+        super().__init__(parent=parent)
+        self.unfreeze()
+        # FIXME? Initialize signals so VisPy is happy
+        self.gammaChanged
+        self.climsChanged
+        self.autoscaleChanged
+        self.cmapChanged
+
+        # Plot
+        self.plot = PlotWidget()
+        self.plot.lock_axis("y")
+        self.central_widget.add_widget(self.plot)
+        self.node_tform = self.plot.node_transform(self.plot._view.scene)
+        self.vertical: bool = False
+        # The values of the left and right edges on the canvas (respectively)
+        self._domain: tuple[float, float] | None = None
+        # The values of the bottom and top edges on the canvas (respectively)
+        self._range: tuple[float, float] | None = None
+
+        # Histogram
+        self._values: np.ndarray | None = None  # TODO: Is this needed?
+        self._bin_edges: np.ndarray | None = None  # TODO: Is this needed?
+        # NB We use a Mesh here, instead of a histogram,
+        # because it gives us flexibility in computing the histogram
+        self._hist = scene.Mesh(color="red")
+        self._log_y: bool = False
+
+        # Clims + Gamma
+        # The Lut Line visualizes both the clims (line segments connecting the
+        # first two and last two points, respectively) and the gamma curve
+        # (the polyline between all remaining points)
+        self.lut_line = scene.LinePlot(
+            data=(0),  # FIXME: Dummy value to prevent resizing errors
+            color="k",
+            connect="strip",
+            symbol=None,
+            line_kind="-",
+            width=1.5,
+            marker_size=10.0,
+            edge_color="k",
+            face_color="b",
+            edge_width=1.0,
+        )
+        self.lut_line.order = -1
+
+        self._gamma: float = 1
+        self._gamma_handle = scene.Markers(
+            pos=np.zeros((1, 2)),  # FIXME: Dummy value to prevent resizing errors
+            size=6,
+            edge_width=0,
+        )
+        self._gamma_handle.order = -2
+        self._gamma_handle_position: float = 0.5
+        self._gamma_handle_grabbed: bool = False
+
+        self._clims: tuple[float, float] | None = None
+        self._clim_handle_grabbed: int = 0
+        # The gamma handle appears halfway between the clims
+
+        self.plot._view.add(self._hist)
+        self.plot._view.add(self.lut_line)
+        self.plot._view.add(self._gamma_handle)
+        self.freeze()
+
+    # -- Protocol methods -- #
+
+    def set_histogram(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
+        """Calculate and show a histogram of data."""
+        self._values = values
+        self._bin_edges = bin_edges
+        self._update_histogram()
+        self._resize()
+
+    def set_std_dev(self, std_dev: float) -> None:
+        # Nothing to do (yet)
+        pass
+
+    def set_average(self, average: float) -> None:
+        # Nothing to do (yet)
+        pass
+
+    def view(self) -> Any:
+        return self.native
+
+    def set_visibility(self, visible: bool) -> None:
+        if self._hist is None:
+            return
+        self._hist.visible = visible
+
+    def set_cmap(self, lut: cmap.Colormap) -> None:
+        if self._hist is None:
+            return
+        self._hist.color = lut.color_stops[-1]
+
+    def set_gamma(self, gamma: float) -> None:
+        self._gamma = gamma
+        self._update_lut_lines()
+
+    def set_clims(self, clims: tuple[float, float]) -> None:
+        self._clims = clims
+        self._update_lut_lines()
+
+    def set_autoscale(self, autoscale: bool | tuple[float, float]) -> None:
+        # Nothing to do (yet)
+        pass
+
+    def set_domain(self, domain: tuple[float, float] | None) -> None:
+        self._domain = domain
+        self._resize()
+
+    def set_range(self, range: tuple[float, float] | None) -> None:
+        self._range = range
+        self._resize()
+
+    def enable_range_log(self, enabled: bool) -> None:
+        if enabled != self._log_y:
+            self._log_y = enabled
+            self._update_histogram()
+            self._resize()
+
+    # -- Helper Methods -- #
+
+    def _update_histogram(self) -> scene.Mesh:
+        """
+        Updates the displayed histogram with current View parameters.
+
+        NB: Much of this code is graciously borrowed from:
+        https://github.com/vispy/vispy/blob/af847424425d4ce51f144a4d1c75ab4033fe39be/vispy/visuals/histogram.py#L28
+        """
+        if self._values is None or self._bin_edges is None:
+            return
+        values = np.log10(self._values) if self._log_y else self._values
+        bin_edges = self._bin_edges
+
+        #   4-5
+        #   | |
+        # 1-2/7-8
+        # |/| | |
+        # 0-3-6-9
+        X, Y = (1, 0) if self.vertical else (0, 1)
+        # construct our vertices
+        rr = np.zeros((3 * len(bin_edges) - 2, 3), np.float32)
+        rr[:, X] = np.repeat(bin_edges, 3)[1:-1]
+        rr[1::3, Y] = values
+        rr[2::3, Y] = values
+        # TODO: The VisPy code has this line, but I have no idea why
+        bin_edges.astype(np.float32)
+        # and now our tris
+        tris = np.zeros((2 * len(bin_edges) - 2, 3), np.uint32)
+        offsets = 3 * np.arange(len(bin_edges) - 1, dtype=np.uint32)[:, np.newaxis]
+        tri_1 = np.array([0, 2, 1])
+        tri_2 = np.array([2, 0, 3])
+        tris[::2] = tri_1 + offsets
+        tris[1::2] = tri_2 + offsets
+
+        self._hist.set_data(vertices=rr, faces=tris)
+
+    def _update_lut_lines(self, npoints: int = 256) -> None:
+        # TODO: Re-add vertical support
+        if self._clims is None or self._gamma is None:
+            return
+
+        X = np.empty(npoints + 4)
+        Y = np.empty(npoints + 4)
+        y1 = self.plot.yaxis.axis.domain[1] * 0.98
+        # clims lines
+        X[0:2], Y[0:2] = self._clims[0], (y1, y1 / 2)
+        X[-2:], Y[-2:] = self._clims[1], (y1 / 2, 0)
+        # gamma line
+        X[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
+        Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma * y1
+        midpoint = np.array([(np.mean(self._clims), y1 * 2**-self._gamma)])
+
+        # TODO: Move to self.edit_cmap
+        color = np.linspace(0.2, 0.8, npoints + 4).repeat(4).reshape(-1, 4)
+        c1, c2 = [0.4] * 4, [0.7] * 4
+        color[0:3] = [c1, c2, c1]
+        color[-3:] = [c1, c2, c1]
+
+        self.lut_line.set_data((X, Y), marker_size=0, color=color)
+
+        self._gamma_handle_position = midpoint[0]
+        self._gamma_handle.set_data(pos=midpoint)
+
+    def on_mouse_press(self, event: SceneMouseEvent) -> None:
+        if event.pos is None:
+            return
+        # determine if a clim_handle was clicked
+        self._clim_handle_grabbed = self._pos_is_clim(event)
+        self._gamma_handle_grabbed = self._pos_is_gamma(event)
+        if self._clim_handle_grabbed or self._gamma_handle_grabbed:
+            # disconnect the pan/zoom mouse events until handle is dropped
+            self.plot.camera.interactive = False
+
+    def on_mouse_release(self, event: SceneMouseEvent) -> None:
+        self._clim_handle_grabbed = 0
+        self._gamma_handle_grabbed = False
+        self.plot.camera.interactive = True
+
+    def _pos_is_clim(self, event: SceneMouseEvent, tolerance: int = 3) -> int:
+        """Returns 1 if x is near clims[0], 2 if near clims[1], else 0
+        event is expected to to have an attribute 'pos' giving the mouse
+        position be in window coordinates.
+        """
+        if self._clims is None:
+            return 0
+        # checking clim1 first since it's more likely
+        if self.vertical:
+            x = event.pos[1]
+            _, clim1 = self._to_window_coords((0, self._clims[1]))
+            _, clim0 = self._to_window_coords((0, self._clims[0]))
+        else:
+            x = event.pos[0]
+            clim1, _ = self._to_window_coords((self._clims[1],))
+            clim0, _ = self._to_window_coords((self._clims[0],))
+        if abs(clim1 - x) < tolerance:
+            return 2
+        if abs(clim0 - x) < tolerance:
+            return 1
+        return 0
+
+    def _pos_is_gamma(self, event: SceneMouseEvent, tolerance: int = 4) -> bool:
+        """Returns True if value is near the gamma handle.
+        event is expected to to have an attribute 'pos' giving the mouse
+        position be in window coordinates.
+        """
+        if self._gamma_handle_position is None:
+            return False
+        gx, gy = self._to_window_coords(self._gamma_handle_position)
+        x, y = event.pos
+        if abs(gx - x) < tolerance and abs(gy - y) < tolerance:
+            return True
+        return False
+
+    def on_mouse_move(self, event: SceneMouseEvent) -> None:
+        """Called whenever mouse moves over canvas."""
+        if event.pos is None:
+            return
+        if self._clims is None:
+            return
+
+        # event.pos == (0,0) is top left corner of window
+
+        if self._clim_handle_grabbed:
+            newlims = list(self._clims)
+            if self.vertical:
+                c = self._to_plot_coords(event.pos)[1]
+            else:
+                c = self._to_plot_coords(event.pos)[0]
+            newlims[self._clim_handle_grabbed - 1] = c
+            self.climsChanged.emit(newlims)
+            return
+
+        if self._gamma_handle_grabbed:
+            y0, y1 = self.plot.yaxis.axis.domain
+            y = self._to_plot_coords(event.pos)[0 if self.vertical else 1]
+            if y < np.maximum(y0, 0) or y > y1:
+                return
+            # self.edit_gamma(-np.log2(y/y1))
+            self.gammaChanged.emit(-np.log2(y / y1))
+            return
+
+        self.native.unsetCursor()
+
+        if self._pos_is_clim(event):
+            if self.vertical:
+                cursor = Qt.CursorShape.SplitVCursor
+            else:
+                cursor = Qt.CursorShape.SplitHCursor
+            self.native.setCursor(cursor)
+        elif self._pos_is_gamma(event):
+            if self.vertical:
+                cursor = Qt.CursorShape.SplitHCursor
+            else:
+                cursor = Qt.CursorShape.SplitVCursor
+            self.native.setCursor(cursor)
+        else:
+            x, y = self._to_plot_coords(event.pos)
+            x1, x2 = self.plot.xaxis.axis.domain
+            y1, y2 = self.plot.yaxis.axis.domain
+            if (x1 < x <= x2) and (y1 <= y <= y2):
+                self.native.setCursor(Qt.CursorShape.SizeAllCursor)
+
+    def _to_window_coords(self, pos: tuple[float, float]) -> tuple[float, float]:
+        x, y, _, _ = self.node_tform.imap(pos)
+        return x, y
+
+    def _to_plot_coords(self, pos: tuple[float, float]) -> tuple[float, float]:
+        x, y, _, _ = self.node_tform.map(pos)
+        return x, y
+
+    def _resize(self) -> None:
+        self.plot.camera.set_range(x=self._domain, y=self._range)
