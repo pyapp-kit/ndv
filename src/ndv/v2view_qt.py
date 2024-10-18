@@ -1,13 +1,93 @@
 from collections.abc import Container, Hashable, Mapping, Sequence
 from typing import Any, cast
 
+import cmap
 from qtpy.QtCore import Qt, Signal
-from qtpy.QtWidgets import QFormLayout, QVBoxLayout, QWidget
-from superqt import QLabeledSlider
+from qtpy.QtWidgets import (
+    QCheckBox,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+from superqt import QCollapsible, QLabeledRangeSlider, QLabeledSlider
+from superqt.cmap import QColormapComboBox
+from superqt.iconify import QIconifyIcon
 
 from .models._array_display_model import AxisKey
 from .viewer._backends import get_canvas_class
 from .viewer._backends._protocols import PImageHandle
+from .viewer._dims_slider import SS
+
+
+class CmapCombo(QColormapComboBox):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent, allow_user_colormaps=True, add_colormap_text="Add...")
+        self.setMinimumSize(120, 21)
+        # self.setStyleSheet("background-color: transparent;")
+
+    def showPopup(self) -> None:
+        super().showPopup()
+        popup = self.findChild(QFrame)
+        popup.setMinimumWidth(self.width() + 100)
+        popup.move(popup.x(), popup.y() - self.height() - popup.height())
+
+
+class LUTWidget(QWidget):
+    visibleChanged = Signal(bool)
+    autoscaleChanged = Signal(bool)
+    cmapChanged = Signal(cmap.Colormap)
+    climsChanged = Signal(tuple)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._visible = QCheckBox()
+        self._visible.setChecked(True)
+        self._visible.toggled.connect(self.visibleChanged)
+
+        self._cmap = CmapCombo()
+        self._cmap.currentColormapChanged.connect(self.cmapChanged)
+        for color in ["gray", "green", "magenta"]:
+            self._cmap.addColormap(color)
+
+        self._clims = QLabeledRangeSlider(Qt.Orientation.Horizontal)
+        self._clims.setStyleSheet(SS)
+        self._clims.setHandleLabelPosition(
+            QLabeledRangeSlider.LabelPosition.LabelsOnHandle
+        )
+        self._clims.setEdgeLabelMode(QLabeledRangeSlider.EdgeLabelMode.NoLabel)
+        self._clims.setRange(0, 2**16)
+        self._clims.valueChanged.connect(self.climsChanged)
+
+        self._auto_clim = QPushButton("Auto")
+        self._auto_clim.setMaximumWidth(42)
+        self._auto_clim.setCheckable(True)
+        self._auto_clim.setChecked(True)
+        self._auto_clim.toggled.connect(self.autoscaleChanged)
+
+        layout = QHBoxLayout(self)
+        # layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._visible)
+        layout.addWidget(self._cmap)
+        layout.addWidget(self._clims)
+        layout.addWidget(self._auto_clim)
+
+    def setName(self, name: str) -> None:
+        self._visible.setText(name)
+
+    def setAutoScale(self, auto: bool) -> None:
+        self._auto_clim.setChecked(auto)
+
+    def setColormap(self, cmap: cmap.Colormap) -> None:
+        self._cmap.setCurrentColormap(cmap)
+
+    def setClims(self, clims: tuple[float, float]) -> None:
+        self._clims.setValue(clims)
+
+    def setLutVisible(self, visible: bool) -> None:
+        self._visible.setChecked(visible)
 
 
 class QDimsSliders(QWidget):
@@ -61,13 +141,26 @@ class QViewerView(QWidget):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
+        # NOTE: it's conceivable we'll want the controller itself to handle the canvas
         self._canvas = get_canvas_class()()
         self._canvas.set_ndim(2)
         layout = QVBoxLayout(self)
+        layout.setSpacing(4)
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
-        layout.addWidget(self._canvas.qwidget())
+
+        self._luts = QCollapsible()
+        self._luts.layout().setSpacing(0)
+        self._luts.setCollapsedIcon(QIconifyIcon("bi:chevron-down", color="#888888"))
+        self._luts.setExpandedIcon(QIconifyIcon("bi:chevron-up", color="#888888"))
+        layout.addWidget(self._canvas.qwidget(), 1)
         layout.addWidget(self._dims_sliders)
+        layout.addWidget(self._luts)
+
+    def add_lut_view(self) -> LUTWidget:
+        wdg = LUTWidget(self)
+        self._luts.addWidget(wdg)
+        return wdg
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
@@ -92,3 +185,7 @@ class QViewerView(QWidget):
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         """Set the current value of the sliders."""
         self._dims_sliders.set_current_index(value)
+
+    def refresh(self) -> None:
+        """Refresh the view."""
+        self._canvas.refresh()

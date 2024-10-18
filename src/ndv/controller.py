@@ -1,6 +1,7 @@
-from collections.abc import Container, Hashable, Mapping, Sequence
+from collections.abc import Container, Hashable, Mapping, MutableMapping, Sequence
 from typing import Any, Protocol
 
+import cmap
 from psygnal import SignalInstance
 from pydantic import Field
 
@@ -36,7 +37,8 @@ class DataDisplayModel(NDVModel):
                 ) from e
             raise IndexError(f"Axis label {axis} not found in data dimensions") from e
 
-    def canonical_data_coords(self) -> Mapping[int, Sequence]:
+    @property
+    def canonical_data_coords(self) -> MutableMapping[int, Sequence]:
         """Return the coordinates of the data in canonical form."""
         if self.data is None:
             return {}
@@ -44,9 +46,20 @@ class DataDisplayModel(NDVModel):
             self._canonicalize_axis_key(ax): c for ax, c in self.data.coords.items()
         }
 
-    def canonical_visible_axes(self) -> Sequence[int]:
+    @property
+    def canonical_visible_axes(self) -> tuple[int, ...]:
         """Return the visible axes in canonical form."""
-        return {self._canonicalize_axis_key(ax) for ax in self.display.visible_axes}
+        return tuple(
+            self._canonicalize_axis_key(ax) for ax in self.display.visible_axes
+        )
+
+    @property
+    def canonical_current_index(self) -> MutableMapping[int, int | slice]:
+        """Return the current index in canonical form."""
+        return {
+            self._canonicalize_axis_key(ax): v
+            for ax, v in self.display.current_index.items()
+        }
 
     def current_slice(self) -> Mapping[int, int | slice]:
         """Return the current index request for the data.
@@ -60,24 +73,47 @@ class DataDisplayModel(NDVModel):
         if self.data is None:
             return {}
 
-        requested_slice = {
-            self._canonicalize_axis_key(ax): v
-            for ax, v in self.display.current_index.items()
-        }
-        for ax in self.display.visible_axes:
-            ax_ = self._canonicalize_axis_key(ax)
-            if not isinstance(requested_slice.get(ax_), slice):
-                requested_slice[ax_] = slice(None)
+        requested_slice = self.canonical_current_index
+        for ax in self.canonical_visible_axes:
+            if not isinstance(requested_slice.get(ax), slice):
+                requested_slice[ax] = slice(None)
+
+        # ensure that all axes are slices, so that we don't lose any dimensions
+        # data will be squeezed to remove singleton dimensions later after
+        # transposing according to the order of visible axes
+        for ax, val in requested_slice.items():
+            if isinstance(val, int):
+                requested_slice[ax] = slice(val, val + 1)
         return requested_slice
 
     def current_data(self) -> Any:
         """Return the data slice requested by the current index (synchronous)."""
-        return self.data.isel(self.current_slice())
+        data = self.data.isel(self.current_slice())  # same shape, with singleton dims
+        # rearrange according to the order of visible axes
+        t_dims = self.canonical_visible_axes
+        t_dims += tuple(i for i in range(data.ndim) if i not in t_dims)
+        return data.transpose(*t_dims).squeeze()
+
+
+class PLutView(Protocol):
+    visibleChanged: SignalInstance
+    autoscaleChanged: SignalInstance
+    cmapChanged: SignalInstance
+    climsChanged: SignalInstance
+
+    def setName(self, name: str) -> None: ...
+    def setAutoScale(self, auto: bool) -> None: ...
+    def setColormap(self, cmap: cmap.Colormap) -> None: ...
+    def setClims(self, clims: tuple[float, float]) -> None: ...
+    def setLutVisible(self, visible: bool) -> None: ...
 
 
 class PView(Protocol):
+    """Protocol for the view in the viewer."""
+
     currentIndexChanged: SignalInstance
 
+    def refresh(self) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     def current_index(self) -> Mapping[AxisKey, int]: ...
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
@@ -86,13 +122,21 @@ class PView(Protocol):
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
     ) -> None: ...
 
+    def add_lut_view(self) -> PLutView: ...
+
 
 class ViewerController:
+    """The controller mostly manages the connection between the model and the view."""
+
     def __init__(self, view: PView) -> None:
         self.view = view
         self._dd_model = DataDisplayModel()  # rename me
         self._set_model_connected(self._dd_model.display)
         self.view.currentIndexChanged.connect(self._on_slider_value_changed)
+        self._handles: dict[int | None, PImageHandle] = {}
+
+        self._lut_views: dict[int | None, PLutView] = {}
+        self.add_lut_view(None)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -122,7 +166,7 @@ class ViewerController:
             return
         self._dd_model.data = DataWrapper.create(data)
 
-        self.view.create_sliders(self._dd_model.canonical_data_coords())
+        self.view.create_sliders(self._dd_model.canonical_data_coords)
         self._update_visible_sliders()
         self._update_canvas()
 
@@ -134,7 +178,7 @@ class ViewerController:
         """Connect or disconnect the model to/from the viewer.
 
         We do this in a single method so that we are sure to connect and disconnect
-        the same events in the same order.
+        the same events in the same order.  (but it's kinda ugly)
         """
         _connect = "connect" if connect else "disconnect"
 
@@ -153,7 +197,7 @@ class ViewerController:
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
         self.view.hide_sliders(
-            self._dd_model.canonical_visible_axes(), show_remainder=True
+            self._dd_model.canonical_visible_axes, show_remainder=True
         )
 
     def _on_current_index_changed(self) -> None:
@@ -169,14 +213,15 @@ class ViewerController:
         if not self._dd_model.data:
             return
 
-        # TODO:
-        # for now we just clear and manage a single data handle
-        # needs to be expanded to handle multiple textures/channels
-        data = self._dd_model.current_data()  # make asynchronous
-        if hdl := getattr(self, "_handle", None):
-            hdl.remove()
-        self._handle = self.view.add_image_to_canvas(data)
-        self._handle.cmap = self.model.default_lut.cmap
+        data = self._dd_model.current_data()  # TODO: make asynchronous
+        if None in self._handles:
+            self._handles[None].data = data
+        else:
+            self._handles[None] = self.view.add_image_to_canvas(data)
+            self._handles[None].cmap = self.model.default_lut.cmap
+            if clims := self.model.default_lut.clims:
+                self._handles[None].clim = clims
+        self.view.refresh()
 
     def _on_luts_changed(self) -> None:
         self._update_canvas()
@@ -184,3 +229,32 @@ class ViewerController:
     def _on_visible_axes_changed(self) -> None:
         self._update_visible_sliders()
         self._update_canvas()
+
+    def add_lut_view(self, key: int | None) -> PLutView:
+        if key in self._lut_views:
+            # need to clean up
+            raise NotImplementedError(f"LUT view with key {key} already exists")
+        self._lut_views[key] = lut = self.view.add_lut_view()
+
+        lut.visibleChanged.connect(self._on_lut_visible_changed)
+        lut.autoscaleChanged.connect(self._on_autoscale_changed)
+        lut.cmapChanged.connect(self._on_cmap_changed)
+        lut.climsChanged.connect(self._on_clims_changed)
+
+        model_lut = self._dd_model.display.default_lut
+        model_lut.events.cmap.connect(lut.setColormap)
+        model_lut.events.clims.connect(lut.setClims)
+        model_lut.events.autoscale.connect(lut.setAutoScale)
+        model_lut.events.visible.connect(lut.setVisible)
+        return lut
+
+    def _on_lut_visible_changed(self, visible: bool) -> None:
+        self._handles[None].visible = visible
+
+    def _on_autoscale_changed(self, autoscale: bool) -> None: ...
+
+    def _on_cmap_changed(self, cmap: cmap.Colormap) -> None:
+        self._handles[None].cmap = cmap
+
+    def _on_clims_changed(self, clims: tuple[float, float]) -> None:
+        self._handles[None].clim = clims

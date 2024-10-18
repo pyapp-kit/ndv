@@ -42,7 +42,7 @@ class LutControl(QWidget):
         auto_clim: bool = True,
     ) -> None:
         super().__init__(parent)
-        self._handles = handles
+        self._handles = list(handles)
         self._name = name
 
         self._visible = QCheckBox(name)
@@ -51,7 +51,7 @@ class LutControl(QWidget):
 
         self._cmap = CmapCombo()
         self._cmap.currentColormapChanged.connect(self._on_cmap_changed)
-        for handle in handles:
+        for handle in self._handles:
             self._cmap.addColormap(handle.cmap)
         for color in cmaplist:
             self._cmap.addColormap(color)
@@ -135,3 +135,8 @@ class LutControl(QWidget):
             self._clims.setMinimum(min(mi, self._clims.minimum()))
             self._clims.setMaximum(max(ma, self._clims.maximum()))
             self._clims.setValue((mi, ma))
+
+    def add_handle(self, handle: PImageHandle) -> None:
+        self._handles.append(handle)
+        self._cmap.addColormap(handle.cmap)
+        self.update_autoscale()
