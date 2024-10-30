@@ -389,16 +389,17 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
 
     def set_vertical(self, vertical: bool) -> None:
         self._vertical = vertical
-        # self._update_histogram()
-        # self._update_lut_lines()
+        self._update_histogram()
         self.plot.lock_axis("x" if vertical else "y")
-        # self._resize()
+        self._resize()
+        self._update_lut_lines()
 
     def enable_range_log(self, enabled: bool) -> None:
         if enabled != self._log_y:
             self._log_y = enabled
             self._update_histogram()
             self._resize()
+            self._update_lut_lines()
 
     # -- Helper Methods -- #
 
@@ -436,9 +437,10 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         tris[1::2] = tri_2 + offsets
 
         self._hist.set_data(vertices=rr, faces=tris)
+        # FIXME: This should be called internally upon set_data, right?
+        self._hist._bounds_changed()
 
     def _update_lut_lines(self, npoints: int = 256) -> None:
-        # TODO: Re-add vertical support
         if self._clims is None or self._gamma is None:
             return
 
