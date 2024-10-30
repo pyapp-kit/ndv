@@ -55,4 +55,11 @@ class HistogramView(StatsView, LutView):
         """
         ...
 
+    def set_vertical(self, vertical: bool) -> None:
+        """
+        If true, views the domain along the y axis and the range along the x axis.
+        Otherwise views the domain along the x axis and the range along the y axis.
+        """
+        ...
+
     def enable_range_log(self, enabled: bool) -> None: ...

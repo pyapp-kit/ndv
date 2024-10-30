@@ -220,7 +220,7 @@ class PlotWidget(scene.Widget):
     def lock_axis(self, axis: Literal["x", "y", None]) -> None:
         """Prevent panning and zooming along a particular axis."""
         self.camera._axis = axis
-        self.camera.set_range()
+        # self.camera.set_range()
 
 
 class PanZoom1DCamera(scene.cameras.PanZoomCamera):
@@ -286,7 +286,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self.plot.lock_axis("y")
         self.central_widget.add_widget(self.plot)
         self.node_tform = self.plot.node_transform(self.plot._view.scene)
-        self.vertical: bool = False
+        self._vertical: bool = False
         # The values of the left and right edges on the canvas (respectively)
         self._domain: tuple[float, float] | None = None
         # The values of the bottom and top edges on the canvas (respectively)
@@ -387,6 +387,13 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self._range = range
         self._resize()
 
+    def set_vertical(self, vertical: bool) -> None:
+        self._vertical = vertical
+        # self._update_histogram()
+        # self._update_lut_lines()
+        self.plot.lock_axis("x" if vertical else "y")
+        # self._resize()
+
     def enable_range_log(self, enabled: bool) -> None:
         if enabled != self._log_y:
             self._log_y = enabled
@@ -400,19 +407,19 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         Updates the displayed histogram with current View parameters.
 
         NB: Much of this code is graciously borrowed from:
+
         https://github.com/vispy/vispy/blob/af847424425d4ce51f144a4d1c75ab4033fe39be/vispy/visuals/histogram.py#L28
         """
         if self._values is None or self._bin_edges is None:
             return
         values = np.log10(self._values) if self._log_y else self._values
         bin_edges = self._bin_edges
-
         #   4-5
         #   | |
         # 1-2/7-8
         # |/| | |
         # 0-3-6-9
-        X, Y = (1, 0) if self.vertical else (0, 1)
+        X, Y = (1, 0) if self._vertical else (0, 1)
         # construct our vertices
         rr = np.zeros((3 * len(bin_edges) - 2, 3), np.float32)
         rr[:, X] = np.repeat(bin_edges, 3)[1:-1]
@@ -437,14 +444,24 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
 
         X = np.empty(npoints + 4)
         Y = np.empty(npoints + 4)
-        y1 = self.plot.yaxis.axis.domain[1] * 0.98
-        # clims lines
-        X[0:2], Y[0:2] = self._clims[0], (y1, y1 / 2)
-        X[-2:], Y[-2:] = self._clims[1], (y1 / 2, 0)
-        # gamma line
-        X[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
-        Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma * y1
-        midpoint = np.array([(np.mean(self._clims), y1 * 2**-self._gamma)])
+        if self._vertical:
+            y1 = self.plot.xaxis.axis.domain[1] * 0.98
+            # clims lines
+            X[0:2], Y[0:2] = (y1, y1 / 2), self._clims[0]
+            X[-2:], Y[-2:] = (y1 / 2, 0), self._clims[1]
+            # gamma line
+            X[2:-2] = np.linspace(0, 1, npoints) ** self._gamma * y1
+            Y[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
+            midpoint = np.array([(y1 * 2**-self._gamma, np.mean(self._clims))])
+        else:
+            y1 = self.plot.yaxis.axis.domain[1] * 0.98
+            # clims lines
+            X[0:2], Y[0:2] = self._clims[0], (y1, y1 / 2)
+            X[-2:], Y[-2:] = self._clims[1], (y1 / 2, 0)
+            # gamma line
+            X[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
+            Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma * y1
+            midpoint = np.array([(np.mean(self._clims), y1 * 2**-self._gamma)])
 
         # TODO: Move to self.edit_cmap
         color = np.linspace(0.2, 0.8, npoints + 4).repeat(4).reshape(-1, 4)
@@ -473,14 +490,16 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self.plot.camera.interactive = True
 
     def _pos_is_clim(self, event: SceneMouseEvent, tolerance: int = 3) -> int:
-        """Returns i if x is near clims[i], else -1
+        """Describes whether the position is "near" a clim.
+
+        Returns i if x is near clims[i], else -1
         event is expected to to have an attribute 'pos' giving the mouse
         position be in window coordinates.
         """
         if self._clims is None:
             return 0
         # checking clim1 first since it's more likely
-        if self.vertical:
+        if self._vertical:
             x = event.pos[1]
             _, clim1 = self._to_window_coords((0, self._clims[1]))
             _, clim0 = self._to_window_coords((0, self._clims[0]))
@@ -495,7 +514,9 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         return -1
 
     def _pos_is_gamma(self, event: SceneMouseEvent, tolerance: int = 4) -> bool:
-        """Returns True if value is near the gamma handle.
+        """Describes whether the position is "near" the gamma handle.
+
+        Returns True if value is near the gamma handle.
         event is expected to to have an attribute 'pos' giving the mouse
         position be in window coordinates.
         """
@@ -518,7 +539,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
 
         if self._clim_handle_grabbed > -1:
             newlims = list(self._clims)
-            if self.vertical:
+            if self._vertical:
                 c = self._to_plot_coords(event.pos)[1]
             else:
                 c = self._to_plot_coords(event.pos)[0]
@@ -531,8 +552,12 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             return
 
         if self._gamma_handle_grabbed:
-            y0, y1 = self.plot.yaxis.axis.domain
-            y = self._to_plot_coords(event.pos)[0 if self.vertical else 1]
+            y0, y1 = (
+                self.plot.xaxis.axis.domain
+                if self._vertical
+                else self.plot.yaxis.axis.domain
+            )
+            y = self._to_plot_coords(event.pos)[0 if self._vertical else 1]
             if y < np.maximum(y0, 0) or y > y1:
                 return
             # self.edit_gamma(-np.log2(y/y1))
@@ -542,13 +567,13 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self.native.unsetCursor()
 
         if self._pos_is_clim(event) > -1:
-            if self.vertical:
+            if self._vertical:
                 cursor = Qt.CursorShape.SplitVCursor
             else:
                 cursor = Qt.CursorShape.SplitHCursor
             self.native.setCursor(cursor)
         elif self._pos_is_gamma(event):
-            if self.vertical:
+            if self._vertical:
                 cursor = Qt.CursorShape.SplitHCursor
             else:
                 cursor = Qt.CursorShape.SplitVCursor
@@ -569,4 +594,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         return x, y
 
     def _resize(self) -> None:
-        self.plot.camera.set_range(x=self._domain, y=self._range)
+        self.plot.camera.set_range(
+            x=self._range if self._vertical else self._domain,
+            y=self._domain if self._vertical else self._range,
+        )
