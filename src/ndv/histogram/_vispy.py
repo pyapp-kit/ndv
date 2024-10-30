@@ -329,7 +329,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self._gamma_handle_grabbed: bool = False
 
         self._clims: tuple[float, float] | None = None
-        self._clim_handle_grabbed: int = 0
+        self._clim_handle_grabbed: int = -1
         # The gamma handle appears halfway between the clims
 
         self.plot._view.add(self._hist)
@@ -463,17 +463,17 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         # determine if a clim_handle was clicked
         self._clim_handle_grabbed = self._pos_is_clim(event)
         self._gamma_handle_grabbed = self._pos_is_gamma(event)
-        if self._clim_handle_grabbed or self._gamma_handle_grabbed:
+        if self._clim_handle_grabbed > -1 or self._gamma_handle_grabbed:
             # disconnect the pan/zoom mouse events until handle is dropped
             self.plot.camera.interactive = False
 
     def on_mouse_release(self, event: SceneMouseEvent) -> None:
-        self._clim_handle_grabbed = 0
+        self._clim_handle_grabbed = -1
         self._gamma_handle_grabbed = False
         self.plot.camera.interactive = True
 
     def _pos_is_clim(self, event: SceneMouseEvent, tolerance: int = 3) -> int:
-        """Returns 1 if x is near clims[0], 2 if near clims[1], else 0
+        """Returns i if x is near clims[i], else -1
         event is expected to to have an attribute 'pos' giving the mouse
         position be in window coordinates.
         """
@@ -489,10 +489,10 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             clim1, _ = self._to_window_coords((self._clims[1],))
             clim0, _ = self._to_window_coords((self._clims[0],))
         if abs(clim1 - x) < tolerance:
-            return 2
-        if abs(clim0 - x) < tolerance:
             return 1
-        return 0
+        if abs(clim0 - x) < tolerance:
+            return 0
+        return -1
 
     def _pos_is_gamma(self, event: SceneMouseEvent, tolerance: int = 4) -> bool:
         """Returns True if value is near the gamma handle.
@@ -516,13 +516,17 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
 
         # event.pos == (0,0) is top left corner of window
 
-        if self._clim_handle_grabbed:
+        if self._clim_handle_grabbed > -1:
             newlims = list(self._clims)
             if self.vertical:
                 c = self._to_plot_coords(event.pos)[1]
             else:
                 c = self._to_plot_coords(event.pos)[0]
-            newlims[self._clim_handle_grabbed - 1] = c
+            newlims[self._clim_handle_grabbed] = c
+            if newlims[0] > newlims[1]:
+                newlims[:] = newlims[::-1]
+                self._clim_handle_grabbed += 1
+                self._clim_handle_grabbed %= 2
             self.climsChanged.emit(newlims)
             return
 
@@ -537,7 +541,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
 
         self.native.unsetCursor()
 
-        if self._pos_is_clim(event):
+        if self._pos_is_clim(event) > -1:
             if self.vertical:
                 cursor = Qt.CursorShape.SplitVCursor
             else:
