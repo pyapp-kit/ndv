@@ -271,20 +271,22 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         super().set_range(x, y, z, margin)
 
 
-class VispyHistogramView(scene.SceneCanvas, HistogramView):
-    def __init__(self, parent: Any = None) -> None:
-        super().__init__(parent=parent)
-        self.unfreeze()
-        # FIXME? Initialize signals so VisPy is happy
-        self.gammaChanged
-        self.climsChanged
-        self.autoscaleChanged
-        self.cmapChanged
+class VispyHistogramView(HistogramView):
+    """A HistogramView on a VisPy SceneCanvas."""
+
+    def __init__(self) -> None:
+        # Canvas
+        self._canvas = scene.SceneCanvas()
+        self._canvas.unfreeze()
+        self._canvas.on_mouse_press = self.on_mouse_press
+        self._canvas.on_mouse_move = self.on_mouse_move
+        self._canvas.on_mouse_release = self.on_mouse_release
+        self._canvas.freeze()
 
         # Plot
         self.plot = PlotWidget()
         self.plot.lock_axis("y")
-        self.central_widget.add_widget(self.plot)
+        self._canvas.central_widget.add_widget(self.plot)
         self.node_tform = self.plot.node_transform(self.plot._view.scene)
         self._vertical: bool = False
         # The values of the left and right edges on the canvas (respectively)
@@ -316,6 +318,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             face_color="b",
             edge_width=1.0,
         )
+        self.lut_line.visible = False
         self.lut_line.order = -1
 
         self._gamma: float = 1
@@ -324,8 +327,12 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             size=6,
             edge_width=0,
         )
+        self._gamma_handle.visible = False
         self._gamma_handle.order = -2
-        self._gamma_handle_position: float = 0.5
+        self._gamma_handle.transform = self.lut_line.transform = (
+            scene.transforms.STTransform()
+        )
+        self._gamma_handle_position: list[float] = [0.5, 0.5]
         self._gamma_handle_grabbed: bool = False
 
         self._clims: tuple[float, float] | None = None
@@ -335,7 +342,6 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self.plot._view.add(self._hist)
         self.plot._view.add(self.lut_line)
         self.plot._view.add(self._gamma_handle)
-        self.freeze()
 
     # -- Protocol methods -- #
 
@@ -344,6 +350,8 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self._values = values
         self._bin_edges = bin_edges
         self._update_histogram()
+        if self._clims is None:
+            self.set_clims((self._bin_edges[0], self._bin_edges[-1]))
         self._resize()
 
     def set_std_dev(self, std_dev: float) -> None:
@@ -355,7 +363,7 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         pass
 
     def view(self) -> Any:
-        return self.native
+        return self._canvas.native
 
     def set_visibility(self, visible: bool) -> None:
         if self._hist is None:
@@ -391,15 +399,15 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         self._vertical = vertical
         self._update_histogram()
         self.plot.lock_axis("x" if vertical else "y")
-        self._resize()
         self._update_lut_lines()
+        self._resize()
 
     def enable_range_log(self, enabled: bool) -> None:
         if enabled != self._log_y:
             self._log_y = enabled
             self._update_histogram()
-            self._resize()
             self._update_lut_lines()
+            self._resize()
 
     # -- Helper Methods -- #
 
@@ -447,23 +455,21 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         X = np.empty(npoints + 4)
         Y = np.empty(npoints + 4)
         if self._vertical:
-            y1 = self.plot.xaxis.axis.domain[1] * 0.98
             # clims lines
-            X[0:2], Y[0:2] = (y1, y1 / 2), self._clims[0]
-            X[-2:], Y[-2:] = (y1 / 2, 0), self._clims[1]
+            X[0:2], Y[0:2] = (1, 1 / 2), self._clims[0]
+            X[-2:], Y[-2:] = (1 / 2, 0), self._clims[1]
             # gamma line
-            X[2:-2] = np.linspace(0, 1, npoints) ** self._gamma * y1
+            X[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
             Y[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
-            midpoint = np.array([(y1 * 2**-self._gamma, np.mean(self._clims))])
+            midpoint = np.array([(2**-self._gamma, np.mean(self._clims))])
         else:
-            y1 = self.plot.yaxis.axis.domain[1] * 0.98
             # clims lines
-            X[0:2], Y[0:2] = self._clims[0], (y1, y1 / 2)
-            X[-2:], Y[-2:] = self._clims[1], (y1 / 2, 0)
+            X[0:2], Y[0:2] = self._clims[0], (1, 1 / 2)
+            X[-2:], Y[-2:] = self._clims[1], (1 / 2, 0)
             # gamma line
             X[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
-            Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma * y1
-            midpoint = np.array([(np.mean(self._clims), y1 * 2**-self._gamma)])
+            Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
+            midpoint = np.array([(np.mean(self._clims), 2**-self._gamma)])
 
         # TODO: Move to self.edit_cmap
         color = np.linspace(0.2, 0.8, npoints + 4).repeat(4).reshape(-1, 4)
@@ -472,9 +478,11 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         color[-3:] = [c1, c2, c1]
 
         self.lut_line.set_data((X, Y), marker_size=0, color=color)
+        self.lut_line.visible = True
 
-        self._gamma_handle_position = midpoint[0]
+        self._gamma_handle_position[:] = midpoint[0]
         self._gamma_handle.set_data(pos=midpoint)
+        self._gamma_handle.visible = True
 
     def on_mouse_press(self, event: SceneMouseEvent) -> None:
         if event.pos is None:
@@ -507,8 +515,8 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             _, clim0 = self._to_window_coords((0, self._clims[0]))
         else:
             x = event.pos[0]
-            clim1, _ = self._to_window_coords((self._clims[1],))
-            clim0, _ = self._to_window_coords((self._clims[0],))
+            clim1, _ = self._to_window_coords((self._clims[1], 0))
+            clim0, _ = self._to_window_coords((self._clims[0], 0))
         if abs(clim1 - x) < tolerance:
             return 1
         if abs(clim0 - x) < tolerance:
@@ -524,7 +532,9 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
         """
         if self._gamma_handle_position is None:
             return False
-        gx, gy = self._to_window_coords(self._gamma_handle_position)
+        gx, gy = self._to_window_coords(
+            self._gamma_handle.transform.map(self._gamma_handle_position)
+        )
         x, y = event.pos
         if abs(gx - x) < tolerance and abs(gy - y) < tolerance:
             return True
@@ -566,32 +576,36 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             self.gammaChanged.emit(-np.log2(y / y1))
             return
 
-        self.native.unsetCursor()
+        self._canvas.native.unsetCursor()
 
         if self._pos_is_clim(event) > -1:
             if self._vertical:
                 cursor = Qt.CursorShape.SplitVCursor
             else:
                 cursor = Qt.CursorShape.SplitHCursor
-            self.native.setCursor(cursor)
+            self._canvas.native.setCursor(cursor)
         elif self._pos_is_gamma(event):
             if self._vertical:
                 cursor = Qt.CursorShape.SplitHCursor
             else:
                 cursor = Qt.CursorShape.SplitVCursor
-            self.native.setCursor(cursor)
+            self._canvas.native.setCursor(cursor)
         else:
             x, y = self._to_plot_coords(event.pos)
             x1, x2 = self.plot.xaxis.axis.domain
             y1, y2 = self.plot.yaxis.axis.domain
             if (x1 < x <= x2) and (y1 <= y <= y2):
-                self.native.setCursor(Qt.CursorShape.SizeAllCursor)
+                self._canvas.native.setCursor(Qt.CursorShape.SizeAllCursor)
+            if self._vertical:
+                self._domain = self.plot.yaxis.axis.domain
+            else:
+                self._domain = self.plot.xaxis.axis.domain
 
-    def _to_window_coords(self, pos: tuple[float, float]) -> tuple[float, float]:
+    def _to_window_coords(self, pos: Sequence[float]) -> tuple[float, float]:
         x, y, _, _ = self.node_tform.imap(pos)
         return x, y
 
-    def _to_plot_coords(self, pos: tuple[float, float]) -> tuple[float, float]:
+    def _to_plot_coords(self, pos: Sequence[float]) -> tuple[float, float]:
         x, y, _, _ = self.node_tform.map(pos)
         return x, y
 
@@ -600,3 +614,9 @@ class VispyHistogramView(scene.SceneCanvas, HistogramView):
             x=self._range if self._vertical else self._domain,
             y=self._domain if self._vertical else self._range,
         )
+        if self._vertical:
+            scale = 0.98 * self.plot.xaxis.axis.domain[1]
+            self.lut_line.transform.scale = (scale, 1)
+        else:
+            scale = 0.98 * self.plot.yaxis.axis.domain[1]
+            self.lut_line.transform.scale = (1, scale)

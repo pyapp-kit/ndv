@@ -38,6 +38,8 @@ class QtHistogramView(HistogramView):
         self._layout.addWidget(self._vert)
         self._layout.addWidget(self._log)
 
+        # Viewbox controls
+
     # -- Protocol methods -- #
 
     def view(self) -> Any:
