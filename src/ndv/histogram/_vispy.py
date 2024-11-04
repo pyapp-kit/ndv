@@ -352,7 +352,7 @@ class VispyHistogramView(HistogramView):
         self._update_histogram()
         if self._clims is None:
             self.set_clims((self._bin_edges[0], self._bin_edges[-1]))
-        self._resize()
+            self._resize()
 
     def set_std_dev(self, std_dev: float) -> None:
         # Nothing to do (yet)
@@ -421,7 +421,9 @@ class VispyHistogramView(HistogramView):
         """
         if self._values is None or self._bin_edges is None:
             return
-        values = np.log10(self._values) if self._log_y else self._values
+        v = self._values
+        values = np.log10(v) if self._log_y else v
+        values[values == float("-inf")] = 0
         bin_edges = self._bin_edges
         #   4-5
         #   | |
@@ -446,6 +448,7 @@ class VispyHistogramView(HistogramView):
 
         self._hist.set_data(vertices=rr, faces=tris)
         # FIXME: This should be called internally upon set_data, right?
+        # Looks like https://github.com/vispy/vispy/issues/1899
         self._hist._bounds_changed()
 
     def _update_lut_lines(self, npoints: int = 256) -> None:
@@ -596,10 +599,6 @@ class VispyHistogramView(HistogramView):
             y1, y2 = self.plot.yaxis.axis.domain
             if (x1 < x <= x2) and (y1 <= y <= y2):
                 self._canvas.native.setCursor(Qt.CursorShape.SizeAllCursor)
-            if self._vertical:
-                self._domain = self.plot.yaxis.axis.domain
-            else:
-                self._domain = self.plot.xaxis.axis.domain
 
     def _to_window_coords(self, pos: Sequence[float]) -> tuple[float, float]:
         x, y, _, _ = self.node_tform.imap(pos)
@@ -610,6 +609,8 @@ class VispyHistogramView(HistogramView):
         return x, y
 
     def _resize(self) -> None:
+        # FIXME: Bitten by https://github.com/vispy/vispy/issues/1483
+        # It's pretty visible in logarithmic mode
         self.plot.camera.set_range(
             x=self._range if self._vertical else self._domain,
             y=self._domain if self._vertical else self._range,
