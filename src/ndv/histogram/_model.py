@@ -16,12 +16,13 @@ class StatsModel:
     standard_deviation: float | None = None
     average: float | None = None
     histogram: tuple[np.ndarray, np.ndarray] | None = None
+    bins: int = 256
     bin_edges: np.ndarray | None = None
     _data: np.ndarray | None = None
 
     @property
     def data(self) -> np.ndarray:
-        if self._data is None:
+        if self._data is not None:
             return self._data
         raise Exception("Data has not yet been set!")
 
@@ -30,6 +31,6 @@ class StatsModel:
         if data is None:
             return
         self._data = data
-        self.histogram = np.histogram(self._data)
+        self.histogram = np.histogram(self._data, bins=self.bins)
         self.average = np.average(self._data)
         self.standard_deviation = np.std(self._data)
