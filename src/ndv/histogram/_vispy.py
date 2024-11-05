@@ -306,7 +306,7 @@ class VispyHistogramView(HistogramView):
         # The Lut Line visualizes both the clims (line segments connecting the
         # first two and last two points, respectively) and the gamma curve
         # (the polyline between all remaining points)
-        self.lut_line = scene.LinePlot(
+        self._lut_line = scene.LinePlot(
             data=(0),  # FIXME: Dummy value to prevent resizing errors
             color="k",
             connect="strip",
@@ -318,8 +318,8 @@ class VispyHistogramView(HistogramView):
             face_color="b",
             edge_width=1.0,
         )
-        self.lut_line.visible = False
-        self.lut_line.order = -1
+        self._lut_line.visible = False
+        self._lut_line.order = -1
 
         self._gamma: float = 1
         self._gamma_handle = scene.Markers(
@@ -329,7 +329,7 @@ class VispyHistogramView(HistogramView):
         )
         self._gamma_handle.visible = False
         self._gamma_handle.order = -2
-        self._gamma_handle.transform = self.lut_line.transform = (
+        self._gamma_handle.transform = self._lut_line.transform = (
             scene.transforms.STTransform()
         )
         self._gamma_handle_position: list[float] = [0.5, 0.5]
@@ -340,7 +340,7 @@ class VispyHistogramView(HistogramView):
         # The gamma handle appears halfway between the clims
 
         self.plot._view.add(self._hist)
-        self.plot._view.add(self.lut_line)
+        self.plot._view.add(self._lut_line)
         self.plot._view.add(self._gamma_handle)
 
     # -- Protocol methods -- #
@@ -480,12 +480,19 @@ class VispyHistogramView(HistogramView):
         color[0:3] = [c1, c2, c1]
         color[-3:] = [c1, c2, c1]
 
-        self.lut_line.set_data((X, Y), marker_size=0, color=color)
-        self.lut_line.visible = True
+        self._lut_line.set_data((X, Y), marker_size=0, color=color)
+        self._lut_line.visible = True
 
         self._gamma_handle_position[:] = midpoint[0]
         self._gamma_handle.set_data(pos=midpoint)
         self._gamma_handle.visible = True
+
+        # FIXME: These should be called internally upon set_data, right?
+        # Looks like https://github.com/vispy/vispy/issues/1899
+        self._lut_line._bounds_changed()
+        for v in self._lut_line._subvisuals:
+            v._bounds_changed()
+        self._gamma_handle._bounds_changed()
 
     def on_mouse_press(self, event: SceneMouseEvent) -> None:
         if event.pos is None:
@@ -617,7 +624,7 @@ class VispyHistogramView(HistogramView):
         )
         if self._vertical:
             scale = 0.98 * self.plot.xaxis.axis.domain[1]
-            self.lut_line.transform.scale = (scale, 1)
+            self._lut_line.transform.scale = (scale, 1)
         else:
             scale = 0.98 * self.plot.yaxis.axis.domain[1]
-            self.lut_line.transform.scale = (1, scale)
+            self._lut_line.transform.scale = (1, scale)
