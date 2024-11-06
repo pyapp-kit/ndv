@@ -1,8 +1,9 @@
+import sys
 from collections.abc import Container, Hashable, Mapping, MutableMapping, Sequence
 from typing import Any, Protocol
 
 import cmap
-from psygnal import SignalInstance
+from psygnal import Signal, SignalInstance
 from pydantic import Field
 
 from .models._array_display_model import ArrayDisplayModel, AxisKey
@@ -96,10 +97,10 @@ class DataDisplayModel(NDVModel):
 
 
 class PLutView(Protocol):
-    visibleChanged: SignalInstance
-    autoscaleChanged: SignalInstance
-    cmapChanged: SignalInstance
-    climsChanged: SignalInstance
+    visibleChanged: Signal
+    autoscaleChanged: Signal
+    cmapChanged: Signal
+    climsChanged: Signal
 
     def setName(self, name: str) -> None: ...
     def setAutoScale(self, auto: bool) -> None: ...
@@ -123,12 +124,15 @@ class PView(Protocol):
     ) -> None: ...
 
     def add_lut_view(self) -> PLutView: ...
+    def show(self) -> None: ...
 
 
 class ViewerController:
     """The controller mostly manages the connection between the model and the view."""
 
-    def __init__(self, view: PView) -> None:
+    def __init__(self, view: PView | None = None) -> None:
+        if view is None:
+            view = _pick_view_backend()
         self.view = view
         self._dd_model = DataDisplayModel()  # rename me
         self._set_model_connected(self._dd_model.display)
@@ -212,7 +216,6 @@ class ViewerController:
     def _update_canvas(self) -> None:
         if not self._dd_model.data:
             return
-
         data = self._dd_model.current_data()  # TODO: make asynchronous
         if None in self._handles:
             self._handles[None].data = data
@@ -245,7 +248,7 @@ class ViewerController:
         model_lut.events.cmap.connect(lut.setColormap)
         model_lut.events.clims.connect(lut.setClims)
         model_lut.events.autoscale.connect(lut.setAutoScale)
-        model_lut.events.visible.connect(lut.setVisible)
+        model_lut.events.visible.connect(lut.setLutVisible)
         return lut
 
     def _on_lut_visible_changed(self, visible: bool) -> None:
@@ -258,3 +261,31 @@ class ViewerController:
 
     def _on_clims_changed(self, clims: tuple[float, float]) -> None:
         self._handles[None].clim = clims
+
+
+def _pick_view_backend() -> PView:
+    if _is_running_in_notebook():
+        from .v2view_jupyter import JupyterViewerView
+
+        return JupyterViewerView()
+    elif _is_running_in_qapp():
+        from .v2view_qt import QViewerView
+
+        return QViewerView()
+
+    raise RuntimeError("Could not determine the appropriate viewer backend")
+
+
+def _is_running_in_notebook() -> bool:
+    if IPython := sys.modules.get("IPython"):
+        if shell := IPython.get_ipython():
+            return bool(shell.__class__.__name__ == "ZMQInteractiveShell")
+    return False
+
+
+def _is_running_in_qapp() -> bool:
+    for mod_name in ("PyQt5", "PySide2", "PySide6", "PyQt6"):
+        if mod := sys.modules.get(f"{mod_name}.QtWidgets"):
+            if qapp := getattr(mod, "QApplication", None):
+                return qapp.instance() is not None
+    return False

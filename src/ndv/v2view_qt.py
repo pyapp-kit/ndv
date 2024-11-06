@@ -35,7 +35,7 @@ class CmapCombo(QColormapComboBox):
         popup.move(popup.x(), popup.y() - self.height() - popup.height())
 
 
-class LUTWidget(QWidget):
+class QLUTWidget(QWidget):
     visibleChanged = Signal(bool)
     autoscaleChanged = Signal(bool)
     cmapChanged = Signal(cmap.Colormap)
@@ -157,8 +157,8 @@ class QViewerView(QWidget):
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
 
-    def add_lut_view(self) -> LUTWidget:
-        wdg = LUTWidget(self)
+    def add_lut_view(self) -> QLUTWidget:
+        wdg = QLUTWidget(self)
         self._luts.addWidget(wdg)
         return wdg
 

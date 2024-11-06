@@ -1,12 +1,86 @@
-from collections.abc import Container, Hashable, Mapping, Sequence
-from typing import Any
+from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
-from .models._array_display_model import AxisKey
 from .viewer._backends import get_canvas_class
-from .viewer._backends._protocols import PImageHandle
+
+if TYPE_CHECKING:
+    from collections.abc import Container, Hashable, Mapping, Sequence
+
+    from .controller import PLutView
+    from .models._array_display_model import AxisKey
+    from .viewer._backends._protocols import PImageHandle
+
+
+class JupyterLutView:
+    visibleChanged = Signal(bool)
+    autoscaleChanged = Signal(bool)
+    cmapChanged = Signal(cmap.Colormap)
+    climsChanged = Signal(tuple)
+
+    def __init__(self) -> None:
+        self._visible = widgets.Checkbox(value=True)
+        self._visible.observe(self._on_visible_changed, names="value")
+
+        self._cmap = widgets.Dropdown(
+            options=["gray", "green", "magenta"], value="gray"
+        )
+        self._cmap.observe(self._on_cmap_changed, names="value")
+
+        self._clims = widgets.FloatRangeSlider(
+            value=[0, 2**16],
+            min=0,
+            max=2**16,
+            step=1,
+            orientation="horizontal",
+            readout=True,
+            readout_format=".0f",
+        )
+        self._clims.observe(self._on_clims_changed, names="value")
+
+        self._auto_clim = widgets.ToggleButton(
+            value=True,
+            description="Auto",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="Auto scale",
+            icon="check",
+        )
+        self._auto_clim.observe(self._on_autoscale_changed, names="value")
+
+        self.layout = widgets.HBox(
+            [self._visible, self._cmap, self._clims, self._auto_clim]
+        )
+
+    def _on_clims_changed(self, change: dict[str, Any]) -> None:
+        self.climsChanged(self._clims.value)
+
+    def _on_visible_changed(self, change: dict[str, Any]) -> None:
+        self.visibleChanged(self._visible.value)
+
+    def _on_cmap_changed(self, change: dict[str, Any]) -> None:
+        self.cmapChanged(cmap.Colormap(self._cmap.value))
+
+    def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
+        self.autoscaleChanged(self._auto_clim.value)
+
+    def setName(self, name: str) -> None:
+        self._visible.description = name
+
+    def setAutoScale(self, auto: bool) -> None:
+        self._auto_clim.value = auto
+
+    def setColormap(self, cmap: cmap.Colormap) -> None:
+        self._cmap.value = cmap.name
+
+    def setClims(self, clims: tuple[float, float]) -> None:
+        self._clims.value = clims
+
+    def setLutVisible(self, visible: bool) -> None:
+        self._visible.value = visible
 
 
 class JupyterViewerView:
@@ -77,3 +151,19 @@ class JupyterViewerView:
             if isinstance(val, slice):
                 raise NotImplementedError("Slices are not supported yet")
             self._sliders[axis].value = val
+
+    def add_lut_view(self) -> PLutView:
+        """Add a LUT view to the viewer."""
+        wdg = JupyterLutView()
+        self.layout.children = (*self.layout.children, wdg.layout)
+        return wdg
+
+    def show(self) -> None:
+        """Show the viewer."""
+        from IPython.display import display
+
+        display(self.layout)  # type: ignore [no-untyped-call]
+
+    def refresh(self) -> None:
+        """Refresh the viewer."""
+        self._canvas.refresh()
