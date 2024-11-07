@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import cmap
 import numpy as np
 import pytest
+from qtpy.QtWidgets import QHBoxLayout, QWidget
 from vispy.color import Color
 
 from ndv.histogram.views._vispy import VispyHistogramView
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
 
 # Accounts for differences between 32-bit and 64-bit floats
 EPSILON = 1e-6
@@ -22,10 +27,18 @@ def data() -> np.ndarray:
 
 
 @pytest.fixture
-def view(data: np.ndarray) -> VispyHistogramView:
+def view(qtbot: QtBot, data: np.ndarray) -> VispyHistogramView:
+    # Create view
     view = VispyHistogramView()
+    # FIXME: Why does `qtbot.add_widget(view.view())` not work?
+    wdg = QWidget()
+    layout = QHBoxLayout(wdg)
+    layout.addWidget(view.view())
+    qtbot.add_widget(wdg)
+    # Set initial data
     values, bin_edges = np.histogram(data)
     view.set_histogram(values, bin_edges)
+
     return view
 
 

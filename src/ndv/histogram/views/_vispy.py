@@ -2,7 +2,7 @@
 # Distributed under the (new) BSD License. See LICENSE.txt for more info.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 import numpy as np
 from qtpy.QtCore import Qt
@@ -89,7 +89,7 @@ class PlotWidget(scene.Widget):
         ylabel: str = "",
         title: str = "",
         lock_axis: Literal["x", "y", None] = None,
-        **widget_kwargs: Unpack[WidgetKwargs],
+        **widget_kwargs: Any,
     ) -> None:
         self._fg_color = fg_color
         self._visuals: list[scene.VisualNode] = []
