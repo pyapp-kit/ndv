@@ -8,7 +8,7 @@ import numpy as np
 from qtpy.QtCore import Qt
 from vispy import scene
 
-from ndv.histogram._view import HistogramView
+from ndv.histogram.view import HistogramView
 
 if TYPE_CHECKING:
     # just here cause vispy has poor type hints
@@ -295,8 +295,8 @@ class VispyHistogramView(HistogramView):
         self._range: tuple[float, float] | None = None
 
         # Histogram
-        self._values: np.ndarray | None = None  # TODO: Is this needed?
-        self._bin_edges: np.ndarray | None = None  # TODO: Is this needed?
+        self._values: Sequence[float] | None = None  # TODO: Is this needed?
+        self._bin_edges: Sequence[float] | None = None  # TODO: Is this needed?
         # NB We use a Mesh here, instead of a histogram,
         # because it gives us flexibility in computing the histogram
         self._hist = scene.Mesh(color="red")
@@ -345,7 +345,9 @@ class VispyHistogramView(HistogramView):
 
     # -- Protocol methods -- #
 
-    def set_histogram(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
+    def set_histogram(
+        self, values: Sequence[float], bin_edges: Sequence[float]
+    ) -> None:
         """Calculate and show a histogram of data."""
         self._values = values
         self._bin_edges = bin_edges
@@ -355,11 +357,11 @@ class VispyHistogramView(HistogramView):
             self._resize()
 
     def set_std_dev(self, std_dev: float) -> None:
-        # Nothing to do (yet)
+        # Nothing to do
         pass
 
     def set_average(self, average: float) -> None:
-        # Nothing to do (yet)
+        # Nothing to do
         pass
 
     def view(self) -> Any:
@@ -369,17 +371,25 @@ class VispyHistogramView(HistogramView):
         if self._hist is None:
             return
         self._hist.visible = visible
+        self._lut_line.visible = visible
+        self._gamma_handle.visible = visible
+        self._lut_handles.visible = visible
 
     def set_cmap(self, lut: cmap.Colormap) -> None:
         if self._hist is None:
             return
-        self._hist.color = lut.color_stops[-1]
+        # TODO is this correct?
+        self._hist.color = lut.color_stops[-1].color.hex
 
     def set_gamma(self, gamma: float) -> None:
+        if gamma < 0:
+            raise ValueError("gamma must be non-negative!")
         self._gamma = gamma
         self._update_lut_lines()
 
     def set_clims(self, clims: tuple[float, float]) -> None:
+        if clims[1] < clims[0]:
+            clims = (clims[1], clims[0])
         self._clims = clims
         self._update_lut_lines()
 
@@ -387,12 +397,24 @@ class VispyHistogramView(HistogramView):
         # Nothing to do (yet)
         pass
 
-    def set_domain(self, domain: tuple[float, float] | None) -> None:
-        self._domain = domain
+    def set_domain(self, bounds: tuple[float, float] | None) -> None:
+        if bounds is not None:
+            if bounds[0] is None or bounds[1] is None:
+                # TODO: Sensible defaults?
+                raise ValueError("Domain min/max cannot be None!")
+            if bounds[0] > bounds[1]:
+                bounds = (bounds[1], bounds[0])
+        self._domain = bounds
         self._resize()
 
-    def set_range(self, range: tuple[float, float] | None) -> None:
-        self._range = range
+    def set_range(self, bounds: tuple[float, float] | None) -> None:
+        if bounds is not None:
+            if bounds[0] is None or bounds[1] is None:
+                # TODO: Sensible defaults?
+                raise ValueError("Range min/max cannot be None!")
+            if bounds[0] > bounds[1]:
+                bounds = (bounds[1], bounds[0])
+        self._range = bounds
         self._resize()
 
     def set_vertical(self, vertical: bool) -> None:
@@ -402,7 +424,7 @@ class VispyHistogramView(HistogramView):
         self._update_lut_lines()
         self._resize()
 
-    def enable_range_log(self, enabled: bool) -> None:
+    def set_range_log(self, enabled: bool) -> None:
         if enabled != self._log_y:
             self._log_y = enabled
             self._update_histogram()
@@ -422,8 +444,8 @@ class VispyHistogramView(HistogramView):
         if self._values is None or self._bin_edges is None:
             return
         v = self._values
+        # FIXME: Warnings about divide by zero from this.
         values = np.log10(v) if self._log_y else v
-        values[values == float("-inf")] = 0
         bin_edges = self._bin_edges
         #   4-5
         #   | |
@@ -436,8 +458,7 @@ class VispyHistogramView(HistogramView):
         rr[:, X] = np.repeat(bin_edges, 3)[1:-1]
         rr[1::3, Y] = values
         rr[2::3, Y] = values
-        # TODO: The VisPy code has this line, but I have no idea why
-        bin_edges.astype(np.float32)
+        rr[rr == float("-inf")] = 0
         # and now our tris
         tris = np.zeros((2 * len(bin_edges) - 2, 3), np.uint32)
         offsets = 3 * np.arange(len(bin_edges) - 1, dtype=np.uint32)[:, np.newaxis]
@@ -616,11 +637,12 @@ class VispyHistogramView(HistogramView):
         return x, y
 
     def _resize(self) -> None:
-        # FIXME: Bitten by https://github.com/vispy/vispy/issues/1483
-        # It's pretty visible in logarithmic mode
         self.plot.camera.set_range(
             x=self._range if self._vertical else self._domain,
             y=self._domain if self._vertical else self._range,
+            # FIXME: Bitten by https://github.com/vispy/vispy/issues/1483
+            # It's pretty visible in logarithmic mode
+            margin=1e-30,
         )
         if self._vertical:
             scale = 0.98 * self.plot.xaxis.axis.domain[1]

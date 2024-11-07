@@ -11,8 +11,8 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from ndv.histogram._model import StatsModel
-from ndv.histogram._vispy import VispyHistogramView
+from ndv.histogram.model import StatsModel
+from ndv.histogram.views._vispy import VispyHistogramView
 
 if TYPE_CHECKING:
     from typing import Any
@@ -44,7 +44,7 @@ class Controller:
         # Log box
         self._log = QPushButton("Logarithmic")
         self._log.setCheckable(True)
-        self._log.toggled.connect(self._view.enable_range_log)
+        self._log.toggled.connect(self._view.set_range_log)
 
         # Data updates
         self._data_btn = QPushButton("Change Data")
