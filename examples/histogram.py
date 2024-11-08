@@ -75,7 +75,7 @@ class Controller:
         return self._wdg
 
 
-app = QApplication([])
+app = QApplication.instance() or QApplication([])
 
 widget = Controller()
 widget.view().show()
