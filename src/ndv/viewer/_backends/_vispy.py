@@ -580,6 +580,21 @@ class VispyViewerCanvas(PCanvas):
             max_size = max(x[1], y[1], z[1])
             self._camera.scale_factor = max_size + 6
 
+    def zoom(self, factor: float | tuple, center: tuple | None = None):
+        """
+        Zoom in (or out) at the given center.
+
+        Parameters
+        ----------
+        factor : float or tuple
+            Fraction by which the scene should be zoomed (e.g. a factor of 2
+            causes the scene to appear twice as large).
+        center : tuple of 2-4 elements
+            The center of the view. If not given or None, use the
+            current center.
+        """
+        return self._camera.zoom(factor=factor, center=center)
+
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
