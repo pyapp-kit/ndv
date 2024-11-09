@@ -107,6 +107,10 @@ class DataWrapper(Generic[ArrayT]):
     def data(self) -> ArrayT:
         return self._data
 
+    @property
+    def ndim(self) -> int:
+        return len(self.dims)
+
     @classmethod
     @abstractmethod
     def supports(cls, obj: Any) -> bool:

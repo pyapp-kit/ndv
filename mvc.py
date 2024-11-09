@@ -9,5 +9,5 @@ app = QApplication([])
 
 viewer = ViewerController()  # ultimately, this will be the public api
 viewer.data = cells3d()
-viewer.view.show()
+viewer._view.show()
 app.exec()
