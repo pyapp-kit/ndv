@@ -45,6 +45,7 @@ def view(qtbot: QtBot, data: np.ndarray) -> VispyHistogramView:
 def test_clims(data: np.ndarray, view: VispyHistogramView) -> None:
     # on startup, clims should be at the extent of the data
     clims = np.min(data), np.max(data)
+    assert view._clims is not None
     assert clims[0] == view._clims[0]
     assert clims[1] == view._clims[1]
     assert abs(clims[0] - view._lut_line._line.pos[0, 0]) <= EPSILON
@@ -69,15 +70,15 @@ def test_gamma(data: np.ndarray, view: VispyHistogramView) -> None:
     # on startup, gamma should be 1
     assert 1 == view._gamma
     gx, gy = (np.max(data) + np.min(data)) / 2, 0.5**view._gamma
-    assert abs(gx - view._gamma_handle_position[0, 0]) <= EPSILON
-    assert abs(gy - view._gamma_handle_position[0, 1]) <= EPSILON
+    assert abs(gx - view._gamma_handle_pos[0, 0]) <= EPSILON
+    assert abs(gy - view._gamma_handle_pos[0, 1]) <= EPSILON
     # set gamma, assert a change
     g = 2
     view.set_gamma(g)
     assert g == view._gamma
     gx, gy = (np.max(data) + np.min(data)) / 2, 0.5**view._gamma
-    assert abs(gx - view._gamma_handle_position[0, 0]) <= EPSILON
-    assert abs(gy - view._gamma_handle_position[0, 1]) <= EPSILON
+    assert abs(gx - view._gamma_handle_pos[0, 0]) <= EPSILON
+    assert abs(gy - view._gamma_handle_pos[0, 1]) <= EPSILON
     # set invalid gammas, assert no change
     with pytest.raises(ValueError):
         view.set_gamma(-1)
@@ -96,19 +97,16 @@ def test_visibility(view: VispyHistogramView) -> None:
     assert view._hist.visible
     assert view._lut_line.visible
     assert view._gamma_handle.visible
-    assert view._lut_handles.visible
     # Visible = False
     view.set_visibility(False)
     assert not view._hist.visible
     assert not view._lut_line.visible
     assert not view._gamma_handle.visible
-    assert not view._lut_handles.visible
     # Visible = True
     view.set_visibility(True)
     assert view._hist.visible
     assert view._lut_line.visible
     assert view._gamma_handle.visible
-    assert view._lut_handles.visible
 
 
 def test_domain(data: np.ndarray, view: VispyHistogramView) -> None:

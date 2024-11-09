@@ -2,6 +2,7 @@
 # Distributed under the (new) BSD License. See LICENSE.txt for more info.
 from __future__ import annotations
 
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 import numpy as np
@@ -9,6 +10,14 @@ from qtpy.QtCore import Qt
 from vispy import scene
 
 from ndv.histogram.view import HistogramView
+
+
+class Grabbable(Enum):
+    NONE = auto()
+    LEFT_CLIM = auto()
+    RIGHT_CLIM = auto()
+    GAMMA = auto()
+
 
 if TYPE_CHECKING:
     # just here cause vispy has poor type hints
@@ -275,7 +284,8 @@ class VispyHistogramView(HistogramView):
     """A HistogramView on a VisPy SceneCanvas."""
 
     def __init__(self) -> None:
-        # Canvas
+        ## -- Canvas -- ##
+
         self._canvas = scene.SceneCanvas()
         self._canvas.unfreeze()
         self._canvas.on_mouse_press = self.on_mouse_press
@@ -283,31 +293,19 @@ class VispyHistogramView(HistogramView):
         self._canvas.on_mouse_release = self.on_mouse_release
         self._canvas.freeze()
 
-        # Plot
-        self.plot = PlotWidget()
-        self.plot.lock_axis("y")
-        self._canvas.central_widget.add_widget(self.plot)
-        self.node_tform = self.plot.node_transform(self.plot._view.scene)
-        self._vertical: bool = False
-        # The values of the left and right edges on the canvas (respectively)
-        self._domain: tuple[float, float] | None = None
-        # The values of the bottom and top edges on the canvas (respectively)
-        self._range: tuple[float, float] | None = None
+        ## -- Visuals -- ##
 
-        # Histogram
-        self._values: Sequence[float] | None = None  # TODO: Is this needed?
-        self._bin_edges: Sequence[float] | None = None  # TODO: Is this needed?
         # NB We use a Mesh here, instead of a histogram,
         # because it gives us flexibility in computing the histogram
         self._hist = scene.Mesh(color="red")
-        self._log_y: bool = False
+        self._values: Sequence[float] | None = None
+        self._bin_edges: Sequence[float] | None = None
 
-        # Clims + Gamma
         # The Lut Line visualizes both the clims (line segments connecting the
         # first two and last two points, respectively) and the gamma curve
         # (the polyline between all remaining points)
         self._lut_line = scene.LinePlot(
-            data=(0),  # FIXME: Dummy value to prevent resizing errors
+            data=(0),  # Dummy value to prevent resizing errors
             color="k",
             connect="strip",
             symbol=None,
@@ -321,23 +319,36 @@ class VispyHistogramView(HistogramView):
         self._lut_line.visible = False
         self._lut_line.order = -1
 
+        self._clims: tuple[float, float] | None = None
+
+        # The gamma handle appears halfway between the clims
         self._gamma: float = 1
+        self._gamma_handle_pos: np.ndarray = np.ndarray((1, 2))
         self._gamma_handle = scene.Markers(
-            pos=np.zeros((1, 2)),  # FIXME: Dummy value to prevent resizing errors
+            pos=self._gamma_handle_pos,
             size=6,
             edge_width=0,
         )
         self._gamma_handle.visible = False
         self._gamma_handle.order = -2
-        self._gamma_handle.transform = self._lut_line.transform = (
-            scene.transforms.STTransform()
-        )
-        self._gamma_handle_position: list[float] = [0.5, 0.5]
-        self._gamma_handle_grabbed: bool = False
 
-        self._clims: tuple[float, float] | None = None
-        self._clim_handle_grabbed: int = -1
-        # The gamma handle appears halfway between the clims
+        # One transform to rule them all!
+        self._handle_transform = scene.transforms.STTransform()
+        self._lut_line.transform = self._handle_transform
+        self._gamma_handle.transform = self._handle_transform
+
+        ## -- Plot -- ##
+        self.plot = PlotWidget()
+        self.plot.lock_axis("y")
+        self._canvas.central_widget.add_widget(self.plot)
+        self.node_tform = self.plot.node_transform(self.plot._view.scene)
+        self._grabbed: Grabbable = Grabbable.NONE
+        self._log_y: bool = False
+        self._vertical: bool = False
+        # The values of the left and right edges on the canvas (respectively)
+        self._domain: tuple[float, float] | None = None
+        # The values of the bottom and top edges on the canvas (respectively)
+        self._range: tuple[float, float] | None = None
 
         self.plot._view.add(self._hist)
         self.plot._view.add(self._lut_line)
@@ -373,13 +384,10 @@ class VispyHistogramView(HistogramView):
         self._hist.visible = visible
         self._lut_line.visible = visible
         self._gamma_handle.visible = visible
-        self._lut_handles.visible = visible
 
     def set_cmap(self, lut: cmap.Colormap) -> None:
-        if self._hist is None:
-            return
-        # TODO is this correct?
-        self._hist.color = lut.color_stops[-1].color.hex
+        if self._hist is not None:
+            self._hist.color = lut.color_stops[-1].color.hex
 
     def set_gamma(self, gamma: float) -> None:
         if gamma < 0:
@@ -504,8 +512,8 @@ class VispyHistogramView(HistogramView):
         self._lut_line.set_data((X, Y), marker_size=0, color=color)
         self._lut_line.visible = True
 
-        self._gamma_handle_position[:] = midpoint[0]
-        self._gamma_handle.set_data(pos=midpoint)
+        self._gamma_handle_pos[:] = midpoint[0]
+        self._gamma_handle.set_data(pos=self._gamma_handle_pos)
         self._gamma_handle.visible = True
 
         # FIXME: These should be called internally upon set_data, right?
@@ -518,58 +526,36 @@ class VispyHistogramView(HistogramView):
     def on_mouse_press(self, event: SceneMouseEvent) -> None:
         if event.pos is None:
             return
-        # determine if a clim_handle was clicked
-        self._clim_handle_grabbed = self._pos_is_clim(event)
-        self._gamma_handle_grabbed = self._pos_is_gamma(event)
-        if self._clim_handle_grabbed > -1 or self._gamma_handle_grabbed:
+        # check whether the user grabbed a node
+        self._grabbed = self._find_nearby_node(event)
+        if self._grabbed != Grabbable.NONE:
             # disconnect the pan/zoom mouse events until handle is dropped
             self.plot.camera.interactive = False
 
     def on_mouse_release(self, event: SceneMouseEvent) -> None:
-        self._clim_handle_grabbed = -1
-        self._gamma_handle_grabbed = False
+        self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
 
-    def _pos_is_clim(self, event: SceneMouseEvent, tolerance: int = 3) -> int:
-        """Describes whether the position is "near" a clim.
+    def _find_nearby_node(
+        self, event: SceneMouseEvent, tolerance: int = 3
+    ) -> Grabbable:
+        """Describes whether the event is near a clim."""
+        x, y = self._to_plot_coords(event.pos)
 
-        Returns i if x is near clims[i], else -1
-        event is expected to to have an attribute 'pos' giving the mouse
-        position be in window coordinates.
-        """
-        if self._clims is None:
-            return 0
-        # checking clim1 first since it's more likely
-        if self._vertical:
-            x = event.pos[1]
-            _, clim1 = self._to_window_coords((0, self._clims[1]))
-            _, clim0 = self._to_window_coords((0, self._clims[0]))
-        else:
-            x = event.pos[0]
-            clim1, _ = self._to_window_coords((self._clims[1], 0))
-            clim0, _ = self._to_window_coords((self._clims[0], 0))
-        if abs(clim1 - x) < tolerance:
-            return 1
-        if abs(clim0 - x) < tolerance:
-            return 0
-        return -1
+        if self._clims is not None:
+            left, right = self._clims
+            # Right bound always selected on overlap
+            if bool(abs(right - x) < tolerance):
+                return Grabbable.RIGHT_CLIM
+            if bool(abs(left - x) < tolerance):
+                return Grabbable.LEFT_CLIM
 
-    def _pos_is_gamma(self, event: SceneMouseEvent, tolerance: int = 4) -> bool:
-        """Describes whether the position is "near" the gamma handle.
+        if self._gamma_handle_pos is not None:
+            gx, gy, _, _ = self._handle_transform.map(self._gamma_handle_pos[0])
+            if bool(abs(gx - x) < tolerance and abs(gy - y) < tolerance):
+                return Grabbable.GAMMA
 
-        Returns True if value is near the gamma handle.
-        event is expected to to have an attribute 'pos' giving the mouse
-        position be in window coordinates.
-        """
-        if self._gamma_handle_position is None:
-            return False
-        gx, gy = self._to_window_coords(
-            self._gamma_handle.transform.map(self._gamma_handle_position)
-        )
-        x, y = event.pos
-        if abs(gx - x) < tolerance and abs(gy - y) < tolerance:
-            return True
-        return False
+        return Grabbable.NONE
 
     def on_mouse_move(self, event: SceneMouseEvent) -> None:
         """Called whenever mouse moves over canvas."""
@@ -578,23 +564,19 @@ class VispyHistogramView(HistogramView):
         if self._clims is None:
             return
 
-        # event.pos == (0,0) is top left corner of window
-
-        if self._clim_handle_grabbed > -1:
+        if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
             newlims = list(self._clims)
             if self._vertical:
                 c = self._to_plot_coords(event.pos)[1]
             else:
                 c = self._to_plot_coords(event.pos)[0]
-            newlims[self._clim_handle_grabbed] = c
-            if newlims[0] > newlims[1]:
-                newlims[:] = newlims[::-1]
-                self._clim_handle_grabbed += 1
-                self._clim_handle_grabbed %= 2
+            if self._grabbed is Grabbable.LEFT_CLIM:
+                newlims[0] = min(newlims[1], c)
+            elif self._grabbed is Grabbable.RIGHT_CLIM:
+                newlims[1] = max(newlims[0], c)
             self.climsChanged.emit(newlims)
             return
-
-        if self._gamma_handle_grabbed:
+        elif self._grabbed is Grabbable.GAMMA:
             y0, y1 = (
                 self.plot.xaxis.axis.domain
                 if self._vertical
@@ -603,19 +585,20 @@ class VispyHistogramView(HistogramView):
             y = self._to_plot_coords(event.pos)[0 if self._vertical else 1]
             if y < np.maximum(y0, 0) or y > y1:
                 return
-            # self.edit_gamma(-np.log2(y/y1))
             self.gammaChanged.emit(-np.log2(y / y1))
             return
 
         self._canvas.native.unsetCursor()
 
-        if self._pos_is_clim(event) > -1:
+        nearby = self._find_nearby_node(event)
+
+        if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
             if self._vertical:
                 cursor = Qt.CursorShape.SplitVCursor
             else:
                 cursor = Qt.CursorShape.SplitHCursor
             self._canvas.native.setCursor(cursor)
-        elif self._pos_is_gamma(event):
+        elif nearby is Grabbable.GAMMA:
             if self._vertical:
                 cursor = Qt.CursorShape.SplitHCursor
             else:
@@ -627,10 +610,6 @@ class VispyHistogramView(HistogramView):
             y1, y2 = self.plot.yaxis.axis.domain
             if (x1 < x <= x2) and (y1 <= y <= y2):
                 self._canvas.native.setCursor(Qt.CursorShape.SizeAllCursor)
-
-    def _to_window_coords(self, pos: Sequence[float]) -> tuple[float, float]:
-        x, y, _, _ = self.node_tform.imap(pos)
-        return x, y
 
     def _to_plot_coords(self, pos: Sequence[float]) -> tuple[float, float]:
         x, y, _, _ = self.node_tform.map(pos)
