@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import sys
+import warnings
 from typing import TYPE_CHECKING, Any, Literal
 
+import numpy as np
 from qtpy.QtWidgets import QApplication
 
 from .viewer._viewer import NDViewer
@@ -45,12 +47,37 @@ def imshow(
             cmap = [cmap]
     elif channel_mode == "auto":
         channel_mode = "mono"
-    viewer = NDViewer(data, colormaps=cmap, channel_mode=channel_mode)
+    channel_axis = None
+    shape = getattr(data, "shape", [None])
+    if shape[-1] in (3, 4):
+        try:
+            has_alpha = shape[-1] == 4
+            channel_mode = "composite"
+            cmap = ["red", "green", "blue"]
+            data = _transpose_color(data).squeeze()
+            if has_alpha:
+                data = data[:3, ...]
+            channel_axis = 0
+        except Exception:
+            warnings.warn(
+                "Failed to interpret data as RGB(A), falling back to mono", stacklevel=2
+            )
+    viewer = NDViewer(
+        data, colormaps=cmap, channel_mode=channel_mode, channel_axis=channel_axis
+    )
     viewer.show()
     viewer.raise_()
     if should_exec:
         app.exec()
     return viewer
+
+
+def _transpose_color(data: Any) -> Any:
+    """Move the color axis to the front of the array."""
+    if xr := sys.modules.get("xarray"):
+        if isinstance(data, xr.DataArray):
+            data = data.data
+    return np.moveaxis(data, -1, 0).squeeze()
 
 
 def _get_app() -> tuple[QCoreApplication, bool]:
