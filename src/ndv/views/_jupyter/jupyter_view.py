@@ -6,14 +6,13 @@ import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
-from .viewer._backends import get_canvas_class
+from ndv.views import get_canvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
-    from .controller import PLutView
-    from .models._array_display_model import AxisKey
-    from .viewer._backends._protocols import PImageHandle
+    from ndv.models._array_display_model import AxisKey
+    from ndv.views.protocols import PImageHandle, PLutView
 
 
 class JupyterLutView:

@@ -1,14 +1,31 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Container, Hashable, Mapping, Sequence
 
     import cmap
     import numpy as np
+    from psygnal import Signal, SignalInstance
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
+
+    from ndv.models._array_display_model import AxisKey
+
+
+class PLutView(Protocol):
+    visibleChanged: Signal
+    autoscaleChanged: Signal
+    cmapChanged: Signal
+    climsChanged: Signal
+
+    def setName(self, name: str) -> None: ...
+    def setAutoScale(self, auto: bool) -> None: ...
+    def setColormap(self, cmap: cmap.Colormap) -> None: ...
+    def setClims(self, clims: tuple[float, float]) -> None: ...
+    def setLutVisible(self, visible: bool) -> None: ...
 
 
 class CanvasElement(Protocol):
@@ -70,6 +87,24 @@ class PImageHandle(CanvasElement, Protocol):
     def cmap(self) -> cmap.Colormap: ...
     @cmap.setter
     def cmap(self, cmap: cmap.Colormap) -> None: ...
+
+
+class PView(Protocol):
+    """Protocol that front-end viewers must implement."""
+
+    currentIndexChanged: SignalInstance
+
+    def refresh(self) -> None: ...
+    def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
+    def current_index(self) -> Mapping[AxisKey, int]: ...
+    def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
+    def add_image_to_canvas(self, data: Any) -> PImageHandle: ...
+    def hide_sliders(
+        self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
+    ) -> None: ...
+
+    def add_lut_view(self) -> PLutView: ...
+    def show(self) -> None: ...
 
 
 class PRoiHandle(CanvasElement, Protocol):

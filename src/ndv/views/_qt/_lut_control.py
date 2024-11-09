@@ -9,14 +9,14 @@ from superqt import QLabeledRangeSlider
 from superqt.cmap import QColormapComboBox
 from superqt.utils import signals_blocked
 
-from ._dims_slider import SS
+from ndv.views._qt._dims_slider import SS
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     import cmap
 
-    from ._backends._protocols import PImageHandle
+    from ndv.views.protocols import PImageHandle
 
 
 class CmapCombo(QColormapComboBox):

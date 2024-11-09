@@ -16,10 +16,10 @@ from superqt import QCollapsible, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 
-from .models._array_display_model import AxisKey
-from .viewer._backends import get_canvas_class
-from .viewer._backends._protocols import PImageHandle
-from .viewer._dims_slider import SS
+from ndv.models._array_display_model import AxisKey
+from ndv.views import get_canvas_class
+from ndv.views._qt._dims_slider import SS
+from ndv.views.protocols import PImageHandle
 
 
 class CmapCombo(QColormapComboBox):

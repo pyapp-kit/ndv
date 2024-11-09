@@ -31,3 +31,4 @@ repos:
           - numpy
           - pydantic
           - psygnal
+          - IPython

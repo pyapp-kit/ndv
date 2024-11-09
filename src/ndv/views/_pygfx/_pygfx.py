@@ -11,7 +11,7 @@ import pylinalg as la
 from qtpy.QtCore import QSize, Qt
 from wgpu.gui.qt import QWgpuCanvas
 
-from ._protocols import PCanvas
+from ndv.views.protocols import PCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from pygfx.resources import Texture
     from qtpy.QtWidgets import QWidget
 
-    from ._protocols import CanvasElement
+    from ndv.views.protocols import CanvasElement
 
 
 def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:

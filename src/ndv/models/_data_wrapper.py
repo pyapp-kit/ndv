@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
     from torch._tensor import Tensor
 
-    from ._dims_slider import Index, Indices, Sizes
+    from ndv.views._qt._dims_slider import Index, Indices, Sizes
 
     _T_contra = TypeVar("_T_contra", contravariant=True)
 

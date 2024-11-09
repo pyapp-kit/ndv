@@ -1,3 +1,5 @@
+"""Example usage of new mvc pattern."""
+
 from qtpy.QtWidgets import QApplication
 
 from ndv.controller import ViewerController

@@ -92,6 +92,7 @@ select = [
 ]
 ignore = [
     "D401", # First line should be in imperative mood
+    # "D10",  # Missing docstring...
 ]
 
 [tool.ruff.lint.per-file-ignores]

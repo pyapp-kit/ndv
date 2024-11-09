@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from qtpy.QtWidgets import QApplication
 
-from .viewer._viewer import NDViewer
+from ._old_viewer import NDViewer
 
 if TYPE_CHECKING:
     from qtpy.QtCore import QCoreApplication
 
-    from .viewer._data_wrapper import DataWrapper
+    from .models._data_wrapper import DataWrapper
 
 
 def imshow(
