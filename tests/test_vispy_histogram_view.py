@@ -86,25 +86,25 @@ def test_gamma(data: np.ndarray, view: VispyHistogramView) -> None:
 
 def test_cmap(view: VispyHistogramView) -> None:
     # By default, histogram is red
-    assert view._hist.color == Color("red")
+    assert view._hist_mesh.color == Color("red")
     # Set cmap, assert a change
     view.set_cmap(cmap.Colormap("blue"))
-    assert view._hist.color == Color("blue")
+    assert view._hist_mesh.color == Color("blue")
 
 
 def test_visibility(view: VispyHistogramView) -> None:
     # By default, everything is visible
-    assert view._hist.visible
+    assert view._hist_mesh.visible
     assert view._lut_line.visible
     assert view._gamma_handle.visible
     # Visible = False
     view.set_visibility(False)
-    assert not view._hist.visible
+    assert not view._hist_mesh.visible
     assert not view._lut_line.visible
     assert not view._gamma_handle.visible
     # Visible = True
     view.set_visibility(True)
-    assert view._hist.visible
+    assert view._hist_mesh.visible
     assert view._lut_line.visible
     assert view._gamma_handle.visible
 
@@ -199,7 +199,7 @@ def test_log(view: VispyHistogramView) -> None:
     # Start out linear
     assert not view._log_y
     linear_range = view.plot.yaxis.axis.domain[1]
-    linear_hist = view._hist.bounds(1)[1]
+    linear_hist = view._hist_mesh.bounds(1)[1]
     # lut line, gamma markers controlled by scale
     linear_line_scale = view._handle_transform.scale[1]
 
@@ -207,7 +207,7 @@ def test_log(view: VispyHistogramView) -> None:
     view.set_range_log(True)
     assert view._log_y
     log_range = view.plot.yaxis.axis.domain[1]
-    log_hist = view._hist.bounds(1)[1]
+    log_hist = view._hist_mesh.bounds(1)[1]
     log_line_scale = view._handle_transform.scale[1]
     assert abs(math.log10(linear_range) - log_range) <= EPSILON
     assert abs(math.log10(linear_hist) - log_hist) <= EPSILON
@@ -219,7 +219,7 @@ def test_log(view: VispyHistogramView) -> None:
     view.set_range_log(False)
     assert not view._log_y
     revert_range = view.plot.yaxis.axis.domain[1]
-    revert_hist = view._hist.bounds(1)[1]
+    revert_hist = view._hist_mesh.bounds(1)[1]
     revert_line_scale = view._handle_transform.scale[1]
     assert abs(linear_range - revert_range) <= EPSILON
     assert abs(linear_hist - revert_hist) <= EPSILON

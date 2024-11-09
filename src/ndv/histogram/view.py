@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 class StatsView(Protocol):
     """A view of the statistics of a dataset."""
 
-    def set_histogram(self, values: Sequence[int], bin_edges: Sequence[float]) -> None:
+    def set_histogram(
+        self, values: Sequence[float], bin_edges: Sequence[float]
+    ) -> None:
         """Defines the distribution of the dataset.
 
         Properties
@@ -164,10 +166,7 @@ class HistogramView(StatsView, LutView):
         """
         ...
 
-    def set_range_log(
-        self,
-        enabled: bool,
-    ) -> None:
+    def set_range_log(self, enabled: bool) -> None:
         """Sets the axis scale of the range.
 
         Properties
