@@ -1,59 +1,21 @@
 """General model for ndv."""
 
 import warnings
-from collections.abc import Sequence
-from contextlib import suppress
-from typing import Annotated, Any, Literal, Self, TypeAlias, cast
+from typing import Literal, Self, TypeAlias, cast
 
-from pydantic import Field, PlainValidator, computed_field, model_validator
+from pydantic import Field, computed_field, model_validator
+
+from ndv._types import AxisKey, Slice
 
 from ._base_model import NDVModel
 from ._lut_model import LUTModel
 from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
-# The Term "Axis" is used when referring to a specific dimension of an array
-# We can change this to dimension if desired... but it should be uniform.
-
-# Axis keys can be either a direct integer index or name (for labeled arrays)
-# we leave it to the DataWrapper to convert `AxisKey -> AxisIndex`
-AxisIndex: TypeAlias = int
-AxisLabel: TypeAlias = str
-# a specific position along a dimension
-# this could eventually be any hashable (like in xarray), but for now we start with int
-CoordIndex: TypeAlias = int
-
-
-def _maybe_int(val: Any) -> Any:
-    # try to convert to int if possible
-    with suppress(ValueError, TypeError):
-        val = int(float(val))
-    return val
-
-
-def _to_slice(val: Any) -> slice:
-    # slices are returned as is
-    if isinstance(val, slice):
-        if not all(
-            isinstance(i, (int, type(None))) for i in (val.start, val.stop, val.step)
-        ):
-            raise TypeError(f"Slice start/stop/step must all be integers: {val!r}")
-        return val
-    # single integers are converted to slices starting at that index
-    if isinstance(val, int):
-        return slice(val, val + 1)
-    # sequences are interpreted as arguments to the slice constructor
-    if isinstance(val, Sequence):
-        return slice(*(int(x) if x is not None else None for x in val))
-    raise TypeError(f"Expected int or slice, got {type(val)}")
-
-
-Slice = Annotated[slice, PlainValidator(_to_slice)]
-AxisKey: TypeAlias = Annotated[AxisIndex | AxisLabel, PlainValidator(_maybe_int)]
 # map of axis to index/slice ... i.e. the current subset of data being displayed
 IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
 # map of index along channel axis to LUTModel object
-LutMap: TypeAlias = ValidatedEventedDict[CoordIndex | None, LUTModel]
+LutMap: TypeAlias = ValidatedEventedDict[int | None, LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
 
@@ -89,7 +51,7 @@ class ArrayDisplayModel(NDVModel):
         dimension are shown, with different LUTs applied to each channel.
         If None, then a single lookup table is used for all channels (`luts[None]`).
         NOTE: it is an error for channel_axis to be in `visible_axes` (or ignore it?)
-    luts : Mapping[CoordIndex | None, LUTModel]
+    luts : Mapping[int | None, LUTModel]
         Instructions for how to display each channel of the array.
         Keys represent position along the dimension specified by `channel_axis`.
         Values are `LUT` objects that specify how to display the channel.

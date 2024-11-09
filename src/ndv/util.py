@@ -12,7 +12,7 @@ from ._old_viewer import NDViewer
 if TYPE_CHECKING:
     from qtpy.QtCore import QCoreApplication
 
-    from .models._data_wrapper import DataWrapper
+    from .models import DataWrapper
 
 
 def imshow(

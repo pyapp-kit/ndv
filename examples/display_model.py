@@ -3,7 +3,6 @@ from rich import print
 from ndv.models._array_display_model import ArrayDisplayModel
 
 m = ArrayDisplayModel()
-print(m)
 
 m.events.channel_axis.connect(lambda x: print(f"channel_axis: {x}"))
 m.current_index.item_added.connect(lambda x, y: print(f"current_index[{x}] = {y}"))

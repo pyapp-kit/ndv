@@ -11,7 +11,7 @@ from ndv.views import get_canvas_class
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
-    from ndv.models._array_display_model import AxisKey
+    from ndv._types import AxisKey
     from ndv.views.protocols import PImageHandle, PLutView
 
 
@@ -96,7 +96,7 @@ class JupyterViewerView:
         # context, but we should be managing that more explicitly ourselves.
         self.layout = widgets.VBox([self._canvas.qwidget(), self._slider_box])
 
-    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         sliders = []
         self._sliders.clear()

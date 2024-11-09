@@ -8,7 +8,6 @@ from abc import abstractmethod
 from collections.abc import Container, Hashable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
-from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -34,7 +33,9 @@ if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
     from torch._tensor import Tensor
 
-    from ndv.views._qt._dims_slider import Index, Indices, Sizes
+    Index = int | slice
+    Indices = Mapping[Hashable, Index]
+    Sizes = Mapping[Hashable, int]
 
     _T_contra = TypeVar("_T_contra", contravariant=True)
 
@@ -164,13 +165,13 @@ class DataWrapper(Generic[ArrayT]):
     @property
     def dims(self) -> Sequence[Hashable]:
         if hasattr(self._data, "dims"):
-            return self._data.dims
-        return range(len(self._data.shape))
+            return self._data.dims  # type: ignore
+        return range(len(self._data.shape))  # type: ignore
 
     @property
     def coords(self) -> Mapping[Hashable, Sequence[Any]]:
         if hasattr(self._data, "coords"):
-            return self._data.coords
+            return self._data.coords  # type: ignore
         shape = getattr(self._data, "shape", None)
         if not isinstance(shape, Sequence) or not all(
             isinstance(x, int) for x in shape
@@ -218,23 +219,6 @@ class DataWrapper(Generic[ArrayT]):
             function=cls.create,
             schema=core_schema.any_schema(),
         )
-
-    # TODO: this needs to be cleared when data.dims changes
-    @cached_property
-    def canonicalized_axis_map(self) -> Mapping[Hashable, int]:
-        """Create a mapping of ALL valid axis keys to canonicalized keys.
-
-        This can be used later to quickly map any valid axis key
-        (axis label, positive int, or negative int) to a positive integer index.
-        """
-        axis_index: dict[Hashable, int] = {}
-        dims: Sequence[Hashable] = self.dims
-        ndims = len(dims)
-        for i, dim in enumerate(dims):
-            axis_index[dim] = i  # map dimension label to positive index
-            axis_index[i] = i  # map positive integer index to itself
-            axis_index[-(ndims - i)] = i  # map negative integer index to positive index
-        return axis_index
 
 
 class XarrayWrapper(DataWrapper["xr.DataArray"]):

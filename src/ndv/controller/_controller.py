@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ndv.models import DataDisplayModel, DataWrapper
+from ndv.models import DataDisplayModel
 from ndv.views import get_view_backend
 
 if TYPE_CHECKING:
@@ -18,12 +18,13 @@ class ViewerController:
     def __init__(
         self, view: PView | None = None, data: DataDisplayModel | None = None
     ) -> None:
-        if view is None:
-            view = get_view_backend()
         if data is None:
             data = DataDisplayModel()
-        self._dd_model = data  # rename me
+        if view is None:
+            view = get_view_backend()
+        self._dd_model = data  # rename me?
         self._view = view
+
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_slider_value_changed)
         self._handles: dict[int | None, PImageHandle] = {}
@@ -52,21 +53,20 @@ class ViewerController:
     @property
     def data(self) -> Any:
         """Return data being displayed."""
-        if self._dd_model.data is None:
+        if self._dd_model.data_wrapper is None:
             return None
-        return self._dd_model.data.data  # returning the actual data, not the wrapper
+        # returning the actual data, not the wrapper
+        return self._dd_model.data_wrapper.data
 
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        if data is None:
-            self._dd_model.data = None
-            return
-        self._dd_model.data = DataWrapper.create(data)
-
+        self._dd_model.data = data
+        print("Creating sliders", self._dd_model.canonical_data_coords)
         self._view.create_sliders(self._dd_model.canonical_data_coords)
-        self._update_visible_sliders()
-        self._update_canvas()
+        if data is not None:
+            self._update_visible_sliders()
+            self._update_canvas()
 
     # -----------------------------------------------------------------------------
 
@@ -108,7 +108,7 @@ class ViewerController:
         self.model.current_index.update(self._view.current_index())
 
     def _update_canvas(self) -> None:
-        if not self._dd_model.data:
+        if not self._dd_model.data_wrapper:
             return
         data = self._dd_model.current_data_slice()  # TODO: make asynchronous
         if None in self._handles:

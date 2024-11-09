@@ -24,20 +24,9 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping
-    from typing import TypeAlias
+    from collections.abc import Mapping
 
     from qtpy.QtGui import QResizeEvent
-
-    # any hashable represent a single dimension in an ND array
-    DimKey: TypeAlias = Hashable
-    # any object that can be used to index a single dimension in an ND array
-    Index: TypeAlias = int | slice
-    # a mapping from dimension keys to indices (eg. {"x": 0, "y": slice(5, 10)})
-    # this object is used frequently to query or set the currently displayed slice
-    Indices: TypeAlias = Mapping[DimKey, Index]
-    # mapping of dimension keys to the maximum value for that dimension
-    Sizes: TypeAlias = Mapping[DimKey, int]
 
 
 SS = """
@@ -155,7 +144,7 @@ class DimsSlider(QWidget):
 
     valueChanged = Signal(object, object)  # where object is int | slice
 
-    def __init__(self, dimension_key: DimKey, parent: QWidget | None = None) -> None:
+    def __init__(self, dimension_key: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setStyleSheet(SS)
         self._slice_mode = False
@@ -242,7 +231,7 @@ class DimsSlider(QWidget):
         self._int_slider.setRange(min_val, max_val)
         self._slice_slider.setRange(min_val, max_val)
 
-    def value(self) -> Index:
+    def value(self) -> int | slice:
         if not self._slice_mode:
             return self._int_slider.value()  # type: ignore
         start, *_, stop = cast("tuple[int, ...]", self._slice_slider.value())
@@ -250,7 +239,7 @@ class DimsSlider(QWidget):
             return start
         return slice(start, stop)
 
-    def setValue(self, val: Index) -> None:
+    def setValue(self, val: int | slice) -> None:
         # variant of setValue that always updates the maximum
         self._set_slice_mode(isinstance(val, slice))
         if self._lock_btn.isChecked():
@@ -265,7 +254,7 @@ class DimsSlider(QWidget):
             self._int_slider.setValue(val)
             # self._slice_slider.setValue((val, val + 1))
 
-    def forceValue(self, val: Index) -> None:
+    def forceValue(self, val: int | slice) -> None:
         """Set value and increase range if necessary."""
         if isinstance(val, slice):
             if isinstance(val.start, int):
@@ -368,10 +357,10 @@ class DimsSliders(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._locks_visible: bool | Mapping[DimKey, bool] = False
-        self._sliders: dict[DimKey, DimsSlider] = {}
-        self._current_index: dict[DimKey, Index] = {}
-        self._invisible_dims: set[DimKey] = set()
+        self._locks_visible: bool | Mapping[int, bool] = False
+        self._sliders: dict[int, DimsSlider] = {}
+        self._current_index: dict[int, int | slice] = {}
+        self._invisible_dims: set[int] = set()
 
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
@@ -379,19 +368,19 @@ class DimsSliders(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-    def __contains__(self, key: DimKey) -> bool:
+    def __contains__(self, key: int) -> bool:
         """Return True if the dimension key is present in the DimsSliders."""
         return key in self._sliders
 
-    def slider(self, key: DimKey) -> DimsSlider:
+    def slider(self, key: int) -> DimsSlider:
         """Return the DimsSlider widget for the given dimension key."""
         return self._sliders[key]
 
-    def value(self) -> Indices:
+    def value(self) -> Mapping[int, int | slice]:
         """Return mapping of {dim_key -> current index} for each dimension."""
         return self._current_index.copy()
 
-    def setValue(self, values: Indices) -> None:
+    def setValue(self, values: Mapping[int, int | slice]) -> None:
         """Set the current index for each dimension.
 
         Parameters
@@ -410,11 +399,11 @@ class DimsSliders(QWidget):
         if val := self.value():
             self.valueChanged.emit(val)
 
-    def minima(self) -> Sizes:
+    def minima(self) -> Mapping[int, int]:
         """Return mapping of {dim_key -> minimum value} for each dimension."""
         return {k: v._int_slider.minimum() for k, v in self._sliders.items()}
 
-    def setMinima(self, values: Sizes) -> None:
+    def setMinima(self, values: Mapping[int, int]) -> None:
         """Set the minimum value for each dimension.
 
         Parameters
@@ -427,11 +416,11 @@ class DimsSliders(QWidget):
                 self.add_dimension(name)
             self._sliders[name].setMinimum(min_val)
 
-    def maxima(self) -> Sizes:
+    def maxima(self) -> Mapping[int, int]:
         """Return mapping of {dim_key -> maximum value} for each dimension."""
         return {k: v._int_slider.maximum() for k, v in self._sliders.items()}
 
-    def setMaxima(self, values: Sizes) -> None:
+    def setMaxima(self, values: Mapping[int, int]) -> None:
         """Set the maximum value for each dimension.
 
         Parameters
@@ -444,14 +433,14 @@ class DimsSliders(QWidget):
                 self.add_dimension(name)
             self._sliders[name].setMaximum(max_val)
 
-    def set_locks_visible(self, visible: bool | Mapping[DimKey, bool]) -> None:
+    def set_locks_visible(self, visible: bool | Mapping[int, bool]) -> None:
         """Set the visibility of the lock buttons for all dimensions."""
         self._locks_visible = visible
         for dim, slider in self._sliders.items():
             viz = visible if isinstance(visible, bool) else visible.get(dim, False)
             slider._lock_btn.setVisible(viz)
 
-    def add_dimension(self, key: DimKey, val: Index | None = None) -> None:
+    def add_dimension(self, key: int, val: int | slice | None = None) -> None:
         """Add a new dimension to the DimsSliders widget.
 
         Parameters
@@ -481,7 +470,7 @@ class DimsSliders(QWidget):
         slider.valueChanged.connect(self._on_dim_slider_value_changed)
         cast("QVBoxLayout", self.layout()).addWidget(slider)
 
-    def set_dimension_visible(self, key: DimKey, visible: bool) -> None:
+    def set_dimension_visible(self, key: int, visible: bool) -> None:
         """Set the visibility of a dimension in the DimsSliders widget.
 
         Once a dimension is hidden, it will not be shown again until it is explicitly
@@ -497,7 +486,7 @@ class DimsSliders(QWidget):
         if key in self._sliders:
             self._sliders[key].setVisible(visible)
 
-    def remove_dimension(self, key: DimKey) -> None:
+    def remove_dimension(self, key: int) -> None:
         """Remove a dimension from the DimsSliders widget."""
         try:
             slider = self._sliders.pop(key)
@@ -514,11 +503,11 @@ class DimsSliders(QWidget):
         self._current_index = {}
         self._invisible_dims = set()
 
-    def _on_dim_slider_value_changed(self, key: DimKey, value: Index) -> None:
+    def _on_dim_slider_value_changed(self, key: int, value: int | slice) -> None:
         self._current_index[key] = value
         self.valueChanged.emit(self.value())
 
-    def add_or_update_dimension(self, key: DimKey, value: Index) -> None:
+    def add_or_update_dimension(self, key: int, value: int | slice) -> None:
         """Add a dimension if it doesn't exist, otherwise update the value."""
         if key in self._sliders:
             self._sliders[key].forceValue(value)

@@ -92,7 +92,7 @@ select = [
 ]
 ignore = [
     "D401", # First line should be in imperative mood
-    # "D10",  # Missing docstring...
+    "D10",  # Missing docstring...
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -115,6 +115,10 @@ show_error_codes = true
 pretty = true
 plugins = ["pydantic.mypy"]
 
+# Alternatively, if _old_viewer is a submodule of ndv
+[[tool.mypy.overrides]]
+module = "ndv._old_viewer"
+ignore_errors = true
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]

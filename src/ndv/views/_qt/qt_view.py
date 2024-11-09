@@ -16,7 +16,7 @@ from superqt import QCollapsible, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 
-from ndv.models._array_display_model import AxisKey
+from ndv._types import AxisKey
 from ndv.views import get_canvas_class
 from ndv.views._qt._dims_slider import SS
 from ndv.views.protocols import PImageHandle
@@ -110,6 +110,8 @@ class QDimsSliders(QWidget):
             if isinstance(_coords, range):
                 sld.setRange(_coords.start, _coords.stop - 1)
                 sld.setSingleStep(_coords.step)
+            else:
+                sld.setRange(0, len(_coords) - 1)
             layout.addRow(str(axis), sld)
             self._sliders[axis] = sld
         self.currentIndexChanged.emit()
@@ -189,3 +191,7 @@ class QViewerView(QWidget):
     def refresh(self) -> None:
         """Refresh the view."""
         self._canvas.refresh()
+
+    def set_visible_axes(self, axes: Sequence[Hashable]) -> None:
+        """Set the visible axes."""
+        self._visible_axes.setText(", ".join(map(str, axes)))
