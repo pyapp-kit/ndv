@@ -153,6 +153,24 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
     # batch operations, with a single value_changed  -------------------------------
 
     @overload
+    def assign(self, m: SupportsKeysAndGetItem[_KT, _VT], /, **kwargs: _VT) -> None: ...
+    @overload
+    def assign(self, m: Iterable[tuple[_KT, _VT]], /, **kwargs: _VT) -> None: ...
+    @overload
+    def assign(self, **kwargs: _VT) -> None: ...
+    def assign(self, *args: Any, **kwargs: _VT) -> None:  # type: ignore[misc]
+        """Override state with the key/value pairs from the mapping or iterable.
+
+        Similar to update, but clears the dictionary first (without signals), replacing
+        the contents with the key/value pairs from the mapping or iterable, and then
+        emitting a single value_changed signal at the end.
+        """
+        with self.value_changed.blocked():
+            self.clear()
+            self.update(*args, **kwargs)
+        self.value_changed.emit()
+
+    @overload
     def update(self, m: SupportsKeysAndGetItem[_KT, _VT], /, **kwargs: _VT) -> None: ...
     @overload
     def update(self, m: Iterable[tuple[_KT, _VT]], /, **kwargs: _VT) -> None: ...

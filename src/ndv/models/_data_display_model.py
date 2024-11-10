@@ -106,7 +106,12 @@ class DataDisplayModel(NDVModel):
             if not isinstance(requested_slice.get(ax), slice):
                 requested_slice[ax] = slice(None)
 
-        # ensure that all axes are slices, so that we don't lose any dimensions
+        if (c_ax := self.display.channel_axis) is not None:
+            c_ax = self._canonicalize_axis_key(c_ax)
+            if not isinstance(requested_slice.get(c_ax), slice):
+                requested_slice[c_ax] = slice(None)
+
+        # ensure that all axes are slices, so that we don't lose any dimensions.
         # data will be squeezed to remove singleton dimensions later after
         # transposing according to the order of visible axes
         # (this operation happens below in `current_data_slice`)

@@ -52,6 +52,19 @@ class DataWrapper(Generic[ArrayT], ABC):
     and it will be automatically detected and used to wrap your data.
     """
 
+    # Order in which subclasses are checked for support.
+    # Lower numbers are checked first, and the first supporting subclass is used.
+    # Default is 50, and fallback to numpy-like duckarray is 100.
+    # Subclasses can override this to change the priority in which they are checked
+    PRIORITY: ClassVar[int] = 50
+    # These names will be checked when looking for a channel axis
+    COMMON_CHANNEL_NAMES: ClassVar[Container[str]] = ("channel", "ch", "c")
+    # Maximum dimension size consider when guessing the channel axis
+    MAX_CHANNELS = 16
+
+    def __init__(self, data: ArrayT) -> None:
+        self._data = data
+
     # ----------------------------- Mandatory methods -----------------------------
 
     @classmethod
@@ -77,20 +90,10 @@ class DataWrapper(Generic[ArrayT], ABC):
     def isel(self, index: Mapping[int, int | slice]) -> np.ndarray:
         """Return a slice of the data as a numpy array."""
 
-    # -----------------------------
-
     def save_as_zarr(self, path: str) -> None:
         raise NotImplementedError("Saving as zarr is not supported for this data type")
 
-    # Order in which subclasses are checked for support.
-    # Lower numbers are checked first, and the first supporting subclass is used.
-    # Default is 50, and fallback to numpy-like duckarray is 100.
-    # Subclasses can override this to change the priority in which they are checked
-    PRIORITY: ClassVar[int] = 50
-    # These names will be checked when looking for a channel axis
-    COMMON_CHANNEL_NAMES: ClassVar[Container[str]] = ("channel", "ch", "c")
-    # Maximum dimension size consider when guessing the channel axis
-    MAX_CHANNELS = 16
+    # -----------------------------
 
     @classmethod
     def create(cls, data: ArrayT) -> DataWrapper[ArrayT]:
@@ -118,9 +121,6 @@ class DataWrapper(Generic[ArrayT], ABC):
         """Return the data being wrapped."""
         return self._data
 
-    def __init__(self, data: ArrayT) -> None:
-        self._data = data
-
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source: type, handler: GetCoreSchemaHandler
@@ -131,6 +131,23 @@ class DataWrapper(Generic[ArrayT], ABC):
             function=cls.create,
             schema=core_schema.any_schema(),
         )
+
+    def sizes(self) -> Mapping[Hashable, int]:
+        """Return the sizes of the dimensions."""
+        return {dim: len(self.coords[dim]) for dim in self.dims}
+
+    def guess_channel_axis(self) -> Hashable | None:
+        """Return the (best guess) axis name for the channel dimension."""
+        # for arrays with labeled dimensions,
+        # see if any of the dimensions are named "channel"
+        sizes = self.sizes()
+        for dimkey, val in sizes.items():
+            if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
+                if val <= self.MAX_CHANNELS:
+                    return dimkey
+
+        # otherwise use the smallest dimension as the channel axis
+        return min(sizes, key=sizes.get)  # type: ignore
 
 
 ##########################

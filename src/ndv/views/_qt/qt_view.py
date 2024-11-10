@@ -15,6 +15,7 @@ from qtpy.QtWidgets import (
 from superqt import QCollapsible, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
+from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
 from ndv.views import get_canvas_class
@@ -78,16 +79,20 @@ class QLUTWidget(QWidget):
         self._visible.setText(name)
 
     def setAutoScale(self, auto: bool) -> None:
-        self._auto_clim.setChecked(auto)
+        with signals_blocked(self):
+            self._auto_clim.setChecked(auto)
 
     def setColormap(self, cmap: cmap.Colormap) -> None:
-        self._cmap.setCurrentColormap(cmap)
+        with signals_blocked(self):
+            self._cmap.setCurrentColormap(cmap)
 
     def setClims(self, clims: tuple[float, float]) -> None:
-        self._clims.setValue(clims)
+        with signals_blocked(self):
+            self._clims.setValue(clims)
 
     def setLutVisible(self, visible: bool) -> None:
-        self._visible.setChecked(visible)
+        with signals_blocked(self):
+            self._visible.setChecked(visible)
 
 
 class QDimsSliders(QWidget):
@@ -151,6 +156,17 @@ class QViewerView(QWidget):
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
 
+        self._channel_mode_btn = QPushButton("Channel")
+
+        self._btns = btns = QHBoxLayout()
+        btns.setContentsMargins(0, 0, 0, 0)
+        btns.setSpacing(0)
+        btns.addStretch()
+        btns.addWidget(self._channel_mode_btn)
+        # btns.addWidget(self._ndims_btn)
+        # btns.addWidget(self._set_range_btn)
+        # btns.addWidget(self._add_roi_btn)
+
         self._luts = QCollapsible()
         self._luts.layout().setSpacing(0)
         self._luts.setCollapsedIcon(QIconifyIcon("bi:chevron-down", color="#888888"))
@@ -158,6 +174,7 @@ class QViewerView(QWidget):
         layout.addWidget(self._canvas.qwidget(), 1)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
+        layout.addLayout(btns)
 
     def add_lut_view(self) -> QLUTWidget:
         wdg = QLUTWidget(self)

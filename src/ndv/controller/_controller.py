@@ -110,10 +110,6 @@ class ViewerController:
     def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
         self._handles[None].clim = clims
 
-    def _on_view_current_index_changed(self) -> None:
-        """Update the model when slider value changes."""
-        self.model.current_index.update(self._view.current_index())
-
     def _update_canvas(self) -> None:
         if not self._dd_model.data_wrapper:
             return
@@ -158,6 +154,10 @@ class ViewerController:
         model_lut.events.visible.connect(lut.setLutVisible)
         return lut
 
+    def _on_view_current_index_changed(self) -> None:
+        """Update the model when slider value changes."""
+        self.model.current_index.update(self._view.current_index())
+
     def _on_view_lut_visible_changed(self, visible: bool) -> None:
         self._handles[None].visible = visible
 
@@ -177,3 +177,4 @@ class ViewerController:
 
     def _on_view_clims_changed(self, clims: tuple[float, float]) -> None:
         self._dd_model.display.default_lut.clims = clims
+        self._dd_model.display.default_lut.autoscale = False
