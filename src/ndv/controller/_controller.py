@@ -26,7 +26,7 @@ class ViewerController:
         self._view = view
 
         self._set_model_connected(self._dd_model.display)
-        self._view.currentIndexChanged.connect(self._on_slider_value_changed)
+        self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._handles: dict[int | None, PImageHandle] = {}
 
         self._lut_views: dict[int | None, PLutView] = {}
@@ -83,12 +83,13 @@ class ViewerController:
         for obj, callback in [
             (model.events.visible_axes, self._on_visible_axes_changed),
             # the current_index attribute itself is immutable
-            (model.current_index.value_changed, self._on_current_index_changed),
+            (model.current_index.value_changed, self._on_model_current_index_changed),
             # (model.events.channel_axis, self._on_channel_axis_changed),
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
-            (model.luts.value_changed, self._on_luts_changed),
-            (model.default_lut.events.cmap, self._on_luts_changed),
+            (model.luts.value_changed, self._on_model_luts_changed),
+            (model.default_lut.events.cmap, self._on_model_luts_changed),
+            (model.default_lut.events.clims, self._on_model_clims_changed),
         ]:
             getattr(obj, _connect)(callback)
 
@@ -98,12 +99,18 @@ class ViewerController:
             self._dd_model.canonical_visible_axes, show_remainder=True
         )
 
-    def _on_current_index_changed(self) -> None:
+    def _on_model_current_index_changed(self) -> None:
         value = self.model.current_index
         self._view.set_current_index(value)
         self._update_canvas()
 
-    def _on_slider_value_changed(self) -> None:
+    def _on_model_luts_changed(self) -> None:
+        self._update_canvas()
+
+    def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
+        self._handles[None].clim = clims
+
+    def _on_view_current_index_changed(self) -> None:
         """Update the model when slider value changes."""
         self.model.current_index.update(self._view.current_index())
 
@@ -113,15 +120,21 @@ class ViewerController:
         data = self._dd_model.current_data_slice()  # TODO: make asynchronous
         if None in self._handles:
             self._handles[None].data = data
+            # if this image handle is visible and autoscale is on, then we need to
+            # update the clim values
+            if self.model.default_lut.autoscale:
+                self.model.default_lut.clims = (data.min(), data.max())
+                # self._lut_views[None].setClims((data.min(), data.max()))
+                # technically... the LutView may also emit a signal that the controller
+                # listens to, and then updates the image handle
+                # but this next line is more direct
+                # self._handles[None].clim = (data.min(), data.max())
         else:
             self._handles[None] = self._view.add_image_to_canvas(data)
             self._handles[None].cmap = self.model.default_lut.cmap
             if clims := self.model.default_lut.clims:
                 self._handles[None].clim = clims
         self._view.refresh()
-
-    def _on_luts_changed(self) -> None:
-        self._update_canvas()
 
     def _on_visible_axes_changed(self) -> None:
         self._update_visible_sliders()
@@ -133,10 +146,10 @@ class ViewerController:
             raise NotImplementedError(f"LUT view with key {key} already exists")
         self._lut_views[key] = lut = self._view.add_lut_view()
 
-        lut.visibleChanged.connect(self._on_lut_visible_changed)
-        lut.autoscaleChanged.connect(self._on_autoscale_changed)
-        lut.cmapChanged.connect(self._on_cmap_changed)
-        lut.climsChanged.connect(self._on_clims_changed)
+        lut.visibleChanged.connect(self._on_view_lut_visible_changed)
+        lut.autoscaleChanged.connect(self._on_view_autoscale_changed)
+        lut.cmapChanged.connect(self._on_view_cmap_changed)
+        lut.climsChanged.connect(self._on_view_clims_changed)
 
         model_lut = self._dd_model.display.default_lut
         model_lut.events.cmap.connect(lut.setColormap)
@@ -145,13 +158,22 @@ class ViewerController:
         model_lut.events.visible.connect(lut.setLutVisible)
         return lut
 
-    def _on_lut_visible_changed(self, visible: bool) -> None:
+    def _on_view_lut_visible_changed(self, visible: bool) -> None:
         self._handles[None].visible = visible
 
-    def _on_autoscale_changed(self, autoscale: bool) -> None: ...
+    def _on_view_autoscale_changed(self, autoscale: bool) -> None:
+        self._dd_model.display.default_lut.autoscale = autoscale
+        self._lut_views[None].setAutoScale(autoscale)
 
-    def _on_cmap_changed(self, cmap: cmap.Colormap) -> None:
+        if autoscale:
+            data = self._handles[None].data
+            self.model.default_lut.clims = (data.min(), data.max())
+            # self._handles[None].clim = (data.min(), data.max())
+            # self._lut_views[None].setClims((data.min(), data.max()))
+
+    def _on_view_cmap_changed(self, cmap: cmap.Colormap) -> None:
         self._handles[None].cmap = cmap
+        self._dd_model.display.default_lut.cmap = cmap
 
-    def _on_clims_changed(self, clims: tuple[float, float]) -> None:
-        self._handles[None].clim = clims
+    def _on_view_clims_changed(self, clims: tuple[float, float]) -> None:
+        self._dd_model.display.default_lut.clims = clims

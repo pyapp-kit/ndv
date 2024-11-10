@@ -10,7 +10,7 @@ app = QApplication([])
 viewer = ViewerController()  # ultimately, this will be the public api
 
 # with suppress(ImportError):
-# viewer.data = data.cosem_dataset(level=5)
-viewer.data = data.cells3d()
+viewer.data = data.cosem_dataset(level=5)
+# viewer.data = data.cells3d()
 viewer._view.show()
 app.exec()
