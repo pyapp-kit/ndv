@@ -404,7 +404,6 @@ class VispyHistogramView(HistogramView):
         self._lut_line.visible = False
         self._lut_line.order = -1
 
-
         # The gamma handle appears halfway between the clims
         self._gamma_handle_pos: np.ndarray = np.ndarray((1, 2))
         self._gamma_handle = scene.Markers(
