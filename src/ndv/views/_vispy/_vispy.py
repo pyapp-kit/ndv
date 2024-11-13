@@ -15,7 +15,7 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ._protocols import PCanvas
+from ndv.views.protocols import PCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from qtpy.QtWidgets import QWidget
 
-    from ._protocols import CanvasElement
+    from ndv.views.protocols import CanvasElement
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
@@ -547,6 +547,9 @@ class VispyViewerCanvas(PCanvas):
 
         When called with no arguments, the range is set to the full extent of the data.
         """
+        # temporary
+        self._camera.set_range()
+        return
         _x = [0.0, 0.0]
         _y = [0.0, 0.0]
         _z = [0.0, 0.0]

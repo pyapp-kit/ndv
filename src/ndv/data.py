@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 __all__ = ["nd_sine_wave", "cells3d"]
@@ -62,3 +64,31 @@ def cells3d() -> np.ndarray:
 
     url = "https://gitlab.com/scikit-image/data/-/raw/2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba/cells3d.tif"
     return volread(url)  # type: ignore [no-any-return]
+
+
+def cosem_dataset(
+    uri: str = "",
+    dataset: str = "jrc_hela-3",
+    label: str = "er-mem_pred",
+    level: int = 4,
+) -> Any:
+    try:
+        import tensorstore as ts
+    except ImportError:
+        raise ImportError("Please install tensorstore to fetch cosem data") from None
+
+    if not uri:
+        uri = f"{dataset}/{dataset}.n5/labels/{label}/s{level}/"
+
+    ts_array = ts.open(
+        {
+            "driver": "n5",
+            "kvstore": {
+                "driver": "s3",
+                "bucket": "janelia-cosem-datasets",
+                "path": uri,
+            },
+        },
+    ).result()
+    ts_array = ts_array[ts.d[:].label["z", "y", "x"]]
+    return ts_array[ts.d[("y", "x", "z")].transpose[:]]

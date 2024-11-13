@@ -29,3 +29,6 @@ repos:
         files: "^src/"
         additional_dependencies:
           - numpy
+          - pydantic
+          - psygnal
+          - IPython

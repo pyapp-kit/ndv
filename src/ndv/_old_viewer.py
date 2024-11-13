@@ -12,29 +12,32 @@ from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidge
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
 
-from ndv.viewer._components import (
+from ndv.models._data_wrapperold import DataWrapper
+from ndv.views import get_canvas_class
+from ndv.views._qt._components import (
     ChannelMode,
     ChannelModeButton,
     DimToggleButton,
     QSpinner,
     ROIButton,
 )
-
-from ._backends import get_canvas_class
-from ._data_wrapper import DataWrapper
-from ._dims_slider import DimsSliders
-from ._lut_control import LutControl
+from ndv.views._qt._dims_slider import DimsSliders
+from ndv.views._qt._lut_control import LutControl
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Iterable, Sequence
+    from collections.abc import Hashable, Iterable, Mapping, Sequence
     from concurrent.futures import Future
     from typing import Any, Callable, TypeAlias
 
     from qtpy.QtCore import QObject
     from qtpy.QtGui import QCloseEvent, QKeyEvent
 
-    from ._backends._protocols import CanvasElement, PCanvas, PImageHandle, PRoiHandle
-    from ._dims_slider import DimKey, Indices, Sizes
+    DimKey = Hashable
+    Index = int | slice
+    Indices = Mapping[Hashable, Index]
+    Sizes = Mapping[Hashable, int]
+
+    from ndv.views.protocols import CanvasElement, PCanvas, PImageHandle, PRoiHandle
 
     ImgKey: TypeAlias = Hashable
     # any mapping of dimensions to sizes
