@@ -674,15 +674,15 @@ class VispyHistogramView(HistogramView):
 
         if self._clims is not None:
             # Right bound always selected on overlap
-            right, _, _, _ = plot_to_canvas([self._clims[1]])
+            right = plot_to_canvas([self._clims[1]])[0]
             if bool(abs(right - click_x) < tolerance):
                 return Grabbable.RIGHT_CLIM
-            left, _, _, _ = plot_to_canvas([self._clims[0]])
+            left = plot_to_canvas([self._clims[0]])[0]
             if bool(abs(left - click_x) < tolerance):
                 return Grabbable.LEFT_CLIM
 
         if self._gamma_handle_pos is not None:
-            gx, gy, _, _ = plot_to_canvas(gamma_to_plot(self._gamma_handle_pos[0]))
+            gx, gy = plot_to_canvas(gamma_to_plot(self._gamma_handle_pos[0]))[:2]
             if bool(abs(gx - click_x) < tolerance and abs(gy - click_y) < tolerance):
                 return Grabbable.GAMMA
 
@@ -690,7 +690,7 @@ class VispyHistogramView(HistogramView):
 
     def _to_plot_coords(self, pos: Sequence[float]) -> tuple[float, float]:
         """Return the plot coordinates of the given position."""
-        x, y, _, _ = self.node_tform.map(pos)
+        x, y = self.node_tform.map(pos)[:2]
         return x, y
 
     def _resize(self) -> None:
