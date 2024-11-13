@@ -662,22 +662,28 @@ class VispyHistogramView(HistogramView):
                 self._canvas.native.setCursor(Qt.CursorShape.SizeAllCursor)
 
     def _find_nearby_node(
-        self, event: SceneMouseEvent, tolerance: int = 3
+        self, event: SceneMouseEvent, tolerance: int = 5
     ) -> Grabbable:
         """Describes whether the event is near a clim."""
-        x, y = self._to_plot_coords(event.pos)
+        click_x, click_y = event.pos
+
+        # NB Computations are performed in canvas-space
+        # for easier tolerance computation.
+        plot_to_canvas = self.node_tform.imap
+        gamma_to_plot = self._handle_transform.map
 
         if self._clims is not None:
-            left, right = self._clims
             # Right bound always selected on overlap
-            if bool(abs(right - x) < tolerance):
+            right, _, _, _ = plot_to_canvas([self._clims[1]])
+            if bool(abs(right - click_x) < tolerance):
                 return Grabbable.RIGHT_CLIM
-            if bool(abs(left - x) < tolerance):
+            left, _, _, _ = plot_to_canvas([self._clims[0]])
+            if bool(abs(left - click_x) < tolerance):
                 return Grabbable.LEFT_CLIM
 
         if self._gamma_handle_pos is not None:
-            gx, gy, _, _ = self._handle_transform.map(self._gamma_handle_pos[0])
-            if bool(abs(gx - x) < tolerance and abs(gy - y) < tolerance):
+            gx, gy, _, _ = plot_to_canvas(gamma_to_plot(self._gamma_handle_pos[0]))
+            if bool(abs(gx - click_x) < tolerance and abs(gy - click_y) < tolerance):
                 return Grabbable.GAMMA
 
         return Grabbable.NONE
