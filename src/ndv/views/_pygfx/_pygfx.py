@@ -524,7 +524,6 @@ class PyGFXViewerCanvas(PCanvas):
     ) -> PyGFXRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         handle = RectangularROIHandle(self.refresh, self.canvas_to_world)
-        handle.visible = False
         self._scene.add(handle)
         if vertices:
             handle.vertices = vertices
