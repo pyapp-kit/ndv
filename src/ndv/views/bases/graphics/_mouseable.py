@@ -5,10 +5,18 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from psygnal import Signal
 
-from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Container
+
+    from qtpy.QtWidgets import QWidget
 
 
 class Mouseable:
@@ -35,6 +43,9 @@ class Mouseable:
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
+        return None
+
 
 def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
     """Intercept mouse events on `scene_canvas` and forward them to `receiver`.
@@ -55,14 +66,16 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
 
     frontend = gui_frontend()
     if frontend == GuiFrontend.QT:
-        from qtpy.QtCore import QEvent, QObject
+        from qtpy.QtCore import QEvent, QObject, Qt
         from qtpy.QtGui import QMouseEvent
 
         if not isinstance(canvas, QObject):
             raise TypeError(f"Expected vispy canvas to be QObject, got {type(canvas)}")
 
         class Filter(QObject):
-            def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
+            pressed: MouseButton = MouseButton.NONE
+
+            def eventFilter(self, obj: QWidget | None, qevent: QEvent | None) -> bool:
                 """Event filter installed on the canvas to handle mouse events.
 
                 here is where we get a chance to intercept mouse events before allowing
@@ -78,6 +91,7 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
                 except RuntimeError:
                     # native is likely dead
                     return False
+                # FIXME
 
                 intercept = False
                 if obj is canvas or obj in children:
@@ -85,17 +99,35 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
                         pos = qevent.pos()
                         etype = qevent.type()
                         if etype == QEvent.Type.MouseMove:
-                            mme = MouseMoveEvent(x=pos.x(), y=pos.y())
+                            mme = MouseMoveEvent(x=pos.x(), y=pos.y(), btn=self.pressed)
                             intercept |= receiver.on_mouse_move(mme)
                             receiver.mouseMoved.emit(mme)
                         elif etype == QEvent.Type.MouseButtonPress:
-                            mpe = MousePressEvent(x=pos.x(), y=pos.y())
+                            qbtn = qevent.button()
+                            self.pressed = (
+                                MouseButton.LEFT
+                                if qbtn == Qt.MouseButton.LeftButton
+                                else MouseButton.RIGHT
+                                if qbtn == Qt.MouseButton.RightButton
+                                else MouseButton.MIDDLE
+                                if qbtn == Qt.MouseButton.MiddleButton
+                                else MouseButton.NONE
+                            )
+                            mpe = MousePressEvent(
+                                x=pos.x(), y=pos.y(), btn=self.pressed
+                            )
                             intercept |= receiver.on_mouse_press(mpe)
                             receiver.mousePressed.emit(mpe)
                         elif etype == QEvent.Type.MouseButtonRelease:
-                            mre = MouseReleaseEvent(x=pos.x(), y=pos.y())
+                            mre = MouseReleaseEvent(
+                                x=pos.x(), y=pos.y(), btn=self.pressed
+                            )
+                            self.pressed = MouseButton.NONE
                             intercept |= receiver.on_mouse_release(mre)
                             receiver.mouseReleased.emit(mre)
+                        if obj is not None:
+                            if cursor := receiver.get_cursor(pos.x(), pos.y()):
+                                obj.setCursor(cursor.to_qt())
                 return intercept
 
         f = Filter()
@@ -115,7 +147,7 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
             etype = ev["event_type"]
             if etype == "pointer_move":
-                mme = MouseMoveEvent(x=ev["x"], y=ev["y"])
+                mme = MouseMoveEvent(x=ev["x"], y=ev["y"], )
                 receiver.on_mouse_move(mme)
                 receiver.mouseMoved.emit(mme)
             elif etype == "pointer_down":

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ndv.controller._channel_controller import ChannelController
-from ndv.models import DataDisplayModel
+from ndv.models import DataDisplayModel, ROIModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import (
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
     from ndv.views.bases import ArrayView, HistogramCanvas
+    from ndv.views.bases.graphics._canvas_elements import RoiHandle
 
     LutKey: TypeAlias = int | None
 
@@ -35,7 +36,9 @@ class ViewerController:
     This is the primary public interface for the viewer.
     """
 
-    def __init__(self, data: DataDisplayModel | None = None) -> None:
+    def __init__(
+        self, data: DataDisplayModel | None = None, roi: ROIModel | None = None
+    ) -> None:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
@@ -51,12 +54,21 @@ class ViewerController:
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
+        # FIXME
+        self._roi = roi or ROIModel()
+        # FIXME: Remove this
+        self._roi_handle: RoiHandle | None = None
 
         self._set_model_connected(self._dd_model.display)
+        self._set_roi_connected(self._roi)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self.add_histogram)
+        self._view.roiRequested.connect(self._on_roi_requested)
+        # FIXME
+        self._canvas.mouseReleased.connect(self._view.mouse_release)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
+        # self._view.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
@@ -92,6 +104,10 @@ class ViewerController:
         self._dd_model.data = data
         self._fully_synchronize_view()
         self._update_hist_domain_for_dtype(data.dtype)
+
+    @property
+    def roi(self) -> ROIModel:
+        return self._roi
 
     # -----------------------------------------------------------------------------
 
@@ -140,6 +156,20 @@ class ViewerController:
         ]:
             getattr(obj, _connect)(callback)
 
+    # FIXME
+    def _set_roi_connected(self, model: ROIModel, connect: bool = True) -> None:
+        """Connect or disconnect the model to/from the viewer.
+
+        We do this in a single method so that we are sure to connect and disconnect
+        the same events in the same order.  (but it's kinda ugly)
+        """
+        _connect = "connect" if connect else "disconnect"
+
+        for obj, callback in [
+            (model.events.bounding_box, self._on_model_bounding_box_changed),
+        ]:
+            getattr(obj, _connect)(callback)
+
     # ------------------ Model callbacks ------------------
 
     def _fully_synchronize_view(self) -> None:
@@ -183,6 +213,37 @@ class ViewerController:
             while lut_ctrl.handles:
                 lut_ctrl.handles.pop().remove()
         # do we need to cleanup the lut views themselves?
+
+    # FIXME
+    def _on_roi_requested(self) -> None:
+        if self._roi_handle:
+            self._roi_handle.remove()
+        # FIXME: probably want some sync_bounding_box or something.
+        # self.roi.bounding_box = ((0, 0), (0, 0))
+        # verts = [
+        #     (0, 0),
+        #     (0, 0),
+        #     (0, 0),
+        #     (0, 0),
+        # ]
+        self._roi_handle = self._canvas.add_roi(visible=False)
+
+        self._update_canvas()
+
+    # FIXME
+    def _on_model_bounding_box_changed(self) -> None:
+        mi, ma = [(0, 0), (0, 0)] if self.roi is None else self._roi.bounding_box
+        verts = [
+            (mi[0], mi[1]),
+            (ma[0], mi[1]),
+            (ma[0], ma[1]),
+            (mi[0], ma[1]),
+        ]
+        if self._roi_handle:
+            self._roi_handle.remove()
+        self._roi_handle = self._canvas.add_roi(vertices=verts, visible=True)
+
+        self._update_canvas()
 
     # ------------------ View callbacks ------------------
 
@@ -229,47 +290,45 @@ class ViewerController:
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
         """
-        if not self._dd_model.data_wrapper:
-            return
+        if self._dd_model.data_wrapper:
+            # TODO: make asynchronous
+            for future in self._dd_model.request_sliced_data():
+                response = future.result()
+                key = response.channel_key
+                data = response.data
 
-        # TODO: make asynchronous
-        for future in self._dd_model.request_sliced_data():
-            response = future.result()
-            key = response.channel_key
-            data = response.data
+                if (lut_ctrl := self._lut_controllers.get(key)) is None:
+                    if key is None:
+                        model = self.model.default_lut
+                    elif key in self.model.luts:
+                        model = self.model.luts[key]
+                    else:
+                        # we received a new channel key that has not been set in the model
+                        # so we create a new LUT model for it
+                        model = self.model.luts[key] = LUTModel()
 
-            if (lut_ctrl := self._lut_controllers.get(key)) is None:
-                if key is None:
-                    model = self.model.default_lut
-                elif key in self.model.luts:
-                    model = self.model.luts[key]
+                    lut_views = [self._view.add_lut_view()]
+                    if self._histogram is not None:
+                        lut_views.append(self._histogram)
+                    self._lut_controllers[key] = lut_ctrl = ChannelController(
+                        key=key,
+                        model=model,
+                        views=lut_views,
+                    )
+
+                if not lut_ctrl.handles:
+                    # we don't yet have any handles for this channel
+                    lut_ctrl.add_handle(self._canvas.add_image(data))
                 else:
-                    # we received a new channel key that has not been set in the model
-                    # so we create a new LUT model for it
-                    model = self.model.luts[key] = LUTModel()
-
-                lut_views = [self._view.add_lut_view()]
-                if self._histogram is not None:
-                    lut_views.append(self._histogram)
-                self._lut_controllers[key] = lut_ctrl = ChannelController(
-                    key=key,
-                    model=model,
-                    views=lut_views,
-                )
-
-            if not lut_ctrl.handles:
-                # we don't yet have any handles for this channel
-                lut_ctrl.add_handle(self._canvas.add_image(data))
-            else:
-                lut_ctrl.update_texture_data(data)
-                if self._histogram is not None:
-                    # TODO: once data comes in in chunks, we'll need a proper stateful
-                    # stats object that calculates the histogram incrementally
-                    counts, bin_edges = _calc_hist_bins(data)
-                    # TODO: currently this is updating the histogram on *any*
-                    # channel index... so it doesn't work with composite mode
-                    self._histogram.set_data(counts, bin_edges)
-                    self._histogram.set_range()
+                    lut_ctrl.update_texture_data(data)
+                    if self._histogram is not None:
+                        # TODO: once data comes in in chunks, we'll need a proper stateful
+                        # stats object that calculates the histogram incrementally
+                        counts, bin_edges = _calc_hist_bins(data)
+                        # TODO: currently this is updating the histogram on *any*
+                        # channel index... so it doesn't work with composite mode
+                        self._histogram.set_data(counts, bin_edges)
+                        self._histogram.set_range()
 
         self._canvas.refresh()
 

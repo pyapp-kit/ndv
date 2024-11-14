@@ -58,6 +58,7 @@ class ArrayCanvas(GraphicsCanvas):
         vertices: Sequence[tuple[float, float]] | None = None,
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
+        visible: bool = False,
     ) -> RoiHandle: ...
 
 

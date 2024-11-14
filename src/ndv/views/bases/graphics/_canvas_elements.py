@@ -11,8 +11,6 @@ if TYPE_CHECKING:
     import cmap as _cmap
     import numpy as np
 
-    from ndv._types import CursorType
-
 
 class CanvasElement(Mouseable):
     """Protocol defining an interactive element on the Canvas."""
@@ -36,9 +34,6 @@ class CanvasElement(Mouseable):
     @abstractmethod
     def set_selected(self, selected: bool) -> None:
         """Sets element selection status."""
-
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        """Returns the element's cursor preference at the provided position."""
 
     def start_move(self, pos: Sequence[float]) -> None:
         """

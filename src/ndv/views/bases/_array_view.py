@@ -27,6 +27,7 @@ class ArrayView(Viewable):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     histogramRequested = Signal()
+    roiRequested = Signal()
     channelModeChanged = Signal(ChannelMode)
 
     @abstractmethod

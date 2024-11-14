@@ -10,7 +10,13 @@ import numpy as np
 import pygfx
 import pylinalg as la
 
-from ndv._types import CursorType
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
 
 if TYPE_CHECKING:
@@ -97,7 +103,7 @@ class PyGFXImageHandle(ImageHandle):
         if (par := self._image.parent) is not None:
             par.remove(self._image)
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
         return None
 
 
@@ -140,7 +146,6 @@ class PyGFXRoiHandle(pygfx.WorldObject):
         # To be implemented by subclasses
         raise NotImplementedError("Must be implemented in subclasses")
 
-    @property
     def visible(self) -> bool:
         if self._outline:
             return bool(self._outline.visible)
@@ -149,14 +154,13 @@ class PyGFXRoiHandle(pygfx.WorldObject):
         # Nothing to see
         return False
 
-    @visible.setter
-    def visible(self, visible: bool) -> None:
+    def set_visible(self, visible: bool) -> None:
         if fill := getattr(self, "_fill", None):
             fill.visible = visible
         if outline := getattr(self, "_outline", None):
             outline.visible = visible
         if handles := getattr(self, "_handles", None):
-            handles.visible = self.selected
+            handles.visible = visible and self.selected()
         self._render()
 
     def can_select(self) -> bool:
@@ -212,7 +216,7 @@ class PyGFXRoiHandle(pygfx.WorldObject):
         if (par := self.parent) is not None:
             par.remove(self)
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
         # To be implemented by subclasses
         raise NotImplementedError("Must be implemented in subclasses")
 
@@ -370,9 +374,9 @@ class RectangularROIHandle(PyGFXRoiHandle):
                 return i
         return None
 
-    def cursor_at(self, canvas_pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
         # Convert canvas -> world
-        world_pos = self._canvas_to_world(canvas_pos)
+        world_pos = self._canvas_to_world((x, y))
         # Step 1: Check if over handle
         if (idx := self._handle_hover_idx(world_pos)) is not None:
             if np.array_equal(
@@ -426,7 +430,7 @@ class GfxArrayCanvas(ArrayCanvas):
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
-        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
+        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas, show_fps=True)
         try:
             # requires https://github.com/pygfx/pygfx/pull/752
             self._renderer.blend_mode = "additive"
@@ -442,6 +446,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
+        self._selection: CanvasElement | None = None
+        # FIXME: Remove
+        self._initializing_roi: PyGFXRoiHandle | None = None
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -526,15 +533,19 @@ class GfxArrayCanvas(ArrayCanvas):
         vertices: Sequence[tuple[float, float]] | None = None,
         color: _cmap.Color | None = None,
         border_color: _cmap.Color | None = None,
+        visible: bool = False,
     ) -> PyGFXRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         handle = RectangularROIHandle(self.refresh, self.canvas_to_world)
-        handle.visible = False
         self._scene.add(handle)
         if vertices:
             handle.vertices = vertices
+        else:
+            # FIXME: Ugly
+            self._initializing_roi = handle
         handle.set_color(color)
         handle.set_border_color(border_color)
+        handle.set_visible(visible)
 
         self._elements[handle] = handle
         return handle
@@ -624,3 +635,48 @@ class GfxArrayCanvas(ArrayCanvas):
     def set_visible(self, visible: bool) -> None:
         """Set the visibility of the canvas."""
         self._canvas.visible = visible
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        if roi := self._initializing_roi:
+            self._initializing_roi = None
+            pos = self.canvas_to_world((event.x, event.y))
+            roi.move(pos)
+            roi.set_visible(True)
+
+        ev_pos = (event.x, event.y)
+        pos = self.canvas_to_world(ev_pos)
+        # TODO why does the canvas need this point untransformed??
+        elements = self.elements_at(ev_pos)
+        # Deselect prior selection before editing new selection
+        if self._selection:
+            self._selection.set_selected(False)
+        for e in elements:
+            if e.can_select():
+                e.start_move(pos)
+                # Select new selection
+                self._selection = e
+                self._selection.set_selected(True)
+                return False
+        return False
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        ev_pos = (event.x, event.y)
+        if event.btn == MouseButton.LEFT:
+            if self._selection and self._selection.selected():
+                ev_pos = (event.x, event.y)
+                pos = self.canvas_to_world(ev_pos)
+                self._selection.move(pos)
+                # If we are moving the object, we don't want to move the camera
+                return True
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        return False
+
+    def get_cursor(self, x: float, y: float) -> CursorType:
+        if self._initializing_roi:
+            return CursorType.CROSS
+        for element in self.elements_at((x, y)):
+            if cursor := element.get_cursor(x, y):
+                return cursor
+        return CursorType.DEFAULT

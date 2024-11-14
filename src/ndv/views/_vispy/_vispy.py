@@ -14,7 +14,13 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv._types import CursorType
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.views.bases import ArrayCanvas, filter_mouse_events
 from ndv.views.bases.graphics._canvas_elements import (
     CanvasElement,
@@ -88,7 +94,7 @@ class Handle(scene.visuals.Markers):
         self._selected = selected
         self.parent.selected = selected
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
         return self._cursor_at(self.pos)
 
 
@@ -243,7 +249,7 @@ class RectangularROI(scene.visuals.Rectangle):
             ]
         self.center = new_center
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
         return CursorType.ALL_ARROW
 
     # ------------------- End EditableROI interface -------------------------
@@ -321,7 +327,7 @@ class VispyImageHandle(ImageHandle):
     def remove(self) -> None:
         self._visual.parent = None
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
         return None
 
 
@@ -355,8 +361,8 @@ class VispyHandleHandle(CanvasElement):
     def remove(self) -> None:
         self._parent.remove()
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        return self._handle.cursor_at(pos)
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
+        return self._handle.get_cursor(x, y)
 
 
 class VispyRoiHandle(RoiHandle):
@@ -412,8 +418,8 @@ class VispyRoiHandle(RoiHandle):
     def remove(self) -> None:
         self._roi.parent = None
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        return self._roi.cursor_at(pos)
+    def get_cursor(self, x: float, y: float) -> CursorType | None:
+        return self._roi.get_cursor(x, y)
 
 
 class VispyViewerCanvas(ArrayCanvas):
@@ -425,6 +431,7 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def __init__(self) -> None:
         self._canvas = scene.SceneCanvas(size=(600, 600))
+        self._canvas.measure_fps()
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
@@ -439,6 +446,9 @@ class VispyViewerCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
+        self._selection: CanvasElement | None = None
+        # FIXME: Remove
+        self._initializing_roi: VispyRoiHandle | None = None
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -501,6 +511,7 @@ class VispyViewerCanvas(ArrayCanvas):
         vertices: Sequence[tuple[float, float]] | None = None,
         color: _cmap.Color | None = None,
         border_color: _cmap.Color | None = None,
+        visible: bool = False,
     ) -> VispyRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         roi = RectangularROI(parent=self._view.scene)
@@ -511,8 +522,12 @@ class VispyViewerCanvas(ArrayCanvas):
         if vertices:
             handle.set_vertices(vertices)
             self.set_range()
+        else:
+            # FIXME: Ugly
+            self._initializing_roi = handle
         handle.set_color(color)
         handle.set_border_color(border_color)
+        handle.set_visible(visible)
         return handle
 
     def set_range(
@@ -575,3 +590,50 @@ class VispyViewerCanvas(ArrayCanvas):
             if (handle := self._elements.get(vis)) is not None:
                 elements.append(handle)
         return elements
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        if roi := self._initializing_roi:
+            self._initializing_roi = None
+            pos = self.canvas_to_world((event.x, event.y))
+            roi.move(pos)
+            roi.set_visible(True)
+
+        ev_pos = (event.x, event.y)
+        pos = self.canvas_to_world(ev_pos)
+        # TODO why does the canvas need this point untransformed??
+        elements = self.elements_at(ev_pos)
+        # Deselect prior selection before editing new selection
+        if self._selection:
+            self._selection.set_selected(False)
+        for e in elements:
+            if e.can_select():
+                e.start_move(pos)
+                # Select new selection
+                self._selection = e
+                self._selection.set_selected(True)
+                self._camera.interactive = False
+                return False
+        return False
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        ev_pos = (event.x, event.y)
+        if event.btn == MouseButton.LEFT:
+            if self._selection and self._selection.selected():
+                ev_pos = (event.x, event.y)
+                pos = self.canvas_to_world(ev_pos)
+                self._selection.move(pos)
+                # If we are moving the object, we don't want to move the camera
+                return True
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        self._camera.interactive = True
+        return False
+
+    def get_cursor(self, x: float, y: float) -> CursorType:
+        if self._initializing_roi:
+            return CursorType.CROSS
+        for element in self.elements_at((x, y)):
+            if cursor := element.get_cursor(x, y):
+                return cursor
+        return CursorType.DEFAULT

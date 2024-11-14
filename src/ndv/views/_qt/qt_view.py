@@ -25,6 +25,7 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
+from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
 from ndv.views.bases import ArrayView, LutView
 
@@ -34,7 +35,8 @@ if TYPE_CHECKING:
     import cmap
     from qtpy.QtGui import QIcon
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, MouseReleaseEvent
+    from ndv.views.protocols import CanvasElement, PRoiHandle
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -149,6 +151,14 @@ class QLutView(LutView):
 
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
+
+
+class ROIButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setToolTip("Add ROI")
+        self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
 
 
 class _QDimsSliders(QWidget):
@@ -278,6 +288,11 @@ class _QArrayViewer(QWidget):
         add_histogram_icon = QIconifyIcon("foundation:graph-bar")
         self.histogram_btn = QPushButton(add_histogram_icon, "", self)
 
+        # button to draw ROIs
+        self._roi_handle: PRoiHandle | None = None
+        self._selection: CanvasElement | None = None
+        self.add_roi_btn = ROIButton()
+
         self.luts = _UpCollapsible(
             "LUTs",
             parent=self,
@@ -291,8 +306,8 @@ class _QArrayViewer(QWidget):
         self._btn_layout.addWidget(self.channel_mode_combo)
         # self._btns.addWidget(self._ndims_btn)
         self._btn_layout.addWidget(self.histogram_btn)
+        self._btn_layout.addWidget(self.add_roi_btn)
         self._btn_layout.addWidget(self.set_range_btn)
-        # self._btns.addWidget(self._add_roi_btn)
 
         # above the canvas
         info_widget = QWidget()
@@ -326,6 +341,7 @@ class QtArrayView(ArrayView):
     def __init__(self, canvas_widget: QWidget) -> None:
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
+        qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -396,3 +412,11 @@ class QtArrayView(ArrayView):
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
+
+    def _on_add_roi_clicked(self, checked: bool) -> None:
+        if checked:
+            # Add new roi
+            self.roiRequested.emit()
+
+    def mouse_release(self, event: MouseReleaseEvent) -> None:
+        self._qwidget.add_roi_btn.setChecked(False)

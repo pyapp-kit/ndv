@@ -691,6 +691,7 @@ class NDViewer(QWidget):
 
     def _press_element(self, event: QMouseEvent) -> bool:
         ev_pos = (event.position().x(), event.position().y())
+        print(f"Event position: {ev_pos}")
         pos = self._canvas.canvas_to_world(ev_pos)
         # TODO why does the canvas need this point untransformed??
         elements = self._canvas.elements_at(ev_pos)
