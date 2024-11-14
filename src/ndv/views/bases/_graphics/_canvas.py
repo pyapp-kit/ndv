@@ -11,12 +11,10 @@ from ndv.views.bases._view_base import Viewable
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import cmap
     import numpy as np
 
-    from ._canvas_elements import CanvasElement, ImageHandle, RoiHandle
+    from ._canvas_elements import CanvasElement, ImageHandle, RectangularROI
+    from ndv.models._viewer_model import ArrayViewerModel
 
 
 class GraphicsCanvas(Viewable, Mouseable):
@@ -49,6 +47,8 @@ class ArrayCanvas(GraphicsCanvas):
     """ABC for canvases that show array data."""
 
     @abstractmethod
+    def __init__(self, viewer_model: ArrayViewerModel | None = ...) -> None: ...
+    @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod
     @abstractmethod
@@ -56,12 +56,7 @@ class ArrayCanvas(GraphicsCanvas):
     @abstractmethod
     def add_volume(self, data: np.ndarray | None = ...) -> ImageHandle: ...
     @abstractmethod
-    def add_roi(
-        self,
-        vertices: Sequence[tuple[float, float]] | None = None,
-        color: cmap.Color | None = None,
-        border_color: cmap.Color | None = None,
-    ) -> RoiHandle: ...
+    def add_bounding_box(self) -> RectangularROI: ...
 
 
 class HistogramCanvas(GraphicsCanvas, LutView):

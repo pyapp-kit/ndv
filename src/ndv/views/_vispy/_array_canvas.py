@@ -8,246 +8,30 @@ from weakref import WeakKeyDictionary
 import cmap as _cmap
 import numpy as np
 import vispy
+import vispy.app
+import vispy.color
 import vispy.scene
 import vispy.visuals
 from vispy import scene
-from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv._types import CursorType
+from ndv._types import CursorType, MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas
 from ndv.views.bases._graphics._canvas_elements import (
     CanvasElement,
     ImageHandle,
-    RoiHandle,
+    RectangularROI,
+    ROIMoveMode,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import Callable
-
-    import vispy.app
 
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
-
-
-class Handle(scene.visuals.Markers):
-    """A Marker that allows specific ROI alterations."""
-
-    def __init__(
-        self,
-        parent: RectangularROI,
-        on_move: Callable[[Sequence[float]], None] | None = None,
-        cursor: CursorType
-        | Callable[[Sequence[float]], CursorType] = CursorType.ALL_ARROW,
-    ) -> None:
-        super().__init__(parent=parent)
-        self.unfreeze()
-        self.parent = parent
-        # on_move function(s)
-        self.on_move: list[Callable[[Sequence[float]], None]] = []
-        if on_move:
-            self.on_move.append(on_move)
-        # cusror preference function
-        if not callable(cursor):
-
-            def cursor(_: Any) -> CursorType:
-                return cursor
-
-        self._cursor_at = cursor
-        self._selected = False
-        # NB VisPy asks that the data is a 2D array
-        self._pos = np.array([[0, 0]], dtype=np.float32)
-        self.interactive = True
-        self.freeze()
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        pass
-
-    def move(self, pos: Sequence[float]) -> None:
-        for func in self.on_move:
-            func(pos)
-
-    @property
-    def pos(self) -> Sequence[float]:
-        return cast("Sequence[float]", self._pos[0, :])
-
-    @pos.setter
-    def pos(self, pos: Sequence[float]) -> None:
-        self._pos[:] = pos[:2]
-        self.set_data(self._pos)
-
-    @property
-    def selected(self) -> bool:
-        return self._selected
-
-    @selected.setter
-    def selected(self, selected: bool) -> None:
-        self._selected = selected
-        self.parent.selected = selected
-
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        return self._cursor_at(self.pos)
-
-
-class RectangularROI(scene.visuals.Rectangle):
-    """A VisPy Rectangle visual whose attributes can be edited."""
-
-    def __init__(
-        self,
-        parent: scene.visuals.Visual,
-        center: list[float] | None = None,
-        width: float = 1e-6,
-        height: float = 1e-6,
-    ) -> None:
-        if center is None:
-            center = [0, 0]
-        scene.visuals.Rectangle.__init__(
-            self, center=center, width=width, height=height, radius=0, parent=parent
-        )
-        self.unfreeze()
-        self.parent = parent
-        self.interactive = True
-
-        self._handles = [
-            Handle(
-                self,
-                on_move=self.move_top_left,
-                cursor=self._handle_cursor_pref,
-            ),
-            Handle(
-                self,
-                on_move=self.move_top_right,
-                cursor=self._handle_cursor_pref,
-            ),
-            Handle(
-                self,
-                on_move=self.move_bottom_right,
-                cursor=self._handle_cursor_pref,
-            ),
-            Handle(
-                self,
-                on_move=self.move_bottom_left,
-                cursor=self._handle_cursor_pref,
-            ),
-        ]
-
-        # drag_reference defines the offset between where the user clicks and the center
-        # of the rectangle
-        self.drag_reference = [0.0, 0.0]
-        self.interactive = True
-        self._selected = False
-        self.freeze()
-
-    def _handle_cursor_pref(self, handle_pos: Sequence[float]) -> CursorType:
-        # Bottom left handle
-        if handle_pos[0] < self.center[0] and handle_pos[1] < self.center[1]:
-            return CursorType.FDIAG_ARROW
-        # Top right handle
-        if handle_pos[0] > self.center[0] and handle_pos[1] > self.center[1]:
-            return CursorType.FDIAG_ARROW
-        # Top left, bottom right
-        return CursorType.BDIAG_ARROW
-
-    def move_top_left(self, pos: Sequence[float]) -> None:
-        self._handles[3].pos = [pos[0], self._handles[3].pos[1]]
-        self._handles[0].pos = pos
-        self._handles[1].pos = [self._handles[1].pos[0], pos[1]]
-        self.redraw()
-
-    def move_top_right(self, pos: Sequence[float]) -> None:
-        self._handles[0].pos = [self._handles[0].pos[0], pos[1]]
-        self._handles[1].pos = pos
-        self._handles[2].pos = [pos[0], self._handles[2].pos[1]]
-        self.redraw()
-
-    def move_bottom_right(self, pos: Sequence[float]) -> None:
-        self._handles[1].pos = [pos[0], self._handles[1].pos[1]]
-        self._handles[2].pos = pos
-        self._handles[3].pos = [self._handles[3].pos[0], pos[1]]
-        self.redraw()
-
-    def move_bottom_left(self, pos: Sequence[float]) -> None:
-        self._handles[2].pos = [self._handles[2].pos[0], pos[1]]
-        self._handles[3].pos = pos
-        self._handles[0].pos = [pos[0], self._handles[0].pos[1]]
-        self.redraw()
-
-    def redraw(self) -> None:
-        left, top, *_ = self._handles[0].pos
-        right, bottom, *_ = self._handles[2].pos
-
-        self.center = [(left + right) / 2, (top + bottom) / 2]
-        self.width = max(abs(left - right), 1e-6)
-        self.height = max(abs(top - bottom), 1e-6)
-
-    # --------------------- EditableROI interface --------------------------
-    # In the future, if any other objects implement these same methods, this
-    # could be extracted into an ABC.
-
-    @property
-    def vertices(self) -> Sequence[Sequence[float]]:
-        return [h.pos for h in self._handles]
-
-    @vertices.setter
-    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
-        if len(vertices) != 4 or any(len(v) != 2 for v in vertices):
-            raise Exception("Only 2D rectangles are currently supported")
-        is_aligned = (
-            vertices[0][1] == vertices[1][1]
-            and vertices[1][0] == vertices[2][0]
-            and vertices[2][1] == vertices[3][1]
-            and vertices[3][0] == vertices[0][0]
-        )
-        if not is_aligned:
-            raise Exception(
-                "Only rectangles aligned with the axes are currently supported"
-            )
-
-        # Update each handle
-        for i, handle in enumerate(self._handles):
-            handle.pos = vertices[i]
-        # Redraw
-        self.redraw()
-
-    @property
-    def selected(self) -> bool:
-        return self._selected
-
-    @selected.setter
-    def selected(self, selected: bool) -> None:
-        self._selected = selected
-        for h in self._handles:
-            h.visible = selected
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        self.drag_reference = [
-            pos[0] - self.center[0],
-            pos[1] - self.center[1],
-        ]
-
-    def move(self, pos: Sequence[float]) -> None:
-        new_center = [
-            pos[0] - self.drag_reference[0],
-            pos[1] - self.drag_reference[1],
-        ]
-        old_center = self.center
-        # TODO: Simplify
-        for h in self._handles:
-            existing_pos = h.pos
-            h.pos = [
-                existing_pos[0] + new_center[0] - old_center[0],
-                existing_pos[1] + new_center[1] - old_center[1],
-            ]
-        self.center = new_center
-
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        return CursorType.ALL_ARROW
-
-    # ------------------- End EditableROI interface -------------------------
 
 
 class VispyImageHandle(ImageHandle):
@@ -322,99 +106,172 @@ class VispyImageHandle(ImageHandle):
     def remove(self) -> None:
         self._visual.parent = None
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         return None
 
 
-# FIXME: Unfortunate naming :)
-class VispyHandleHandle(CanvasElement):
-    def __init__(self, handle: Handle, parent: CanvasElement) -> None:
-        self._handle = handle
-        self._parent = parent
+class VispyBoundingBox(RectangularROI):
+    def __init__(self, parent: Any) -> None:
+        self._selected = False
+        self._move_mode: ROIMoveMode | None = None
+        # NB _move_anchor has different meanings depending on _move_mode
+        self._move_anchor: tuple[float, float] = (0, 0)
 
-    def visible(self) -> bool:
-        return cast("bool", self._handle.visible)
+        # Rectangle handles both fill and border
+        self._rect = scene.Rectangle(center=[0, 0], width=1, height=1, parent=parent)
+        # NB: Should be greater than image orders BUT NOT handle order
+        self._rect.order = 10
+        self._rect.interactive = True
 
-    def set_visible(self, visible: bool) -> None:
-        self._handle.visible = visible
+        self._handle_data = np.zeros((4, 2))
+        self._handle_size = 10  # px
+        self._handles = scene.Markers(
+            pos=self._handle_data,
+            size=self._handle_size,
+            scaling="fixed",
+            parent=parent,
+        )
+        # NB: Should be greater than image orders and rect order
+        self._handles.order = 100
+        self._handles.interactive = True
 
-    def can_select(self) -> bool:
-        return True
+        self._tform = self._rect.transforms.get_transform("canvas", "scene")
 
-    def selected(self) -> bool:
-        return self._handle.selected
-
-    def set_selected(self, selected: bool) -> None:
-        self._handle.selected = selected
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        self._handle.start_move(pos)
-
-    def move(self, pos: Sequence[float]) -> None:
-        self._handle.move(pos)
-
-    def remove(self) -> None:
-        self._parent.remove()
-
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        return self._handle.cursor_at(pos)
-
-
-class VispyRoiHandle(RoiHandle):
-    def __init__(self, roi: RectangularROI) -> None:
-        self._roi = roi
-
-    def vertices(self) -> Sequence[Sequence[float]]:
-        return self._roi.vertices
-
-    def set_vertices(self, vertices: Sequence[Sequence[float]]) -> None:
-        self._roi.vertices = vertices
-
-    def visible(self) -> bool:
-        return bool(self._roi.visible)
-
-    def set_visible(self, visible: bool) -> None:
-        self._roi.visible = visible
+        self.set_fill(_cmap.Color("transparent"))
+        self.set_border(_cmap.Color("yellow"))
+        self.set_handles(_cmap.Color("white"))
+        self.set_visible(False)
 
     def can_select(self) -> bool:
         return True
 
     def selected(self) -> bool:
-        return self._roi.selected
+        return self._selected
 
     def set_selected(self, selected: bool) -> None:
-        self._roi.selected = selected
+        self._selected = selected
+        self._handles.visible = selected and self.visible()
 
-    def start_move(self, pos: Sequence[float]) -> None:
-        self._roi.start_move(pos)
+    def set_fill(self, color: _cmap.Color) -> None:
+        _vis_color = vispy.color.Color(color.hex)
+        # NB We need alpha>0 for selection
+        _vis_color.alpha = max(color.alpha, 1e-6)
+        self._rect.color = _vis_color
 
-    def move(self, pos: Sequence[float]) -> None:
-        self._roi.move(pos)
+    def set_border(self, color: _cmap.Color) -> None:
+        _vis_color = vispy.color.Color(color.hex)
+        _vis_color.alpha = color.alpha
+        self._rect.border_color = _vis_color
 
-    def color(self) -> Any:
-        return self._roi.color
+    # TODO: Misleading name?
+    def set_handles(self, color: _cmap.Color) -> None:
+        _vis_color = vispy.color.Color(color.hex)
+        _vis_color.alpha = color.alpha
+        self._handles.set_data(face_color=_vis_color)
 
-    def set_color(self, color: _cmap.Color | None) -> None:
-        if color is None:
-            color = _cmap.Color("transparent")
-        # NB: To enable dragging the shape within the border,
-        # we require a positive alpha.
-        alpha = max(color.alpha, 1e-6)
-        self._roi.color = Color(color.hex, alpha=alpha)
+    def set_bounding_box(
+        self, mi: tuple[float, float], ma: tuple[float, float]
+    ) -> None:
+        # NB: Support two diagonal points, not necessarily true min/max
+        x1 = float(min(mi[0], ma[0]))
+        y1 = float(min(mi[1], ma[1]))
+        x2 = float(max(mi[0], ma[0]))
+        y2 = float(max(mi[1], ma[1]))
 
-    def border_color(self) -> _cmap.Color:
-        return _cmap.Color(self._roi.border_color.rgba)
+        # Update rectangle
+        self._rect.center = [(x1 + x2) / 2, (y1 + y2) / 2]
+        self._rect.width = max(float(x2 - x1), 1e-30)
+        self._rect.height = max(float(y2 - y1), 1e-30)
 
-    def set_border_color(self, color: _cmap.Color | None) -> None:
-        if color is None:
-            color = _cmap.Color("yellow")
-        self._roi.border_color = Color(color.hex, alpha=color.alpha)
+        # Update handles
+        self._handle_data[0] = x1, y1
+        self._handle_data[1] = x2, y1
+        self._handle_data[2] = x2, y2
+        self._handle_data[3] = x1, y2
+        self._handles.set_data(pos=self._handle_data)
+
+        # FIXME: These should be called internally upon set_data, right?
+        # Looks like https://github.com/vispy/vispy/issues/1899
+        self._rect._bounds_changed()
+        for v in self._rect._subvisuals:
+            v._bounds_changed()
+        self._handles._bounds_changed()
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        # Convert canvas -> world
+        canvas_pos = (event.x, event.y)
+        world_pos = self._tform.map(canvas_pos)[:2]
+        # moving a handle
+        if self._move_mode == ROIMoveMode.HANDLE:
+            # The anchor is set to the opposite handle, which never moves.
+            self.boundingBoxChanged.emit((world_pos, self._move_anchor))
+        # translating the whole roi
+        elif self._move_mode == ROIMoveMode.TRANSLATE:
+            # The anchor is the mouse position reported in the previous mouse event.
+            dx = world_pos[0] - self._move_anchor[0]
+            dy = world_pos[1] - self._move_anchor[1]
+            # If the mouse moved (dx, dy) between events, the whole ROI needs to be
+            # translated that amount.
+            new_min = (self._handle_data[0, 0] + dx, self._handle_data[0, 1] + dy)
+            new_max = (self._handle_data[2, 0] + dx, self._handle_data[2, 1] + dy)
+            self.boundingBoxChanged.emit((new_min, new_max))
+            self._move_anchor = world_pos
+
+        return False
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        self.set_selected(True)
+        # Convert canvas -> world
+        canvas_pos = (event.x, event.y)
+        world_pos = self._tform.map(canvas_pos)[:2]
+        drag_idx = self._handle_under(world_pos)
+        # If a marker is pressed
+        if drag_idx is not None:
+            opposite_idx = (drag_idx + 2) % 4
+            self._move_mode = ROIMoveMode.HANDLE
+            self._move_anchor = tuple(self._handle_data[opposite_idx].copy())
+        # If the rectangle is pressed
+        else:
+            self._move_mode = ROIMoveMode.TRANSLATE
+            self._move_anchor = world_pos
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        return False
+
+    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType | None:
+        pos = self._tform.map(canvas_pos)[:2]
+        if self._handle_under(pos) is not None:
+            center = self._rect.center
+            if pos[0] < center[0] and pos[1] < center[1]:
+                return CursorType.FDIAG_ARROW
+            if pos[0] > center[0] and pos[1] > center[1]:
+                return CursorType.FDIAG_ARROW
+            return CursorType.BDIAG_ARROW
+        return CursorType.ALL_ARROW
+
+    def visible(self) -> bool:
+        return bool(self._rect.visible)
+
+    def set_visible(self, visible: bool) -> None:
+        self._rect.visible = visible
+        self._handles.visible = visible and self.selected()
 
     def remove(self) -> None:
-        self._roi.parent = None
+        self._rect.parent = None
+        self._handles.parent = None
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        return self._roi.cursor_at(pos)
+    def _handle_under(self, pos: Sequence[float]) -> int | None:
+        """Returns an int in [0, 3], or None.
+
+        If an int i, means that the handle at self._positions[i] is at pos.
+        If None, there is no handle at pos.
+        """
+        rad2 = (self._handle_size / 2) ** 2
+        for i, p in enumerate(self._handle_data):
+            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= rad2:
+                return i
+        return None
 
 
 class VispyArrayCanvas(ArrayCanvas):
@@ -424,7 +281,9 @@ class VispyArrayCanvas(ArrayCanvas):
     could be swapped in if needed as long as they implement the same interface).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, viewer_model: ArrayViewerModel) -> None:
+        self._viewer = viewer_model
+
         self._canvas = scene.SceneCanvas(size=(600, 600))
 
         # this filter needs to remain in scope for the lifetime of the canvas
@@ -440,6 +299,9 @@ class VispyArrayCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
+        self._selection: CanvasElement | None = None
+        # TODO: Weak Reference?
+        self._last_roi_created: VispyBoundingBox | None = None
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -520,24 +382,13 @@ class VispyArrayCanvas(ArrayCanvas):
             self.set_range()
         return handle
 
-    def add_roi(
-        self,
-        vertices: Sequence[tuple[float, float]] | None = None,
-        color: _cmap.Color | None = None,
-        border_color: _cmap.Color | None = None,
-    ) -> VispyRoiHandle:
+    def add_bounding_box(self) -> VispyBoundingBox:
         """Add a new Rectangular ROI node to the scene."""
-        roi = RectangularROI(parent=self._view.scene)
-        handle = VispyRoiHandle(roi)
-        self._elements[roi] = handle
-        for h in roi._handles:
-            self._elements[h] = VispyHandleHandle(h, handle)
-        if vertices:
-            handle.set_vertices(vertices)
-            self.set_range()
-        handle.set_color(color)
-        handle.set_border_color(border_color)
-        return handle
+        self._last_roi_created = VispyBoundingBox(parent=self._view.scene)
+        self._last_roi_created.set_visible(False)
+        self._elements[self._last_roi_created._handles] = self._last_roi_created
+        self._elements[self._last_roi_created._rect] = self._last_roi_created
+        return self._last_roi_created
 
     def set_range(
         self,
@@ -599,6 +450,66 @@ class VispyArrayCanvas(ArrayCanvas):
             if (handle := self._elements.get(vis)) is not None:
                 elements.append(handle)
         return elements
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        if self._selection:
+            self._selection.set_selected(False)
+            self._selection = None
+        canvas_pos = (event.x, event.y)
+        world_pos = self.canvas_to_world(canvas_pos)[:2]
+
+        # If in CREATE_ROI mode, the new ROI should "start" here.
+        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
+            if self._last_roi_created is None:
+                raise ValueError("No ROI to create!")
+            new_roi = self._last_roi_created
+            # HACK: Provide a non-zero starting size so that if the user clicks
+            # and immediately releases, it's visible and can be selected again
+            _min = world_pos
+            _max = (world_pos[0] + 1, world_pos[1] + 1)
+            # Put the ROI where the user clicked
+            new_roi.boundingBoxChanged.emit((_min, _max))
+            # new_roi.set_bounding_box(_min, _max)
+            # Make it visible
+            new_roi.set_visible(True)
+            # Select it so the mouse press event below triggers ROIMoveMode.HANDLE
+            # TODO: Make behavior more direct
+            new_roi.set_selected(True)
+
+            # All done - exit the mode
+            self._viewer.interaction_mode = InteractionMode.PAN_ZOOM
+
+        # Find all visuals at the point
+        for vis in self.elements_at(canvas_pos):
+            if vis.can_select():
+                self._selection = vis
+                self._selection.on_mouse_press(event)
+                self._camera.interactive = False
+                return False
+
+        return False
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        if event.btn == MouseButton.LEFT:
+            if self._selection and self._selection.selected():
+                self._selection.on_mouse_move(event)
+                # If we are moving the object, we don't want to move the camera
+                return True
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        if self._selection:
+            self._selection.on_mouse_release(event)
+        self._camera.interactive = True
+        return False
+
+    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType:
+        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
+            return CursorType.CROSS
+        for vis in self.elements_at(canvas_pos):
+            if cursor := vis.get_cursor(canvas_pos):
+                return cursor
+        return CursorType.DEFAULT
 
 
 def _downcast(data: np.ndarray | None) -> np.ndarray | None:
