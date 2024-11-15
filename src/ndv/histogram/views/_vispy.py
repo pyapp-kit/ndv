@@ -673,12 +673,19 @@ class VispyHistogramView(HistogramView):
         gamma_to_plot = self._handle_transform.map
 
         if self._clims is not None:
+            if self._vertical:
+                click = click_y
+                right = plot_to_canvas([0, self._clims[1]])[1]
+                left = plot_to_canvas([0, self._clims[0]])[1]
+            else:
+                click = click_x
+                right = plot_to_canvas([self._clims[1], 0])[0]
+                left = plot_to_canvas([self._clims[0], 0])[0]
+
             # Right bound always selected on overlap
-            right = plot_to_canvas([self._clims[1]])[0]
-            if bool(abs(right - click_x) < tolerance):
+            if bool(abs(right - click) < tolerance):
                 return Grabbable.RIGHT_CLIM
-            left = plot_to_canvas([self._clims[0]])[0]
-            if bool(abs(left - click_x) < tolerance):
+            if bool(abs(left - click) < tolerance):
                 return Grabbable.LEFT_CLIM
 
         if self._gamma_handle_pos is not None:
