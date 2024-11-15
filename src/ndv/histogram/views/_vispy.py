@@ -513,6 +513,8 @@ class VispyHistogramView(HistogramView):
         self._vertical = vertical
         self._update_histogram()
         self.plot.lock_axis("x" if vertical else "y")
+        # When vertical, smaller values should appear at the top of the canvas
+        self.plot.camera.flip = [False, vertical, False]
         self._update_lut_lines()
         self._resize()
 
