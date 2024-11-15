@@ -179,7 +179,8 @@ def test_vertical(view: VispyHistogramView) -> None:
     view.set_vertical(True)
     assert view._vertical
     domain_after = view.plot.xaxis.axis.domain
-    range_after = view.plot.yaxis.axis.domain
+    # NB vertical mode inverts y axis
+    range_after = view.plot.yaxis.axis.domain[::-1]
     assert abs(domain_before[0] - range_after[0]) <= PLOT_EPSILON
     assert abs(domain_before[1] - range_after[1]) <= PLOT_EPSILON
     assert abs(range_before[0] - domain_after[0]) <= PLOT_EPSILON
