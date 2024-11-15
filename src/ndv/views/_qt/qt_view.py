@@ -2,7 +2,8 @@ from collections.abc import Container, Hashable, Mapping, Sequence
 from typing import Any, cast
 
 import cmap
-from qtpy.QtCore import Qt, Signal
+from qtpy.QtCore import QEvent, QObject, Qt, Signal
+from qtpy.QtGui import QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -20,7 +21,7 @@ from superqt.utils import signals_blocked
 from ndv._types import AxisKey
 from ndv.views import get_canvas_class
 from ndv.views._qt._dims_slider import SS
-from ndv.views.protocols import PImageHandle
+from ndv.views.protocols import CanvasElement, PImageHandle, PRoiHandle
 
 
 class CmapCombo(QColormapComboBox):
@@ -95,6 +96,14 @@ class QLUTWidget(QWidget):
             self._visible.setChecked(visible)
 
 
+class ROIButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setToolTip("Add ROI")
+        self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
+
+
 class QDimsSliders(QWidget):
     currentIndexChanged = Signal()
 
@@ -145,6 +154,7 @@ class QDimsSliders(QWidget):
 
 class QViewerView(QWidget):
     currentIndexChanged = Signal()
+    boundingBoxChanged = Signal()
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -157,6 +167,12 @@ class QViewerView(QWidget):
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
 
         self._channel_mode_btn = QPushButton("Channel")
+        self._roi_handle: PRoiHandle | None = None
+        self._selection: CanvasElement | None = None
+
+        # button to draw ROIs
+        self._add_roi_btn = ROIButton()
+        self._add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._btns = btns = QHBoxLayout()
         btns.setContentsMargins(0, 0, 0, 0)
@@ -165,13 +181,15 @@ class QViewerView(QWidget):
         btns.addWidget(self._channel_mode_btn)
         # btns.addWidget(self._ndims_btn)
         # btns.addWidget(self._set_range_btn)
-        # btns.addWidget(self._add_roi_btn)
+        btns.addWidget(self._add_roi_btn)
 
         self._luts = QCollapsible()
         self._luts.layout().setSpacing(0)
         self._luts.setCollapsedIcon(QIconifyIcon("bi:chevron-down", color="#888888"))
         self._luts.setExpandedIcon(QIconifyIcon("bi:chevron-up", color="#888888"))
-        layout.addWidget(self._canvas.qwidget(), 1)
+        qwidget = self._canvas.qwidget()
+        qwidget.installEventFilter(self)
+        layout.addWidget(qwidget, 1)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
         layout.addLayout(btns)
@@ -212,3 +230,145 @@ class QViewerView(QWidget):
     def set_visible_axes(self, axes: Sequence[Hashable]) -> None:
         """Set the visible axes."""
         self._visible_axes.setText(", ".join(map(str, axes)))
+
+    def setBoundingBox(self, min: Sequence[int], max: Sequence[int]) -> None:
+        if self._roi_handle is None:
+            self._roi_handle = self._canvas.add_roi()
+
+        # Only 2D vertices currently supported
+        if len(min) != 2 or len(max) != 2:
+            raise ValueError("Only 2D Boxes currently supported")
+        self._roi_handle.vertices = [
+            (min[0], min[1]),
+            (max[0], min[1]),
+            (max[0], max[1]),
+            (min[0], max[1]),
+        ]
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        """Event filter installed on the canvas to handle mouse events."""
+        if event is None:
+            return False  # pragma: no cover
+
+        # here is where we get a chance to intercept mouse events before passing them
+        # to the canvas. Return `True` to prevent the event from being passed to
+        # the backend widget.
+        intercept = False
+        # use children in case backend has a subwidget stealing events.
+        qcanvas = self._canvas.qwidget()
+        if obj is qcanvas or obj in (qcanvas.children()):
+            if isinstance(event, QMouseEvent):
+                intercept |= self._canvas_mouse_event(event)
+            if event.type() == QEvent.Type.KeyPress:
+                self.keyPressEvent(cast("QKeyEvent", event))
+        return intercept
+
+    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
+        intercept = False
+        if ev.type() == QEvent.Type.MouseButtonPress:
+            if self._add_roi_btn.isChecked():
+                intercept |= self._begin_roi(ev)
+            intercept |= self._grab_roi(ev)
+            return intercept
+        if ev.type() == QEvent.Type.MouseMove:
+            intercept = self._move_roi(ev)
+            intercept |= self._update_cursor(ev)
+            return intercept
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            intercept |= self._deselect_roi_btn()
+            return intercept
+        return intercept
+
+    # FIXME: This is ugly
+    def _begin_roi(self, event: QMouseEvent) -> bool:
+        self._roi_handle = self._canvas.add_roi()
+        if self._roi_handle:
+            ev_pos = event.position()
+            pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
+            self._roi_handle.move(pos)
+            self._roi_handle.visible = True
+        return False
+
+    def _grab_roi(self, ev: QMouseEvent) -> bool:
+        ev_pos = (ev.position().x(), ev.position().y())
+        pos = self._canvas.canvas_to_world(ev_pos)
+        # TODO why does the canvas need this point untransformed??
+        elements = self._canvas.elements_at(ev_pos)
+        # Deselect prior selection before editing new selection
+        if self._selection:
+            self._selection.selected = False
+        for e in elements:
+            if e.can_select:
+                e.start_move(pos)
+                # Select new selection
+                self._selection = e
+                self._selection.selected = True
+                return False
+        return False
+
+    def _move_roi(self, event: QMouseEvent) -> bool:
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            if self._selection and self._selection.selected:
+                ev_pos = event.pos()
+                pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
+                self._selection.move(pos)
+                # If we are moving the object, we don't want to move the camera
+                return True
+        return False
+
+    def _update_cursor(self, event: QMouseEvent) -> bool:
+        # Avoid changing the cursor when dragging
+        if event.buttons() != Qt.MouseButton.NoButton:
+            return False
+        qcanvas = self._canvas.qwidget()
+        # When "creating" a ROI, use CrossCursor
+        if self._add_roi_btn.isChecked():
+            qcanvas.setCursor(Qt.CursorShape.CrossCursor)
+            return False
+        # If any local elements have a preference, use it
+        pos = (event.pos().x(), event.pos().y())
+        for e in self._canvas.elements_at(pos):
+            if (pref := e.cursor_at(pos)) is not None:
+                qcanvas.setCursor(pref)
+                return False
+        # Otherwise, normal cursor
+        qcanvas.setCursor(Qt.CursorShape.ArrowCursor)
+        return False
+
+    def _set_roi(
+        self,
+        vertices: list[tuple[float, float]] | None = None,
+        color: Any = None,
+        border_color: Any = None,
+    ) -> None:
+        """Set the properties of the ROI overlaid on the displayed data.
+
+        Properties
+        ----------
+        vertices : list[tuple[float, float]] | None
+            The vertices of the ROI.
+        color : str, tuple, list, array, Color, or int
+            The fill color.  Can be any "ColorLike".
+        border_color : str, tuple, list, array, Color, or int
+            The border color.  Can be any "ColorLike".
+        """
+        # Remove the old ROI
+        if self._roi_handle:
+            self._roi_handle.remove()
+
+        self._roi_handle = self._canvas.add_roi(
+            vertices=vertices, color=color, border_color=border_color
+        )
+
+    def _on_add_roi_clicked(self, checked: bool) -> None:
+        if checked:
+            # Add new roi
+            self._set_roi()
+
+    def _deselect_roi_btn(self) -> bool:
+        if self._add_roi_btn.isChecked():
+            self._add_roi_btn.click()
+        # TODO: Improve code
+        if self._roi_handle and self._selection is not None:
+            self.boundingBoxChanged.emit()
+        return False

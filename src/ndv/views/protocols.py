@@ -28,6 +28,12 @@ class PLutView(Protocol):
     def setLutVisible(self, visible: bool) -> None: ...
 
 
+class PRoiView(Protocol):
+    boundingBoxChanged: Signal
+
+    def setBoundingBox(self, min: Sequence[int], max: Sequence[int]) -> None: ...
+
+
 class CanvasElement(Protocol):
     """Protocol defining an interactive element on the Canvas."""
 
@@ -93,6 +99,7 @@ class PView(Protocol):
     """Protocol that front-end viewers must implement."""
 
     currentIndexChanged: SignalInstance
+    boundingBoxChanged: SignalInstance
 
     def refresh(self) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
