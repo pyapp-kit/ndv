@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import cmap
-    from vispy.scene.events import SceneMouseEvent
+    from vispy.app.canvas import MouseEvent
 
     class Grid(scene.Grid):
         def add_view(
@@ -594,7 +594,7 @@ class VispyHistogramView(HistogramView):
             v._bounds_changed()
         self._gamma_handle._bounds_changed()
 
-    def on_mouse_press(self, event: SceneMouseEvent) -> None:
+    def on_mouse_press(self, event: MouseEvent) -> None:
         if event.pos is None:
             return  # pragma: no cover
         # check whether the user grabbed a node
@@ -603,11 +603,11 @@ class VispyHistogramView(HistogramView):
             # disconnect the pan/zoom mouse events until handle is dropped
             self.plot.camera.interactive = False
 
-    def on_mouse_release(self, event: SceneMouseEvent) -> None:
+    def on_mouse_release(self, event: MouseEvent) -> None:
         self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
 
-    def on_mouse_move(self, event: SceneMouseEvent) -> None:
+    def on_mouse_move(self, event: MouseEvent) -> None:
         """Called whenever mouse moves over canvas."""
         if event.pos is None:
             return  # pragma: no cover
@@ -663,9 +663,7 @@ class VispyHistogramView(HistogramView):
             if (x1 < x <= x2) and (y1 <= y <= y2):
                 self._canvas.native.setCursor(Qt.CursorShape.SizeAllCursor)
 
-    def _find_nearby_node(
-        self, event: SceneMouseEvent, tolerance: int = 5
-    ) -> Grabbable:
+    def _find_nearby_node(self, event: MouseEvent, tolerance: int = 5) -> Grabbable:
         """Describes whether the event is near a clim."""
         click_x, click_y = event.pos
 
