@@ -42,6 +42,39 @@ def view(qtbot: QtBot, data: np.ndarray) -> VispyHistogramView:
     return view
 
 
+def test_plot(view: VispyHistogramView) -> None:
+    plot = view.plot
+
+    assert plot.title == ""
+    plot.title = "foo"
+    assert plot._title.text == "foo"
+
+    assert plot.xlabel == ""
+    plot.xlabel = "bar"
+    assert plot._xlabel.text == "bar"
+
+    assert plot.ylabel == ""
+    plot.ylabel = "baz"
+    assert plot._ylabel.text == "baz"
+
+    # Test axis lock - pan
+    _domain = plot.xaxis.axis.domain
+    _range = plot.yaxis.axis.domain
+    plot.camera.pan([20, 20])
+    assert np.all(np.isclose(_domain, [x - 20 for x in plot.xaxis.axis.domain]))
+    assert np.all(np.isclose(_range, plot.yaxis.axis.domain))
+
+    # Test axis lock - zoom
+    _domain = plot.xaxis.axis.domain
+    _range = plot.yaxis.axis.domain
+    plot.camera.zoom(0.5)
+    dx = (_domain[1] - _domain[0]) / 4
+    assert np.all(
+        np.isclose([_domain[0] + dx, _domain[1] - dx], plot.xaxis.axis.domain)
+    )
+    assert np.all(np.isclose(_range, plot.yaxis.axis.domain))
+
+
 def test_clims(data: np.ndarray, view: VispyHistogramView) -> None:
     # on startup, clims should be at the extent of the data
     clims = np.min(data), np.max(data)

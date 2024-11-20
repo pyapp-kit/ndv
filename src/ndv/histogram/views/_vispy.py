@@ -321,7 +321,7 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
             super().zoom(factor, center=center)
             return
 
-        if isinstance(factor, float):
+        if isinstance(factor, (float, int)):
             factor = (factor, factor)
         _factor = list(factor)
         _factor[self.axis_index] = 1
@@ -462,7 +462,7 @@ class VispyHistogramView(HistogramView):
 
     def set_visibility(self, visible: bool) -> None:
         if self._hist_mesh is None:
-            return
+            return  # pragma: no cover
         self._hist_mesh.visible = visible
         self._lut_line.visible = visible
         self._gamma_handle.visible = visible
@@ -536,7 +536,7 @@ class VispyHistogramView(HistogramView):
         https://github.com/vispy/vispy/blob/af847424425d4ce51f144a4d1c75ab4033fe39be/vispy/visuals/histogram.py#L28
         """
         if self._values is None or self._bin_edges is None:
-            return
+            return  # pragma: no cover
         values = self._values
         if self._log_y:
             # Replace zero values with 1 (which will be log10(1) = 0)
@@ -552,7 +552,7 @@ class VispyHistogramView(HistogramView):
 
     def _update_lut_lines(self, npoints: int = 256) -> None:
         if self._clims is None or self._gamma is None:
-            return
+            return  # pragma: no cover
 
         # 2 additional points for each of the two vertical clims lines
         X = np.empty(npoints + 4)
@@ -596,7 +596,7 @@ class VispyHistogramView(HistogramView):
 
     def on_mouse_press(self, event: SceneMouseEvent) -> None:
         if event.pos is None:
-            return
+            return  # pragma: no cover
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(event)
         if self._grabbed != Grabbable.NONE:
@@ -610,9 +610,9 @@ class VispyHistogramView(HistogramView):
     def on_mouse_move(self, event: SceneMouseEvent) -> None:
         """Called whenever mouse moves over canvas."""
         if event.pos is None:
-            return
+            return  # pragma: no cover
         if self._clims is None:
-            return
+            return  # pragma: no cover
 
         if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
             newlims = list(self._clims)

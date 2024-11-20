@@ -33,7 +33,7 @@ class StatsModel:
         """Returns the data backing this StatsModel."""
         if self._data is not None:
             return self._data
-        raise Exception("Data has not yet been set!")
+        raise RuntimeError("Data has not yet been set!")
 
     @data.setter
     def data(self, data: np.ndarray) -> None:
