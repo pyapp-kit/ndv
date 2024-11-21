@@ -3,14 +3,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-import cmap
-from psygnal import Signal
-
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
+    import cmap
     import numpy as np
-    from psygnal import SignalInstance
+    from psygnal import Signal, SignalInstance
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
@@ -52,70 +50,24 @@ PSignal = Union[PSignalDescriptor, PSignalInstance]
 
 
 class PLutView(Protocol):
+    """An (interactive) view of a LookUp Table (LUT)."""
+
     visibleChanged: PSignal
     autoscaleChanged: PSignal
     cmapChanged: PSignal
     climsChanged: PSignal
+    gammaChanged: PSignal
 
-    def set_name(self, name: str) -> None: ...
-    def set_auto_scale(self, auto: bool) -> None: ...
-    def set_colormap(self, cmap: cmap.Colormap) -> None: ...
-    def set_clims(self, clims: tuple[float, float]) -> None: ...
-    def set_lut_visible(self, visible: bool) -> None: ...
-
-
-class LutView(Protocol):
-    """An (interactive) view of a LookUp Table (LUT)."""
-
-    cmapChanged: Signal = Signal(cmap.Colormap)
-    gammaChanged: Signal = Signal(float)
-    climsChanged: Signal = Signal(tuple[float, float])
-    autoscaleChanged: Signal = Signal(object)
-
-    def set_visibility(self, visible: bool) -> None:
-        """Defines whether this view is visible.
+    def set_name(self, name: str) -> None:
+        """Defines the name of the view.
 
         Properties
         ----------
-        visible : bool
-            True iff the view should be visible.
+        name : str
+            The name (label) of the LUT
         """
         ...
-
-    def set_cmap(self, lut: cmap.Colormap) -> None:
-        """Defines the colormap backing the view.
-
-        Properties
-        ----------
-        lut : cmap.Colormap
-            The object mapping scalar values to RGB(A) colors.
-        """
-        ...
-
-    def set_gamma(self, gamma: float) -> None:
-        """Defines the exponent used for gamma correction.
-
-        Properties
-        ----------
-        gamma : float
-            The exponent used for gamma correction
-        """
-        ...
-
-    def set_clims(self, clims: tuple[float, float]) -> None:
-        """Defines the input clims.
-
-        The contrast limits (clims) are the input values mapped to the minimum and
-        maximum (respectively) of the LUT.
-
-        Properties
-        ----------
-        clims : tuple[float, float]
-            The clims
-        """
-        ...
-
-    def set_autoscale(self, autoscale: bool | tuple[float, float]) -> None:
+    def set_auto_scale(self, auto: bool) -> None:
         """Defines whether autoscale has been enabled.
 
         Autoscale defines whether the contrast limits (clims) are adjusted when the
@@ -130,18 +82,53 @@ class LutView(Protocol):
             upper clims, respectively.
         """
         ...
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
+        """Defines the colormap backing the view.
 
-    def view(self) -> Any:
-        """The native object that can be displayed."""
+        Properties
+        ----------
+        lut : cmap.Colormap
+            The object mapping scalar values to RGB(A) colors.
+        """
+        ...
+    def set_clims(self, clims: tuple[float, float]) -> None:
+        """Defines the input clims.
+
+        The contrast limits (clims) are the input values mapped to the minimum and
+        maximum (respectively) of the LUT.
+
+        TODO: What does None imply? Autoscale?
+
+        Properties
+        ----------
+        clims : tuple[float, float] | None
+            The clims
+        """
+        ...
+    def set_lut_visible(self, visible: bool) -> None:
+        """Defines whether this view is visible.
+
+        Properties
+        ----------
+        visible : bool
+            True iff the view should be visible.
+        """
         ...
 
+    def set_gamma(self, gamma: float) -> None:
+        """Defines the input gamma.
 
-class StatsView(Protocol):
+        properties
+        ----------
+        gamma : float
+            The gamma
+        """
+        ...
+
+class PStatsView(Protocol):
     """A view of the statistics of a dataset."""
 
-    def set_histogram(
-        self, values: Sequence[float], bin_edges: Sequence[float]
-    ) -> None:
+    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
         """Defines the distribution of the dataset.
 
         Properties
@@ -176,12 +163,8 @@ class StatsView(Protocol):
         """
         ...
 
-    def view(self) -> Any:
-        """The native object that can be displayed."""
-        ...
 
-
-class HistogramView(StatsView, LutView):
+class PHistogramView(PStatsView, PLutView):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
