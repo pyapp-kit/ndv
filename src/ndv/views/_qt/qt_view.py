@@ -21,9 +21,11 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey, MouseMoveEvent
+from ndv.views import get_histogram_class
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
+    from typing import Any
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -336,3 +338,101 @@ class QtViewerView(QWidget):
         # if ev.type() == QEvent.Type.MouseButtonRelease:
         #     ...
         return False
+
+class QHistogramView(QWidget):
+    """A Qt wrapper around a 'backend' Histogram View.
+
+    Parameters
+    ----------
+    parent: QWidget | None
+        If a widget, set as the parent of this widget
+    """
+
+    visibleChanged = Signal()
+    autoscaleChanged = Signal()
+    cmapChanged = Signal(cmap.Colormap)
+    climsChanged = Signal(tuple)
+    gammaChanged = Signal(float)
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._backend = get_histogram_class()()
+        self._backend.visibleChanged.connect(self.visibleChanged.emit)
+        self._backend.autoscaleChanged.connect(self.autoscaleChanged.emit)
+        self._backend.cmapChanged.connect(self.cmapChanged.emit)
+        self._backend.climsChanged.connect(self.climsChanged.emit)
+        self._backend.gammaChanged.connect(self.gammaChanged.emit)
+
+        # Vertical box
+        self._vert = QPushButton("Vertical")
+        self._vert.setCheckable(True)
+        self._vert.toggled.connect(self._backend.set_vertical)
+
+        # Log box
+        self._log = QPushButton("Logarithmic")
+        self._log.setCheckable(True)
+        self._log.toggled.connect(self._backend.set_range_log)
+
+        # Layout
+        self._layout = QVBoxLayout(self)
+        # FIXME: Add to protocol?
+        self._layout.addWidget(self._backend.view())
+        self._layout.addWidget(self._vert)
+        self._layout.addWidget(self._log)
+
+    # ------------- StatsView Protocol methods ------------- #
+
+    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
+        """Set the histogram values and bin edges.
+
+        These inputs follow the same format as the return value of numpy.histogram.
+        """
+        self._backend.set_histogram(values, bin_edges)
+
+    def set_std_dev(self, std_dev: float) -> None:
+        self._backend.set_std_dev(std_dev)
+
+    def set_average(self, average: float) -> None:
+        self._backend.set_average(average)
+
+    def view(self) -> Any:
+        return self
+
+    # ------------- LutView Protocol methods ------------- #
+
+    def set_name(self, name: str) -> None:
+        # TODO: maybe show text somewhere
+        self._backend.set_name(name)
+        pass
+
+    def set_lut_visible(self, visible: bool) -> None:
+        self._backend.set_lut_visible(visible)
+
+    def set_colormap(self, lut: cmap.Colormap) -> None:
+        # TODO: Maybe some controls would be nice here?
+        self._backend.set_colormap(lut)
+
+    def set_gamma(self, gamma: float) -> None:
+        self._backend.set_gamma(gamma)
+
+    def set_clims(self, clims: tuple[float, float]) -> None:
+        self._backend.set_clims(clims)
+
+    def set_auto_scale(self, autoscale: bool) -> None:
+        self._backend.set_auto_scale(autoscale)
+
+    # ------------- HistogramView Protocol methods ------------- #
+
+    def set_domain(self, bounds: tuple[float, float] | None) -> None:
+        self._backend.set_domain(bounds)
+
+    def set_range(self, bounds: tuple[float, float] | None) -> None:
+        self._backend.set_range(bounds)
+
+    def set_vertical(self, vertical: bool) -> None:
+        self._vert.setChecked(vertical)
+        self._backend.set_vertical(vertical)
+
+    def set_range_log(self, enabled: bool) -> None:
+        self._log.setChecked(enabled)
+        self._backend.set_range_log(enabled)

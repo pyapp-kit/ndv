@@ -1068,16 +1068,13 @@ class VispyHistogramView(PHistogramView):
         self._gamma = gamma
         self._update_lut_lines()
 
-    def set_clims(self, clims: tuple[float, float] | None) -> None:
-        # FIXME
-        if clims is None:
-            return
+    def set_clims(self, clims: tuple[float, float]) -> None:
         if clims[1] < clims[0]:
             clims = (clims[1], clims[0])
         self._clims = clims
         self._update_lut_lines()
 
-    def set_auto_scale(self, autoscale: bool | tuple[float, float]) -> None:
+    def set_auto_scale(self, autoscale: bool) -> None:
         # Nothing to do (yet)
         pass
 
@@ -1209,15 +1206,14 @@ class VispyHistogramView(PHistogramView):
             return  # pragma: no cover
 
         if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
-            newlims = list(self._clims)
             if self._vertical:
                 c = self._to_plot_coords(event.pos)[1]
             else:
                 c = self._to_plot_coords(event.pos)[0]
             if self._grabbed is Grabbable.LEFT_CLIM:
-                newlims[0] = min(newlims[1], c)
+                newlims = (min(self._clims[1], c), self._clims[1])
             elif self._grabbed is Grabbable.RIGHT_CLIM:
-                newlims[1] = max(newlims[0], c)
+                newlims = (self._clims[0], max(self._clims[0], c))
             self.climsChanged.emit(newlims)
             return
         elif self._grabbed is Grabbable.GAMMA:

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from ndv.views.protocols import PCanvas
 
-    from .protocols import PView
+    from .protocols import PHistogramView, PView
 
     GuiFrontend: TypeAlias = Literal["qt", "jupyter"]
     CanvasBackend: TypeAlias = Literal["vispy", "pygfx"]
@@ -55,6 +55,14 @@ def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
         return PyGFXViewerCanvas
 
     raise RuntimeError("No canvas backend found")
+
+
+def get_histogram_backend(backend: str | None = None) -> PHistogramView:
+    if _is_running_in_qapp():
+        from ._qt.qt_view import QHistogramView
+
+        return QHistogramView()
+    raise RuntimeError("Could not determine the appropriate histogram backend")
 
 
 def _is_running_in_notebook() -> bool:
@@ -122,3 +130,19 @@ def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
         return cast("CanvasBackend", backend)
 
     raise ValueError(f"Invalid canvas backend: {backend!r}")
+
+
+def get_histogram_class(backend: str | None = None) -> type[PHistogramView]:
+    backend = backend or os.getenv("NDV_CANVAS_BACKEND", None)
+    if backend == "vispy" or (backend is None and "vispy" in sys.modules):
+        from ndv.views._vispy._vispy import VispyHistogramView
+
+        return VispyHistogramView
+
+    if backend is None:
+        if importlib.util.find_spec("vispy") is not None:
+            from ndv.views._vispy._vispy import VispyHistogramView
+
+            return VispyHistogramView
+
+    raise RuntimeError("No histogram backend found")

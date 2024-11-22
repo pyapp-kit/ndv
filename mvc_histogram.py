@@ -12,7 +12,7 @@ from qtpy.QtWidgets import (
 )
 
 from ndv.models import LUTModel, StatsModel
-from ndv.views._vispy._vispy import VispyHistogramView
+from ndv.views import get_histogram_backend
 
 if TYPE_CHECKING:
     from typing import Any
@@ -35,7 +35,7 @@ class Controller:
         if lut_model is None:
             lut_model = LUTModel()
         if view is None:
-            view = VispyHistogramView()
+            view = get_histogram_backend()
         self._stats = stats_model
         self._lut = lut_model
         self._view = view
@@ -49,16 +49,6 @@ class Controller:
         self._view.climsChanged.connect(self._set_view_clims)
         self._lut.events.gamma.connect(self._set_model_gamma)
         self._view.gammaChanged.connect(self._set_view_gamma)
-
-        # Vertical box
-        self._vert = QPushButton("Vertical")
-        self._vert.setCheckable(True)
-        self._vert.toggled.connect(self._view.set_vertical)
-
-        # Log box
-        self._log = QPushButton("Logarithmic")
-        self._log.setCheckable(True)
-        self._log.toggled.connect(self._view.set_range_log)
 
         # Data updates
         self._data_btn = QPushButton("Change Data")
@@ -80,8 +70,6 @@ class Controller:
         # Layout
         self._layout = QVBoxLayout(self._wdg)
         self._layout.addWidget(self._view.view())
-        self._layout.addWidget(self._vert)
-        self._layout.addWidget(self._log)
         self._layout.addWidget(self._data_btn)
 
     def _set_data(self) -> None:

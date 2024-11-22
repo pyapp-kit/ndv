@@ -75,11 +75,8 @@ class PLutView(Protocol):
 
         Properties
         ----------
-        autoscale : bool | tuple[float, float]
-            If a boolean, true iff clims automatically changed on dataset alteration.
-            If a tuple, indicated that clims automatically changed. Values denote
-            the fraction of the dataset located below and above the lower and
-            upper clims, respectively.
+        autoscale : bool
+            True iff clims automatically changed on dataset alteration.
         """
         ...
     def set_colormap(self, cmap: cmap.Colormap) -> None:
@@ -97,11 +94,9 @@ class PLutView(Protocol):
         The contrast limits (clims) are the input values mapped to the minimum and
         maximum (respectively) of the LUT.
 
-        TODO: What does None imply? Autoscale?
-
         Properties
         ----------
-        clims : tuple[float, float] | None
+        clims : tuple[float, float]
             The clims
         """
         ...
