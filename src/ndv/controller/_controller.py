@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ndv.models import DataDisplayModel
+import numpy as np
+
+from ndv.models import DataDisplayModel, ROIModel
 from ndv.views import get_view_backend
 
 if TYPE_CHECKING:
@@ -16,17 +18,25 @@ class ViewerController:
     """The controller mostly manages the connection between the model and the view."""
 
     def __init__(
-        self, view: PView | None = None, data: DataDisplayModel | None = None
+        self,
+        view: PView | None = None,
+        data: DataDisplayModel | None = None,
+        roi: ROIModel | None = None,
     ) -> None:
         if data is None:
             data = DataDisplayModel()
         if view is None:
             view = get_view_backend()
+        if roi is None:
+            roi = ROIModel(visible=False)
         self._dd_model = data  # rename me?
         self._view = view
+        self._roi = roi
 
         self._set_model_connected(self._dd_model.display)
+        self._set_roi_connected(self._roi)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
+        self._view.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
         self._handles: dict[int | None, PImageHandle] = {}
 
         self._lut_views: dict[int | None, PLutView] = {}
@@ -68,6 +78,10 @@ class ViewerController:
             self._update_visible_sliders()
             self._update_canvas()
 
+    @property
+    def roi(self) -> ROIModel:
+        return self._roi
+
     # -----------------------------------------------------------------------------
 
     def _set_model_connected(
@@ -90,6 +104,19 @@ class ViewerController:
             (model.luts.value_changed, self._on_model_luts_changed),
             (model.default_lut.events.cmap, self._on_model_luts_changed),
             (model.default_lut.events.clims, self._on_model_clims_changed),
+        ]:
+            getattr(obj, _connect)(callback)
+
+    def _set_roi_connected(self, model: ROIModel, connect: bool = True) -> None:
+        """Connect or disconnect the model to/from the viewer.
+
+        We do this in a single method so that we are sure to connect and disconnect
+        the same events in the same order.  (but it's kinda ugly)
+        """
+        _connect = "connect" if connect else "disconnect"
+
+        for obj, callback in [
+            (model.events.bounding_box, self._on_bounding_box_changed),
         ]:
             getattr(obj, _connect)(callback)
 
@@ -136,6 +163,10 @@ class ViewerController:
         self._update_visible_sliders()
         self._update_canvas()
 
+    def _on_bounding_box_changed(self) -> None:
+        bb = self._roi.bounding_box
+        self._view.setBoundingBox(*bb)
+
     def add_lut_view(self, key: int | None) -> PLutView:
         if key in self._lut_views:
             # need to clean up
@@ -157,6 +188,14 @@ class ViewerController:
     def _on_view_current_index_changed(self) -> None:
         """Update the model when slider value changes."""
         self.model.current_index.update(self._view.current_index())
+
+    def _on_view_bounding_box_changed(self) -> None:
+        """Update the model when slider value changes."""
+        # FIXME: Find the best way to expose the bounding box
+        vertices = self._view._roi_handle.vertices
+        mi = tuple(float(t) for t in np.min(vertices, axis=0))
+        ma = tuple(float(t) for t in np.max(vertices, axis=0))
+        self.roi.bounding_box = (mi, ma)
 
     def _on_view_lut_visible_changed(self, visible: bool) -> None:
         self._handles[None].visible = visible
