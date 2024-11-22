@@ -7,7 +7,12 @@ import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
+<<<<<<< HEAD
 from ndv._types import MouseMoveEvent
+=======
+from ndv.views import get_canvas_class, get_histogram_class
+from ndv.views.protocols import CursorType
+>>>>>>> 114c36b (Create JupyterHistogramView)
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -231,3 +236,143 @@ class JupyterViewerView:
 
     def set_hover_info(self, hover_info: str) -> None:
         self._hover_info_label.value = hover_info
+
+
+class JupyterHistogramView:
+    """A Jupyter wrapper around a 'backend' Histogram View."""
+
+    visibleChanged = Signal()
+    autoscaleChanged = Signal()
+    cmapChanged = Signal(cmap.Colormap)
+    climsChanged = Signal(tuple)
+    gammaChanged = Signal(float)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._backend = get_histogram_class()()
+        self._backend.visibleChanged.connect(self.visibleChanged.emit)
+        self._backend.autoscaleChanged.connect(self.autoscaleChanged.emit)
+        self._backend.cmapChanged.connect(self.cmapChanged.emit)
+        self._backend.climsChanged.connect(self.climsChanged.emit)
+        self._backend.gammaChanged.connect(self.gammaChanged.emit)
+        self._vert = widgets.ToggleButton(
+            value=False,
+            description="Vertical",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            # TODO: Workshop tooltip
+            tooltip="If enabled, histogram domain will be displayed along the vertical axis",
+        )
+        self._vert.observe(self._on_vertical_changed, names="value")
+
+        self._log = widgets.ToggleButton(
+            value=False,
+            description="Logarithmic Range",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="Display the base-10 logarithm of each bin height",
+        )
+        self._log.observe(self._on_log_changed, names="value")
+        # `qwidget` is obviously a misnomer here.  it works, because vispy is smart
+        # enough to return a widget that ipywidgets can display in the appropriate
+        # context, but we should be managing that more explicitly ourselves.
+        self.layout = widgets.VBox([self._backend.view(), self._vert, self._log])
+
+    def show(self) -> None:
+        """Show the viewer."""
+        from IPython.display import display
+
+        display(self.layout)  # type: ignore [no-untyped-call]
+
+    def refresh(self) -> None:
+        self._backend.refresh()
+
+    # ------------- StatsView Protocol methods ------------- #
+
+    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
+        """Set the histogram values and bin edges.
+
+        These inputs follow the same format as the return value of numpy.histogram.
+        """
+        self._backend.set_histogram(values, bin_edges)
+        self._backend.refresh()
+
+    def set_std_dev(self, std_dev: float) -> None:
+        self._backend.set_std_dev(std_dev)
+        self._backend.refresh()
+
+    def set_average(self, average: float) -> None:
+        self._backend.set_average(average)
+        self._backend.refresh()
+
+    def view(self) -> Any:
+        return self
+
+    # ------------- LutView Protocol methods ------------- #
+
+    def set_name(self, name: str) -> None:
+        # TODO: maybe show text somewhere
+        self._backend.set_name(name)
+        self._backend.refresh()
+        pass
+
+    def set_lut_visible(self, visible: bool) -> None:
+        self._backend.set_lut_visible(visible)
+        self._backend.refresh()
+
+    def set_colormap(self, lut: cmap.Colormap) -> None:
+        # TODO: Maybe some controls would be nice here?
+        self._backend.set_colormap(lut)
+        self._backend.refresh()
+
+    def set_gamma(self, gamma: float) -> None:
+        self._backend.set_gamma(gamma)
+        self._backend.refresh()
+
+    def set_clims(self, clims: tuple[float, float] | None) -> None:
+        self._backend.set_clims(clims)
+        self._backend.refresh()
+
+    def set_auto_scale(self, autoscale: bool | tuple[float, float]) -> None:
+        self._backend.set_auto_scale(autoscale)
+        self._backend.refresh()
+
+    # ------------- HistogramView Protocol methods ------------- #
+
+    def set_domain(self, bounds: tuple[float, float] | None) -> None:
+        self._backend.set_domain(bounds)
+        self._backend.refresh()
+
+    def set_range(self, bounds: tuple[float, float] | None) -> None:
+        self._backend.set_range(bounds)
+        self._backend.refresh()
+
+    def set_vertical(self, vertical: bool) -> None:
+        self._vert.value = vertical
+        self._backend.set_vertical(vertical)
+        self._backend.refresh()
+
+    def set_range_log(self, enabled: bool) -> None:
+        self._log.value = enabled
+        self._backend.set_range_log(enabled)
+        self._backend.refresh()
+
+    def _on_vertical_changed(self, change: dict[str, Any]) -> None:
+        self.set_vertical(self._vert.value)
+
+    def _on_log_changed(self, change: dict[str, Any]) -> None:
+        self.set_range_log(self._log.value)
+
+
+class JupyterCursor:
+    def __init__(self, native: Any) -> None:
+        # FIXME
+        self._native = native
+
+    def set(self, type: CursorType) -> None:
+        if type is CursorType.DEFAULT:
+            self._native.cursor = "default"
+        elif type is CursorType.V_ARROW:
+            self._native.cursor = "ns-resize"
+        elif type is CursorType.H_ARROW:
+            self._native.cursor = "ew-resize"
+        elif type is CursorType.ALL_ARROW:
+            self._native.cursor = "move"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
@@ -162,6 +163,8 @@ class PStatsView(Protocol):
 class PHistogramView(PStatsView, PLutView):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
+    # TODO: Remove?
+    def refresh(self) -> None: ...
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
         """Sets the domain of the view.
 
@@ -341,3 +344,15 @@ class PCanvas(Protocol):
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
     ) -> PRoiHandle: ...
+
+
+class CursorType(Enum):
+    DEFAULT = auto()
+    V_ARROW = auto()
+    H_ARROW = auto()
+    ALL_ARROW = auto()
+
+
+class PCursor(Protocol):
+    def __init__(self, native: Any) -> None: ...
+    def set(self, type: CursorType) -> None: ...

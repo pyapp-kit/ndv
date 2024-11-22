@@ -17,7 +17,8 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views.protocols import PCanvas, PHistogramView
+from ndv.views import get_cursor_class
+from ndv.views.protocols import CursorType, PCanvas, PHistogramView
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -968,6 +969,8 @@ class VispyHistogramView(PHistogramView):
         self._canvas.on_mouse_release = self.on_mouse_release
         self._canvas.freeze()
 
+        self._cursor = get_cursor_class()(self._canvas.native)
+
         ## -- Visuals -- ##
 
         # NB We directly use scene.Mesh, instead of scene.Histogram,
@@ -1016,6 +1019,9 @@ class VispyHistogramView(PHistogramView):
         self.plot._view.add(self._hist_mesh)
         self.plot._view.add(self._lut_line)
         self.plot._view.add(self._gamma_handle)
+
+    def refresh(self) -> None:
+        self._canvas.update()
 
     # ------------- StatsView Protocol methods ------------- #
 
@@ -1228,30 +1234,27 @@ class VispyHistogramView(PHistogramView):
             self.gammaChanged.emit(-np.log2(y / y1))
             return
 
-        # TODO: try to remove the Qt aspect here so that we can use
-        # this for Jupyter as well
-        self._canvas.native.unsetCursor()
-
         nearby = self._find_nearby_node(event)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
             if self._vertical:
-                cursor = Qt.CursorShape.SplitVCursor
+                cursor_type = CursorType.V_ARROW
             else:
-                cursor = Qt.CursorShape.SplitHCursor
-            self._canvas.native.setCursor(cursor)
+                cursor_type = CursorType.H_ARROW
         elif nearby is Grabbable.GAMMA:
             if self._vertical:
-                cursor = Qt.CursorShape.SplitHCursor
+                cursor_type = CursorType.H_ARROW
             else:
-                cursor = Qt.CursorShape.SplitVCursor
-            self._canvas.native.setCursor(cursor)
+                cursor_type = CursorType.V_ARROW
         else:
             x, y = self._to_plot_coords(event.pos)
             x1, x2 = self.plot.xaxis.axis.domain
             y1, y2 = self.plot.yaxis.axis.domain
             if (x1 < x <= x2) and (y1 <= y <= y2):
-                self._canvas.native.setCursor(Qt.CursorShape.SizeAllCursor)
+                cursor_type = CursorType.ALL_ARROW
+            else:
+                cursor_type = CursorType.DEFAULT
+        self._cursor.set(cursor_type)
 
     def _find_nearby_node(self, event: MouseEvent, tolerance: int = 5) -> Grabbable:
         """Describes whether the event is near a clim."""

@@ -9,9 +9,7 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from typing import Literal, TypeAlias
 
-    from ndv.views.protocols import PCanvas
-
-    from .protocols import PHistogramView, PView
+    from ndv.views.protocols import PCanvas, PCursor, PHistogramView, PView
 
     GuiFrontend: TypeAlias = Literal["qt", "jupyter"]
     CanvasBackend: TypeAlias = Literal["vispy", "pygfx"]
@@ -58,6 +56,10 @@ def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
 
 
 def get_histogram_backend(backend: str | None = None) -> PHistogramView:
+    if _is_running_in_notebook():
+        from ._jupyter.jupyter_view import JupyterHistogramView
+
+        return JupyterHistogramView()
     if _is_running_in_qapp():
         from ._qt.qt_view import QHistogramView
 
@@ -146,3 +148,16 @@ def get_histogram_class(backend: str | None = None) -> type[PHistogramView]:
             return VispyHistogramView
 
     raise RuntimeError("No histogram backend found")
+
+
+def get_cursor_class(backend: str | None = None) -> type[PCursor]:
+    if _is_running_in_notebook():
+        from ._jupyter.jupyter_view import JupyterCursor
+
+        return JupyterCursor
+    elif _is_running_in_qapp():
+        from ._qt.qt_view import QCursor
+
+        return QCursor
+
+    raise RuntimeError("Could not determine the appropriate viewer backend")

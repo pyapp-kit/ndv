@@ -20,6 +20,7 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
+<<<<<<< HEAD
 from ndv._types import AxisKey, MouseMoveEvent
 from ndv.views import get_histogram_class
 
@@ -60,6 +61,12 @@ QRangeSlider { qproperty-barColor: qlineargradient(
         stop:1 rgba(100, 80, 120, 0.4)
     )}
 """
+=======
+from ndv._types import AxisKey
+from ndv.views import get_canvas_class, get_histogram_class
+from ndv.views._qt._dims_slider import SS
+from ndv.views.protocols import CursorType, PImageHandle
+>>>>>>> 114c36b (Create JupyterHistogramView)
 
 
 class CmapCombo(QColormapComboBox):
@@ -380,6 +387,9 @@ class QHistogramView(QWidget):
         self._layout.addWidget(self._vert)
         self._layout.addWidget(self._log)
 
+    def refresh(self) -> None:
+        self._backend.refresh()
+
     # ------------- StatsView Protocol methods ------------- #
 
     def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
@@ -436,3 +446,19 @@ class QHistogramView(QWidget):
     def set_range_log(self, enabled: bool) -> None:
         self._log.setChecked(enabled)
         self._backend.set_range_log(enabled)
+
+
+class QCursor:
+    def __init__(self, native: Any) -> None:
+        # FIXME
+        self._native = native
+
+    def set(self, type: CursorType) -> None:
+        if type is CursorType.V_ARROW:
+            self._native.setCursor(Qt.CursorShape.SplitVCursor)
+        elif type is CursorType.H_ARROW:
+            self._native.setCursor(Qt.CursorShape.SplitHCursor)
+        elif type is CursorType.ALL_ARROW:
+            self._native.setCursor(Qt.CursorShape.SizeAllCursor)
+        else:
+            self._native.unsetCursor()
