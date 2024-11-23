@@ -6,13 +6,11 @@ import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
-from ndv.views import get_canvas_class
-
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey
-    from ndv.views.protocols import PImageHandle, PLutView
+    from ndv.views.protocols import PLutView, PSignal
 
 
 class JupyterLutView:
@@ -84,18 +82,18 @@ class JupyterLutView:
 
 # this is a PView
 class JupyterViewerView:
-    currentIndexChanged = Signal()
+    # not sure why this annotation is necessary ... something wrong with PSignal
+    currentIndexChanged: PSignal = Signal()
 
-    def __init__(self) -> None:
+    def __init__(self, canvas_widget: Any, **kwargs: Any) -> None:
         super().__init__()
-        self._canvas = get_canvas_class()()
-        self._canvas.set_ndim(2)
+        self._canvas_widget = canvas_widget
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
         # `qwidget` is obviously a misnomer here.  it works, because vispy is smart
         # enough to return a widget that ipywidgets can display in the appropriate
         # context, but we should be managing that more explicitly ourselves.
-        self.layout = widgets.VBox([self._canvas.qwidget(), self._slider_box])
+        self.layout = widgets.VBox([self._canvas_widget, self._slider_box])
 
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
@@ -123,13 +121,7 @@ class JupyterViewerView:
 
     def on_slider_change(self, change: dict[str, Any]) -> None:
         """Emit signal when a slider value changes."""
-        self.currentIndexChanged()
-
-    def add_image_to_canvas(self, data: Any) -> PImageHandle:
-        """Add image data to the canvas."""
-        hdl = self._canvas.add_image(data)
-        self._canvas.set_range()
-        return hdl
+        self.currentIndexChanged.emit()
 
     def hide_sliders(
         self, axes_to_hide: Container[Hashable], show_remainder: bool = True
@@ -163,9 +155,5 @@ class JupyterViewerView:
         from IPython.display import display
 
         display(self.layout)  # type: ignore [no-untyped-call]
-
-    def refresh(self) -> None:
-        """Refresh the viewer."""
-        self._canvas.refresh()
 
     def set_data_info(self, data_info: str) -> None: ...

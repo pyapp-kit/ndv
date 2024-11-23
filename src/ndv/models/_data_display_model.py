@@ -120,6 +120,7 @@ class DataDisplayModel(NDVModel):
                 requested_slice[ax] = slice(val, val + 1)
         return requested_slice
 
+    # TODO: make async
     def current_data_slice(self) -> np.ndarray:
         """Return the slice of data requested by the current index (synchronous)."""
         if self.data_wrapper is None:

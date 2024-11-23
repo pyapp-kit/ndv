@@ -4,7 +4,7 @@ import importlib
 import importlib.util
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     from ndv.views.protocols import PCanvas
@@ -12,17 +12,17 @@ if TYPE_CHECKING:
     from .protocols import PView
 
 
-def get_view_backend() -> PView:
+def get_view_frontend_class() -> type[PView]:
     if _is_running_in_notebook():
         from ._jupyter.jupyter_view import JupyterViewerView
 
-        return JupyterViewerView()
+        return JupyterViewerView
     elif _is_running_in_qapp():
         from ._qt.qt_view import QViewerView
 
-        return QViewerView()
+        return QViewerView
 
-    raise RuntimeError("Could not determine the appropriate viewer backend")
+    raise RuntimeError("Could not determine an appropriate view frontend")
 
 
 def _is_running_in_notebook() -> bool:
@@ -40,27 +40,38 @@ def _is_running_in_qapp() -> bool:
     return False
 
 
+def _determine_canvas_backend(requested: str | None) -> Literal["vispy", "pygfx"]:
+    backend = requested or os.getenv("NDV_CANVAS_BACKEND", "").lower()
+
+    if not backend:
+        # first check for things that have already been imported
+        if "vispy" in sys.modules:
+            backend = "vispy"
+        elif "pygfx" in sys.modules:
+            backend = "pygfx"
+        # then check for installed packages
+        elif importlib.util.find_spec("vispy"):
+            backend = "vispy"
+        elif importlib.util.find_spec("pygfx"):
+            backend = "pygfx"
+        else:
+            raise RuntimeError("No canvas backend found")
+
+    if backend not in ("vispy", "pygfx"):
+        raise ValueError(f"Invalid canvas backend: {backend!r}")
+    return cast(Literal["vispy", "pygfx"], backend)
+
+
 def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
-    backend = backend or os.getenv("NDV_CANVAS_BACKEND", None)
-    if backend == "vispy" or (backend is None and "vispy" in sys.modules):
+    _backend = _determine_canvas_backend(backend)
+    if _backend == "vispy":
         from ndv.views._vispy._vispy import VispyViewerCanvas
 
         return VispyViewerCanvas
 
-    if backend == "pygfx" or (backend is None and "pygfx" in sys.modules):
+    if _backend == "pygfx":
         from ndv.views._pygfx._pygfx import PyGFXViewerCanvas
 
         return PyGFXViewerCanvas
-
-    if backend is None:
-        if importlib.util.find_spec("vispy") is not None:
-            from ndv.views._vispy._vispy import VispyViewerCanvas
-
-            return VispyViewerCanvas
-
-        if importlib.util.find_spec("pygfx") is not None:
-            from ndv.views._pygfx._pygfx import PyGFXViewerCanvas
-
-            return PyGFXViewerCanvas
 
     raise RuntimeError("No canvas backend found")

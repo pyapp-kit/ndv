@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from ndv.models import DataDisplayModel
-from ndv.views import get_view_backend
+from ndv.views import get_canvas_class, get_view_frontend_class
 
 if TYPE_CHECKING:
     import cmap
@@ -15,19 +15,21 @@ if TYPE_CHECKING:
 class ViewerController:
     """The controller mostly manages the connection between the model and the view."""
 
-    def __init__(
-        self, view: PView | None = None, data: DataDisplayModel | None = None
-    ) -> None:
+    def __init__(self, data: DataDisplayModel | None = None) -> None:
         if data is None:
             data = DataDisplayModel()
-        if view is None:
-            view = get_view_backend()
+
+        self._canvas = get_canvas_class()()
+        self._canvas.set_ndim(2)
+
+        view = get_view_frontend_class()(self._canvas.qwidget())
+
         self._dd_model = data  # rename me?
         self._view = view
 
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
-        self._handles: dict[int | None, PImageHandle] = {}
+        self._img_handles: dict[int | None, PImageHandle] = {}
 
         self._lut_views: dict[int | None, PLutView] = {}
         self.add_lut_view(None)
@@ -109,14 +111,19 @@ class ViewerController:
         self._update_canvas()
 
     def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
-        self._handles[None].clim = clims
+        self._img_handles[None].clim = clims
 
     def _update_canvas(self) -> None:
+        """Force the canvas to fetch and update the displayed data.
+
+        This is called (frequently) when anything changes that requires a redraw.
+        It fetches the current data slice from the model and updates the image handle.
+        """
         if not self._dd_model.data_wrapper:
             return
         data = self._dd_model.current_data_slice()  # TODO: make asynchronous
-        if None in self._handles:
-            self._handles[None].data = data
+        if None in self._img_handles:
+            self._img_handles[None].data = data
             # if this image handle is visible and autoscale is on, then we need to
             # update the clim values
             if self.model.default_lut.autoscale:
@@ -127,11 +134,12 @@ class ViewerController:
                 # but this next line is more direct
                 # self._handles[None].clim = (data.min(), data.max())
         else:
-            self._handles[None] = self._view.add_image_to_canvas(data)
-            self._handles[None].cmap = self.model.default_lut.cmap
+            self._img_handles[None] = self._canvas.add_image(data)
+            self._canvas.set_range()
+            self._img_handles[None].cmap = self.model.default_lut.cmap
             if clims := self.model.default_lut.clims:
-                self._handles[None].clim = clims
-        self._view.refresh()
+                self._img_handles[None].clim = clims
+        self._canvas.refresh()
 
     def _on_visible_axes_changed(self) -> None:
         self._update_visible_sliders()
@@ -160,20 +168,20 @@ class ViewerController:
         self.model.current_index.update(self._view.current_index())
 
     def _on_view_lut_visible_changed(self, visible: bool) -> None:
-        self._handles[None].visible = visible
+        self._img_handles[None].visible = visible
 
     def _on_view_autoscale_changed(self, autoscale: bool) -> None:
         self._dd_model.display.default_lut.autoscale = autoscale
         self._lut_views[None].setAutoScale(autoscale)
 
         if autoscale:
-            data = self._handles[None].data
+            data = self._img_handles[None].data
             self.model.default_lut.clims = (data.min(), data.max())
             # self._handles[None].clim = (data.min(), data.max())
             # self._lut_views[None].setClims((data.min(), data.max()))
 
     def _on_view_cmap_changed(self, cmap: cmap.Colormap) -> None:
-        self._handles[None].cmap = cmap
+        self._img_handles[None].cmap = cmap
         self._dd_model.display.default_lut.cmap = cmap
 
     def _on_view_clims_changed(self, clims: tuple[float, float]) -> None:

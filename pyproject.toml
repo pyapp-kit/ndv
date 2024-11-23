@@ -60,7 +60,17 @@ test = [
     "pytest-qt",
     "pytest",
 ]
-dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
+dev = [
+    "ipython",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "rich",
+    "ruff",
+    "ipykernel",
+    "jupyter_rfb",
+    "pyqt6",
+]
 
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"

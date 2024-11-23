@@ -8,11 +8,45 @@ if TYPE_CHECKING:
 
     import cmap
     import numpy as np
-    from psygnal import Signal, SignalInstance
+    from psygnal import Signal
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
+
+from typing import Callable, Union, runtime_checkable
+
+
+@runtime_checkable
+class PSignalInstance(Protocol):
+    """The protocol that a signal instance must implement.
+
+    In practice this will either be a `pyqtSignal/pyqtBoundSignal` or a
+    `psygnal.SignalInstance`.
+    """
+
+    def connect(self, slot: Callable) -> Any:
+        """Connect slot to this signal."""
+
+    def disconnect(self, slot: Callable | None = None) -> Any:
+        """Disconnect slot from this signal.
+
+        If `None`, all slots should be disconnected.
+        """
+
+    def emit(self, *args: Any) -> Any:
+        """Emits the signal with the given arguments."""
+
+
+@runtime_checkable
+class PSignalDescriptor(Protocol):
+    """Descriptor that returns a signal instance."""
+
+    def __get__(self, instance: Any | None, owner: Any) -> PSignalInstance:
+        """Returns the signal instance for this descriptor."""
+
+
+PSignal = Union[PSignalDescriptor, PSignalInstance]
 
 
 class PLutView(Protocol):
@@ -92,22 +126,23 @@ class PImageHandle(CanvasElement, Protocol):
 class PView(Protocol):
     """Protocol that front-end viewers must implement."""
 
-    currentIndexChanged: SignalInstance
+    currentIndexChanged: PSignal
 
-    def refresh(self) -> None: ...
+    def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     def current_index(self) -> Mapping[AxisKey, int | slice]: ...
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
     def set_data_info(self, data_info: str) -> None:
         """Set info about the currently displayed data, usually above canvas."""
 
-    def add_image_to_canvas(self, data: Any) -> PImageHandle: ...
     def hide_sliders(
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
     ) -> None: ...
-
     def add_lut_view(self) -> PLutView: ...
     def show(self) -> None: ...
+
+    # def refresh(self) -> None: ...
+    # def add_image_to_canvas(self, data: Any) -> PImageHandle: ...
 
 
 class PRoiHandle(CanvasElement, Protocol):

@@ -1,8 +1,10 @@
 from collections.abc import Container, Hashable, Mapping, Sequence
-from typing import Any, cast
+from typing import cast
 
 import cmap
-from qtpy.QtCore import Qt, Signal
+import numpy as np
+from qtpy.QtCore import QEvent, QObject, Qt, Signal
+from qtpy.QtGui import QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -19,9 +21,7 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
-from ndv.views import get_canvas_class
 from ndv.views._qt._dims_slider import SS
-from ndv.views.protocols import PImageHandle
 
 
 class CmapCombo(QColormapComboBox):
@@ -148,19 +148,25 @@ class QDimsSliders(QWidget):
 class QViewerView(QWidget):
     currentIndexChanged = Signal()
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
-        # NOTE: it's conceivable we'll want the controller itself to handle the canvas
-        self._canvas = get_canvas_class()()
-        self._canvas.set_ndim(2)
+        self._qcanvas = canvas_widget
 
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
 
         # place to display dataset summary
         self._data_info_label = QElidingLabel("", parent=self)
+        # place to display arbitrary text
+        self._hover_info_label = QElidingLabel("", self)
 
+        # the button that controls the display mode of the channels
         self._channel_mode_btn = QPushButton("Channel")
+        # button to reset the zoom of the canvas
+        # TODO: unify icons across all the view frontends in a new file
+        set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
+        self._set_range_btn = QPushButton(set_range_icon, "", self)
+        self._set_range_btn.clicked.connect(self._reset_zoom)
 
         self._btns = btns = QHBoxLayout()
         btns.setContentsMargins(0, 0, 0, 0)
@@ -168,7 +174,7 @@ class QViewerView(QWidget):
         btns.addStretch()
         btns.addWidget(self._channel_mode_btn)
         # btns.addWidget(self._ndims_btn)
-        # btns.addWidget(self._set_range_btn)
+        btns.addWidget(self._set_range_btn)
         # btns.addWidget(self._add_roi_btn)
 
         self._luts = QCollapsible()
@@ -188,7 +194,8 @@ class QViewerView(QWidget):
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(info_widget)
-        layout.addWidget(self._canvas.qwidget(), 1)
+        layout.addWidget(self._qcanvas, 1)
+        layout.addWidget(self._hover_info_label)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
         layout.addLayout(btns)
@@ -201,12 +208,6 @@ class QViewerView(QWidget):
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         self._dims_sliders.create_sliders(coords)
-
-    def add_image_to_canvas(self, data: Any) -> PImageHandle:
-        """Add image data to the canvas."""
-        hdl = self._canvas.add_image(data)
-        self._canvas.set_range()
-        return hdl
 
     def hide_sliders(
         self, axes_to_hide: Container[Hashable], show_remainder: bool = True
@@ -231,5 +232,83 @@ class QViewerView(QWidget):
         self._visible_axes.setText(", ".join(map(str, axes)))
 
     def set_data_info(self, text: str) -> None:
-        """Set the data info text."""
+        """Set the data info text, above the canvas."""
         self._data_info_label.setText(text)
+
+    def set_hover_info(self, text: str) -> None:
+        """Set the hover info text, below the canvas."""
+        self._hover_info_label.setText(text)
+
+    # FIXME:
+    # this method is called when we click the reset zoom button
+    # however, the controller currently knows nothing about it, because this view
+    # itself directly controls the canvas.  We probably need the controller to control
+    # the canvas.
+    def _reset_zoom(self) -> None:
+        self._canvas.set_range()
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        """Event filter installed on the canvas to handle mouse events."""
+        if event is None:
+            return False  # pragma: no cover
+
+        # here is where we get a chance to intercept mouse events before passing them
+        # to the canvas. Return `True` to prevent the event from being passed to
+        # the backend widget.
+        intercept = False
+        # use children in case backend has a subwidget stealing events.
+        if obj is self._qcanvas or obj in (self._qcanvas.children()):
+            if isinstance(event, QMouseEvent):
+                intercept |= self._canvas_mouse_event(event)
+            if event.type() == QEvent.Type.KeyPress:
+                self.keyPressEvent(cast("QKeyEvent", event))
+        return intercept
+
+    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
+        intercept = False
+        # if ev.type() == QEvent.Type.MouseButtonPress:
+        # ...
+        if ev.type() == QEvent.Type.MouseMove:
+            intercept = self._update_hover_info(ev)
+            return intercept
+        # if ev.type() == QEvent.Type.MouseButtonRelease:
+        #     ...
+        return False
+
+    def _update_hover_info(self, event: QMouseEvent) -> bool:
+        """Update text of hover_info_label with data value(s) at point."""
+        point = event.pos()
+        x, y, _z = self._canvas.canvas_to_world((point.x(), point.y()))
+        # TODO: handle 3D data
+        if (x < 0 or y < 0) or self._ndims == 3:  # pragma: no cover
+            self._hover_info_label.setText("")
+            return False
+
+        x = int(x)
+        y = int(y)
+        text = f"[{y}, {x}]"
+        for n, handles in enumerate(self._img_handles.values()):
+            channels = []
+            for handle in handles:
+                try:
+                    # here, we're retrieving the value from the in-memory data
+                    # stored by the backend visual, rather than querying the data itself
+                    # this is a quick workaround to get the value without having to
+                    # worry about higher dimensions in the data source (since the
+                    # texture has already been reduced to 2D). But a more complete
+                    # implementation would gather the full current nD index and query
+                    # the data source directly.
+                    value = handle.data[y, x]
+                    if isinstance(value, (np.floating, float)):
+                        value = f"{value:.2f}"
+                    channels.append(f" {n}: {value}")
+                except IndexError:
+                    # we're out of bounds
+                    # if we eventually have multiple image sources with different
+                    # extents, this will need to be handled.  here, we just skip
+                    self._hover_info_label.setText("")
+                    return False
+                break  # only getting one handle per channel
+            text += ",".join(channels)
+        self._hover_info_label.setText(text)
+        return False
