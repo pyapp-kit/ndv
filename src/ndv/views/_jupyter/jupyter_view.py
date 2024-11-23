@@ -11,6 +11,8 @@ from ndv._types import MouseMoveEvent
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
+    from vispy.app.backends import _jupyter_rfb
+
     from ndv._types import AxisKey
     from ndv.views.protocols import PLutView, PSignal
 
@@ -89,15 +91,37 @@ class JupyterViewerView:
     resetZoomClicked: PSignal = Signal()
     mouseMoved: PSignal = Signal(MouseMoveEvent)
 
-    def __init__(self, canvas_widget: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
+    ) -> None:
         super().__init__()
         self._canvas_widget = canvas_widget
+
+        # patch the handle_event from _jupyter_rfb.CanvasBackend
+        # to intercept various mouse events.
+        if hasattr(canvas_widget, "handle_event"):
+            self._original_handle_event = canvas_widget.handle_event
+            canvas_widget.handle_event = self.handle_event
+
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
-        # `qwidget` is obviously a misnomer here.  it works, because vispy is smart
-        # enough to return a widget that ipywidgets can display in the appropriate
-        # context, but we should be managing that more explicitly ourselves.
-        self.layout = widgets.VBox([self._canvas_widget, self._slider_box])
+
+        self._data_info_label = widgets.Label()
+        self._hover_info_label = widgets.Label()
+        self.layout = widgets.VBox(
+            [
+                self._data_info_label,
+                self._canvas_widget,
+                self._hover_info_label,
+                self._slider_box,
+            ]
+        )
+
+    def handle_event(self, ev: dict) -> None:
+        etype = ev["event_type"]
+        if etype == "pointer_move":
+            self.mouseMoved.emit(MouseMoveEvent(x=ev["x"], y=ev["y"]))
+        self._original_handle_event(ev)
 
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
@@ -160,5 +184,8 @@ class JupyterViewerView:
 
         display(self.layout)  # type: ignore [no-untyped-call]
 
-    def set_data_info(self, data_info: str) -> None: ...
-    def set_hover_info(self, hover_info: str) -> None: ...
+    def set_data_info(self, data_info: str) -> None:
+        self._data_info_label.value = data_info
+
+    def set_hover_info(self, hover_info: str) -> None:
+        self._hover_info_label.value = hover_info
