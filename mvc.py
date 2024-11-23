@@ -13,5 +13,5 @@ viewer = ViewerController()  # ultimately, this will be the public api
 _data = data.cells3d()
 # _data = np.tile(_data, (2, 1, 3, 4))
 viewer.data = _data
-viewer._view.show()
+viewer.show()
 app.exec()

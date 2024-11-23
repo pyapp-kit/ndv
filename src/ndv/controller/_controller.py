@@ -260,3 +260,7 @@ class ViewerController:
                 values[channel_key] = handle.data[y, x]
 
         return values
+
+    def show(self) -> None:
+        """Show the viewer."""
+        self._view.show()
