@@ -6,6 +6,8 @@ import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
+from ndv._types import MouseMoveEvent
+
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
@@ -84,6 +86,8 @@ class JupyterLutView:
 class JupyterViewerView:
     # not sure why this annotation is necessary ... something wrong with PSignal
     currentIndexChanged: PSignal = Signal()
+    resetZoomClicked: PSignal = Signal()
+    mouseMoved: PSignal = Signal(MouseMoveEvent)
 
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None:
         super().__init__()
@@ -157,3 +161,4 @@ class JupyterViewerView:
         display(self.layout)  # type: ignore [no-untyped-call]
 
     def set_data_info(self, data_info: str) -> None: ...
+    def set_hover_info(self, hover_info: str) -> None: ...

@@ -2,7 +2,6 @@ from collections.abc import Container, Hashable, Mapping, Sequence
 from typing import cast
 
 import cmap
-import numpy as np
 from qtpy.QtCore import QEvent, QObject, Qt, Signal
 from qtpy.QtGui import QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
@@ -20,7 +19,7 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
-from ndv._types import AxisKey
+from ndv._types import AxisKey, MouseMoveEvent
 from ndv.views._qt._dims_slider import SS
 
 
@@ -147,10 +146,14 @@ class QDimsSliders(QWidget):
 # this is a PView ... but that would make a metaclass conflict
 class QViewerView(QWidget):
     currentIndexChanged = Signal()
+    resetZoomClicked = Signal()
+    mouseMoved = Signal(MouseMoveEvent)
 
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
         self._qcanvas = canvas_widget
+        # Install an event filter so we can intercept mouse/key events
+        self._qcanvas.installEventFilter(self)
 
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
@@ -166,7 +169,7 @@ class QViewerView(QWidget):
         # TODO: unify icons across all the view frontends in a new file
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
         self._set_range_btn = QPushButton(set_range_icon, "", self)
-        self._set_range_btn.clicked.connect(self._reset_zoom)
+        self._set_range_btn.clicked.connect(self.resetZoomClicked)
 
         self._btns = btns = QHBoxLayout()
         btns.setContentsMargins(0, 0, 0, 0)
@@ -223,13 +226,9 @@ class QViewerView(QWidget):
         """Set the current value of the sliders."""
         self._dims_sliders.set_current_index(value)
 
-    def refresh(self) -> None:
-        """Refresh the view."""
-        self._canvas.refresh()
-
-    def set_visible_axes(self, axes: Sequence[Hashable]) -> None:
-        """Set the visible axes."""
-        self._visible_axes.setText(", ".join(map(str, axes)))
+    # def set_visible_axes(self, axes: Sequence[Hashable]) -> None:
+    #     """Set the visible axes."""
+    #     self._visible_axes.setText(", ".join(map(str, axes)))
 
     def set_data_info(self, text: str) -> None:
         """Set the data info text, above the canvas."""
@@ -239,22 +238,14 @@ class QViewerView(QWidget):
         """Set the hover info text, below the canvas."""
         self._hover_info_label.setText(text)
 
-    # FIXME:
-    # this method is called when we click the reset zoom button
-    # however, the controller currently knows nothing about it, because this view
-    # itself directly controls the canvas.  We probably need the controller to control
-    # the canvas.
-    def _reset_zoom(self) -> None:
-        self._canvas.set_range()
-
     def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
         """Event filter installed on the canvas to handle mouse events."""
         if event is None:
             return False  # pragma: no cover
 
-        # here is where we get a chance to intercept mouse events before passing them
-        # to the canvas. Return `True` to prevent the event from being passed to
-        # the backend widget.
+        # here is where we get a chance to intercept mouse events before allowing the
+        # canvas to respond to them.
+        # Return `True` to prevent the event from being passed to the canvas.
         intercept = False
         # use children in case backend has a subwidget stealing events.
         if obj is self._qcanvas or obj in (self._qcanvas.children()):
@@ -265,50 +256,11 @@ class QViewerView(QWidget):
         return intercept
 
     def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
-        intercept = False
         # if ev.type() == QEvent.Type.MouseButtonPress:
         # ...
         if ev.type() == QEvent.Type.MouseMove:
-            intercept = self._update_hover_info(ev)
-            return intercept
+            pos = ev.pos()
+            self.mouseMoved.emit(MouseMoveEvent(x=pos.x(), y=pos.y()))
         # if ev.type() == QEvent.Type.MouseButtonRelease:
         #     ...
-        return False
-
-    def _update_hover_info(self, event: QMouseEvent) -> bool:
-        """Update text of hover_info_label with data value(s) at point."""
-        point = event.pos()
-        x, y, _z = self._canvas.canvas_to_world((point.x(), point.y()))
-        # TODO: handle 3D data
-        if (x < 0 or y < 0) or self._ndims == 3:  # pragma: no cover
-            self._hover_info_label.setText("")
-            return False
-
-        x = int(x)
-        y = int(y)
-        text = f"[{y}, {x}]"
-        for n, handles in enumerate(self._img_handles.values()):
-            channels = []
-            for handle in handles:
-                try:
-                    # here, we're retrieving the value from the in-memory data
-                    # stored by the backend visual, rather than querying the data itself
-                    # this is a quick workaround to get the value without having to
-                    # worry about higher dimensions in the data source (since the
-                    # texture has already been reduced to 2D). But a more complete
-                    # implementation would gather the full current nD index and query
-                    # the data source directly.
-                    value = handle.data[y, x]
-                    if isinstance(value, (np.floating, float)):
-                        value = f"{value:.2f}"
-                    channels.append(f" {n}: {value}")
-                except IndexError:
-                    # we're out of bounds
-                    # if we eventually have multiple image sources with different
-                    # extents, this will need to be handled.  here, we just skip
-                    self._hover_info_label.setText("")
-                    return False
-                break  # only getting one handle per channel
-            text += ",".join(channels)
-        self._hover_info_label.setText(text)
         return False

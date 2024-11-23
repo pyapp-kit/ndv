@@ -2,7 +2,7 @@
 
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
-from typing import Annotated, Any, TypeAlias
+from typing import Annotated, Any, NamedTuple, TypeAlias
 
 from pydantic import PlainValidator
 
@@ -38,3 +38,10 @@ Slice = Annotated[slice, PlainValidator(_to_slice)]
 # or other hashable object.  It is up to the DataWrapper to convert these keys to
 # actual integer indices.
 AxisKey: TypeAlias = Annotated[Hashable, PlainValidator(_maybe_int)]
+
+
+class MouseMoveEvent(NamedTuple):
+    """Event emitted when the user moves the cursor."""
+
+    x: float
+    y: float

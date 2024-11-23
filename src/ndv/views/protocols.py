@@ -127,6 +127,8 @@ class PView(Protocol):
     """Protocol that front-end viewers must implement."""
 
     currentIndexChanged: PSignal
+    resetZoomClicked: PSignal
+    mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
 
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
@@ -134,6 +136,9 @@ class PView(Protocol):
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
     def set_data_info(self, data_info: str) -> None:
         """Set info about the currently displayed data, usually above canvas."""
+
+    def set_hover_info(self, hover_info: str) -> None:
+        """Set info about the current hover position, usually below canvas."""
 
     def hide_sliders(
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
