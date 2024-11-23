@@ -149,6 +149,26 @@ class DataWrapper(Generic[ArrayT], ABC):
         # otherwise use the smallest dimension as the channel axis
         return min(sizes, key=sizes.get)  # type: ignore
 
+    def summary_info(self) -> str:
+        """Return info label with information about the data."""
+        package = getattr(self._data, "__module__", "").split(".")[0]
+        info = f"{package}.{getattr(type(self._data), '__qualname__', '')}"
+
+        if sizes := self.sizes():
+            # if all of the dimension keys are just integers, omit them from size_str
+            if all(isinstance(x, int) for x in sizes):
+                size_str = repr(tuple(sizes.values()))
+            # otherwise, include the keys in the size_str
+            else:
+                size_str = ", ".join(f"{k}:{v}" for k, v in sizes.items())
+                size_str = f"({size_str})"
+            info += f" {size_str}"
+        if dtype := getattr(self._data, "dtype", ""):
+            info += f", {dtype}"
+        if nbytes := getattr(self._data, "nbytes", 0) / 1e6:
+            info += f", {nbytes:.2f}MB"
+        return info
+
 
 ##########################
 

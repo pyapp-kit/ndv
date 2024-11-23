@@ -1,6 +1,5 @@
 """Example usage of new mvc pattern."""
 
-import numpy as np
 from qtpy.QtWidgets import QApplication
 
 from ndv import data
@@ -10,7 +9,9 @@ app = QApplication([])
 
 viewer = ViewerController()  # ultimately, this will be the public api
 
-# viewer.data = data.cosem_dataset(level=5)
-viewer.data = np.tile(data.cells3d(), (2, 1, 3, 4))
+# _data = data.cosem_dataset(level=5)
+_data = data.cells3d()
+# _data = np.tile(_data, (2, 1, 3, 4))
+viewer.data = _data
 viewer._view.show()
 app.exec()

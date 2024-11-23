@@ -82,6 +82,7 @@ class JupyterLutView:
         self._visible.value = visible
 
 
+# this is a PView
 class JupyterViewerView:
     currentIndexChanged = Signal()
 
@@ -166,3 +167,5 @@ class JupyterViewerView:
     def refresh(self) -> None:
         """Refresh the viewer."""
         self._canvas.refresh()
+
+    def set_data_info(self, data_info: str) -> None: ...

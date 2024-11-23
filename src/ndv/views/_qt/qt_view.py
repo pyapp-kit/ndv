@@ -8,11 +8,12 @@ from qtpy.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QLayout,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
-from superqt import QCollapsible, QLabeledRangeSlider, QLabeledSlider
+from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
@@ -106,7 +107,7 @@ class QDimsSliders(QWidget):
         layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         layout = cast("QFormLayout", self.layout())
         for axis, _coords in coords.items():
@@ -143,6 +144,7 @@ class QDimsSliders(QWidget):
             self._sliders[axis].setValue(val)
 
 
+# this is a PView ... but that would make a metaclass conflict
 class QViewerView(QWidget):
     currentIndexChanged = Signal()
 
@@ -151,10 +153,12 @@ class QViewerView(QWidget):
         # NOTE: it's conceivable we'll want the controller itself to handle the canvas
         self._canvas = get_canvas_class()()
         self._canvas.set_ndim(2)
-        layout = QVBoxLayout(self)
-        layout.setSpacing(4)
+
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
+
+        # place to display dataset summary
+        self._data_info_label = QElidingLabel("", parent=self)
 
         self._channel_mode_btn = QPushButton("Channel")
 
@@ -168,9 +172,22 @@ class QViewerView(QWidget):
         # btns.addWidget(self._add_roi_btn)
 
         self._luts = QCollapsible()
-        self._luts.layout().setSpacing(0)
+        cast("QLayout", self._luts.layout()).setSpacing(0)
         self._luts.setCollapsedIcon(QIconifyIcon("bi:chevron-down", color="#888888"))
         self._luts.setExpandedIcon(QIconifyIcon("bi:chevron-up", color="#888888"))
+
+        # above the canvas
+        info_widget = QWidget()
+        info = QHBoxLayout(info_widget)
+        info.setContentsMargins(0, 0, 0, 2)
+        info.setSpacing(0)
+        info.addWidget(self._data_info_label)
+        info_widget.setFixedHeight(16)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(2)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.addWidget(info_widget)
         layout.addWidget(self._canvas.qwidget(), 1)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
@@ -181,7 +198,7 @@ class QViewerView(QWidget):
         self._luts.addWidget(wdg)
         return wdg
 
-    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         self._dims_sliders.create_sliders(coords)
 
@@ -212,3 +229,7 @@ class QViewerView(QWidget):
     def set_visible_axes(self, axes: Sequence[Hashable]) -> None:
         """Set the visible axes."""
         self._visible_axes.setText(", ".join(map(str, axes)))
+
+    def set_data_info(self, text: str) -> None:
+        """Set the data info text."""
+        self._data_info_label.setText(text)

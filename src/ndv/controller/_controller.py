@@ -62,11 +62,12 @@ class ViewerController:
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
         self._dd_model.data = data
-        print("Creating sliders", self._dd_model.canonical_data_coords)
         self._view.create_sliders(self._dd_model.canonical_data_coords)
         if data is not None:
             self._update_visible_sliders()
             self._update_canvas()
+            if wrapper := self._dd_model.data_wrapper:
+                self._view.set_data_info(wrapper.summary_info())
 
     # -----------------------------------------------------------------------------
 
