@@ -78,7 +78,7 @@ class ArrayDisplayModel(NDVModel):
         return cast(Literal[2, 3], len(self.visible_axes))
 
     @model_validator(mode="after")
-    def _validate_model(self) -> Self:
+    def _validate_model(self) -> "Self":
         # prevent channel_axis from being in visible_axes
         if self.channel_axis in self.visible_axes:
             warnings.warn(
