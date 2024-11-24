@@ -8,18 +8,18 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
-    from typing import Any, TypeAlias
 
     import pydantic_core
     import tensorstore as ts
     from pydantic import GetCoreSchemaHandler
+    from typing_extensions import TypeAlias, TypeGuard
 
     Index: TypeAlias = int | slice
 

@@ -1,7 +1,7 @@
 """General model for ndv."""
 
 import warnings
-from typing import Literal, cast
+from typing import Literal, Optional, Union, cast
 
 from pydantic import Field, computed_field, model_validator
 from typing_extensions import Self, TypeAlias
@@ -14,11 +14,15 @@ from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
-IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
+IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]
 # map of index along channel axis to LUTModel object
-LutMap: TypeAlias = ValidatedEventedDict[int | None, LUTModel]
+LutMap: TypeAlias = ValidatedEventedDict[Union[int, None], LUTModel]
 # map of axis to reducer
-Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
+Reducers: TypeAlias = ValidatedEventedDict[Union[AxisKey, None], ReducerType]
+
+TwoOrThreeAxisTuple: TypeAlias = Union[
+    tuple[AxisKey, AxisKey, AxisKey], tuple[AxisKey, AxisKey]
+]
 
 
 class ArrayDisplayModel(NDVModel):
@@ -60,9 +64,12 @@ class ArrayDisplayModel(NDVModel):
         and is used when `channel_axis` is None.  It should always be present
     """
 
-    visible_axes: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey] = (-2, -1)
+    visible_axes: TwoOrThreeAxisTuple = (
+        -2,
+        -1,
+    )
     current_index: IndexMap = Field(default_factory=IndexMap, frozen=True)
-    channel_axis: AxisKey | None = None
+    channel_axis: Optional[AxisKey] = None
 
     # map of axis to reducer (function that can reduce dimensionality along that axis)
     reducers: Reducers = Field(default_factory=Reducers, frozen=True)

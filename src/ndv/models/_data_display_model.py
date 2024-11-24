@@ -1,6 +1,6 @@
 from collections.abc import Hashable, Mapping, Sequence
 from functools import cached_property
-from typing import Any, Protocol
+from typing import Any, Optional, Protocol, Union
 
 import numpy as np
 from pydantic import Field
@@ -20,7 +20,7 @@ class DataWrapperP(Protocol):
     def dims(self) -> tuple[Hashable, ...]: ...
     @property
     def coords(self) -> Mapping[Hashable, Sequence]: ...
-    def isel(self, index: Mapping[int, int | slice]) -> np.ndarray: ...
+    def isel(self, index: Mapping[int, Union[int, slice]]) -> np.ndarray: ...
 
 
 class DataDisplayModel(NDVModel):
@@ -32,10 +32,10 @@ class DataDisplayModel(NDVModel):
     """
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
-    data_wrapper: DataWrapper | None = None
+    data_wrapper: Optional[DataWrapper] = None
 
     @property
-    def data(self) -> Any | None:
+    def data(self) -> Any:
         """Return the data being displayed."""
         if self.data_wrapper is None:
             return None
@@ -82,14 +82,14 @@ class DataDisplayModel(NDVModel):
         )
 
     @property
-    def canonical_current_index(self) -> Mapping[int, int | slice]:
+    def canonical_current_index(self) -> Mapping[int, Union[int, slice]]:
         """Return the current index in canonical form."""
         return {
             self._canonicalize_axis_key(ax): v
             for ax, v in self.display.current_index.items()
         }
 
-    def current_slice_request(self) -> Mapping[int, int | slice]:
+    def current_slice_request(self) -> Mapping[int, Union[int, slice]]:
         """Return the current index request for the data.
 
         This reconciles the `current_index` and `visible_axes` attributes of the display
