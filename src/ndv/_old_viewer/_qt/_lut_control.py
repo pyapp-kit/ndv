@@ -9,7 +9,7 @@ from superqt import QLabeledRangeSlider
 from superqt.cmap import QColormapComboBox
 from superqt.utils import signals_blocked
 
-from ndv.views._qt._dims_slider import SS
+from ._dims_slider import SS
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

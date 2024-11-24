@@ -7,7 +7,7 @@ import numpy as np
 import ndv
 
 if TYPE_CHECKING:
-    from ndv import Indices, Sizes
+    from collections.abc import Hashable, Mapping
 
 
 class MyArrayThing:
@@ -26,11 +26,11 @@ class MyWrapper(ndv.DataWrapper[MyArrayThing]):
             return True
         return False
 
-    def sizes(self) -> Sizes:
+    def sizes(self) -> dict[Hashable, int]:
         """Return a mapping of {dim: size} for the data"""
         return {f"dim_{k}": v for k, v in enumerate(self.data.shape)}
 
-    def isel(self, indexers: Indices) -> Any:
+    def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
         """Convert mapping of {dim: index} to conventional indexing"""
         idx = tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
         return self.data[idx]

@@ -10,8 +10,7 @@ __author__ = "Talley Lambert"
 __email__ = "talley.lambert@example.com"
 
 from . import data
-from ._old_viewer import NDViewer
-from .models import DataWrapper
+from ._old_viewer import DataWrapper, NDViewer
 from .util import imshow
 
-__all__ = ["NDViewer", "DataWrapper", "imshow", "data"]
+__all__ = ["DataWrapper", "NDViewer", "data", "imshow"]

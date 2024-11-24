@@ -1,10 +1,15 @@
-from typing import Any, Callable
+from typing import Any, Callable, Optional, Union
 
 import numpy.typing as npt
 from cmap import Colormap
 from pydantic import Field, model_validator
+from typing_extensions import TypeAlias
 
 from ._base_model import NDVModel
+
+AutoscaleType: TypeAlias = Union[
+    Callable[[npt.ArrayLike], tuple[float, float]], tuple[float, float], bool
+]
 
 
 class LUTModel(NDVModel):
@@ -38,11 +43,9 @@ class LUTModel(NDVModel):
 
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
-    clims: tuple[float, float] | None = None
+    clims: Optional[tuple[float, float]] = None
     gamma: float = 1.0
-    autoscale: (
-        bool | tuple[float, float] | Callable[[npt.ArrayLike], tuple[float, float]]
-    ) = (0, 1)
+    autoscale: AutoscaleType = Field(default=True, union_mode="left_to_right")
 
     @model_validator(mode="before")
     def _validate_model(cls, v: Any) -> Any:
