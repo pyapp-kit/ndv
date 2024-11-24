@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import warnings
-from collections.abc import Container, Hashable, Mapping, Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import cmap
 from qtpy.QtCore import QEvent, QObject, Qt, Signal
@@ -20,6 +21,9 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey, MouseMoveEvent
+
+if TYPE_CHECKING:
+    from collections.abc import Container, Hashable, Mapping, Sequence
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
