@@ -47,8 +47,6 @@ class ViewerController:
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.mouseMoved.connect(self._on_view_mouse_moved)
 
-        self._add_lut_view(None)
-
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
     def view(self) -> PView:
@@ -79,12 +77,7 @@ class ViewerController:
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
         self._dd_model.data = data
-        self._view.create_sliders(self._dd_model.canonical_data_coords)
-        if data is not None:
-            self._update_visible_sliders()
-            self._update_canvas()
-            if wrapper := self._dd_model.data_wrapper:
-                self._view.set_data_info(wrapper.summary_info())
+        self._fully_synchronize_view()
 
     # -----------------------------------------------------------------------------
 
@@ -106,12 +99,27 @@ class ViewerController:
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
             # (model.luts.value_changed, self._on_model_default_lut_cmap_changed),
+            (
+                model.default_lut.events.visible,
+                self._on_model_default_lut_visible_changed,
+            ),
             (model.default_lut.events.cmap, self._on_model_default_lut_cmap_changed),
             (model.default_lut.events.clims, self._on_model_default_lut_clims_changed),
         ]:
             getattr(obj, _connect)(callback)
 
     # ------------------ Model callbacks ------------------
+
+    def _fully_synchronize_view(self) -> None:
+        """Fully re-synchronize the view with the model."""
+        self._view.create_sliders(self._dd_model.canonical_data_coords)
+        if self.data is not None:
+            self._update_visible_sliders()
+            # if we have data:
+            if wrapper := self._dd_model.data_wrapper:
+                self._view.set_data_info(wrapper.summary_info())
+
+            self._update_canvas()
 
     def _on_model_visible_axes_changed(self) -> None:
         self._update_visible_sliders()
@@ -122,8 +130,13 @@ class ViewerController:
         self._view.set_current_index(value)
         self._update_canvas()
 
+    def _on_model_default_lut_visible_changed(self, visible: bool) -> None:
+        for handle in self._img_handles[None]:
+            handle.visible = visible
+
     def _on_model_default_lut_cmap_changed(self) -> None:
-        self._update_canvas()
+        for handle in self._img_handles[None]:
+            handle.cmap = self.model.default_lut.cmap
 
     def _on_model_default_lut_clims_changed(self, clims: tuple[float, float]) -> None:
         for handle in self._img_handles[None]:
@@ -149,16 +162,16 @@ class ViewerController:
         self, autoscale: bool, key: int | None = None
     ) -> None:
         self._dd_model.display.default_lut.autoscale = autoscale
-        self._lut_views[key].set_auto_scale(autoscale)
+        lut_view = self._lut_views[key]
+        lut_view.set_auto_scale(autoscale)
 
         if autoscale:
-            lut = self.model.default_lut if key is None else self.model.luts[key]
+            lut_model = self.model.default_lut if key is None else self.model.luts[key]
             # TODO: or should we have a global min/max across all handles for this key?
             for handle in self._img_handles[key]:
                 data = handle.data
-                lut.clims = (data.min(), data.max())
-                # self._handles[None].clim = (data.min(), data.max())
-                # self._lut_views[None].setClims((data.min(), data.max()))
+                # update the model with the new clim values
+                lut_model.clims = (data.min(), data.max())
 
     def _on_view_lut_cmap_changed(
         self, cmap: cmap.Colormap, key: int | None = None
@@ -189,48 +202,71 @@ class ViewerController:
         if not self._dd_model.data_wrapper:
             return
 
+        key = None  # TODO: handle multiple channels
+
+        if key in self._lut_views:
+            self._lut_views[key]
+        else:
+            self._add_lut_view(key)
+
+        if key is None:
+            lut_model = self.model.default_lut
+        else:
+            lut_model = self.model.luts[key]
+
         data = self._dd_model.current_data_slice()  # TODO: make asynchronous
-        if None in self._img_handles:
-            if handles := self._img_handles[None]:
+        if key in self._img_handles:
+            if handles := self._img_handles[key]:
                 # until we have a more sophisticated way to handle updating data for
                 # multiple handles, we'll just update the first one
                 handles[0].data = data
                 # if this image handle is visible and autoscale is on, then we need to
                 # update the clim values
-                if self.model.default_lut.autoscale:
-                    self.model.default_lut.clims = (data.min(), data.max())
-                    # self._lut_views[None].setClims((data.min(), data.max()))
+                if lut_model.autoscale:
+                    lut_model.clims = (data.min(), data.max())
+                    # lut_view.setClims((data.min(), data.max()))
                     # technically... the LutView may also emit a signal that the
                     # controller listens to, and then updates the image handle
                     # but this next line is more direct
                     # self._handles[None].clim = (data.min(), data.max())
         else:
             handle = self._canvas.add_image(data)
-            self._img_handles[None].append(handle)
+            self._img_handles[key].append(handle)
             self._canvas.set_range()
-            handle.cmap = self.model.default_lut.cmap
-            if clims := self.model.default_lut.clims:
+            handle.cmap = lut_model.cmap
+            if clims := lut_model.clims:
                 handle.clim = clims
         self._canvas.refresh()
 
     def _add_lut_view(self, key: int | None) -> PLutView:
+        """Create a new LUT view and connect it to the model."""
         if key in self._lut_views:
             # need to clean up
             raise NotImplementedError(f"LUT view with key {key} already exists")
 
-        self._lut_views[key] = lut = self._view.add_lut_view()
+        self._lut_views[key] = lut_view = self._view.add_lut_view()
+        lut_model = self.model.default_lut if key is None else self.model.luts[key]
 
-        lut.visibleChanged.connect(self._on_view_lut_visible_changed)
-        lut.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
-        lut.cmapChanged.connect(self._on_view_lut_cmap_changed)
-        lut.climsChanged.connect(self._on_view_lut_clims_changed)
+        # setup the initial state of the LUT view
+        lut_view.set_colormap(lut_model.cmap)
+        if lut_model.clims:
+            lut_view.set_clims(lut_model.clims)
+        # TODO: handle more complex autoscale types
+        lut_view.set_auto_scale(bool(lut_model.autoscale))
+        lut_view.set_lut_visible(True)
 
-        model_lut = self._dd_model.display.default_lut
-        model_lut.events.cmap.connect(lut.set_colormap)
-        model_lut.events.clims.connect(lut.set_clims)
-        model_lut.events.autoscale.connect(lut.set_auto_scale)
-        model_lut.events.visible.connect(lut.set_lut_visible)
-        return lut
+        # connect view changes to controller callbacks that update the model
+        lut_view.visibleChanged.connect(self._on_view_lut_visible_changed)
+        lut_view.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
+        lut_view.cmapChanged.connect(self._on_view_lut_cmap_changed)
+        lut_view.climsChanged.connect(self._on_view_lut_clims_changed)
+
+        # connect model changes to view callbacks that update the view
+        lut_model.events.cmap.connect(lut_view.set_colormap)
+        lut_model.events.clims.connect(lut_view.set_clims)
+        lut_model.events.autoscale.connect(lut_view.set_auto_scale)
+        lut_model.events.visible.connect(lut_view.set_lut_visible)
+        return lut_view
 
     def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""

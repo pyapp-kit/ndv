@@ -105,7 +105,6 @@ class QLUTWidget(QWidget):
         self._auto_clim = QPushButton("Auto")
         self._auto_clim.setMaximumWidth(42)
         self._auto_clim.setCheckable(True)
-        self._auto_clim.setChecked(True)
         self._auto_clim.toggled.connect(self.autoscaleChanged)
 
         layout = QHBoxLayout(self)
@@ -118,6 +117,9 @@ class QLUTWidget(QWidget):
 
     def set_name(self, name: str) -> None:
         self._visible.setText(name)
+
+    # NOTE: it's important to block signals when setting values from the controller
+    # to avoid loops, unnecessary updates, and unexpected behavior
 
     def set_auto_scale(self, auto: bool) -> None:
         with signals_blocked(self):

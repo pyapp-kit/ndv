@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import cmap
 import ipywidgets as widgets
@@ -22,17 +22,17 @@ if TYPE_CHECKING:
 
 
 class JupyterLutView:
-    visibleChanged: PSignal = Signal(bool)
-    autoscaleChanged: PSignal = Signal(bool)
-    cmapChanged: PSignal = Signal(cmap.Colormap)
-    climsChanged: PSignal = Signal(tuple)
+    visibleChanged = Signal(bool)
+    autoscaleChanged = Signal(bool)
+    cmapChanged = Signal(cmap.Colormap)
+    climsChanged = Signal(tuple)
 
     def __init__(self) -> None:
         # WIDGETS
 
         self._visible = widgets.Checkbox(value=True)
         self._cmap = widgets.Dropdown(
-            options=["gray", "green", "magenta"], value="gray"
+            options=["gray", "green", "magenta", "cubehelix"], value="gray"
         )
         self._clims = widgets.FloatRangeSlider(
             value=[0, 2**16],
@@ -88,17 +88,24 @@ class JupyterLutView:
     def set_name(self, name: str) -> None:
         self._visible.description = name
 
+    # NOTE: it's important to block signals when setting values from the controller
+    # to avoid loops, unnecessary updates, and unexpected behavior
+
     def set_auto_scale(self, auto: bool) -> None:
-        self._auto_clim.value = auto
+        with self.autoscaleChanged.blocked():
+            self._auto_clim.value = auto
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._cmap.value = cmap.name
+        with self.cmapChanged.blocked():
+            self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        self._clims.value = clims
+        with self.climsChanged.blocked():
+            self._clims.value = clims
 
     def set_lut_visible(self, visible: bool) -> None:
-        self._visible.value = visible
+        with self.visibleChanged.blocked():
+            self._visible.value = visible
 
 
 # this is a PView
@@ -208,7 +215,10 @@ class JupyterViewerView:
         """Add a LUT view to the viewer."""
         wdg = JupyterLutView()
         self.layout.children = (*self.layout.children, wdg.layout)
-        return wdg
+
+        # this cast is necessary because psygnal.Signal() is not being recognized
+        # as a PSignalDescriptor by the type checker
+        return cast("PLutView", wdg)
 
     def show(self) -> None:
         """Show the viewer."""

@@ -14,6 +14,7 @@ def test_mvc_viewer() -> None:
     """Example usage of new mvc pattern."""
     viewer = ViewerController()  # ultimately, this will be the public api
     assert _determine_gui_frontend() in type(viewer._view).__name__.lower()
+    viewer.show()
 
     data = np.random.randint(0, 255, size=(10, 10, 10, 10, 10), dtype="uint8")
     viewer.data = data

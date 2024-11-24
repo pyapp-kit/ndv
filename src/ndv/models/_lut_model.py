@@ -8,7 +8,7 @@ from typing_extensions import TypeAlias
 from ._base_model import NDVModel
 
 AutoscaleType: TypeAlias = Union[
-    bool, tuple[float, float], Callable[[npt.ArrayLike], tuple[float, float]]
+    Callable[[npt.ArrayLike], tuple[float, float]], tuple[float, float], bool
 ]
 
 
@@ -45,7 +45,7 @@ class LUTModel(NDVModel):
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
     clims: Optional[tuple[float, float]] = None
     gamma: float = 1.0
-    autoscale: AutoscaleType = (0, 1)
+    autoscale: AutoscaleType = Field(default=True, union_mode="left_to_right")
 
     @model_validator(mode="before")
     def _validate_model(cls, v: Any) -> Any:

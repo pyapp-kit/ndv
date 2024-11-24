@@ -17,4 +17,6 @@ _data = data.cells3d()
 # _data = np.tile(_data, (2, 1, 3, 4))
 viewer.data = _data
 viewer.show()
+viewer.model.current_index.update({0: 18})
+viewer.model.default_lut.cmap = "cubehelix"
 app.exec()
