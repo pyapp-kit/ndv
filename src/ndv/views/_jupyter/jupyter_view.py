@@ -16,22 +16,23 @@ if TYPE_CHECKING:
     from ndv._types import AxisKey
     from ndv.views.protocols import PLutView, PSignal
 
+# not entirely sure why it's necessary to specifically annotat signals as : PSignal
+# i think it has to do with type variance?
+
 
 class JupyterLutView:
-    visibleChanged = Signal(bool)
-    autoscaleChanged = Signal(bool)
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
+    visibleChanged: PSignal = Signal(bool)
+    autoscaleChanged: PSignal = Signal(bool)
+    cmapChanged: PSignal = Signal(cmap.Colormap)
+    climsChanged: PSignal = Signal(tuple)
 
     def __init__(self) -> None:
-        self._visible = widgets.Checkbox(value=True)
-        self._visible.observe(self._on_visible_changed, names="value")
+        # WIDGETS
 
+        self._visible = widgets.Checkbox(value=True)
         self._cmap = widgets.Dropdown(
             options=["gray", "green", "magenta"], value="gray"
         )
-        self._cmap.observe(self._on_cmap_changed, names="value")
-
         self._clims = widgets.FloatRangeSlider(
             value=[0, 2**16],
             min=0,
@@ -41,8 +42,6 @@ class JupyterLutView:
             readout=True,
             readout_format=".0f",
         )
-        self._clims.observe(self._on_clims_changed, names="value")
-
         self._auto_clim = widgets.ToggleButton(
             value=True,
             description="Auto",
@@ -50,37 +49,54 @@ class JupyterLutView:
             tooltip="Auto scale",
             icon="check",
         )
-        self._auto_clim.observe(self._on_autoscale_changed, names="value")
+
+        # LAYOUT
 
         self.layout = widgets.HBox(
-            [self._visible, self._cmap, self._clims, self._auto_clim]
+            [
+                self._visible,
+                self._cmap,
+                self._clims,
+                self._auto_clim,
+            ]
         )
 
+        # CONNECTIONS
+
+        self._visible.observe(self._on_visible_changed, names="value")
+        self._cmap.observe(self._on_cmap_changed, names="value")
+        self._clims.observe(self._on_clims_changed, names="value")
+        self._auto_clim.observe(self._on_autoscale_changed, names="value")
+
+    # ------------------ emit changes to the controller ------------------
+
     def _on_clims_changed(self, change: dict[str, Any]) -> None:
-        self.climsChanged(self._clims.value)
+        self.climsChanged.emit(self._clims.value)
 
     def _on_visible_changed(self, change: dict[str, Any]) -> None:
-        self.visibleChanged(self._visible.value)
+        self.visibleChanged.emit(self._visible.value)
 
     def _on_cmap_changed(self, change: dict[str, Any]) -> None:
-        self.cmapChanged(cmap.Colormap(self._cmap.value))
+        self.cmapChanged.emit(cmap.Colormap(self._cmap.value))
 
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
-        self.autoscaleChanged(self._auto_clim.value)
+        self.autoscaleChanged.emit(self._auto_clim.value)
 
-    def setName(self, name: str) -> None:
+    # ------------------ receive changes from the controller ---------------
+
+    def set_name(self, name: str) -> None:
         self._visible.description = name
 
-    def setAutoScale(self, auto: bool) -> None:
+    def set_auto_scale(self, auto: bool) -> None:
         self._auto_clim.value = auto
 
-    def setColormap(self, cmap: cmap.Colormap) -> None:
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._cmap.value = cmap.name
 
-    def setClims(self, clims: tuple[float, float]) -> None:
+    def set_clims(self, clims: tuple[float, float]) -> None:
         self._clims.value = clims
 
-    def setLutVisible(self, visible: bool) -> None:
+    def set_lut_visible(self, visible: bool) -> None:
         self._visible.value = visible
 
 
@@ -95,8 +111,9 @@ class JupyterViewerView:
         self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
     ) -> None:
         super().__init__()
-        self._canvas_widget = canvas_widget
 
+        # WIDGETS
+        self._canvas_widget = canvas_widget
         # patch the handle_event from _jupyter_rfb.CanvasBackend
         # to intercept various mouse events.
         if hasattr(canvas_widget, "handle_event"):
@@ -105,9 +122,11 @@ class JupyterViewerView:
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
-
         self._data_info_label = widgets.Label()
         self._hover_info_label = widgets.Label()
+
+        # LAYOUT
+
         self.layout = widgets.VBox(
             [
                 self._data_info_label,

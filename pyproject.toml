@@ -127,8 +127,12 @@ plugins = ["pydantic.mypy"]
 
 # Alternatively, if _old_viewer is a submodule of ndv
 [[tool.mypy.overrides]]
-module = "ndv._old_viewer"
+module = "ndv._old_viewer.*"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
+ignore_missing_imports = true
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]

@@ -8,7 +8,6 @@ if TYPE_CHECKING:
 
     import cmap
     import numpy as np
-    from psygnal import Signal
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
@@ -50,16 +49,16 @@ PSignal = Union[PSignalDescriptor, PSignalInstance]
 
 
 class PLutView(Protocol):
-    visibleChanged: Signal
-    autoscaleChanged: Signal
-    cmapChanged: Signal
-    climsChanged: Signal
+    visibleChanged: PSignal
+    autoscaleChanged: PSignal
+    cmapChanged: PSignal
+    climsChanged: PSignal
 
-    def setName(self, name: str) -> None: ...
-    def setAutoScale(self, auto: bool) -> None: ...
-    def setColormap(self, cmap: cmap.Colormap) -> None: ...
-    def setClims(self, clims: tuple[float, float]) -> None: ...
-    def setLutVisible(self, visible: bool) -> None: ...
+    def set_name(self, name: str) -> None: ...
+    def set_auto_scale(self, auto: bool) -> None: ...
+    def set_colormap(self, cmap: cmap.Colormap) -> None: ...
+    def set_clims(self, clims: tuple[float, float]) -> None: ...
+    def set_lut_visible(self, visible: bool) -> None: ...
 
 
 class CanvasElement(Protocol):

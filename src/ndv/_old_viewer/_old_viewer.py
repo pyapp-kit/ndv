@@ -12,17 +12,18 @@ from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidge
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
 
-from ndv.models._data_wrapperold import DataWrapper
 from ndv.views import get_canvas_class
-from ndv.views._qt._components import (
+
+from ._old_data_wrapper import DataWrapper
+from ._qt._components import (
     ChannelMode,
     ChannelModeButton,
     DimToggleButton,
     QSpinner,
     ROIButton,
 )
-from ndv.views._qt._dims_slider import DimsSliders
-from ndv.views._qt._lut_control import LutControl
+from ._qt._dims_slider import DimsSliders
+from ._qt._lut_control import LutControl
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Iterable, Mapping, Sequence

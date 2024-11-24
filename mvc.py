@@ -5,6 +5,9 @@ from qtpy.QtWidgets import QApplication
 from ndv import data
 from ndv.controller import ViewerController
 
+# TODO: we don't actually need to import/start a qapp anymore
+# this can all be done in get_view_frontend_class
+# but then we need a way to execute the app.exec() call
 app = QApplication([])
 
 viewer = ViewerController()  # ultimately, this will be the public api

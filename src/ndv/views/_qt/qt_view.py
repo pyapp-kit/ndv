@@ -9,7 +9,6 @@ from qtpy.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
-    QLayout,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -20,7 +19,40 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey, MouseMoveEvent
-from ndv.views._qt._dims_slider import SS
+
+SLIDER_STYLE = """
+QSlider::groove:horizontal {
+    height: 15px;
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(128, 128, 128, 0.25),
+        stop:1 rgba(128, 128, 128, 0.1)
+    );
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    width: 38px;
+    background: #999999;
+    border-radius: 3px;
+}
+
+QSlider::sub-page:horizontal {
+    background: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(100, 100, 100, 0.25),
+        stop:1 rgba(100, 100, 100, 0.1)
+    );
+}
+
+QLabel { font-size: 12px; }
+
+QRangeSlider { qproperty-barColor: qlineargradient(
+        x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(100, 80, 120, 0.2),
+        stop:1 rgba(100, 80, 120, 0.4)
+    )}
+"""
 
 
 class CmapCombo(QColormapComboBox):
@@ -49,12 +81,15 @@ class QLUTWidget(QWidget):
         self._visible.toggled.connect(self.visibleChanged)
 
         self._cmap = CmapCombo()
+        self._cmap.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._cmap.currentColormapChanged.connect(self.cmapChanged)
         for color in ["gray", "green", "magenta"]:
             self._cmap.addColormap(color)
 
         self._clims = QLabeledRangeSlider(Qt.Orientation.Horizontal)
-        self._clims.setStyleSheet(SS)
+
+        WHITE_SS = SLIDER_STYLE + "SliderLabel { font-size: 10px; color: white;}"
+        self._clims.setStyleSheet(WHITE_SS)
         self._clims.setHandleLabelPosition(
             QLabeledRangeSlider.LabelPosition.LabelsOnHandle
         )
@@ -69,28 +104,29 @@ class QLUTWidget(QWidget):
         self._auto_clim.toggled.connect(self.autoscaleChanged)
 
         layout = QHBoxLayout(self)
+        layout.setSpacing(5)
         # layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._visible)
         layout.addWidget(self._cmap)
         layout.addWidget(self._clims)
         layout.addWidget(self._auto_clim)
 
-    def setName(self, name: str) -> None:
+    def set_name(self, name: str) -> None:
         self._visible.setText(name)
 
-    def setAutoScale(self, auto: bool) -> None:
+    def set_auto_scale(self, auto: bool) -> None:
         with signals_blocked(self):
             self._auto_clim.setChecked(auto)
 
-    def setColormap(self, cmap: cmap.Colormap) -> None:
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
         with signals_blocked(self):
             self._cmap.setCurrentColormap(cmap)
 
-    def setClims(self, clims: tuple[float, float]) -> None:
+    def set_clims(self, clims: tuple[float, float]) -> None:
         with signals_blocked(self):
             self._clims.setValue(clims)
 
-    def setLutVisible(self, visible: bool) -> None:
+    def set_lut_visible(self, visible: bool) -> None:
         with signals_blocked(self):
             self._visible.setChecked(visible)
 
@@ -101,8 +137,10 @@ class QDimsSliders(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._sliders: dict[Hashable, QLabeledSlider] = {}
+        self.setStyleSheet(SLIDER_STYLE)
 
         layout = QFormLayout(self)
+        layout.setSpacing(2)
         layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -151,7 +189,11 @@ class QViewerView(QWidget):
 
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
+
         self._qcanvas = canvas_widget
+        # TODO: this actually doesn't need to be in the QtViewerView at all
+        # this could be patched at the level of the vispy/pygfx canvas
+        # removing a need for the mouseMoved signal
         # Install an event filter so we can intercept mouse/key events
         self._qcanvas.installEventFilter(self)
 
@@ -180,10 +222,24 @@ class QViewerView(QWidget):
         btns.addWidget(self._set_range_btn)
         # btns.addWidget(self._add_roi_btn)
 
-        self._luts = QCollapsible()
-        cast("QLayout", self._luts.layout()).setSpacing(0)
-        self._luts.setCollapsedIcon(QIconifyIcon("bi:chevron-down", color="#888888"))
-        self._luts.setExpandedIcon(QIconifyIcon("bi:chevron-up", color="#888888"))
+        self._luts = QCollapsible(
+            "LUTs",
+            parent=self,
+            expandedIcon=QIconifyIcon("bi:chevron-up", color="#888888"),
+            collapsedIcon=QIconifyIcon("bi:chevron-down", color="#888888"),
+        )
+
+        # little hack to make the lut collapsible take up less space
+        lut_layout = cast("QVBoxLayout", self._luts.layout())
+        lut_layout.setContentsMargins(0, 1, 0, 1)
+        lut_layout.setSpacing(0)
+        if (
+            # look-before-leap on private attribute that may change
+            hasattr(self._luts, "_content")
+            and (layout := self._luts._content.layout()) is not None
+        ):
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
 
         # above the canvas
         info_widget = QWidget()
@@ -225,10 +281,6 @@ class QViewerView(QWidget):
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         """Set the current value of the sliders."""
         self._dims_sliders.set_current_index(value)
-
-    # def set_visible_axes(self, axes: Sequence[Hashable]) -> None:
-    #     """Set the visible axes."""
-    #     self._visible_axes.setText(", ".join(map(str, axes)))
 
     def set_data_info(self, text: str) -> None:
         """Set the data info text, above the canvas."""

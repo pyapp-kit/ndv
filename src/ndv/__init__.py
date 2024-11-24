@@ -14,4 +14,4 @@ from ._old_viewer import NDViewer
 from .models import DataWrapper
 from .util import imshow
 
-__all__ = ["NDViewer", "DataWrapper", "imshow", "data"]
+__all__ = ["DataWrapper", "NDViewer", "data", "imshow"]

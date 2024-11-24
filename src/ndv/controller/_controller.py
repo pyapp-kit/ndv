@@ -15,17 +15,25 @@ if TYPE_CHECKING:
     from ndv.views.protocols import PImageHandle, PLutView, PView
 
 
+# (probably rename to something like just Viewer)
 class ViewerController:
-    """The controller mostly manages the connection between the model and the view."""
+    """The controller mostly manages the connection between the model and the view.
+
+    This is the primary public interface for the viewer.
+    """
 
     def __init__(self, data: DataDisplayModel | None = None) -> None:
         if data is None:
             data = DataDisplayModel()
 
         # mapping of channel/LUT index to image handle, where None is the default LUT
+        # PImageHandle is an object that allows this controller to update the canvas img
         self._img_handles: defaultdict[int | None, list[PImageHandle]] = defaultdict(
             list
         )
+        # mapping of channel/LUT index to LutView, where None is the default LUT
+        # LutView is a front-end object that allows the user to interact with the LUT
+        self._lut_views: dict[int | None, PLutView] = {}
 
         self._canvas = get_canvas_class()()
         self._canvas.set_ndim(2)
@@ -41,7 +49,6 @@ class ViewerController:
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.mouseMoved.connect(self._on_view_mouse_moved)
 
-        self._lut_views: dict[int | None, PLutView] = {}
         self._add_lut_view(None)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
@@ -144,7 +151,7 @@ class ViewerController:
         self, autoscale: bool, key: int | None = None
     ) -> None:
         self._dd_model.display.default_lut.autoscale = autoscale
-        self._lut_views[key].setAutoScale(autoscale)
+        self._lut_views[key].set_auto_scale(autoscale)
 
         if autoscale:
             lut = self.model.default_lut if key is None else self.model.luts[key]
@@ -212,6 +219,7 @@ class ViewerController:
         if key in self._lut_views:
             # need to clean up
             raise NotImplementedError(f"LUT view with key {key} already exists")
+
         self._lut_views[key] = lut = self._view.add_lut_view()
 
         lut.visibleChanged.connect(self._on_view_lut_visible_changed)
@@ -220,22 +228,25 @@ class ViewerController:
         lut.climsChanged.connect(self._on_view_lut_clims_changed)
 
         model_lut = self._dd_model.display.default_lut
-        model_lut.events.cmap.connect(lut.setColormap)
-        model_lut.events.clims.connect(lut.setClims)
-        model_lut.events.autoscale.connect(lut.setAutoScale)
-        model_lut.events.visible.connect(lut.setLutVisible)
+        model_lut.events.cmap.connect(lut.set_colormap)
+        model_lut.events.clims.connect(lut.set_clims)
+        model_lut.events.autoscale.connect(lut.set_auto_scale)
+        model_lut.events.visible.connect(lut.set_lut_visible)
         return lut
 
     def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
-        """Update text of hover_info_label with data value(s) at point."""
+        """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+
+        # collect and format intensity values at the current mouse position
         channel_values = self._get_values_at_world_point(int(x), int(y))
         vals = []
         for ch, value in channel_values.items():
             # restrict to 2 decimal places, but remove trailing zeros
             fval = f"{value:.2f}".rstrip("0").rstrip(".")
-            vals.append(f"{ch}: {fval}")
-        text = f"[{y:.1f}, {x:.1f}]" + ",".join(vals)
+            fch = f"{ch}: " if ch is not None else ""
+            vals.append(f"{fch}{fval}")
+        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
         self._view.set_hover_info(text)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[int | None, float]:
@@ -244,7 +255,7 @@ class ViewerController:
             return {}
 
         values: dict[int | None, float] = {}
-        for channel_key, handles in enumerate(self._img_handles.values()):
+        for channel_key, handles in self._img_handles.items():
             if not handles:
                 continue
             # only getting one handle per channel for now
@@ -253,7 +264,7 @@ class ViewerController:
                 # here, we're retrieving the value from the in-memory data
                 # stored by the backend visual, rather than querying the data itself
                 # this is a quick workaround to get the value without having to
-                # worry about higher dimensions in the data source (since the
+                # worry about other dimensions in the data source (since the
                 # texture has already been reduced to 2D). But a more complete
                 # implementation would gather the full current nD index and query
                 # the data source directly.
