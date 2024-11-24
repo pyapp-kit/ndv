@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["nd_sine_wave", "cells3d"]
+__all__ = ["cells3d", "nd_sine_wave"]
 
 
 def nd_sine_wave(
