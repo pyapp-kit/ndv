@@ -23,19 +23,15 @@ if TYPE_CHECKING:
 
     import dask.array as da
     import numpy.typing as npt
-    import pydantic_core
     import pyopencl.array as cl_array
     import sparse
     import tensorstore as ts
     import torch
     import xarray as xr
     import zarr
-    from pydantic import GetCoreSchemaHandler
     from torch._tensor import Tensor
 
-    Index = int | slice
-    Indices = Mapping[Hashable, Index]
-    Sizes = Mapping[Hashable, int]
+    from ._dims_slider import Index, Indices, Sizes
 
     _T_contra = TypeVar("_T_contra", contravariant=True)
 
@@ -108,10 +104,6 @@ class DataWrapper(Generic[ArrayT]):
     def data(self) -> ArrayT:
         return self._data
 
-    @property
-    def ndim(self) -> int:
-        return len(self.dims)
-
     @classmethod
     @abstractmethod
     def supports(cls, obj: Any) -> bool:
@@ -159,26 +151,6 @@ class DataWrapper(Generic[ArrayT]):
     def save_as_zarr(self, save_loc: str | Path) -> None:
         raise NotImplementedError("save_as_zarr not implemented for this data type.")
 
-    # TODO: we need a way for DataWrapper to be able to say that the dims/coords
-    # have changed (essentially, that the shape of the data has changed)
-    # among other things, this would allow the canonicalized_axis_map to be cleared
-    @property
-    def dims(self) -> Sequence[Hashable]:
-        if hasattr(self._data, "dims"):
-            return self._data.dims  # type: ignore
-        return range(len(self._data.shape))  # type: ignore
-
-    @property
-    def coords(self) -> Mapping[Hashable, Sequence[Any]]:
-        if hasattr(self._data, "coords"):
-            return self._data.coords  # type: ignore
-        shape = getattr(self._data, "shape", None)
-        if not isinstance(shape, Sequence) or not all(
-            isinstance(x, int) for x in shape
-        ):
-            raise NotImplementedError(f"Cannot determine shape of {type(self._data)}")
-        return {k: range(v) for k, v in enumerate(shape)}
-
     def sizes(self) -> Sizes:
         """Return a mapping of {dimkey: size} for the data.
 
@@ -187,7 +159,13 @@ class DataWrapper(Generic[ArrayT]):
         (`dims` is used by xarray, `names` is used by torch, etc...). If no labels
         are found, the dimensions are just named by their integer index.
         """
-        return {ax: len(c) for ax, c in self.coords.items()}
+        shape = getattr(self._data, "shape", None)
+        if not isinstance(shape, Sequence) or not all(
+            isinstance(x, int) for x in shape
+        ):
+            raise NotImplementedError(f"Cannot determine sizes for {type(self._data)}")
+        dims = range(len(shape))
+        return {dim: int(size) for dim, size in zip(dims, shape)}
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""
@@ -208,17 +186,6 @@ class DataWrapper(Generic[ArrayT]):
         if nbytes := getattr(self._data, "nbytes", 0) / 1e6:
             info += f", {nbytes:.2f}MB"
         return info
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source: type, handler: GetCoreSchemaHandler
-    ) -> pydantic_core.CoreSchema:
-        from pydantic_core import core_schema
-
-        return core_schema.no_info_before_validator_function(
-            function=cls.create,
-            schema=core_schema.any_schema(),
-        )
 
 
 class XarrayWrapper(DataWrapper["xr.DataArray"]):
