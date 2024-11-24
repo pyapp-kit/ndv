@@ -1,9 +1,10 @@
 """General model for ndv."""
 
 import warnings
-from typing import Literal, Self, TypeAlias, cast
+from typing import Literal, cast
 
 from pydantic import Field, computed_field, model_validator
+from typing_extensions import Self, TypeAlias
 
 from ndv._types import AxisKey, Slice
 
