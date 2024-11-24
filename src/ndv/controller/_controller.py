@@ -23,9 +23,6 @@ class ViewerController:
     """
 
     def __init__(self, data: DataDisplayModel | None = None) -> None:
-        if data is None:
-            data = DataDisplayModel()
-
         # mapping of channel/LUT index to image handle, where None is the default LUT
         # PImageHandle is an object that allows this controller to update the canvas img
         self._img_handles: defaultdict[int | None, list[PImageHandle]] = defaultdict(
@@ -35,14 +32,15 @@ class ViewerController:
         # LutView is a front-end object that allows the user to interact with the LUT
         self._lut_views: dict[int | None, PLutView] = {}
 
-        self._canvas = get_canvas_class()()
+        # get and create the front-end and canvas classes
+        frontend_cls = get_view_frontend_class()
+        canvas_cls = get_canvas_class()
+        self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
-
-        view = get_view_frontend_class()(self._canvas.qwidget())
+        self._view = frontend_cls(self._canvas.qwidget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
-        self._dd_model = data
-        self._view = view
+        self._dd_model = data or DataDisplayModel()
 
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)

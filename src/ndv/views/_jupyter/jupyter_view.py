@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import cmap
@@ -186,10 +187,22 @@ class JupyterViewerView:
 
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         """Set the current value of the sliders."""
-        for axis, val in value.items():
-            if isinstance(val, slice):
-                raise NotImplementedError("Slices are not supported yet")
-            self._sliders[axis].value = val
+        changed = False
+        # this type ignore is only necessary because we had to override the signal
+        # to be a PSignal in the class def above :(
+        with self.currentIndexChanged.blocked():  # type: ignore [attr-defined]
+            for axis, val in value.items():
+                if isinstance(val, slice):
+                    raise NotImplementedError("Slices are not supported yet")
+
+                if sld := self._sliders.get(axis):
+                    if sld.value != val:
+                        sld.value = val
+                        changed = True
+                else:  # pragma: no cover
+                    warnings.warn(f"Axis {axis} not found in sliders", stacklevel=2)
+        if changed:
+            self.currentIndexChanged.emit()
 
     def add_lut_view(self) -> PLutView:
         """Add a LUT view to the viewer."""

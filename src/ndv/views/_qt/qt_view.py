@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Container, Hashable, Mapping, Sequence
 from typing import cast
 
@@ -175,14 +176,27 @@ class QDimsSliders(QWidget):
 
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         """Set the current value of the sliders."""
-        for axis, val in value.items():
-            if isinstance(val, slice):
-                raise NotImplementedError("Slices are not supported yet")
-            self._sliders[axis].setValue(val)
+        changed = False
+        # only emit signal if the value actually changed
+        # NOTE: this may be unnecessary, since usually the only thing calling
+        # set_current_index is the controller, which already knows the value
+        # however, we use this method directly in testing and it's nice to ensure.
+        with signals_blocked(self):
+            for axis, val in value.items():
+                if isinstance(val, slice):
+                    raise NotImplementedError("Slices are not supported yet")
+                if slider := self._sliders.get(axis):
+                    if slider.value() != val:
+                        changed = True
+                        slider.setValue(val)
+                else:  # pragma: no cover
+                    warnings.warn(f"Axis {axis} not found in sliders", stacklevel=2)
+        if changed:
+            self.currentIndexChanged.emit()
 
 
 # this is a PView ... but that would make a metaclass conflict
-class QViewerView(QWidget):
+class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     mouseMoved = Signal(MouseMoveEvent)

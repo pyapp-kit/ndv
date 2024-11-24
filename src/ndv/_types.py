@@ -4,7 +4,7 @@ from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from typing import Annotated, Any, NamedTuple, TypeAlias
 
-from pydantic import PlainValidator
+from pydantic import PlainSerializer, PlainValidator
 
 
 def _maybe_int(val: Any) -> Any:
@@ -37,7 +37,9 @@ Slice = Annotated[slice, PlainValidator(_to_slice)]
 # In many cases it will be an integer, but for some labeled arrays it may be a string
 # or other hashable object.  It is up to the DataWrapper to convert these keys to
 # actual integer indices.
-AxisKey: TypeAlias = Annotated[Hashable, PlainValidator(_maybe_int)]
+AxisKey: TypeAlias = Annotated[
+    Hashable, PlainValidator(_maybe_int), PlainSerializer(str, return_type=str)
+]
 
 
 class MouseMoveEvent(NamedTuple):

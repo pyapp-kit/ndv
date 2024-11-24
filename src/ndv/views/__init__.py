@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     GuiFrontend: TypeAlias = Literal["qt", "jupyter"]
     CanvasBackend: TypeAlias = Literal["vispy", "pygfx"]
 
+GUI_ENV_VAR = "NDV_GUI_FRONTEND"
+CANVAS_ENV_VAR = "NDV_CANVAS_BACKEND"
+
 
 # TODO: add a way to set the frontend via an environment variable
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
@@ -26,17 +29,23 @@ def get_view_frontend_class() -> type[PView]:
 
         return JupyterViewerView
     if frontend == "qt":
-        from ._qt.qt_view import QViewerView
+        from ._qt.qt_view import QtViewerView
 
-        return QViewerView
+        return QtViewerView
 
     raise RuntimeError("No GUI frontend found")
 
 
 def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
     _backend = _determine_canvas_backend(backend)
+    _frontend = _determine_gui_frontend()
     if _backend == "vispy":
+        from vispy.app import use_app
+
         from ndv.views._vispy._vispy import VispyViewerCanvas
+
+        if _frontend == "jupyter":
+            use_app("jupyter_rfb")
 
         return VispyViewerCanvas
 
@@ -78,6 +87,11 @@ def _try_start_qapp() -> bool:
 
 
 def _determine_gui_frontend() -> GuiFrontend:
+    requested = os.getenv(GUI_ENV_VAR, "").lower()
+    if requested:
+        if requested not in ("qt", "jupyter"):
+            raise ValueError(f"Invalid GUI frontend: {requested!r}")
+        return cast("GuiFrontend", requested)
     if _is_running_in_notebook():
         return "jupyter"
     if _is_running_in_qapp():
@@ -88,7 +102,7 @@ def _determine_gui_frontend() -> GuiFrontend:
 
 
 def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
-    backend = requested or os.getenv("NDV_CANVAS_BACKEND", "").lower()
+    backend = requested or os.getenv(CANVAS_ENV_VAR, "").lower()
 
     if not backend:
         # first check for things that have already been imported
