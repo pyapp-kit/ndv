@@ -2,9 +2,10 @@
 
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
-from typing import Annotated, Any, NamedTuple, TypeAlias
+from typing import Annotated, Any, NamedTuple
 
 from pydantic import PlainSerializer, PlainValidator
+from typing_extensions import TypeAlias
 
 
 def _maybe_int(val: Any) -> Any:
