@@ -53,8 +53,8 @@ class ChannelMode(str, Enum):
         all channels.
     RGBA : str
         The array is displayed as an RGB image, with a single lookup table applied.
-        In this mode, the channel axis is hidden, and a single LUT control is shown.
-        Only valid when channel axis has length <= 4.
+        In this mode, the slider for the channel axis is hidden, and a single LUT
+        control is shown. Only valid when channel axis has length <= 4.
     RGB : str
         Alias for RGBA.
     """
@@ -66,6 +66,13 @@ class ChannelMode(str, Enum):
 
     def __str__(self) -> str:
         return self.value
+
+    def is_multichannel(self) -> bool:
+        """Return whether this mode displays multiple channels.
+
+        If `is_multichannel` is True, then the `channel_axis` slider should be hidden.
+        """
+        return self in (ChannelMode.COMPOSITE, ChannelMode.RGBA)
 
 
 ChannelMode._member_map_["RGB"] = ChannelMode.RGBA  #  ChannelMode["RGB"]

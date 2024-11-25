@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -12,11 +12,9 @@ if TYPE_CHECKING:
     from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
+    from ndv.models._array_display_model import ChannelMode
 
-from typing import Callable, Union, runtime_checkable
 
-
-@runtime_checkable
 class PSignalInstance(Protocol):
     """The protocol that a signal instance must implement.
 
@@ -37,7 +35,6 @@ class PSignalInstance(Protocol):
         """Emits the signal with the given arguments."""
 
 
-@runtime_checkable
 class PSignalDescriptor(Protocol):
     """Descriptor that returns a signal instance."""
 
@@ -123,16 +120,18 @@ class PImageHandle(CanvasElement, Protocol):
 
 
 class PView(Protocol):
-    """Protocol that front-end viewers must implement."""
+    """Primary protocol for top level, front-end viewers."""
 
     currentIndexChanged: PSignal
     resetZoomClicked: PSignal
     mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
+    channelModeChanged: PSignal
 
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     def current_index(self) -> Mapping[AxisKey, int | slice]: ...
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
+    def set_channel_mode(self, mode: ChannelMode) -> None: ...
     def set_data_info(self, data_info: str) -> None:
         """Set info about the currently displayed data, usually above canvas."""
 
@@ -145,9 +144,6 @@ class PView(Protocol):
     def add_lut_view(self) -> PLutView: ...
     def remove_lut_view(self, view: PLutView) -> None: ...
     def show(self) -> None: ...
-
-    # def refresh(self) -> None: ...
-    # def add_image_to_canvas(self, data: Any) -> PImageHandle: ...
 
 
 class PRoiHandle(CanvasElement, Protocol):

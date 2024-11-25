@@ -2,7 +2,7 @@ from collections.abc import Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol, Union, cast
 
 import numpy as np
 from pydantic import Field, model_validator
@@ -12,8 +12,6 @@ from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._base_model import NDVModel
 
 from .data_wrappers import DataWrapper
-
-MULTI_CHANNEL_MODES = {ChannelMode.COMPOSITE, ChannelMode.RGBA}
 
 
 class DataWrapperP(Protocol):
@@ -120,6 +118,13 @@ class DataDisplayModel(NDVModel):
         )
 
     @property
+    def canonical_channel_axis(self) -> int | None:
+        """Return the channel axis in canonical form."""
+        if self.display.channel_axis is None:
+            return None
+        return self._canonicalize_axis_key(self.display.channel_axis)
+
+    @property
     def canonical_current_index(self) -> Mapping[int, Union[int, slice]]:
         """Return the current index in canonical form."""
         return {
@@ -147,12 +152,15 @@ class DataDisplayModel(NDVModel):
 
         # if we need to request multiple channels (composite mode or RGB),
         # ensure that the channel axis is also sliced
-        if (c_ax := self.display.channel_axis) is not None:
-            c_ax = self._canonicalize_axis_key(c_ax)
-
-            if self.display.channel_mode in MULTI_CHANNEL_MODES:
+        if c_ax := self.canonical_channel_axis:
+            if self.display.channel_mode.is_multichannel():
                 if not isinstance(requested_slice.get(c_ax), slice):
                     requested_slice[c_ax] = slice(None)
+            else:
+                # somewhat of a hack.
+                # we heed DataRequest.channel_axis to be None if we want the view
+                # to use the default_lut
+                c_ax = None
 
         # ensure that all axes are slices, so that we don't lose any dimensions.
         # data will be squeezed to remove singleton dimensions later after
@@ -197,7 +205,7 @@ class DataDisplayModel(NDVModel):
                 if i is None:
                     ch_data = data
                 else:
-                    ch_keepdims = (slice(None),) * ch_ax + (i,) + (None,)
+                    ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
                     ch_data = data[ch_keepdims]
                 future = Future[DataResponse]()
                 future.set_result(

@@ -8,6 +8,7 @@ import ipywidgets as widgets
 from psygnal import Signal
 
 from ndv._types import MouseMoveEvent
+from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -110,10 +111,10 @@ class JupyterLutView:
 
 # this is a PView
 class JupyterViewerView:
-    # not sure why this annotation is necessary ... something wrong with PSignal
     currentIndexChanged: PSignal = Signal()
     resetZoomClicked: PSignal = Signal()
     mouseMoved: PSignal = Signal(MouseMoveEvent)
+    channelModeChanged: PSignal = Signal(ChannelMode)
 
     def __init__(
         self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
@@ -133,6 +134,13 @@ class JupyterViewerView:
         self._data_info_label = widgets.Label()
         self._hover_info_label = widgets.Label()
 
+        # the button that controls the display mode of the channels
+        self._channel_mode_combo = widgets.Dropdown(
+            options=[x.value for x in ChannelMode], value=str(ChannelMode.GRAYSCALE)
+        )
+
+        self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
+
         # LAYOUT
 
         self.layout = widgets.VBox(
@@ -141,8 +149,13 @@ class JupyterViewerView:
                 self._canvas_widget,
                 self._hover_info_label,
                 self._slider_box,
+                self._channel_mode_combo,
             ]
         )
+
+        # CONNECTIONS
+
+        self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
     def handle_event(self, ev: dict) -> None:
         etype = ev["event_type"]
@@ -167,15 +180,11 @@ class JupyterViewerView:
                 continuous_update=True,
                 orientation="horizontal",
             )
-            sld.observe(self.on_slider_change, "value")
+            sld.observe(self._on_slider_change, "value")
             sliders.append(sld)
             self._sliders[axis] = sld
         self._slider_box.children = sliders
 
-        self.currentIndexChanged.emit()
-
-    def on_slider_change(self, change: dict[str, Any]) -> None:
-        """Emit signal when a slider value changes."""
         self.currentIndexChanged.emit()
 
     def hide_sliders(
@@ -237,3 +246,15 @@ class JupyterViewerView:
 
     def set_hover_info(self, hover_info: str) -> None:
         self._hover_info_label.value = hover_info
+
+    def set_channel_mode(self, mode: ChannelMode) -> None:
+        with self.channelModeChanged.blocked():  # type: ignore [attr-defined]
+            self._channel_mode_combo.value = mode.value
+
+    def _on_slider_change(self, change: dict[str, Any]) -> None:
+        """Emit signal when a slider value changes."""
+        self.currentIndexChanged.emit()
+
+    def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
+        """Emit signal when the channel mode changes."""
+        self.channelModeChanged.emit(ChannelMode(change["new"]))

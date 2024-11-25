@@ -19,6 +19,5 @@ _data[:, 1] = _data[:, 1] * 1
 viewer.data = _data
 viewer.show()
 viewer.model.current_index.update({0: 32})
-viewer.model.default_lut.cmap = "cubehelix"
 viewer.model.channel_mode = "composite"
 app.exec()

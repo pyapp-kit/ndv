@@ -15,12 +15,19 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
+from superqt import (
+    QCollapsible,
+    QElidingLabel,
+    QEnumComboBox,
+    QLabeledRangeSlider,
+    QLabeledSlider,
+)
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey, MouseMoveEvent
+from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -206,6 +213,7 @@ class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     mouseMoved = Signal(MouseMoveEvent)
+    channelModeChanged = Signal(ChannelMode)
 
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
@@ -226,7 +234,9 @@ class QtViewerView(QWidget):
         self._hover_info_label = QElidingLabel("", self)
 
         # the button that controls the display mode of the channels
-        self._channel_mode_btn = QPushButton("Channel")
+        self._channel_mode_combo = QEnumComboBox(self, ChannelMode)
+        self._channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged)
+
         # button to reset the zoom of the canvas
         # TODO: unify icons across all the view frontends in a new file
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
@@ -237,7 +247,7 @@ class QtViewerView(QWidget):
         btns.setContentsMargins(0, 0, 0, 0)
         btns.setSpacing(0)
         btns.addStretch()
-        btns.addWidget(self._channel_mode_btn)
+        btns.addWidget(self._channel_mode_combo)
         # btns.addWidget(self._ndims_btn)
         btns.addWidget(self._set_range_btn)
         # btns.addWidget(self._add_roi_btn)
@@ -312,6 +322,10 @@ class QtViewerView(QWidget):
     def set_hover_info(self, text: str) -> None:
         """Set the hover info text, below the canvas."""
         self._hover_info_label.setText(text)
+
+    def set_channel_mode(self, mode: ChannelMode) -> None:
+        """Set the channel mode button text."""
+        self._channel_mode_combo.setCurrentEnum(mode)
 
     def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
         """Event filter installed on the canvas to handle mouse events."""

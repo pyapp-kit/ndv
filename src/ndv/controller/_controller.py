@@ -49,6 +49,7 @@ class ViewerController:
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.mouseMoved.connect(self._on_view_mouse_moved)
+        self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -99,7 +100,6 @@ class ViewerController:
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
-            # (model.events.channel_axis, self._on_channel_axis_changed),
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
             # (model.luts.value_changed, self._on_model_default_lut_cmap_changed),
@@ -117,6 +117,7 @@ class ViewerController:
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
         self._view.create_sliders(self._dd_model.canonical_data_coords)
+        self._view.set_channel_mode(self.model.channel_mode)
         if self.data is not None:
             self._update_visible_sliders()
             # if we have data:
@@ -132,6 +133,12 @@ class ViewerController:
     def _on_model_current_index_changed(self) -> None:
         value = self.model.current_index
         self._view.set_current_index(value)
+        self._update_canvas()
+
+    def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
+        self._view.set_channel_mode(mode)
+        self._update_visible_sliders()
+        self._clear_canvas()
         self._update_canvas()
 
     def _on_model_default_lut_visible_changed(self, visible: bool) -> None:
@@ -152,11 +159,6 @@ class ViewerController:
             for handle in handles:
                 handle.remove()
         self._img_handles.clear()
-
-    def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
-        print(f"Channel mode changed to {mode!s}")
-        self._clear_canvas()
-        self._update_canvas()
 
     # ------------------ View callbacks ------------------
 
@@ -199,13 +201,34 @@ class ViewerController:
         self.model.default_lut.clims = clims
         self.model.default_lut.autoscale = False
 
+    def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
+        """Respond to a mouse move event in the view."""
+        x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+
+        # collect and format intensity values at the current mouse position
+        channel_values = self._get_values_at_world_point(int(x), int(y))
+        vals = []
+        for ch, value in channel_values.items():
+            # restrict to 2 decimal places, but remove trailing zeros
+            fval = f"{value:.2f}".rstrip("0").rstrip(".")
+            fch = f"{ch}: " if ch is not None else ""
+            vals.append(f"{fch}{fval}")
+        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
+        self._view.set_hover_info(text)
+
+    def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
+        self.model.channel_mode = mode
+
     # ------------------ Helper methods ------------------
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
-        self._view.hide_sliders(
-            self._dd_model.canonical_visible_axes, show_remainder=True
-        )
+        hidden_sliders = self._dd_model.canonical_visible_axes
+        if self.model.channel_mode.is_multichannel():
+            if ch := self._dd_model.canonical_channel_axis:
+                hidden_sliders += (ch,)
+
+        self._view.hide_sliders(hidden_sliders, show_remainder=True)
 
     def _update_canvas(self) -> None:
         """Force the canvas to fetch and update the displayed data.
@@ -244,7 +267,6 @@ class ViewerController:
                         # but this next line is more direct
                         # self._handles[None].clim = (data.min(), data.max())
             else:
-                print(">>>Adding new image handle", key)
                 handle = self._canvas.add_image(data)
                 self._img_handles[key].append(handle)
                 self._canvas.set_range()
@@ -269,6 +291,7 @@ class ViewerController:
         # TODO: handle more complex autoscale types
         lut_view.set_auto_scale(bool(lut_model.autoscale))
         lut_view.set_lut_visible(True)
+        lut_view.set_name(f"{key}")
 
         # connect view changes to controller callbacks that update the model
         lut_view.visibleChanged.connect(self._on_view_lut_visible_changed)
@@ -282,21 +305,6 @@ class ViewerController:
         lut_model.events.autoscale.connect(lut_view.set_auto_scale)
         lut_model.events.visible.connect(lut_view.set_lut_visible)
         return lut_view
-
-    def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
-        """Respond to a mouse move event in the view."""
-        x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
-
-        # collect and format intensity values at the current mouse position
-        channel_values = self._get_values_at_world_point(int(x), int(y))
-        vals = []
-        for ch, value in channel_values.items():
-            # restrict to 2 decimal places, but remove trailing zeros
-            fval = f"{value:.2f}".rstrip("0").rstrip(".")
-            fch = f"{ch}: " if ch is not None else ""
-            vals.append(f"{fch}{fval}")
-        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
-        self._view.set_hover_info(text)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
         # TODO: handle 3D data
