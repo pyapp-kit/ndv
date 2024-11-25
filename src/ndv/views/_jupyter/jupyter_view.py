@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import cmap
 import ipywidgets as widgets
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
-    from ndv.views.protocols import PLutView, PSignal
+    from ndv.views.protocols import PSignal
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -211,14 +211,20 @@ class JupyterViewerView:
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self) -> PLutView:
+    def add_lut_view(self) -> JupyterLutView:
         """Add a LUT view to the viewer."""
         wdg = JupyterLutView()
         self.layout.children = (*self.layout.children, wdg.layout)
 
         # this cast is necessary because psygnal.Signal() is not being recognized
         # as a PSignalDescriptor by the type checker
-        return cast("PLutView", wdg)
+        return wdg
+
+    def remove_lut_view(self, view: JupyterLutView) -> None:
+        """Remove a LUT view from the viewer."""
+        self.layout.children = tuple(
+            wdg for wdg in self.layout.children if wdg != view.layout
+        )
 
     def show(self) -> None:
         """Show the viewer."""

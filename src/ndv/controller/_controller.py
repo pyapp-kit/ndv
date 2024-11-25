@@ -6,13 +6,17 @@ from typing import TYPE_CHECKING, Any
 
 from ndv.models import DataDisplayModel
 from ndv.views import get_canvas_class, get_view_frontend_class
+from ndv.views.protocols import PImageHandle
 
 if TYPE_CHECKING:
     import cmap
+    from typing_extensions import TypeAlias
 
     from ndv._types import MouseMoveEvent
-    from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PImageHandle, PLutView, PView
+    from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
+    from ndv.views.protocols import PLutView, PView
+
+    LutKey: TypeAlias = int | None
 
 
 # (probably rename to something like just Viewer)
@@ -25,12 +29,11 @@ class ViewerController:
     def __init__(self, data: DataDisplayModel | None = None) -> None:
         # mapping of channel/LUT index to image handle, where None is the default LUT
         # PImageHandle is an object that allows this controller to update the canvas img
-        self._img_handles: defaultdict[int | None, list[PImageHandle]] = defaultdict(
-            list
-        )
+        self._img_handles = defaultdict["LutKey", list[PImageHandle]](list)
+
         # mapping of channel/LUT index to LutView, where None is the default LUT
         # LutView is a front-end object that allows the user to interact with the LUT
-        self._lut_views: dict[int | None, PLutView] = {}
+        self._lut_views: dict[LutKey, PLutView] = {}
 
         # get and create the front-end and canvas classes
         frontend_cls = get_view_frontend_class()
@@ -95,6 +98,7 @@ class ViewerController:
             (model.events.visible_axes, self._on_model_visible_axes_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
+            (model.events.channel_mode, self._on_model_channel_mode_changed),
             # (model.events.channel_axis, self._on_channel_axis_changed),
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
@@ -142,6 +146,18 @@ class ViewerController:
         for handle in self._img_handles[None]:
             handle.clim = clims
 
+    def _clear_canvas(self) -> None:
+        for key, handles in self._img_handles.items():
+            self._view.remove_lut_view(self._lut_views.pop(key))
+            for handle in handles:
+                handle.remove()
+        self._img_handles.clear()
+
+    def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
+        print(f"Channel mode changed to {mode!s}")
+        self._clear_canvas()
+        self._update_canvas()
+
     # ------------------ View callbacks ------------------
 
     def _on_view_current_index_changed(self) -> None:
@@ -152,14 +168,12 @@ class ViewerController:
         """Reset the zoom level of the canvas."""
         self._canvas.set_range()
 
-    def _on_view_lut_visible_changed(
-        self, visible: bool, key: int | None = None
-    ) -> None:
+    def _on_view_lut_visible_changed(self, visible: bool, key: LutKey = None) -> None:
         for handle in self._img_handles[None]:
             handle.visible = visible
 
     def _on_view_lut_autoscale_changed(
-        self, autoscale: bool, key: int | None = None
+        self, autoscale: bool, key: LutKey = None
     ) -> None:
         self._dd_model.display.default_lut.autoscale = autoscale
         lut_view = self._lut_views[key]
@@ -174,7 +188,7 @@ class ViewerController:
                 lut_model.clims = (data.min(), data.max())
 
     def _on_view_lut_cmap_changed(
-        self, cmap: cmap.Colormap, key: int | None = None
+        self, cmap: cmap.Colormap, key: LutKey = None
     ) -> None:
         lut = self.model.default_lut if key is None else self.model.luts[key]
         for handle in self._img_handles[key]:
@@ -202,50 +216,51 @@ class ViewerController:
         if not self._dd_model.data_wrapper:
             return
 
-        key = None  # TODO: handle multiple channels
+        # TODO: make asynchronous
+        for future in self._dd_model.request_sliced_data():
+            response = future.result()
+            key = response.channel_key
 
-        if key in self._lut_views:
-            self._lut_views[key]
-        else:
-            self._add_lut_view(key)
+            if key in self._lut_views:
+                self._lut_views[key]
+            else:
+                self._add_lut_view(key)
 
-        if key is None:
-            lut_model = self.model.default_lut
-        else:
-            lut_model = self.model.luts[key]
+            lut_model = self.model.luts.get(key, self.model.default_lut)
 
-        data = self._dd_model.current_data_slice()  # TODO: make asynchronous
-        if key in self._img_handles:
-            if handles := self._img_handles[key]:
-                # until we have a more sophisticated way to handle updating data for
-                # multiple handles, we'll just update the first one
-                handles[0].data = data
-                # if this image handle is visible and autoscale is on, then we need to
-                # update the clim values
-                if lut_model.autoscale:
-                    lut_model.clims = (data.min(), data.max())
-                    # lut_view.setClims((data.min(), data.max()))
-                    # technically... the LutView may also emit a signal that the
-                    # controller listens to, and then updates the image handle
-                    # but this next line is more direct
-                    # self._handles[None].clim = (data.min(), data.max())
-        else:
-            handle = self._canvas.add_image(data)
-            self._img_handles[key].append(handle)
-            self._canvas.set_range()
-            handle.cmap = lut_model.cmap
-            if clims := lut_model.clims:
-                handle.clim = clims
+            data = response.data
+            if key in self._img_handles:
+                if handles := self._img_handles[key]:
+                    # until we have a more sophisticated way to handle updating data
+                    # for multiple handles, we'll just update the first one
+                    handles[0].data = data
+                    # if this image handle is visible and autoscale is on, then we need
+                    # to update the clim values
+                    if lut_model.autoscale:
+                        lut_model.clims = (data.min(), data.max())
+                        # lut_view.setClims((data.min(), data.max()))
+                        # technically... the LutView may also emit a signal that the
+                        # controller listens to, and then updates the image handle
+                        # but this next line is more direct
+                        # self._handles[None].clim = (data.min(), data.max())
+            else:
+                print(">>>Adding new image handle", key)
+                handle = self._canvas.add_image(data)
+                self._img_handles[key].append(handle)
+                self._canvas.set_range()
+                handle.cmap = lut_model.cmap
+                if clims := lut_model.clims:
+                    handle.clim = clims
         self._canvas.refresh()
 
-    def _add_lut_view(self, key: int | None) -> PLutView:
+    def _add_lut_view(self, key: LutKey) -> PLutView:
         """Create a new LUT view and connect it to the model."""
         if key in self._lut_views:
             # need to clean up
             raise NotImplementedError(f"LUT view with key {key} already exists")
 
         self._lut_views[key] = lut_view = self._view.add_lut_view()
-        lut_model = self.model.default_lut if key is None else self.model.luts[key]
+        lut_model = self.model.luts.get(key, self.model.default_lut)
 
         # setup the initial state of the LUT view
         lut_view.set_colormap(lut_model.cmap)
@@ -283,12 +298,12 @@ class ViewerController:
         text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
         self._view.set_hover_info(text)
 
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[int | None, float]:
+    def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
         # TODO: handle 3D data
         if (x < 0 or y < 0) or self.model.n_visible_axes != 2:  # pragma: no cover
             return {}
 
-        values: dict[int | None, float] = {}
+        values: dict[LutKey, float] = {}
         for channel_key, handles in self._img_handles.items():
             if not handles:
                 continue

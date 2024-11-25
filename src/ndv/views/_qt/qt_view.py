@@ -284,6 +284,9 @@ class QtViewerView(QWidget):
         self._luts.addWidget(wdg)
         return wdg
 
+    def remove_lut_view(self, wdg: QLUTWidget) -> None:
+        self._luts.removeWidget(wdg)
+
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         self._dims_sliders.create_sliders(coords)
