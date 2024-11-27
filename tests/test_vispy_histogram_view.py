@@ -7,7 +7,6 @@ import cmap
 import numpy as np
 import pytest
 from qtpy.QtWidgets import QHBoxLayout, QWidget
-from vispy.app.canvas import MouseEvent
 from vispy.color import Color
 
 from ndv.views._vispy._vispy import Grabbable, VispyHistogramView
@@ -269,21 +268,18 @@ def test_move_clim(qtbot: QtBot, view: VispyHistogramView) -> None:
     view.set_clims((10, 90))
     # Click on the left clim
     press_pos = view.node_tform.imap([10])[:2]
-    event = MouseEvent("mouse_press", pos=press_pos, button=1)
-    view.on_mouse_press(event)
+    view.on_mouse_press(press_pos)
     assert view._grabbed == Grabbable.LEFT_CLIM
     assert not view.plot.camera.interactive
     # Move it to 50
     move_pos = view.node_tform.imap([50])[:2]
-    event = MouseEvent("mouse_move", pos=move_pos, button=1)
     with qtbot.waitSignal(view.climsChanged):
-        view.on_mouse_move(event)
+        view.on_mouse_move(move_pos)
     assert view._grabbed == Grabbable.LEFT_CLIM
     assert not view.plot.camera.interactive
     # Release mouse
     release_pos = move_pos
-    event = MouseEvent("mouse_release", pos=release_pos, button=1)
-    view.on_mouse_release(event)
+    view.on_mouse_release(release_pos)
     assert view._grabbed == Grabbable.NONE
     assert view.plot.camera.interactive
 
@@ -291,21 +287,18 @@ def test_move_clim(qtbot: QtBot, view: VispyHistogramView) -> None:
     view.set_clims((50, 50))
     # Ensure clicking and moving at 50 moves the right clim
     press_pos = view.node_tform.imap([50])[:2]
-    event = MouseEvent("mouse_press", pos=press_pos, button=1)
-    view.on_mouse_press(event)
+    view.on_mouse_press(press_pos)
     assert view._grabbed == Grabbable.RIGHT_CLIM
     assert not view.plot.camera.interactive
     # Move it to 70
     move_pos = view.node_tform.imap([70])[:2]
-    event = MouseEvent("mouse_move", pos=move_pos, button=1)
     with qtbot.waitSignal(view.climsChanged):
-        view.on_mouse_move(event)
+        view.on_mouse_move(move_pos)
     assert view._grabbed == Grabbable.RIGHT_CLIM
     assert not view.plot.camera.interactive
     # Release mouse
     release_pos = move_pos
-    event = MouseEvent("mouse_release", pos=release_pos, button=1)
-    view.on_mouse_release(event)
+    view.on_mouse_release(release_pos)
     assert view._grabbed == Grabbable.NONE
     assert view.plot.camera.interactive
 
@@ -318,20 +311,17 @@ def test_move_gamma(qtbot: QtBot, view: VispyHistogramView) -> None:
     view.set_clims((-9950, 10050))
     # Click on the gamma handle
     press_pos = view.node_tform.imap(view._handle_transform.map([50, 0.5]))[:2]
-    event = MouseEvent("mouse_press", pos=press_pos, button=1)
-    view.on_mouse_press(event)
+    view.on_mouse_press(press_pos)
     assert view._grabbed == Grabbable.GAMMA
     assert not view.plot.camera.interactive
     # Move it to 50
     move_pos = view.node_tform.imap(view._handle_transform.map([50, 0.75]))[:2]
-    event = MouseEvent("mouse_move", pos=move_pos, button=1)
     with qtbot.waitSignal(view.gammaChanged):
-        view.on_mouse_move(event)
+        view.on_mouse_move(move_pos)
     assert view._grabbed == Grabbable.GAMMA
     assert not view.plot.camera.interactive
     # Release mouse
     release_pos = move_pos
-    event = MouseEvent("mouse_release", pos=release_pos, button=1)
-    view.on_mouse_release(event)
+    view.on_mouse_release(release_pos)
     assert view._grabbed == Grabbable.NONE
     assert view.plot.camera.interactive

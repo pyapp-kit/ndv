@@ -5,14 +5,27 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from ndv.models import DataDisplayModel
-from ndv.views import get_canvas_class, get_view_frontend_class
+from ndv.models._lut_model import LUTModel
+from ndv.models._stats_model import StatsModel
+from ndv.views import (
+    get_canvas_class,
+    get_histogram_backend_class,
+    get_histogram_frontend_class,
+    get_view_frontend_class,
+)
 
 if TYPE_CHECKING:
     import cmap
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PImageHandle, PLutView, PView
+    from ndv.views.protocols import (
+        PHistogramCanvas,
+        PHistogramView,
+        PImageHandle,
+        PLutView,
+        PView,
+    )
 
 
 # (probably rename to something like just Viewer)
@@ -309,3 +322,73 @@ class ViewerController:
     def show(self) -> None:
         """Show the viewer."""
         self._view.show()
+
+
+class HistogramController:
+    """Manages the connection between models and a histogram view."""
+
+    def __init__(
+        self,
+        data: DataDisplayModel | None = None,
+        lut: LUTModel | None = None,
+    ) -> None:
+        self._lut = lut or LUTModel()
+        self._stats = StatsModel()
+        self._data = data or DataDisplayModel()
+
+        self._hist: PHistogramCanvas = get_histogram_backend_class()()
+        self._view: PHistogramView = get_histogram_frontend_class()(self._hist)
+
+        # A HistogramView is both a StatsView and a LUTView
+        # DataDisplayModel <-> StatsModel
+        self._data.display.current_index.value_changed.connect(self._update_data)
+        # StatModel <-> StatsView
+        self._stats.events.data.connect(self._set_data)
+        self._stats.events.bins.connect(self._set_data)
+        # # LutModel <-> LutView
+        self._lut.events.clims.connect(self._set_model_clims)
+        self._hist.climsChanged.connect(self._set_view_clims)
+        self._lut.events.gamma.connect(self._set_model_gamma)
+        self._hist.gammaChanged.connect(self._set_view_gamma)
+
+    def _update_data(self) -> None:
+        data = self._data.current_data_slice()  # TODO: make asynchronous
+        self._stats.data = data
+
+    def _set_data(self) -> None:
+        values, bin_edges = self._stats.histogram
+        self._hist.set_histogram(values, bin_edges)
+
+    @property
+    def data(self) -> Any:
+        """Return data being displayed."""
+        if self._data.data_wrapper is None:
+            return None
+        # returning the actual data, not the wrapper
+        return self._data.data_wrapper.data
+
+    @data.setter
+    def data(self, data: Any) -> None:
+        """Set the data to be displayed."""
+        self._data.data = data
+        self._update_data()
+
+    def _set_model_clims(self) -> None:
+        clims = self._lut.clims
+        # FIXME: Discrepancy between LUTModel and LUTView
+        if clims is not None:
+            self._hist.set_clims(clims)
+
+    def _set_view_clims(self, clims: tuple[float, float]) -> None:
+        self._lut.clims = clims
+
+    def _set_model_gamma(self) -> None:
+        gamma = self._lut.gamma
+        self._hist.set_gamma(gamma)
+
+    def _set_view_gamma(self, gamma: float) -> None:
+        self._lut.gamma = gamma
+
+    def view(self) -> Any:
+        """Returns an object that can be displayed by the active backend."""
+        return self._view

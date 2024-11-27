@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
     import cmap
     import numpy as np
-    from psygnal import Signal, SignalInstance
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
@@ -68,6 +67,7 @@ class PLutView(Protocol):
             The name (label) of the LUT
         """
         ...
+
     def set_auto_scale(self, auto: bool) -> None:
         """Defines whether autoscale has been enabled.
 
@@ -80,6 +80,7 @@ class PLutView(Protocol):
             True iff clims automatically changed on dataset alteration.
         """
         ...
+
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         """Defines the colormap backing the view.
 
@@ -89,6 +90,7 @@ class PLutView(Protocol):
             The object mapping scalar values to RGB(A) colors.
         """
         ...
+
     def set_clims(self, clims: tuple[float, float]) -> None:
         """Defines the input clims.
 
@@ -101,6 +103,7 @@ class PLutView(Protocol):
             The clims
         """
         ...
+
     def set_lut_visible(self, visible: bool) -> None:
         """Defines whether this view is visible.
 
@@ -121,10 +124,13 @@ class PLutView(Protocol):
         """
         ...
 
+
 class PStatsView(Protocol):
     """A view of the statistics of a dataset."""
 
-    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
+    def set_histogram(
+        self, values: Sequence[float], bin_edges: Sequence[float]
+    ) -> None:
         """Defines the distribution of the dataset.
 
         Properties
@@ -160,13 +166,24 @@ class PStatsView(Protocol):
         ...
 
 
-class PHistogramView(PStatsView, PLutView):
+class PHistogramCanvas(PStatsView, PLutView, Protocol):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
     # TODO: Remove?
     def refresh(self) -> None: ...
+    # TODO: Shares some similarities with PCanvas
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType: ...
+    def on_mouse_press(self, pos: tuple[float, float]) -> bool: ...
+    def on_mouse_move(self, pos: tuple[float, float]) -> bool: ...
+    def on_mouse_release(self, pos: tuple[float, float]) -> bool: ...
+
+    def qwidget(self) -> QWidget: ...
+
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
         """Sets the domain of the view.
+
+        TODO: What is the "extent of the data"? Is it the bounds of the
+        histogram, or the bounds of (clims + histogram)?
 
         Properties
         ----------
@@ -209,6 +226,13 @@ class PHistogramView(PStatsView, PLutView):
             scale. If false, the range will be displayed with a linear scale.
         """
         ...
+
+
+class PHistogramView(Protocol):
+    """Frontend object viewing a PHistogramCanvas."""
+
+    def __init__(self, histogram_widget: PHistogramCanvas, **kwargs: Any) -> None: ...
+    def show(self) -> None: ...
 
 
 class CanvasElement(Protocol):
@@ -351,8 +375,3 @@ class CursorType(Enum):
     V_ARROW = auto()
     H_ARROW = auto()
     ALL_ARROW = auto()
-
-
-class PCursor(Protocol):
-    def __init__(self, native: Any) -> None: ...
-    def set(self, type: CursorType) -> None: ...

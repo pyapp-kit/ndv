@@ -17,8 +17,7 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views import get_cursor_class
-from ndv.views.protocols import CursorType, PCanvas, PHistogramView
+from ndv.views.protocols import CursorType, PCanvas, PHistogramCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -613,8 +612,6 @@ if TYPE_CHECKING:
     # just here cause vispy has poor type hints
     from collections.abc import Sequence
 
-    from vispy.app.canvas import MouseEvent
-
     class Grid(scene.Grid):
         def add_view(
             self,
@@ -811,7 +808,8 @@ class PlotWidget(scene.Widget):
         # cross-platform.  Note that `width_max` and `height_max` of 2 is actually
         # *less* visible than 0 for some reason.  They should also be extracted into
         # some sort of `hide/show` logic for each component
-        self._grid_wdgs[Component.YAXIS].width_max = 30  # otherwise it takes too much
+        # TODO: dynamic max based on max tick value?
+        self._grid_wdgs[Component.YAXIS].width_max = 40  # otherwise it takes too much
         self._grid_wdgs[Component.PAD_LEFT].width_max = 20  # otherwise you get clipping
         self._grid_wdgs[Component.XAXIS].height_max = 20  # otherwise it takes too much
         self.ylabel = ylabel
@@ -932,7 +930,7 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
 
 
 # TODO: Move much of this logic to _qt
-class VispyHistogramView(PHistogramView):
+class VispyHistogramView(PHistogramCanvas):
     """A HistogramView on a VisPy SceneCanvas."""
 
     visibleChanged = Signal(bool)
@@ -963,13 +961,6 @@ class VispyHistogramView(PHistogramView):
         # ------------ VisPy Canvas ------------ #
 
         self._canvas = scene.SceneCanvas()
-        self._canvas.unfreeze()
-        self._canvas.on_mouse_press = self.on_mouse_press
-        self._canvas.on_mouse_move = self.on_mouse_move
-        self._canvas.on_mouse_release = self.on_mouse_release
-        self._canvas.freeze()
-
-        self._cursor = get_cursor_class()(self._canvas.native)
 
         ## -- Visuals -- ##
 
@@ -1025,7 +1016,9 @@ class VispyHistogramView(PHistogramView):
 
     # ------------- StatsView Protocol methods ------------- #
 
-    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
+    def set_histogram(
+        self, values: Sequence[float], bin_edges: Sequence[float]
+    ) -> None:
         """Set the histogram values and bin edges.
 
         These inputs follow the same format as the return value of numpy.histogram.
@@ -1122,6 +1115,9 @@ class VispyHistogramView(PHistogramView):
             self._update_lut_lines()
             self._resize()
 
+    def qwidget(self) -> QWidget:
+        return self._canvas.native
+
     # ------------- Private methods ------------- #
 
     def _update_histogram(self) -> None:
@@ -1191,74 +1187,74 @@ class VispyHistogramView(PHistogramView):
             v._bounds_changed()
         self._gamma_handle._bounds_changed()
 
-    def on_mouse_press(self, event: MouseEvent) -> None:
-        if event.pos is None:
-            return  # pragma: no cover
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+        nearby = self._find_nearby_node(pos)
+
+        if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
+            return CursorType.V_ARROW if self._vertical else CursorType.H_ARROW
+        elif nearby is Grabbable.GAMMA:
+            return CursorType.H_ARROW if self._vertical else CursorType.V_ARROW
+        else:
+            x, y = self._to_plot_coords(pos)
+            x1, x2 = self.plot.xaxis.axis.domain
+            y1, y2 = self.plot.yaxis.axis.domain
+            if (x1 < x <= x2) and (y1 <= y <= y2):
+                return CursorType.ALL_ARROW
+            else:
+                return CursorType.DEFAULT
+
+    def on_mouse_press(self, pos: tuple[float, float]) -> bool:
+        if pos is None:
+            return False  # pragma: no cover
         # check whether the user grabbed a node
-        self._grabbed = self._find_nearby_node(event)
+        self._grabbed = self._find_nearby_node(pos)
         if self._grabbed != Grabbable.NONE:
             # disconnect the pan/zoom mouse events until handle is dropped
             self.plot.camera.interactive = False
+        return False
 
-    def on_mouse_release(self, event: MouseEvent) -> None:
+    def on_mouse_release(self, pos: tuple[float, float]) -> bool:
         self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
+        return False
 
-    def on_mouse_move(self, event: MouseEvent) -> None:
+    def on_mouse_move(self, pos: tuple[float, float]) -> bool:
         """Called whenever mouse moves over canvas."""
-        if event.pos is None:
-            return  # pragma: no cover
+        if pos is None:
+            return False  # pragma: no cover
         if self._clims is None:
-            return  # pragma: no cover
+            return False  # pragma: no cover
 
         if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
             if self._vertical:
-                c = self._to_plot_coords(event.pos)[1]
+                c = self._to_plot_coords(pos)[1]
             else:
-                c = self._to_plot_coords(event.pos)[0]
+                c = self._to_plot_coords(pos)[0]
             if self._grabbed is Grabbable.LEFT_CLIM:
                 newlims = (min(self._clims[1], c), self._clims[1])
             elif self._grabbed is Grabbable.RIGHT_CLIM:
                 newlims = (self._clims[0], max(self._clims[0], c))
             self.climsChanged.emit(newlims)
-            return
+            return False
         elif self._grabbed is Grabbable.GAMMA:
             y0, y1 = (
                 self.plot.xaxis.axis.domain
                 if self._vertical
                 else self.plot.yaxis.axis.domain
             )
-            y = self._to_plot_coords(event.pos)[0 if self._vertical else 1]
+            y = self._to_plot_coords(pos)[0 if self._vertical else 1]
             if y < np.maximum(y0, 0) or y > y1:
-                return
+                return False
             self.gammaChanged.emit(-np.log2(y / y1))
-            return
+            return False
 
-        nearby = self._find_nearby_node(event)
+        return False
 
-        if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
-            if self._vertical:
-                cursor_type = CursorType.V_ARROW
-            else:
-                cursor_type = CursorType.H_ARROW
-        elif nearby is Grabbable.GAMMA:
-            if self._vertical:
-                cursor_type = CursorType.H_ARROW
-            else:
-                cursor_type = CursorType.V_ARROW
-        else:
-            x, y = self._to_plot_coords(event.pos)
-            x1, x2 = self.plot.xaxis.axis.domain
-            y1, y2 = self.plot.yaxis.axis.domain
-            if (x1 < x <= x2) and (y1 <= y <= y2):
-                cursor_type = CursorType.ALL_ARROW
-            else:
-                cursor_type = CursorType.DEFAULT
-        self._cursor.set(cursor_type)
-
-    def _find_nearby_node(self, event: MouseEvent, tolerance: int = 5) -> Grabbable:
+    def _find_nearby_node(
+        self, pos: tuple[float, float], tolerance: int = 5
+    ) -> Grabbable:
         """Describes whether the event is near a clim."""
-        click_x, click_y = event.pos
+        click_x, click_y = pos
 
         # NB Computations are performed in canvas-space
         # for easier tolerance computation.

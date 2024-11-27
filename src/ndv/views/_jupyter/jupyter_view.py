@@ -7,12 +7,8 @@ import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
-<<<<<<< HEAD
 from ndv._types import MouseMoveEvent
-=======
-from ndv.views import get_canvas_class, get_histogram_class
-from ndv.views.protocols import CursorType
->>>>>>> 114c36b (Create JupyterHistogramView)
+from ndv.views.protocols import CursorType, PHistogramCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -241,26 +237,23 @@ class JupyterViewerView:
 class JupyterHistogramView:
     """A Jupyter wrapper around a 'backend' Histogram View."""
 
-    visibleChanged = Signal()
-    autoscaleChanged = Signal()
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
-    gammaChanged = Signal(float)
+    def __init__(self, backend_widget: PHistogramCanvas, **kwargs: Any) -> None:
+        self._backend = backend_widget
+        # TODO: Rename
+        self._qwdg = backend_widget.qwidget()
+        self._mouse_down: bool = False
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._backend = get_histogram_class()()
-        self._backend.visibleChanged.connect(self.visibleChanged.emit)
-        self._backend.autoscaleChanged.connect(self.autoscaleChanged.emit)
-        self._backend.cmapChanged.connect(self.cmapChanged.emit)
-        self._backend.climsChanged.connect(self.climsChanged.emit)
-        self._backend.gammaChanged.connect(self.gammaChanged.emit)
+        # patch the handle_event from _jupyter_rfb.CanvasBackend
+        # to intercept various mouse events.
+        if hasattr(self._qwdg, "handle_event"):
+            self._original_handle_event = self._qwdg.handle_event
+            self._qwdg.handle_event = self.handle_event
+
         self._vert = widgets.ToggleButton(
             value=False,
             description="Vertical",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            # TODO: Workshop tooltip
-            tooltip="If enabled, histogram domain will be displayed along the vertical axis",
+            tooltip="Toggle axis of histogram domain (X or Y)",
         )
         self._vert.observe(self._on_vertical_changed, names="value")
 
@@ -268,13 +261,23 @@ class JupyterHistogramView:
             value=False,
             description="Logarithmic Range",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="Display the base-10 logarithm of each bin height",
+            tooltip="Toggle logarithmic (base-10) range scaling",
         )
         self._log.observe(self._on_log_changed, names="value")
+
+        # TODO: An icon like the Qt version would be nice
+        self._reset = widgets.Button(
+            description="Reset Pan/Zoom",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            # TODO: Workshop tooltip
+            tooltip="Resets Pan and Zoom to the extent of canvas components",
+        )
+        self._reset.on_click(self._resetZoom)
         # `qwidget` is obviously a misnomer here.  it works, because vispy is smart
         # enough to return a widget that ipywidgets can display in the appropriate
         # context, but we should be managing that more explicitly ourselves.
-        self.layout = widgets.VBox([self._backend.view(), self._vert, self._log])
+        self._btns = widgets.HBox([self._vert, self._log, self._reset])
+        self.layout = widgets.VBox([self._backend.qwidget(), self._btns])
 
     def show(self) -> None:
         """Show the viewer."""
@@ -282,97 +285,46 @@ class JupyterHistogramView:
 
         display(self.layout)  # type: ignore [no-untyped-call]
 
+    def handle_event(self, ev: dict) -> None:
+        etype = ev["event_type"]
+        intercepted = False
+        if etype == "pointer_down":
+            pos = (ev["x"], ev["y"])
+            intercepted |= self._backend.on_mouse_press(pos)
+            self._mouse_down = True
+        if etype == "pointer_move":
+            pos = (ev["x"], ev["y"])
+            intercepted |= self._backend.on_mouse_move(pos)
+            if not self._mouse_down:
+                self._set_cursor(self._backend.get_cursor(pos))
+        if etype == "pointer_up":
+            pos = (ev["x"], ev["y"])
+            intercepted |= self._backend.on_mouse_release(pos)
+            self._mouse_down = False
+
+        if not intercepted:
+            self._original_handle_event(ev)
+
     def refresh(self) -> None:
         self._backend.refresh()
 
-    # ------------- StatsView Protocol methods ------------- #
-
-    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
-        """Set the histogram values and bin edges.
-
-        These inputs follow the same format as the return value of numpy.histogram.
-        """
-        self._backend.set_histogram(values, bin_edges)
-        self._backend.refresh()
-
-    def set_std_dev(self, std_dev: float) -> None:
-        self._backend.set_std_dev(std_dev)
-        self._backend.refresh()
-
-    def set_average(self, average: float) -> None:
-        self._backend.set_average(average)
-        self._backend.refresh()
-
-    def view(self) -> Any:
-        return self
-
-    # ------------- LutView Protocol methods ------------- #
-
-    def set_name(self, name: str) -> None:
-        # TODO: maybe show text somewhere
-        self._backend.set_name(name)
-        self._backend.refresh()
-        pass
-
-    def set_lut_visible(self, visible: bool) -> None:
-        self._backend.set_lut_visible(visible)
-        self._backend.refresh()
-
-    def set_colormap(self, lut: cmap.Colormap) -> None:
-        # TODO: Maybe some controls would be nice here?
-        self._backend.set_colormap(lut)
-        self._backend.refresh()
-
-    def set_gamma(self, gamma: float) -> None:
-        self._backend.set_gamma(gamma)
-        self._backend.refresh()
-
-    def set_clims(self, clims: tuple[float, float] | None) -> None:
-        self._backend.set_clims(clims)
-        self._backend.refresh()
-
-    def set_auto_scale(self, autoscale: bool | tuple[float, float]) -> None:
-        self._backend.set_auto_scale(autoscale)
-        self._backend.refresh()
-
-    # ------------- HistogramView Protocol methods ------------- #
-
-    def set_domain(self, bounds: tuple[float, float] | None) -> None:
-        self._backend.set_domain(bounds)
-        self._backend.refresh()
-
-    def set_range(self, bounds: tuple[float, float] | None) -> None:
-        self._backend.set_range(bounds)
-        self._backend.refresh()
-
-    def set_vertical(self, vertical: bool) -> None:
-        self._vert.value = vertical
-        self._backend.set_vertical(vertical)
-        self._backend.refresh()
-
-    def set_range_log(self, enabled: bool) -> None:
-        self._log.value = enabled
-        self._backend.set_range_log(enabled)
-        self._backend.refresh()
+    def _resetZoom(self, wdg: widgets.Button) -> None:
+        self._backend.set_domain(None)
+        self._backend.set_range(None)
 
     def _on_vertical_changed(self, change: dict[str, Any]) -> None:
-        self.set_vertical(self._vert.value)
+        self._backend.set_vertical(self._vert.value)
 
     def _on_log_changed(self, change: dict[str, Any]) -> None:
-        self.set_range_log(self._log.value)
+        self._backend.set_range_log(self._log.value)
 
-
-class JupyterCursor:
-    def __init__(self, native: Any) -> None:
-        # FIXME
-        self._native = native
-
-    def set(self, type: CursorType) -> None:
+    def _set_cursor(self, type: CursorType) -> None:
+        # FIXME: mypy errors
         if type is CursorType.DEFAULT:
-            self._native.cursor = "default"
+            self._qwdg.cursor = "default"
         elif type is CursorType.V_ARROW:
-            self._native.cursor = "ns-resize"
+            self._qwdg.cursor = "ns-resize"
         elif type is CursorType.H_ARROW:
-            self._native.cursor = "ew-resize"
+            self._qwdg.cursor = "ew-resize"
         elif type is CursorType.ALL_ARROW:
-            self._native.cursor = "move"
+            self._qwdg.cursor = "move"

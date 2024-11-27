@@ -20,13 +20,13 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
-<<<<<<< HEAD
 from ndv._types import AxisKey, MouseMoveEvent
-from ndv.views import get_histogram_class
+from ndv.views.protocols import CursorType
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
-    from typing import Any
+
+    from ndv.views.protocols import PHistogramCanvas
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -61,12 +61,6 @@ QRangeSlider { qproperty-barColor: qlineargradient(
         stop:1 rgba(100, 80, 120, 0.4)
     )}
 """
-=======
-from ndv._types import AxisKey
-from ndv.views import get_canvas_class, get_histogram_class
-from ndv.views._qt._dims_slider import SS
-from ndv.views.protocols import CursorType, PImageHandle
->>>>>>> 114c36b (Create JupyterHistogramView)
 
 
 class CmapCombo(QColormapComboBox):
@@ -346,119 +340,104 @@ class QtViewerView(QWidget):
         #     ...
         return False
 
-class QHistogramView(QWidget):
-    """A Qt wrapper around a 'backend' Histogram View.
+
+class QtHistogramView(QWidget):
+    """A 'frontend' Qt wrapper around a 'backend' PHistogramView.
 
     Parameters
     ----------
+    backend_widget: PHistogramView
+        If a widget, set as the parent of this widget
     parent: QWidget | None
         If a widget, set as the parent of this widget
     """
 
-    visibleChanged = Signal()
-    autoscaleChanged = Signal()
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
-    gammaChanged = Signal(float)
-
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, backend_widget: PHistogramCanvas, parent: QWidget | None = None):
         super().__init__(parent)
-        self._backend = get_histogram_class()()
-        self._backend.visibleChanged.connect(self.visibleChanged.emit)
-        self._backend.autoscaleChanged.connect(self.autoscaleChanged.emit)
-        self._backend.cmapChanged.connect(self.cmapChanged.emit)
-        self._backend.climsChanged.connect(self.climsChanged.emit)
-        self._backend.gammaChanged.connect(self.gammaChanged.emit)
+        self._backend = backend_widget
+        self._qwdg = self._backend.qwidget()
+        self._qwdg.installEventFilter(self)
+        self._pressed: bool = False
 
         # Vertical box
         self._vert = QPushButton("Vertical")
+        self._vert.setToolTip("Toggle axis of histogram domain")
         self._vert.setCheckable(True)
         self._vert.toggled.connect(self._backend.set_vertical)
 
         # Log box
         self._log = QPushButton("Logarithmic")
+        self._vert.setToolTip("Toggle logarithmic (base-10) range scaling")
         self._log.setCheckable(True)
         self._log.toggled.connect(self._backend.set_range_log)
 
+        # button to reset the zoom of the canvas
+        # TODO: unify icons across all the view frontends in a new file
+        set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
+        self._set_range_btn = QPushButton(set_range_icon, "", self)
+        self._set_range_btn.setToolTip("Reset Pan/Zoom")
+        self._set_range_btn.clicked.connect(self._resetZoom)
+
+        self._btns = btns = QHBoxLayout()
+        btns.setContentsMargins(0, 0, 0, 0)
+        btns.setSpacing(0)
+        btns.addStretch()
+        btns.addWidget(self._vert)
+        btns.addWidget(self._log)
+        btns.addWidget(self._set_range_btn)
+
         # Layout
         self._layout = QVBoxLayout(self)
-        # FIXME: Add to protocol?
-        self._layout.addWidget(self._backend.view())
-        self._layout.addWidget(self._vert)
-        self._layout.addWidget(self._log)
+        self._layout.addWidget(self._qwdg)
+        self._layout.addLayout(self._btns)
 
     def refresh(self) -> None:
         self._backend.refresh()
 
-    # ------------- StatsView Protocol methods ------------- #
+    # -- Private helpers -- #
 
-    def set_histogram(self, values: Sequence[float], bin_edges: Sequence[float]) -> None:
-        """Set the histogram values and bin edges.
+    def _resetZoom(self) -> None:
+        self._backend.set_domain(None)
+        self._backend.set_range(None)
 
-        These inputs follow the same format as the return value of numpy.histogram.
-        """
-        self._backend.set_histogram(values, bin_edges)
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        """Event filter installed on the canvas to handle mouse events."""
+        if event is None:
+            return False  # pragma: no cover
 
-    def set_std_dev(self, std_dev: float) -> None:
-        self._backend.set_std_dev(std_dev)
+        # here is where we get a chance to intercept mouse events before allowing the
+        # canvas to respond to them.
+        # Return `True` to prevent the event from being passed to the canvas.
+        intercept = False
+        # use children in case backend has a subwidget stealing events.
+        if obj is self._qwdg or obj in (self._qwdg.children()):
+            if isinstance(event, QMouseEvent):
+                intercept |= self._canvas_mouse_event(event)
+            if event.type() == QEvent.Type.KeyPress:
+                self.keyPressEvent(cast("QKeyEvent", event))
+        return intercept
 
-    def set_average(self, average: float) -> None:
-        self._backend.set_average(average)
+    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
+        pos = (ev.pos().x(), ev.pos().y())
+        intercepted = False
+        if ev.type() == QEvent.Type.MouseButtonPress:
+            intercepted |= self._backend.on_mouse_press(pos)
+            self._pressed = True
+        if ev.type() == QEvent.Type.MouseMove:
+            intercepted |= self._backend.on_mouse_move(pos)
+            if not self._pressed:
+                self._set_cursor(self._backend.get_cursor(pos))
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            intercepted |= self._backend.on_mouse_release(pos)
+            self._pressed = False
+        return intercepted
 
-    def view(self) -> Any:
-        return self
-
-    # ------------- LutView Protocol methods ------------- #
-
-    def set_name(self, name: str) -> None:
-        # TODO: maybe show text somewhere
-        self._backend.set_name(name)
-        pass
-
-    def set_lut_visible(self, visible: bool) -> None:
-        self._backend.set_lut_visible(visible)
-
-    def set_colormap(self, lut: cmap.Colormap) -> None:
-        # TODO: Maybe some controls would be nice here?
-        self._backend.set_colormap(lut)
-
-    def set_gamma(self, gamma: float) -> None:
-        self._backend.set_gamma(gamma)
-
-    def set_clims(self, clims: tuple[float, float]) -> None:
-        self._backend.set_clims(clims)
-
-    def set_auto_scale(self, autoscale: bool) -> None:
-        self._backend.set_auto_scale(autoscale)
-
-    # ------------- HistogramView Protocol methods ------------- #
-
-    def set_domain(self, bounds: tuple[float, float] | None) -> None:
-        self._backend.set_domain(bounds)
-
-    def set_range(self, bounds: tuple[float, float] | None) -> None:
-        self._backend.set_range(bounds)
-
-    def set_vertical(self, vertical: bool) -> None:
-        self._vert.setChecked(vertical)
-        self._backend.set_vertical(vertical)
-
-    def set_range_log(self, enabled: bool) -> None:
-        self._log.setChecked(enabled)
-        self._backend.set_range_log(enabled)
-
-
-class QCursor:
-    def __init__(self, native: Any) -> None:
-        # FIXME
-        self._native = native
-
-    def set(self, type: CursorType) -> None:
+    def _set_cursor(self, type: CursorType) -> None:
         if type is CursorType.V_ARROW:
-            self._native.setCursor(Qt.CursorShape.SplitVCursor)
+            self._qwdg.setCursor(Qt.CursorShape.SplitVCursor)
         elif type is CursorType.H_ARROW:
-            self._native.setCursor(Qt.CursorShape.SplitHCursor)
+            self._qwdg.setCursor(Qt.CursorShape.SplitHCursor)
         elif type is CursorType.ALL_ARROW:
-            self._native.setCursor(Qt.CursorShape.SizeAllCursor)
+            self._qwdg.setCursor(Qt.CursorShape.SizeAllCursor)
         else:
-            self._native.unsetCursor()
+            self._qwdg.unsetCursor()

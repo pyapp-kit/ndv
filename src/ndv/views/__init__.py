@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from typing import Literal, TypeAlias
 
-    from ndv.views.protocols import PCanvas, PCursor, PHistogramView, PView
+    from ndv.views.protocols import PCanvas, PHistogramCanvas, PHistogramView, PView
 
     GuiFrontend: TypeAlias = Literal["qt", "jupyter"]
     CanvasBackend: TypeAlias = Literal["vispy", "pygfx"]
@@ -34,6 +34,22 @@ def get_view_frontend_class() -> type[PView]:
     raise RuntimeError("No GUI frontend found")
 
 
+# TODO: add a way to set the frontend via an environment variable
+# (for example, it should be possible to use qt frontend in a jupyter notebook)
+def get_histogram_frontend_class() -> type[PHistogramView]:
+    frontend = _determine_gui_frontend()
+    if frontend == "jupyter":
+        from ._jupyter.jupyter_view import JupyterHistogramView
+
+        return JupyterHistogramView
+    if frontend == "qt":
+        from ._qt.qt_view import QtHistogramView
+
+        return QtHistogramView
+
+    raise RuntimeError("No GUI frontend found")
+
+
 def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
     _backend = _determine_canvas_backend(backend)
     _frontend = _determine_gui_frontend()
@@ -53,18 +69,6 @@ def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
         return PyGFXViewerCanvas
 
     raise RuntimeError("No canvas backend found")
-
-
-def get_histogram_backend(backend: str | None = None) -> PHistogramView:
-    if _is_running_in_notebook():
-        from ._jupyter.jupyter_view import JupyterHistogramView
-
-        return JupyterHistogramView()
-    if _is_running_in_qapp():
-        from ._qt.qt_view import QHistogramView
-
-        return QHistogramView()
-    raise RuntimeError("Could not determine the appropriate histogram backend")
 
 
 def _is_running_in_notebook() -> bool:
@@ -134,7 +138,7 @@ def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
     raise ValueError(f"Invalid canvas backend: {backend!r}")
 
 
-def get_histogram_class(backend: str | None = None) -> type[PHistogramView]:
+def get_histogram_backend_class(backend: str | None = None) -> type[PHistogramCanvas]:
     backend = backend or os.getenv("NDV_CANVAS_BACKEND", None)
     if backend == "vispy" or (backend is None and "vispy" in sys.modules):
         from ndv.views._vispy._vispy import VispyHistogramView
@@ -148,16 +152,3 @@ def get_histogram_class(backend: str | None = None) -> type[PHistogramView]:
             return VispyHistogramView
 
     raise RuntimeError("No histogram backend found")
-
-
-def get_cursor_class(backend: str | None = None) -> type[PCursor]:
-    if _is_running_in_notebook():
-        from ._jupyter.jupyter_view import JupyterCursor
-
-        return JupyterCursor
-    elif _is_running_in_qapp():
-        from ._qt.qt_view import QCursor
-
-        return QCursor
-
-    raise RuntimeError("Could not determine the appropriate viewer backend")
