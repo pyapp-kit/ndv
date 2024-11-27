@@ -125,6 +125,7 @@ class PLutView(Protocol):
         ...
 
 
+# TODO: Consider deleting this. It's probably not necessary.
 class PStatsView(Protocol):
     """A view of the statistics of a dataset."""
 

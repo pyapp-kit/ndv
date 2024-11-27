@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from ndv.models import DataDisplayModel
 from ndv.models._lut_model import LUTModel
-from ndv.models._stats_model import StatsModel
+from ndv.models._stats import Stats
 from ndv.views import (
     get_canvas_class,
     get_histogram_backend_class,
@@ -333,18 +333,14 @@ class HistogramController:
         lut: LUTModel | None = None,
     ) -> None:
         self._lut = lut or LUTModel()
-        self._stats = StatsModel()
         self._data = data or DataDisplayModel()
 
         self._hist: PHistogramCanvas = get_histogram_backend_class()()
         self._view: PHistogramView = get_histogram_frontend_class()(self._hist)
 
         # A HistogramView is both a StatsView and a LUTView
-        # DataDisplayModel <-> StatsModel
+        # DataDisplayModel <-> StatsView
         self._data.display.current_index.value_changed.connect(self._update_data)
-        # StatModel <-> StatsView
-        self._stats.events.data.connect(self._set_data)
-        self._stats.events.bins.connect(self._set_data)
         # # LutModel <-> LutView
         self._lut.events.clims.connect(self._set_model_clims)
         self._hist.climsChanged.connect(self._set_view_clims)
@@ -353,10 +349,9 @@ class HistogramController:
 
     def _update_data(self) -> None:
         data = self._data.current_data_slice()  # TODO: make asynchronous
-        self._stats.data = data
-
-    def _set_data(self) -> None:
-        values, bin_edges = self._stats.histogram
+        stats = Stats(data=data)  # TODO: make asynchronous
+        values, bin_edges = stats.histogram
+        # TODO: Display average, min, max, std_deviation?
         self._hist.set_histogram(values, bin_edges)
 
     @property

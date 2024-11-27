@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-from math import isnan
-from typing import TYPE_CHECKING
-
 import numpy as np
 import pytest
 
-from ndv.models import StatsModel
-
-if TYPE_CHECKING:
-    from pytestqt.qtbot import QtBot
-
+from ndv.models._stats import Stats
 
 EPSILON = 1e-6
 
@@ -25,19 +18,8 @@ def data() -> np.ndarray:
     return data
 
 
-def test_empty_stats_model() -> None:
-    model = StatsModel()
-    assert None is model.data
-    assert isnan(model.average)
-    assert isnan(model.standard_deviation)
-    assert ([], []) == model.histogram
-    assert model.bins == 256
-
-
-def test_stats_model(qtbot: QtBot, data: np.ndarray) -> None:
-    model = StatsModel()
-    with qtbot.wait_signal(model.events.data):
-        model.data = data
+def test_stats_model(data: np.ndarray) -> None:
+    model = Stats(data=data)
     assert np.all(model.data == data)
     # Basic regression tests
     assert abs(model.average - 1.000104) < 1e-6
@@ -50,6 +32,3 @@ def test_stats_model(qtbot: QtBot, data: np.ndarray) -> None:
     assert len(edges) == 257
     assert edges[0] == np.min(data)
     assert edges[256] == np.max(data)
-    # Assert bins changed emits a signal
-    with qtbot.wait_signal(model.events.bins):
-        model.bins = 128
