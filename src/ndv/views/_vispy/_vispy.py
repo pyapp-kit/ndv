@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from contextlib import suppress
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 from weakref import WeakKeyDictionary
 
 import cmap
@@ -735,7 +735,7 @@ class PlotWidget(scene.Widget):
         ylabel: str = "",
         title: str = "",
         lock_axis: Literal["x", "y", None] = None,
-        **widget_kwargs: Unpack[WidgetKwargs],
+        **widget_kwargs: Any,
     ) -> None:
         self._fg_color = fg_color
         self._visuals: list[scene.VisualNode] = []
