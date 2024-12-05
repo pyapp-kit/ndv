@@ -317,7 +317,8 @@ class LutController:
         # TODO: handle more complex autoscale types
         self.lut_view.set_auto_scale(bool(self.lut_model.autoscale))
         self.lut_view.set_lut_visible(True)
-        self.lut_view.set_name(f"{self.key}")
+        name = str(self.key) if self.key is not None else ""
+        self.lut_view.set_name(name)
 
     def _on_view_lut_visible_changed(self, visible: bool, key: LutKey = None) -> None:
         """The visibility checkbox in the LUT widget has changed."""
