@@ -31,7 +31,7 @@ class DataResponse:
     """Response object for data requests."""
 
     data: np.ndarray
-    channel_key: int | None
+    channel_key: Optional[int]
 
 
 @dataclass
@@ -41,7 +41,7 @@ class DataRequest:
     wrapper: DataWrapper
     index: Mapping[int, Union[int, slice]]
     visible_axes: tuple[int, ...]
-    channel_axis: int | None
+    channel_axis: Optional[int]
 
 
 class DataDisplayModel(NDVModel):
@@ -118,7 +118,7 @@ class DataDisplayModel(NDVModel):
         )
 
     @property
-    def canonical_channel_axis(self) -> int | None:
+    def canonical_channel_axis(self) -> Optional[int]:
         """Return the channel axis in canonical form."""
         if self.display.channel_axis is None:
             return None
@@ -197,7 +197,7 @@ class DataDisplayModel(NDVModel):
             t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
 
             if (ch_ax := req.channel_axis) is not None:
-                ch_indices: Iterable[int | None] = range(data.shape[ch_ax])
+                ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
             else:
                 ch_indices = (None,)
 

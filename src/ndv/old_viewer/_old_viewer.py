@@ -718,7 +718,7 @@ class NDViewer(QWidget):
         pos = (event.pos().x(), event.pos().y())
         for e in self._canvas.elements_at(pos):
             if (pref := e.cursor_at(pos)) is not None:
-                self._qcanvas.setCursor(pref)
+                self._qcanvas.setCursor(pref.to_qt())
                 return False
         # Otherwise, normal cursor
         self._qcanvas.setCursor(Qt.CursorShape.ArrowCursor)

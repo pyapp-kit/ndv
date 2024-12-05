@@ -5,14 +5,11 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any, Literal
 
-from qtpy.QtWidgets import QApplication
-
-from ._old_viewer import NDViewer
-
 if TYPE_CHECKING:
     from qtpy.QtCore import QCoreApplication
 
     from .models import DataWrapper
+    from .old_viewer import NDViewer
 
 
 def imshow(
@@ -38,6 +35,8 @@ def imshow(
     NDViewer
         The viewer window.
     """
+    from .old_viewer import NDViewer
+
     app, should_exec = _get_app()
     if cmap is not None:
         channel_mode = "composite"
@@ -54,6 +53,8 @@ def imshow(
 
 
 def _get_app() -> tuple[QCoreApplication, bool]:
+    from qtpy.QtWidgets import QApplication
+
     is_ipython = False
     if (app := QApplication.instance()) is None:
         app = QApplication([])

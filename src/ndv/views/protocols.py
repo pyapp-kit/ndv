@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
 
 if TYPE_CHECKING:
@@ -82,7 +83,7 @@ class CanvasElement(Protocol):
     def selected(self, selected: bool) -> None:
         """Sets element selection status."""
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         """Returns the element's cursor preference at the provided position."""
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -196,3 +197,25 @@ class PCanvas(Protocol):
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
     ) -> PRoiHandle: ...
+
+
+class CursorType(Enum):
+    DEFAULT = "default"
+    V_ARROW = "v_arrow"
+    H_ARROW = "h_arrow"
+    ALL_ARROW = "all_arrow"
+    BDIAG_ARROW = "bdiag_arrow"
+    FDIAG_ARROW = "fdiag_arrow"
+
+    def to_qt(self) -> Qt.CursorShape:
+        """Converts CursorType to Qt.CursorShape."""
+        from qtpy.QtCore import Qt
+
+        return {
+            CursorType.DEFAULT: Qt.ArrowCursor,
+            CursorType.V_ARROW: Qt.SizeVerCursor,
+            CursorType.H_ARROW: Qt.SizeHorCursor,
+            CursorType.ALL_ARROW: Qt.SizeAllCursor,
+            CursorType.BDIAG_ARROW: Qt.SizeBDiagCursor,
+            CursorType.FDIAG_ARROW: Qt.SizeFDiagCursor,
+        }[self]
