@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import cmap
 import ipywidgets as widgets
@@ -16,17 +16,17 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
-    from ndv.views.protocols import PSignal
+    from ndv.views.protocols import PLutView, PSignal
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
 
 
 class JupyterLutView:
-    visibleChanged = Signal(bool)
-    autoscaleChanged = Signal(bool)
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
+    visibleChanged: PSignal = Signal(bool)
+    autoscaleChanged: PSignal = Signal(bool)
+    cmapChanged: PSignal = Signal(cmap.Colormap)
+    climsChanged: PSignal = Signal(tuple)
 
     def __init__(self) -> None:
         # WIDGETS
@@ -93,20 +93,24 @@ class JupyterLutView:
     # to avoid loops, unnecessary updates, and unexpected behavior
 
     def set_auto_scale(self, auto: bool) -> None:
-        with self.autoscaleChanged.blocked():
+        with self.autoscaleChanged.blocked():  # type: ignore [attr-defined]
             self._auto_clim.value = auto
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        with self.cmapChanged.blocked():
+        with self.cmapChanged.blocked():  # type: ignore [attr-defined]
             self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        with self.climsChanged.blocked():
+        with self.climsChanged.blocked():  # type: ignore [attr-defined]
             self._clims.value = clims
 
     def set_lut_visible(self, visible: bool) -> None:
-        with self.visibleChanged.blocked():
+        with self.visibleChanged.blocked():  # type: ignore [attr-defined]
             self._visible.value = visible
+
+    def setVisible(self, visible: bool) -> None:
+        # show or hide the actual widget itself
+        self.layout.layout.display = "flex" if visible else "none"
 
 
 # this is a PView
@@ -229,10 +233,11 @@ class JupyterViewerView:
         # as a PSignalDescriptor by the type checker
         return wdg
 
-    def remove_lut_view(self, view: JupyterLutView) -> None:
+    def remove_lut_view(self, view: PLutView) -> None:
         """Remove a LUT view from the viewer."""
+        _view = cast("JupyterLutView", view)
         self.layout.children = tuple(
-            wdg for wdg in self.layout.children if wdg != view.layout
+            wdg for wdg in self.layout.children if wdg != _view.layout
         )
 
     def show(self) -> None:
@@ -240,6 +245,12 @@ class JupyterViewerView:
         from IPython.display import display
 
         display(self.layout)  # type: ignore [no-untyped-call]
+
+    def hide(self) -> None:
+        """Hide the viewer."""
+        from IPython.display import clear_output
+
+        clear_output()  # type: ignore [no-untyped-call]
 
     def set_data_info(self, data_info: str) -> None:
         self._data_info_label.value = data_info

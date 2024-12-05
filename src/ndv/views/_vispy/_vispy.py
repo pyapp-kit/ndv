@@ -487,7 +487,10 @@ class VispyViewerCanvas(PCanvas):
         self._canvas.update()
 
     def add_image(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        clims: tuple[float, float] | None = None,
     ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         img = scene.visuals.Image(data, parent=self._view.scene)
@@ -499,6 +502,8 @@ class VispyViewerCanvas(PCanvas):
             self.set_range()
         if cmap is not None:
             handle.cmap = cmap
+        if clims is not None:
+            handle.clim = clims
         return handle
 
     def add_volume(
