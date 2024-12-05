@@ -21,9 +21,7 @@ class Stats:
     bins : int
         Number of bins to use for histogram computation. Defaults to 256.
     average : float
-        The average (mean) value of data.
-    standard_deviation : float
-        The standard deviation of data.
+        The average (mean) value of the data.
     histogram : tuple[Sequence[int], Sequence[float]]
         A 2-tuple of sequences.
 
@@ -32,17 +30,16 @@ class Stats:
 
         The second sequence contains (n+1) floats. The ith bin spans the domain
         between the values at index i (inclusive) and index i+1 (exclusive).
+    maximum : float
+        The maximum value present in the data.
+    minimum : float
+        The minimum value present in the data.
+    standard_deviation : float
+        The standard deviation of the data.
     """
 
     data: np.ndarray
     bins: int = 256
-
-    @cached_property
-    def standard_deviation(self) -> float:
-        """Computes the standard deviation of the dataset."""
-        if self.data is None:
-            return float("nan")
-        return float(np.std(self.data))
 
     @cached_property
     def average(self) -> float:
@@ -60,3 +57,18 @@ class Stats:
             tuple[Sequence[int], Sequence[float]],
             np.histogram(self.data, bins=self.bins),
         )
+
+    @cached_property
+    def maximum(self) -> float:
+        return float(np.max(self.data))
+
+    @cached_property
+    def minimum(self) -> float:
+        return float(np.min(self.data))
+
+    @cached_property
+    def standard_deviation(self) -> float:
+        """Computes the standard deviation of the dataset."""
+        if self.data is None:
+            return float("nan")
+        return float(np.std(self.data))

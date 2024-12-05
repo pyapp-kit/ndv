@@ -355,7 +355,7 @@ class QtHistogramView(QWidget):
     def __init__(self, backend_widget: PHistogramCanvas, parent: QWidget | None = None):
         super().__init__(parent)
         self._backend = backend_widget
-        self._qwdg = self._backend.qwidget()
+        self._qwdg = cast(QWidget, self._backend.widget())
         self._qwdg.installEventFilter(self)
         self._pressed: bool = False
 
@@ -367,7 +367,7 @@ class QtHistogramView(QWidget):
 
         # Log box
         self._log = QPushButton("Logarithmic")
-        self._vert.setToolTip("Toggle logarithmic (base-10) range scaling")
+        self._log.setToolTip("Toggle logarithmic (base-10) range scaling")
         self._log.setCheckable(True)
         self._log.toggled.connect(self._backend.set_range_log)
 

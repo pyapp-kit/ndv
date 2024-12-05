@@ -240,14 +240,14 @@ class JupyterHistogramView:
     def __init__(self, backend_widget: PHistogramCanvas, **kwargs: Any) -> None:
         self._backend = backend_widget
         # TODO: Rename
-        self._qwdg = backend_widget.qwidget()
+        self._canvas = backend_widget.widget()
         self._mouse_down: bool = False
 
         # patch the handle_event from _jupyter_rfb.CanvasBackend
         # to intercept various mouse events.
-        if hasattr(self._qwdg, "handle_event"):
-            self._original_handle_event = self._qwdg.handle_event
-            self._qwdg.handle_event = self.handle_event
+        if hasattr(self._canvas, "handle_event"):
+            self._original_handle_event = self._canvas.handle_event
+            self._canvas.handle_event = self.handle_event
 
         self._vert = widgets.ToggleButton(
             value=False,
@@ -273,11 +273,8 @@ class JupyterHistogramView:
             tooltip="Resets Pan and Zoom to the extent of canvas components",
         )
         self._reset.on_click(self._resetZoom)
-        # `qwidget` is obviously a misnomer here.  it works, because vispy is smart
-        # enough to return a widget that ipywidgets can display in the appropriate
-        # context, but we should be managing that more explicitly ourselves.
         self._btns = widgets.HBox([self._vert, self._log, self._reset])
-        self.layout = widgets.VBox([self._backend.qwidget(), self._btns])
+        self.layout = widgets.VBox([self._canvas, self._btns])
 
     def show(self) -> None:
         """Show the viewer."""
@@ -321,10 +318,10 @@ class JupyterHistogramView:
     def _set_cursor(self, type: CursorType) -> None:
         # FIXME: mypy errors
         if type is CursorType.DEFAULT:
-            self._qwdg.cursor = "default"
+            self._canvas.cursor = "default"
         elif type is CursorType.V_ARROW:
-            self._qwdg.cursor = "ns-resize"
+            self._canvas.cursor = "ns-resize"
         elif type is CursorType.H_ARROW:
-            self._qwdg.cursor = "ew-resize"
+            self._canvas.cursor = "ew-resize"
         elif type is CursorType.ALL_ARROW:
-            self._qwdg.cursor = "move"
+            self._canvas.cursor = "move"

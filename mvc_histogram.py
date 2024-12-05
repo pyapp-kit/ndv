@@ -6,13 +6,21 @@ from qtpy.QtWidgets import (
 
 from ndv import data
 from ndv.controller._controller import HistogramController
+from ndv.models import LUTModel
+from ndv.models._stats import Stats
 
 app = QApplication.instance() or QApplication([])
 
 widget = HistogramController()
-widget.data = data.cells3d()
-widget.view().show()
-# TODO: This throws an error when calling `DataWrapper.current_data_slice`
-# (Also happens with normal Controller)
-# widget.data = numpy.random.normal(10, 100, (10000, 10000))
+widget.stats = Stats(data.cells3d())
+widget.show()
+
+# Uncomment to attach a LUTModel
+lut_model = LUTModel(
+    cmap="green",
+    clims=[10000, 30000],
+    gamma=2,
+)
+widget.lut = lut_model
+
 app.exec()

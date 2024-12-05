@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
+    from ndv.models._stats import Stats
 
 from typing import Callable, Union, runtime_checkable
 
@@ -125,49 +126,7 @@ class PLutView(Protocol):
         ...
 
 
-# TODO: Consider deleting this. It's probably not necessary.
-class PStatsView(Protocol):
-    """A view of the statistics of a dataset."""
-
-    def set_histogram(
-        self, values: Sequence[float], bin_edges: Sequence[float]
-    ) -> None:
-        """Defines the distribution of the dataset.
-
-        Properties
-        ----------
-        values : Sequence[int]
-            A length (n) sequence of values representing clustered counts of data
-            points. values[i] defines the number of data points falling between
-            bin_edges[i] and bin_edges[i+1].
-        bin_edges : Sequence[float]
-            A length (n+1) sequence of values defining the intervals partitioning
-            all data points. Must be non-decreasing.
-        """
-        ...
-
-    def set_std_dev(self, std_dev: float) -> None:
-        """Defines the standard deviation of the dataset.
-
-        Properties
-        ----------
-        std_dev : float
-            The standard deviation.
-        """
-        ...
-
-    def set_average(self, avg: float) -> None:
-        """Defines the average value of the dataset.
-
-        Properties
-        ----------
-        std_dev : float
-            The average value of the dataset.
-        """
-        ...
-
-
-class PHistogramCanvas(PStatsView, PLutView, Protocol):
+class PHistogramCanvas(PLutView, Protocol):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
     # TODO: Remove?
@@ -178,7 +137,19 @@ class PHistogramCanvas(PStatsView, PLutView, Protocol):
     def on_mouse_move(self, pos: tuple[float, float]) -> bool: ...
     def on_mouse_release(self, pos: tuple[float, float]) -> bool: ...
 
-    def qwidget(self) -> QWidget: ...
+    def widget(self) -> Any:
+        """Returns an object understood by the widget frontend."""
+        ...
+
+    def set_stats(self, stats: Stats) -> None:
+        """Sets the statistics for display.
+
+        Properties
+        ----------
+        stats : Stats
+            The statistics to be reflected in the histogram
+        """
+        ...
 
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
         """Sets the domain of the view.

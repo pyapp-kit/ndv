@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 import cmap
 import numpy as np
 import pytest
-from qtpy.QtWidgets import QHBoxLayout, QWidget
 from vispy.color import Color
 
+from ndv.models._stats import Stats
 from ndv.views._vispy._vispy import Grabbable, VispyHistogramView
 
 if TYPE_CHECKING:
@@ -21,24 +21,19 @@ PLOT_EPSILON = 1e-4
 
 
 @pytest.fixture
-def data() -> np.ndarray:
+def stats() -> Stats:
     gen = np.random.default_rng(seed=0xDEADBEEF)
-    return gen.normal(10, 10, 10000).astype(np.float64)
+    data = gen.normal(10, 10, 10000).astype(np.float64)
+    return Stats(data)
 
 
 @pytest.fixture
-def view(qtbot: QtBot, data: np.ndarray) -> VispyHistogramView:
+def view(stats: Stats) -> VispyHistogramView:
     # Create view
     view = VispyHistogramView()
     view._canvas.size = (100, 100)
-    # FIXME: Why does `qtbot.add_widget(view.view())` not work?
-    wdg = QWidget()
-    layout = QHBoxLayout(wdg)
-    layout.addWidget(view.view())
-    qtbot.add_widget(wdg)
-    # Set initial data
-    values, bin_edges = np.histogram(data)
-    view.set_histogram(values, bin_edges)
+    # Set statistics
+    view.set_stats(stats)
 
     return view
 
@@ -76,9 +71,9 @@ def test_plot(view: VispyHistogramView) -> None:
     assert np.all(np.isclose(_range, plot.yaxis.axis.domain))
 
 
-def test_clims(data: np.ndarray, view: VispyHistogramView) -> None:
+def test_clims(stats: Stats, view: VispyHistogramView) -> None:
     # on startup, clims should be at the extent of the data
-    clims = np.min(data), np.max(data)
+    clims = stats.minimum, stats.maximum
     assert view._clims is not None
     assert clims[0] == view._clims[0]
     assert clims[1] == view._clims[1]
@@ -100,17 +95,17 @@ def test_clims(data: np.ndarray, view: VispyHistogramView) -> None:
     assert abs(clims[0] - view._lut_line._line.pos[-1, 0]) <= EPSILON
 
 
-def test_gamma(data: np.ndarray, view: VispyHistogramView) -> None:
+def test_gamma(stats: Stats, view: VispyHistogramView) -> None:
     # on startup, gamma should be 1
     assert 1 == view._gamma
-    gx, gy = (np.max(data) + np.min(data)) / 2, 0.5**view._gamma
+    gx, gy = (stats.minimum + stats.maximum) / 2, 0.5**view._gamma
     assert abs(gx - view._gamma_handle_pos[0, 0]) <= EPSILON
     assert abs(gy - view._gamma_handle_pos[0, 1]) <= EPSILON
     # set gamma, assert a change
     g = 2
     view.set_gamma(g)
     assert g == view._gamma
-    gx, gy = (np.max(data) + np.min(data)) / 2, 0.5**view._gamma
+    gx, gy = (stats.minimum + stats.maximum) / 2, 0.5**view._gamma
     assert abs(gx - view._gamma_handle_pos[0, 0]) <= EPSILON
     assert abs(gy - view._gamma_handle_pos[0, 1]) <= EPSILON
     # set invalid gammas, assert no change
@@ -127,34 +122,34 @@ def test_cmap(view: VispyHistogramView) -> None:
 
 
 def test_visibility(view: VispyHistogramView) -> None:
-    # By default, everything is visible
+    # By default, the lut components are invisible
     assert view._hist_mesh.visible
-    assert view._lut_line.visible
-    assert view._gamma_handle.visible
-    # Visible = False
-    view.set_lut_visible(False)
-    assert not view._hist_mesh.visible
     assert not view._lut_line.visible
     assert not view._gamma_handle.visible
-    # Visible = True
+    # Make them visible
     view.set_lut_visible(True)
     assert view._hist_mesh.visible
     assert view._lut_line.visible
     assert view._gamma_handle.visible
+    # Make them invisible again
+    view.set_lut_visible(False)
+    assert view._hist_mesh.visible
+    assert not view._lut_line.visible
+    assert not view._gamma_handle.visible
 
 
-def test_domain(data: np.ndarray, view: VispyHistogramView) -> None:
+def test_domain(stats: Stats, view: VispyHistogramView) -> None:
     def assert_extent(min_x: float, max_x: float) -> None:
         domain = view.plot.xaxis.axis.domain
         assert abs(min_x - domain[0]) <= PLOT_EPSILON
         assert abs(max_x - domain[1]) <= PLOT_EPSILON
-        min_y, max_y = 0, np.max(np.histogram(data)[0])
+        min_y, max_y = 0, np.max(stats.histogram[0])
         range = view.plot.yaxis.axis.domain  # noqa: A001
         assert abs(min_y - range[0]) <= PLOT_EPSILON
         assert abs(max_y - range[1]) <= PLOT_EPSILON
 
     # By default, the view should be around the histogram
-    assert_extent(np.min(data), np.max(data))
+    assert_extent(stats.minimum, stats.maximum)
     # Set the domain, request a change
     new_domain = (10, 12)
     view.set_domain(new_domain)
@@ -162,7 +157,7 @@ def test_domain(data: np.ndarray, view: VispyHistogramView) -> None:
     # Set the domain to None, assert going back
     new_domain = None
     view.set_domain(new_domain)
-    assert_extent(np.min(data), np.max(data))
+    assert_extent(stats.minimum, stats.maximum)
     # Assert None value in tuple raises ValueError
     with pytest.raises(ValueError):
         view.set_domain((None, 12))
@@ -172,12 +167,12 @@ def test_domain(data: np.ndarray, view: VispyHistogramView) -> None:
     assert_extent(10, 12)
 
 
-def test_range(data: np.ndarray, view: VispyHistogramView) -> None:
+def test_range(stats: Stats, view: VispyHistogramView) -> None:
     # FIXME: Why do we need a larger epsilon?
     _EPSILON = 1e-4
 
     def assert_extent(min_y: float, max_y: float) -> None:
-        min_x, max_x = np.min(data), np.max(data)
+        min_x, max_x = stats.minimum, stats.maximum
         domain = view.plot.xaxis.axis.domain
         assert abs(min_x - domain[0]) <= _EPSILON
         assert abs(max_x - domain[1]) <= _EPSILON
@@ -186,7 +181,7 @@ def test_range(data: np.ndarray, view: VispyHistogramView) -> None:
         assert abs(max_y - range[1]) <= _EPSILON
 
     # By default, the view should be around the histogram
-    assert_extent(0, np.max(np.histogram(data)[0]))
+    assert_extent(0, np.max(stats.histogram[0]))
     # Set the range, request a change
     new_range = (10, 12)
     view.set_range(new_range)
@@ -194,7 +189,7 @@ def test_range(data: np.ndarray, view: VispyHistogramView) -> None:
     # Set the range to None, assert going back
     new_range = None
     view.set_range(new_range)
-    assert_extent(0, np.max(np.histogram(data)[0]))
+    assert_extent(0, np.max(stats.histogram[0]))
     # Assert None value in tuple raises ValueError
     with pytest.raises(ValueError):
         view.set_range((None, 12))

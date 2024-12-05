@@ -71,6 +71,22 @@ def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
     raise RuntimeError("No canvas backend found")
 
 
+def get_histogram_canvas_class(backend: str | None = None) -> type[PHistogramCanvas]:
+    backend = backend or os.getenv("NDV_CANVAS_BACKEND", None)
+    if backend == "vispy" or (backend is None and "vispy" in sys.modules):
+        from ndv.views._vispy._vispy import VispyHistogramView
+
+        return VispyHistogramView
+
+    if backend is None:
+        if importlib.util.find_spec("vispy") is not None:
+            from ndv.views._vispy._vispy import VispyHistogramView
+
+            return VispyHistogramView
+
+    raise RuntimeError("No histogram backend found")
+
+
 def _is_running_in_notebook() -> bool:
     if IPython := sys.modules.get("IPython"):
         if shell := IPython.get_ipython():
@@ -136,19 +152,3 @@ def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
         return cast("CanvasBackend", backend)
 
     raise ValueError(f"Invalid canvas backend: {backend!r}")
-
-
-def get_histogram_backend_class(backend: str | None = None) -> type[PHistogramCanvas]:
-    backend = backend or os.getenv("NDV_CANVAS_BACKEND", None)
-    if backend == "vispy" or (backend is None and "vispy" in sys.modules):
-        from ndv.views._vispy._vispy import VispyHistogramView
-
-        return VispyHistogramView
-
-    if backend is None:
-        if importlib.util.find_spec("vispy") is not None:
-            from ndv.views._vispy._vispy import VispyHistogramView
-
-            return VispyHistogramView
-
-    raise RuntimeError("No histogram backend found")

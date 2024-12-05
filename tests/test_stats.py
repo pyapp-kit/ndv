@@ -22,8 +22,10 @@ def test_stats_model(data: np.ndarray) -> None:
     model = Stats(data=data)
     assert np.all(model.data == data)
     # Basic regression tests
-    assert abs(model.average - 1.000104) < 1e-6
-    assert abs(model.standard_deviation - 10.003385) < 1e-6
+    assert abs(model.minimum - np.min(data)) < EPSILON
+    assert abs(model.maximum - np.max(data)) < EPSILON
+    assert abs(model.average - np.average(data)) < EPSILON
+    assert abs(model.standard_deviation - np.std(data)) < EPSILON
     assert 256 == model.bins
     values, edges = model.histogram
     assert len(values) == 256

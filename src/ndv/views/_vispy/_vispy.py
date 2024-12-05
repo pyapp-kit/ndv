@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from qtpy.QtWidgets import QWidget
 
+    from ndv.models._stats import Stats
     from ndv.views.protocols import CanvasElement
 
 turn = np.sin(np.pi / 4)
@@ -1014,35 +1015,6 @@ class VispyHistogramView(PHistogramCanvas):
     def refresh(self) -> None:
         self._canvas.update()
 
-    # ------------- StatsView Protocol methods ------------- #
-
-    def set_histogram(
-        self, values: Sequence[float], bin_edges: Sequence[float]
-    ) -> None:
-        """Set the histogram values and bin edges.
-
-        These inputs follow the same format as the return value of numpy.histogram.
-        """
-        self._values = values
-        self._bin_edges = bin_edges
-        self._update_histogram()
-        if self._clims is None:
-            self.set_clims((self._bin_edges[0], self._bin_edges[-1]))
-            self._resize()
-
-    def set_std_dev(self, std_dev: float) -> None:
-        # Nothing to do.
-        # TODO: maybe show text somewhere
-        pass
-
-    def set_average(self, average: float) -> None:
-        # Nothing to do
-        # TODO: maybe show text somewhere
-        pass
-
-    def view(self) -> Any:
-        return self._canvas.native
-
     # ------------- LutView Protocol methods ------------- #
 
     def set_name(self, name: str) -> None:
@@ -1051,9 +1023,6 @@ class VispyHistogramView(PHistogramCanvas):
         pass
 
     def set_lut_visible(self, visible: bool) -> None:
-        if self._hist_mesh is None:
-            return  # pragma: no cover
-        self._hist_mesh.visible = visible
         self._lut_line.visible = visible
         self._gamma_handle.visible = visible
 
@@ -1078,6 +1047,17 @@ class VispyHistogramView(PHistogramCanvas):
         pass
 
     # ------------- HistogramView Protocol methods ------------- #
+
+    def set_stats(self, stats: Stats) -> None:
+        """Set the histogram values and bin edges.
+
+        These inputs follow the same format as the return value of numpy.histogram.
+        """
+        self._values, self._bin_edges = stats.histogram
+        self._update_histogram()
+        if self._clims is None:
+            self.set_clims((self._bin_edges[0], self._bin_edges[-1]))
+            self._resize()
 
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
         if bounds is not None:
@@ -1115,7 +1095,7 @@ class VispyHistogramView(PHistogramCanvas):
             self._update_lut_lines()
             self._resize()
 
-    def qwidget(self) -> QWidget:
+    def widget(self) -> Any:
         return self._canvas.native
 
     # ------------- Private methods ------------- #
@@ -1174,11 +1154,9 @@ class VispyHistogramView(PHistogramCanvas):
         color[-3:] = [c1, c2, c1]
 
         self._lut_line.set_data((X, Y), marker_size=0, color=color)
-        self._lut_line.visible = True
 
         self._gamma_handle_pos[:] = midpoint[0]
         self._gamma_handle.set_data(pos=self._gamma_handle_pos)
-        self._gamma_handle.visible = True
 
         # FIXME: These should be called internally upon set_data, right?
         # Looks like https://github.com/vispy/vispy/issues/1899
