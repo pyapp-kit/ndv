@@ -19,6 +19,8 @@ EPSILON = 1e-6
 # FIXME: Why do plot checks need a larger epsilon?
 PLOT_EPSILON = 1e-4
 
+# TODO: How should we handle VisPy not being installed?
+
 
 @pytest.fixture
 def stats() -> Stats:
