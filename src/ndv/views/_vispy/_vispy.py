@@ -930,9 +930,8 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         super().set_range(x, y, z, margin)
 
 
-# TODO: Move much of this logic to _qt
-class VispyHistogramView(PHistogramCanvas):
-    """A HistogramView on a VisPy SceneCanvas."""
+class VispyHistogramCanvas(PHistogramCanvas):
+    """A HistogramCanvas utilizing VisPy."""
 
     visibleChanged = Signal(bool)
     autoscaleChanged = Signal(bool)

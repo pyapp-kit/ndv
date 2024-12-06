@@ -9,7 +9,7 @@ import pytest
 from vispy.color import Color
 
 from ndv.models._stats import Stats
-from ndv.views._vispy._vispy import Grabbable, VispyHistogramView
+from ndv.views._vispy._vispy import Grabbable, VispyHistogramCanvas
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -28,9 +28,9 @@ def stats() -> Stats:
 
 
 @pytest.fixture
-def view(stats: Stats) -> VispyHistogramView:
+def view(stats: Stats) -> VispyHistogramCanvas:
     # Create view
-    view = VispyHistogramView()
+    view = VispyHistogramCanvas()
     view._canvas.size = (100, 100)
     # Set statistics
     view.set_stats(stats)
@@ -38,7 +38,7 @@ def view(stats: Stats) -> VispyHistogramView:
     return view
 
 
-def test_plot(view: VispyHistogramView) -> None:
+def test_plot(view: VispyHistogramCanvas) -> None:
     plot = view.plot
 
     assert plot.title == ""
@@ -71,7 +71,7 @@ def test_plot(view: VispyHistogramView) -> None:
     assert np.all(np.isclose(_range, plot.yaxis.axis.domain))
 
 
-def test_clims(stats: Stats, view: VispyHistogramView) -> None:
+def test_clims(stats: Stats, view: VispyHistogramCanvas) -> None:
     # on startup, clims should be at the extent of the data
     clims = stats.minimum, stats.maximum
     assert view._clims is not None
@@ -95,7 +95,7 @@ def test_clims(stats: Stats, view: VispyHistogramView) -> None:
     assert abs(clims[0] - view._lut_line._line.pos[-1, 0]) <= EPSILON
 
 
-def test_gamma(stats: Stats, view: VispyHistogramView) -> None:
+def test_gamma(stats: Stats, view: VispyHistogramCanvas) -> None:
     # on startup, gamma should be 1
     assert 1 == view._gamma
     gx, gy = (stats.minimum + stats.maximum) / 2, 0.5**view._gamma
@@ -113,7 +113,7 @@ def test_gamma(stats: Stats, view: VispyHistogramView) -> None:
         view.set_gamma(-1)
 
 
-def test_cmap(view: VispyHistogramView) -> None:
+def test_cmap(view: VispyHistogramCanvas) -> None:
     # By default, histogram is red
     assert view._hist_mesh.color == Color("red")
     # Set cmap, assert a change
@@ -121,7 +121,7 @@ def test_cmap(view: VispyHistogramView) -> None:
     assert view._hist_mesh.color == Color("blue")
 
 
-def test_visibility(view: VispyHistogramView) -> None:
+def test_visibility(view: VispyHistogramCanvas) -> None:
     # By default, the lut components are invisible
     assert view._hist_mesh.visible
     assert not view._lut_line.visible
@@ -138,7 +138,7 @@ def test_visibility(view: VispyHistogramView) -> None:
     assert not view._gamma_handle.visible
 
 
-def test_domain(stats: Stats, view: VispyHistogramView) -> None:
+def test_domain(stats: Stats, view: VispyHistogramCanvas) -> None:
     def assert_extent(min_x: float, max_x: float) -> None:
         domain = view.plot.xaxis.axis.domain
         assert abs(min_x - domain[0]) <= PLOT_EPSILON
@@ -167,7 +167,7 @@ def test_domain(stats: Stats, view: VispyHistogramView) -> None:
     assert_extent(10, 12)
 
 
-def test_range(stats: Stats, view: VispyHistogramView) -> None:
+def test_range(stats: Stats, view: VispyHistogramCanvas) -> None:
     # FIXME: Why do we need a larger epsilon?
     _EPSILON = 1e-4
 
@@ -199,7 +199,7 @@ def test_range(stats: Stats, view: VispyHistogramView) -> None:
     assert_extent(10, 12)
 
 
-def test_vertical(view: VispyHistogramView) -> None:
+def test_vertical(view: VispyHistogramCanvas) -> None:
     # Start out Horizontal
     assert not view._vertical
     domain_before = view.plot.xaxis.axis.domain
@@ -225,7 +225,7 @@ def test_vertical(view: VispyHistogramView) -> None:
     assert abs(range_before[1] - range_after[1]) <= PLOT_EPSILON
 
 
-def test_log(view: VispyHistogramView) -> None:
+def test_log(view: VispyHistogramCanvas) -> None:
     # Start out linear
     assert not view._log_y
     linear_range = view.plot.yaxis.axis.domain[1]
@@ -257,7 +257,7 @@ def test_log(view: VispyHistogramView) -> None:
 
 
 # @pytest.mark.skipif(sys.platform != "darwin", reason="the mouse event is tricky")
-def test_move_clim(qtbot: QtBot, view: VispyHistogramView) -> None:
+def test_move_clim(qtbot: QtBot, view: VispyHistogramCanvas) -> None:
     # Set clims within the viewbox
     view.set_domain((0, 100))
     view.set_clims((10, 90))
@@ -298,7 +298,7 @@ def test_move_clim(qtbot: QtBot, view: VispyHistogramView) -> None:
     assert view.plot.camera.interactive
 
 
-def test_move_gamma(qtbot: QtBot, view: VispyHistogramView) -> None:
+def test_move_gamma(qtbot: QtBot, view: VispyHistogramCanvas) -> None:
     # Set clims outside the viewbox
     # NB the canvas is small in this test, so we have to put the clims
     # far away or they'll be grabbed over the gamma
