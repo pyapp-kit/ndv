@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
+    from ndv.models._stats import Stats
 
 from typing import Callable, Union, runtime_checkable
 
@@ -49,16 +51,160 @@ PSignal = Union[PSignalDescriptor, PSignalInstance]
 
 
 class PLutView(Protocol):
+    """An (interactive) view of a LookUp Table (LUT)."""
+
     visibleChanged: PSignal
     autoscaleChanged: PSignal
     cmapChanged: PSignal
     climsChanged: PSignal
+    gammaChanged: PSignal
 
-    def set_name(self, name: str) -> None: ...
-    def set_auto_scale(self, auto: bool) -> None: ...
-    def set_colormap(self, cmap: cmap.Colormap) -> None: ...
-    def set_clims(self, clims: tuple[float, float]) -> None: ...
-    def set_lut_visible(self, visible: bool) -> None: ...
+    def set_name(self, name: str) -> None:
+        """Defines the name of the view.
+
+        Properties
+        ----------
+        name : str
+            The name (label) of the LUT
+        """
+        ...
+
+    def set_auto_scale(self, auto: bool) -> None:
+        """Defines whether autoscale has been enabled.
+
+        Autoscale defines whether the contrast limits (clims) are adjusted when the
+        data changes.
+
+        Properties
+        ----------
+        autoscale : bool
+            True iff clims automatically changed on dataset alteration.
+        """
+        ...
+
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
+        """Defines the colormap backing the view.
+
+        Properties
+        ----------
+        lut : cmap.Colormap
+            The object mapping scalar values to RGB(A) colors.
+        """
+        ...
+
+    def set_clims(self, clims: tuple[float, float]) -> None:
+        """Defines the input clims.
+
+        The contrast limits (clims) are the input values mapped to the minimum and
+        maximum (respectively) of the LUT.
+
+        Properties
+        ----------
+        clims : tuple[float, float]
+            The clims
+        """
+        ...
+
+    def set_lut_visible(self, visible: bool) -> None:
+        """Defines whether this view is visible.
+
+        Properties
+        ----------
+        visible : bool
+            True iff the view should be visible.
+        """
+        ...
+
+    def set_gamma(self, gamma: float) -> None:
+        """Defines the input gamma.
+
+        properties
+        ----------
+        gamma : float
+            The gamma
+        """
+        ...
+
+
+class PHistogramCanvas(PLutView, Protocol):
+    """A histogram-based view for LookUp Table (LUT) adjustment."""
+
+    # TODO: Remove?
+    def refresh(self) -> None: ...
+    # TODO: Shares some similarities with PCanvas
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType: ...
+    def on_mouse_press(self, pos: tuple[float, float]) -> bool: ...
+    def on_mouse_move(self, pos: tuple[float, float]) -> bool: ...
+    def on_mouse_release(self, pos: tuple[float, float]) -> bool: ...
+
+    def widget(self) -> Any:
+        """Returns an object understood by the widget frontend."""
+        ...
+
+    def set_stats(self, stats: Stats) -> None:
+        """Sets the statistics for display.
+
+        Properties
+        ----------
+        stats : Stats
+            The statistics to be reflected in the histogram
+        """
+        ...
+
+    def set_domain(self, bounds: tuple[float, float] | None) -> None:
+        """Sets the domain of the view.
+
+        TODO: What is the "extent of the data"? Is it the bounds of the
+        histogram, or the bounds of (clims + histogram)?
+
+        Properties
+        ----------
+        bounds : tuple[float, float] | None
+            If a tuple, sets the displayed extremes of the x axis to the passed
+            values. If None, sets them to the extent of the data instead.
+        """
+        ...
+
+    def set_range(self, bounds: tuple[float, float] | None) -> None:
+        """Sets the range of the view.
+
+        Properties
+        ----------
+        bounds : tuple[float, float] | None
+            If a tuple, sets the displayed extremes of the y axis to the passed
+            values. If None, sets them to the extent of the data instead.
+        """
+        ...
+
+    def set_vertical(self, vertical: bool) -> None:
+        """Sets the axis of the domain.
+
+        Properties
+        ----------
+        vertical : bool
+            If true, views the domain along the y axis and the range along the x
+            axis. If false, views the domain along the x axis and the range along
+            the y axis.
+        """
+        ...
+
+    def set_range_log(self, enabled: bool) -> None:
+        """Sets the axis scale of the range.
+
+        Properties
+        ----------
+        enabled : bool
+            If true, the range will be displayed with a logarithmic (base 10)
+            scale. If false, the range will be displayed with a linear scale.
+        """
+        ...
+
+
+class PHistogramView(Protocol):
+    """Frontend object viewing a PHistogramCanvas."""
+
+    def __init__(self, histogram_widget: PHistogramCanvas, **kwargs: Any) -> None: ...
+    def show(self) -> None: ...
 
 
 class CanvasElement(Protocol):
@@ -194,3 +340,10 @@ class PCanvas(Protocol):
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
     ) -> PRoiHandle: ...
+
+
+class CursorType(Enum):
+    DEFAULT = auto()
+    V_ARROW = auto()
+    H_ARROW = auto()
+    ALL_ARROW = auto()

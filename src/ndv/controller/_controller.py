@@ -5,14 +5,27 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from ndv.models import DataDisplayModel
-from ndv.views import get_canvas_class, get_view_frontend_class
+from ndv.views import (
+    get_canvas_class,
+    get_histogram_canvas_class,
+    get_histogram_frontend_class,
+    get_view_frontend_class,
+)
 
 if TYPE_CHECKING:
     import cmap
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PImageHandle, PLutView, PView
+    from ndv.models._lut_model import LUTModel
+    from ndv.models._stats import Stats
+    from ndv.views.protocols import (
+        PHistogramCanvas,
+        PHistogramView,
+        PImageHandle,
+        PLutView,
+        PView,
+    )
 
 
 # (probably rename to something like just Viewer)
@@ -309,3 +322,115 @@ class ViewerController:
     def show(self) -> None:
         """Show the viewer."""
         self._view.show()
+
+
+class HistogramController:
+    """Manages the connection between a LUTModel, statistics and a histogram view."""
+
+    def __init__(
+        self,
+        *,
+        lut: LUTModel | None = None,
+        stats: Stats | None = None,
+    ) -> None:
+        """Initializes a HistogramController.
+
+        Properties
+        ----------
+        lut : LUTModel | None
+            An initial LUTModel to attach.
+        stats : Stats | None
+            Initial statistics for display
+        """
+        # Canvas backend
+        self._hist: PHistogramCanvas = get_histogram_canvas_class()()
+        self._hist.climsChanged.connect(self._on_view_clims_update)
+        self._hist.gammaChanged.connect(self._on_view_gamma_update)
+        # Widget frontend
+        self._view: PHistogramView = get_histogram_frontend_class()(self._hist)
+
+        # Set initial statistics
+        self._stats: Stats | None = None
+        if stats:
+            self.stats = stats
+        # Set initial lut
+        self._lut: LUTModel | None = None
+        self.lut = lut
+
+    @property
+    def stats(self) -> Stats:
+        """Return stats being displayed."""
+        if self._stats is None:
+            raise ValueError("Statistics have not yet been set!")
+        return self._stats
+
+    @stats.setter
+    def stats(self, stats: Stats) -> None:
+        """Set stats for display."""
+        self._stats = stats
+        self._hist.set_stats(stats)
+
+    @property
+    def lut(self) -> LUTModel | None:
+        """Return the LUTModel currently attached."""
+        return self._lut
+
+    @lut.setter
+    def lut(self, lut: LUTModel | None) -> None:
+        """Sets the attached LUTModel."""
+        connections = [
+            ("clims", self._on_model_clims_update),
+            ("cmap", self._on_model_cmap_update),
+            ("gamma", self._on_model_gamma_update),
+            ("visible", self._on_model_visible_update),
+        ]
+        old = self._lut
+        self._lut = lut
+
+        for signal_name, slot in connections:
+            if old is not None:
+                # Detach old LUT
+                getattr(old.events, signal_name).disconnect(slot)
+            if self._lut is not None:
+                # Attach new LUT
+                getattr(self._lut.events, signal_name).connect(slot)
+            # Synchronize histogram with new LUT
+            slot()
+
+    def show(self) -> None:
+        """Show the viewer."""
+        self._view.show()
+
+    # -- Private helpers -- #
+
+    def _on_model_cmap_update(self) -> None:
+        """Runs when the model's cmap changes."""
+        # FIXME: Discrepancy between LUTModel and LUTView
+        if self._lut:
+            self._hist.set_colormap(self._lut.cmap)
+
+    def _on_model_clims_update(self) -> None:
+        """Runs when the model's clims change."""
+        # FIXME: Discrepancy between LUTModel and LUTView
+        if self._lut and (clims := self._lut.clims):
+            self._hist.set_clims(clims)
+
+    def _on_model_gamma_update(self) -> None:
+        """Runs when the model's gamma changes."""
+        if self._lut:
+            self._hist.set_gamma(self._lut.gamma)
+
+    def _on_model_visible_update(self) -> None:
+        """Runs when the model's visibility changes."""
+        visible = False if self._lut is None else self._lut.visible
+        self._hist.set_lut_visible(visible)
+
+    def _on_view_clims_update(self, clims: tuple[float, float]) -> None:
+        """Runs when the user updates the clims on the view."""
+        if self._lut is not None:
+            self._lut.clims = clims
+
+    def _on_view_gamma_update(self, gamma: float) -> None:
+        """Runs when the user updates the gamma on the view."""
+        if self._lut is not None:
+            self._lut.gamma = gamma
