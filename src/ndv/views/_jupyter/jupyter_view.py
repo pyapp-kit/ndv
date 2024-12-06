@@ -249,14 +249,6 @@ class JupyterHistogramView:
             self._original_handle_event = self._canvas.handle_event
             self._canvas.handle_event = self.handle_event
 
-        self._vert = widgets.ToggleButton(
-            value=False,
-            description="Vertical",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="Toggle axis of histogram domain (X or Y)",
-        )
-        self._vert.observe(self._on_vertical_changed, names="value")
-
         self._log = widgets.ToggleButton(
             value=False,
             description="Logarithmic Range",
@@ -273,7 +265,7 @@ class JupyterHistogramView:
             tooltip="Resets Pan and Zoom to the extent of canvas components",
         )
         self._reset.on_click(self._resetZoom)
-        self._btns = widgets.HBox([self._vert, self._log, self._reset])
+        self._btns = widgets.HBox([self._log, self._reset])
         self.layout = widgets.VBox([self._canvas, self._btns])
 
     def show(self) -> None:
@@ -308,9 +300,6 @@ class JupyterHistogramView:
     def _resetZoom(self, wdg: widgets.Button) -> None:
         self._backend.set_domain(None)
         self._backend.set_range(None)
-
-    def _on_vertical_changed(self, change: dict[str, Any]) -> None:
-        self._backend.set_vertical(self._vert.value)
 
     def _on_log_changed(self, change: dict[str, Any]) -> None:
         self._backend.set_range_log(self._log.value)

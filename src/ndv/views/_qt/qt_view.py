@@ -359,12 +359,6 @@ class QtHistogramView(QWidget):
         self._qwdg.installEventFilter(self)
         self._pressed: bool = False
 
-        # Vertical box
-        self._vert = QPushButton("Vertical")
-        self._vert.setToolTip("Toggle axis of histogram domain")
-        self._vert.setCheckable(True)
-        self._vert.toggled.connect(self._backend.set_vertical)
-
         # Log box
         self._log = QPushButton("Logarithmic")
         self._log.setToolTip("Toggle logarithmic (base-10) range scaling")
@@ -382,7 +376,6 @@ class QtHistogramView(QWidget):
         btns.setContentsMargins(0, 0, 0, 0)
         btns.setSpacing(0)
         btns.addStretch()
-        btns.addWidget(self._vert)
         btns.addWidget(self._log)
         btns.addWidget(self._set_range_btn)
 
