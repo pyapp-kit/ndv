@@ -4,7 +4,8 @@ import importlib
 import importlib.util
 import os
 import sys
-from typing import TYPE_CHECKING, cast
+from functools import cache
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from typing import Literal, TypeAlias
@@ -13,11 +14,12 @@ if TYPE_CHECKING:
 
     from .protocols import PView
 
-    GuiFrontend: TypeAlias = Literal["qt", "jupyter"]
+    GuiFrontend: TypeAlias = Literal["qt", "jupyter", "wx"]
     CanvasBackend: TypeAlias = Literal["vispy", "pygfx"]
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
 CANVAS_ENV_VAR = "NDV_CANVAS_BACKEND"
+_APP_INSTANCE: Any | None = None
 
 
 # TODO: add a way to set the frontend via an environment variable
@@ -32,6 +34,11 @@ def get_view_frontend_class() -> type[PView]:
         from ._qt.qt_view import QtViewerView
 
         return QtViewerView
+
+    if frontend == "wx":
+        from ._wx.wx_view import WxViewerView
+
+        return WxViewerView
 
     raise RuntimeError("No GUI frontend found")
 
@@ -72,32 +79,59 @@ def _is_running_in_qapp() -> bool:
     return False
 
 
+def _is_running_in_wxapp() -> bool:
+    if wx := sys.modules.get("wx"):
+        return wx.App.Get() is not None
+    return False
+
+
 def _try_start_qapp() -> bool:
+    global _APP_INSTANCE
     try:
         from qtpy.QtWidgets import QApplication
 
-        if QApplication.instance() is None:
-            app = QApplication([])
-            app.setOrganizationName("ndv")
-            app.setApplicationName("ndv")
+        if (qapp := QApplication.instance()) is None:
+            qapp = QApplication([])
+            qapp.setOrganizationName("ndv")
+            qapp.setApplicationName("ndv")
+        _APP_INSTANCE = qapp
 
         return True
     except Exception:
         return False
 
 
+def _try_start_wxapp() -> bool:
+    global _APP_INSTANCE
+    try:
+        import wx
+
+        if (wxapp := wx.App.Get()) is None:
+            wxapp = wx.App()
+        _APP_INSTANCE = wxapp
+
+        return True
+    except Exception:
+        return False
+
+
+@cache  # not allowed to change
 def _determine_gui_frontend() -> GuiFrontend:
     requested = os.getenv(GUI_ENV_VAR, "").lower()
     if requested:
-        if requested not in ("qt", "jupyter"):
+        if requested not in ("qt", "jupyter", "wx"):
             raise ValueError(f"Invalid GUI frontend: {requested!r}")
         return cast("GuiFrontend", requested)
     if _is_running_in_notebook():
         return "jupyter"
     if _is_running_in_qapp():
         return "qt"
+    if _is_running_in_wxapp():
+        return "wx"
     if _try_start_qapp():
         return "qt"
+    if _try_start_wxapp():
+        return "wx"
     raise RuntimeError("Could not find an appropriate GUI frontend (Qt or Jupyter).")
 
 
@@ -122,3 +156,19 @@ def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
         return cast("CanvasBackend", backend)
 
     raise ValueError(f"Invalid canvas backend: {backend!r}")
+
+
+def run_app() -> None:
+    frontend = _determine_gui_frontend()
+    if frontend == "qt":
+        from qtpy.QtWidgets import QApplication
+
+        if not isinstance(_APP_INSTANCE, QApplication):
+            raise RuntimeError("Got unexpected application type: {type(_APP_INSTANCE)}")
+        _APP_INSTANCE.exec()
+    elif frontend == "wx":
+        import wx
+
+        if not isinstance(_APP_INSTANCE, wx.App):
+            raise RuntimeError("Got unexpected application type: {type(_APP_INSTANCE)}")
+        _APP_INSTANCE.MainLoop()
