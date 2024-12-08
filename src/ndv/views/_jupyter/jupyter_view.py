@@ -8,6 +8,7 @@ import ipywidgets as widgets
 from psygnal import Signal
 
 from ndv._types import MouseMoveEvent
+from ndv.models._array_display_model import ChannelMode
 from ndv.views.protocols import CursorType, PHistogramCanvas
 
 if TYPE_CHECKING:
@@ -23,10 +24,11 @@ if TYPE_CHECKING:
 
 
 class JupyterLutView:
-    visibleChanged = Signal(bool)
-    autoscaleChanged = Signal(bool)
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
+    visibleChanged: PSignal = Signal(bool)
+    autoscaleChanged: PSignal = Signal(bool)
+    cmapChanged: PSignal = Signal(cmap.Colormap)
+    climsChanged: PSignal = Signal(tuple)
+    gammaChanged: PSignal = Signal(float)
 
     def __init__(self) -> None:
         # WIDGETS
@@ -93,28 +95,35 @@ class JupyterLutView:
     # to avoid loops, unnecessary updates, and unexpected behavior
 
     def set_auto_scale(self, auto: bool) -> None:
-        with self.autoscaleChanged.blocked():
+        with self.autoscaleChanged.blocked():  # type: ignore [attr-defined]
             self._auto_clim.value = auto
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        with self.cmapChanged.blocked():
+        with self.cmapChanged.blocked():  # type: ignore [attr-defined]
             self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        with self.climsChanged.blocked():
+        with self.climsChanged.blocked():  # type: ignore [attr-defined]
             self._clims.value = clims
 
     def set_lut_visible(self, visible: bool) -> None:
-        with self.visibleChanged.blocked():
+        with self.visibleChanged.blocked():  # type: ignore [attr-defined]
             self._visible.value = visible
+
+    def set_gamma(self, gamma: float) -> None:
+        pass
+
+    def setVisible(self, visible: bool) -> None:
+        # show or hide the actual widget itself
+        self.layout.layout.display = "flex" if visible else "none"
 
 
 # this is a PView
 class JupyterViewerView:
-    # not sure why this annotation is necessary ... something wrong with PSignal
     currentIndexChanged: PSignal = Signal()
     resetZoomClicked: PSignal = Signal()
     mouseMoved: PSignal = Signal(MouseMoveEvent)
+    channelModeChanged: PSignal = Signal(ChannelMode)
 
     def __init__(
         self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
@@ -134,6 +143,13 @@ class JupyterViewerView:
         self._data_info_label = widgets.Label()
         self._hover_info_label = widgets.Label()
 
+        # the button that controls the display mode of the channels
+        self._channel_mode_combo = widgets.Dropdown(
+            options=[x.value for x in ChannelMode], value=str(ChannelMode.GRAYSCALE)
+        )
+
+        self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
+
         # LAYOUT
 
         self.layout = widgets.VBox(
@@ -142,8 +158,13 @@ class JupyterViewerView:
                 self._canvas_widget,
                 self._hover_info_label,
                 self._slider_box,
+                self._channel_mode_combo,
             ]
         )
+
+        # CONNECTIONS
+
+        self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
     def handle_event(self, ev: dict) -> None:
         etype = ev["event_type"]
@@ -168,15 +189,11 @@ class JupyterViewerView:
                 continuous_update=True,
                 orientation="horizontal",
             )
-            sld.observe(self.on_slider_change, "value")
+            sld.observe(self._on_slider_change, "value")
             sliders.append(sld)
             self._sliders[axis] = sld
         self._slider_box.children = sliders
 
-        self.currentIndexChanged.emit()
-
-    def on_slider_change(self, change: dict[str, Any]) -> None:
-        """Emit signal when a slider value changes."""
         self.currentIndexChanged.emit()
 
     def hide_sliders(
@@ -212,14 +229,21 @@ class JupyterViewerView:
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self) -> PLutView:
+    def add_lut_view(self) -> JupyterLutView:
         """Add a LUT view to the viewer."""
         wdg = JupyterLutView()
         self.layout.children = (*self.layout.children, wdg.layout)
 
         # this cast is necessary because psygnal.Signal() is not being recognized
         # as a PSignalDescriptor by the type checker
-        return cast("PLutView", wdg)
+        return wdg
+
+    def remove_lut_view(self, view: PLutView) -> None:
+        """Remove a LUT view from the viewer."""
+        _view = cast("JupyterLutView", view)
+        self.layout.children = tuple(
+            wdg for wdg in self.layout.children if wdg != _view.layout
+        )
 
     def show(self) -> None:
         """Show the viewer."""
@@ -227,11 +251,29 @@ class JupyterViewerView:
 
         display(self.layout)  # type: ignore [no-untyped-call]
 
+    def hide(self) -> None:
+        """Hide the viewer."""
+        from IPython.display import clear_output
+
+        clear_output()  # type: ignore [no-untyped-call]
+
     def set_data_info(self, data_info: str) -> None:
         self._data_info_label.value = data_info
 
     def set_hover_info(self, hover_info: str) -> None:
         self._hover_info_label.value = hover_info
+
+    def set_channel_mode(self, mode: ChannelMode) -> None:
+        with self.channelModeChanged.blocked():  # type: ignore [attr-defined]
+            self._channel_mode_combo.value = mode.value
+
+    def _on_slider_change(self, change: dict[str, Any]) -> None:
+        """Emit signal when a slider value changes."""
+        self.currentIndexChanged.emit()
+
+    def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
+        """Emit signal when the channel mode changes."""
+        self.channelModeChanged.emit(ChannelMode(change["new"]))
 
 
 class JupyterHistogramView:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -13,12 +13,10 @@ if TYPE_CHECKING:
     from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
+    from ndv.models._array_display_model import ChannelMode
     from ndv.models._stats import Stats
 
-from typing import Callable, Union, runtime_checkable
 
-
-@runtime_checkable
 class PSignalInstance(Protocol):
     """The protocol that a signal instance must implement.
 
@@ -39,7 +37,6 @@ class PSignalInstance(Protocol):
         """Emits the signal with the given arguments."""
 
 
-@runtime_checkable
 class PSignalDescriptor(Protocol):
     """Descriptor that returns a signal instance."""
 
@@ -67,7 +64,6 @@ class PLutView(Protocol):
         name : str
             The name (label) of the LUT
         """
-        ...
 
     def set_auto_scale(self, auto: bool) -> None:
         """Defines whether autoscale has been enabled.
@@ -80,7 +76,6 @@ class PLutView(Protocol):
         autoscale : bool
             True iff clims automatically changed on dataset alteration.
         """
-        ...
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         """Defines the colormap backing the view.
@@ -90,7 +85,6 @@ class PLutView(Protocol):
         lut : cmap.Colormap
             The object mapping scalar values to RGB(A) colors.
         """
-        ...
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         """Defines the input clims.
@@ -103,7 +97,6 @@ class PLutView(Protocol):
         clims : tuple[float, float]
             The clims
         """
-        ...
 
     def set_lut_visible(self, visible: bool) -> None:
         """Defines whether this view is visible.
@@ -113,7 +106,6 @@ class PLutView(Protocol):
         visible : bool
             True iff the view should be visible.
         """
-        ...
 
     def set_gamma(self, gamma: float) -> None:
         """Defines the input gamma.
@@ -123,7 +115,9 @@ class PLutView(Protocol):
         gamma : float
             The gamma
         """
-        ...
+
+    def setVisible(self, visible: bool) -> None:
+        """Sets the visibility of the view/widget itself."""
 
 
 class PHistogramCanvas(PLutView, Protocol):
@@ -149,7 +143,6 @@ class PHistogramCanvas(PLutView, Protocol):
         stats : Stats
             The statistics to be reflected in the histogram
         """
-        ...
 
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
         """Sets the domain of the view.
@@ -163,7 +156,6 @@ class PHistogramCanvas(PLutView, Protocol):
             If a tuple, sets the displayed extremes of the x axis to the passed
             values. If None, sets them to the extent of the data instead.
         """
-        ...
 
     def set_range(self, bounds: tuple[float, float] | None) -> None:
         """Sets the range of the view.
@@ -174,7 +166,6 @@ class PHistogramCanvas(PLutView, Protocol):
             If a tuple, sets the displayed extremes of the y axis to the passed
             values. If None, sets them to the extent of the data instead.
         """
-        ...
 
     def set_vertical(self, vertical: bool) -> None:
         """Sets the axis of the domain.
@@ -186,7 +177,6 @@ class PHistogramCanvas(PLutView, Protocol):
             axis. If false, views the domain along the x axis and the range along
             the y axis.
         """
-        ...
 
     def set_range_log(self, enabled: bool) -> None:
         """Sets the axis scale of the range.
@@ -197,7 +187,6 @@ class PHistogramCanvas(PLutView, Protocol):
             If true, the range will be displayed with a logarithmic (base 10)
             scale. If false, the range will be displayed with a linear scale.
         """
-        ...
 
 
 class PHistogramView(Protocol):
@@ -205,6 +194,12 @@ class PHistogramView(Protocol):
 
     def __init__(self, histogram_widget: PHistogramCanvas, **kwargs: Any) -> None: ...
     def show(self) -> None: ...
+    def set_name(self, name: str) -> None: ...
+    def set_auto_scale(self, auto: bool) -> None: ...
+    def set_colormap(self, cmap: cmap.Colormap) -> None: ...
+    def set_clims(self, clims: tuple[float, float]) -> None: ...
+    def set_lut_visible(self, visible: bool) -> None: ...
+    def setVisible(self, visible: bool) -> None: ...
 
 
 class CanvasElement(Protocol):
@@ -230,7 +225,7 @@ class CanvasElement(Protocol):
     def selected(self, selected: bool) -> None:
         """Sets element selection status."""
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         """Returns the element's cursor preference at the provided position."""
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -269,16 +264,18 @@ class PImageHandle(CanvasElement, Protocol):
 
 
 class PView(Protocol):
-    """Protocol that front-end viewers must implement."""
+    """Primary protocol for top level, front-end viewers."""
 
     currentIndexChanged: PSignal
     resetZoomClicked: PSignal
     mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
+    channelModeChanged: PSignal
 
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     def current_index(self) -> Mapping[AxisKey, int | slice]: ...
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
+    def set_channel_mode(self, mode: ChannelMode) -> None: ...
     def set_data_info(self, data_info: str) -> None:
         """Set info about the currently displayed data, usually above canvas."""
 
@@ -289,10 +286,9 @@ class PView(Protocol):
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
     ) -> None: ...
     def add_lut_view(self) -> PLutView: ...
+    def remove_lut_view(self, view: PLutView) -> None: ...
     def show(self) -> None: ...
-
-    # def refresh(self) -> None: ...
-    # def add_image_to_canvas(self, data: Any) -> PImageHandle: ...
+    def hide(self) -> None: ...
 
 
 class PRoiHandle(CanvasElement, Protocol):
@@ -323,7 +319,10 @@ class PCanvas(Protocol):
     def refresh(self) -> None: ...
     def qwidget(self) -> QWidget: ...
     def add_image(
-        self, data: np.ndarray | None = ..., cmap: cmap.Colormap | None = ...
+        self,
+        data: np.ndarray | None = ...,
+        cmap: cmap.Colormap | None = ...,
+        clims: tuple[float, float] | None = ...,
     ) -> PImageHandle: ...
     def add_volume(
         self, data: np.ndarray | None = ..., cmap: cmap.Colormap | None = ...
@@ -343,7 +342,22 @@ class PCanvas(Protocol):
 
 
 class CursorType(Enum):
-    DEFAULT = auto()
-    V_ARROW = auto()
-    H_ARROW = auto()
-    ALL_ARROW = auto()
+    DEFAULT = "default"
+    V_ARROW = "v_arrow"
+    H_ARROW = "h_arrow"
+    ALL_ARROW = "all_arrow"
+    BDIAG_ARROW = "bdiag_arrow"
+    FDIAG_ARROW = "fdiag_arrow"
+
+    def to_qt(self) -> Qt.CursorShape:
+        """Converts CursorType to Qt.CursorShape."""
+        from qtpy.QtCore import Qt
+
+        return {
+            CursorType.DEFAULT: Qt.CursorShape.ArrowCursor,
+            CursorType.V_ARROW: Qt.CursorShape.SizeVerCursor,
+            CursorType.H_ARROW: Qt.CursorShape.SizeHorCursor,
+            CursorType.ALL_ARROW: Qt.CursorShape.SizeAllCursor,
+            CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
+            CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
+        }[self]

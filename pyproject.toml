@@ -43,6 +43,8 @@ dependencies = [
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
+qt = ["vispy", "pyopengl", "pyqt6", "imageio[tifffile]"]
+jupyter = ["vispy", "pyopengl", "ipywidgets", "jupyter", "jupyter_rfb", "glfw", "imageio[tifffile]"]
 pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
@@ -77,6 +79,7 @@ dev = [
     "ipykernel",
     "jupyter_rfb",
     "pyqt6",
+    "notebook",
 ]
 
 [project.urls]
@@ -134,7 +137,7 @@ plugins = ["pydantic.mypy"]
 
 # Alternatively, if _old_viewer is a submodule of ndv
 [[tool.mypy.overrides]]
-module = "ndv._old_viewer.*"
+module = "ndv.old_viewer.*"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
@@ -180,3 +183,6 @@ ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
 
 [tool.typos.default]
 extend-ignore-identifiers-re = ["(?i)nd2?.*", "(?i)ome", ".*ser_schema"]
+
+[tool.typos.files]
+extend-exclude = ["**/*.ipynb"]
