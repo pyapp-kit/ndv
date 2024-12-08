@@ -118,8 +118,9 @@ def _try_start_wxapp() -> bool:
 @cache  # not allowed to change
 def _determine_gui_frontend() -> GuiFrontend:
     requested = os.getenv(GUI_ENV_VAR, "").lower()
+    valid = ("qt", "jupyter", "wx")
     if requested:
-        if requested not in ("qt", "jupyter", "wx"):
+        if requested not in valid:
             raise ValueError(f"Invalid GUI frontend: {requested!r}")
         return cast("GuiFrontend", requested)
     if _is_running_in_notebook():
@@ -132,7 +133,10 @@ def _determine_gui_frontend() -> GuiFrontend:
         return "qt"
     if _try_start_wxapp():
         return "wx"
-    raise RuntimeError("Could not find an appropriate GUI frontend (Qt or Jupyter).")
+    raise RuntimeError(
+        f"Could not find an appropriate GUI frontend: {valid}. "
+        "Please pip install ndv[<frontend>] to pick one."
+    )
 
 
 def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
