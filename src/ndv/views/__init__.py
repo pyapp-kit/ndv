@@ -167,12 +167,18 @@ def run_app() -> None:
     if frontend == "qt":
         from qtpy.QtWidgets import QApplication
 
+        _try_start_qapp()
         if not isinstance(_APP_INSTANCE, QApplication):
-            raise RuntimeError("Got unexpected application type: {type(_APP_INSTANCE)}")
+            raise RuntimeError(
+                f"Got unexpected application type: {type(_APP_INSTANCE)}"
+            )
         _APP_INSTANCE.exec()
     elif frontend == "wx":
         import wx
 
+        _try_start_wxapp()
         if not isinstance(_APP_INSTANCE, wx.App):
-            raise RuntimeError("Got unexpected application type: {type(_APP_INSTANCE)}")
+            raise RuntimeError(
+                f"Got unexpected application type: {type(_APP_INSTANCE)}"
+            )
         _APP_INSTANCE.MainLoop()
