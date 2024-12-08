@@ -10,12 +10,11 @@ import numpy as np
 import vispy
 import vispy.scene
 import vispy.visuals
-from qtpy.QtCore import Qt
 from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views.protocols import PCanvas
+from ndv.views.protocols import CanvasElement, CursorType, PCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
 
     from qtpy.QtWidgets import QWidget
 
-    from ndv.views.protocols import CanvasElement
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
@@ -36,8 +34,8 @@ class Handle(scene.visuals.Markers):
         self,
         parent: RectangularROI,
         on_move: Callable[[Sequence[float]], None] | None = None,
-        cursor: Qt.CursorShape
-        | Callable[[Sequence[float]], Qt.CursorShape] = Qt.CursorShape.SizeAllCursor,
+        cursor: CursorType
+        | Callable[[Sequence[float]], CursorType] = CursorType.ALL_ARROW,
     ) -> None:
         super().__init__(parent=parent)
         self.unfreeze()
@@ -47,12 +45,12 @@ class Handle(scene.visuals.Markers):
         if on_move:
             self.on_move.append(on_move)
         # cusror preference function
-        if isinstance(cursor, Qt.CursorShape):
-            self._cursor_at = cast(
-                "Callable[[Sequence[float]], Qt.CursorShape]", lambda _: cursor
-            )
-        else:
-            self._cursor_at = cursor
+        if not callable(cursor):
+
+            def cursor(_: Any) -> CursorType:
+                return cursor
+
+        self._cursor_at = cursor
         self._selected = False
         # NB VisPy asks that the data is a 2D array
         self._pos = np.array([[0, 0]], dtype=np.float32)
@@ -84,7 +82,7 @@ class Handle(scene.visuals.Markers):
         self._selected = selected
         self.parent.selected = selected
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         return self._cursor_at(self.pos)
 
 
@@ -137,15 +135,15 @@ class RectangularROI(scene.visuals.Rectangle):
         self._selected = False
         self.freeze()
 
-    def _handle_cursor_pref(self, handle_pos: Sequence[float]) -> Qt.CursorShape:
+    def _handle_cursor_pref(self, handle_pos: Sequence[float]) -> CursorType:
         # Bottom left handle
         if handle_pos[0] < self.center[0] and handle_pos[1] < self.center[1]:
-            return Qt.CursorShape.SizeFDiagCursor
+            return CursorType.FDIAG_ARROW
         # Top right handle
         if handle_pos[0] > self.center[0] and handle_pos[1] > self.center[1]:
-            return Qt.CursorShape.SizeFDiagCursor
+            return CursorType.FDIAG_ARROW
         # Top left, bottom right
-        return Qt.CursorShape.SizeBDiagCursor
+        return CursorType.BDIAG_ARROW
 
     def move_top_left(self, pos: Sequence[float]) -> None:
         self._handles[3].pos = [pos[0], self._handles[3].pos[1]]
@@ -239,8 +237,8 @@ class RectangularROI(scene.visuals.Rectangle):
             ]
         self.center = new_center
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
-        return Qt.CursorShape.SizeAllCursor
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
+        return CursorType.ALL_ARROW
 
     # ------------------- End EditableROI interface -------------------------
 
@@ -323,7 +321,7 @@ class VispyImageHandle:
     def remove(self) -> None:
         self._visual.parent = None
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         return None
 
 
@@ -362,7 +360,7 @@ class VispyHandleHandle:
     def remove(self) -> None:
         self._parent.remove()
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         return self._handle.cursor_at(pos)
 
 
@@ -434,7 +432,7 @@ class VispyRoiHandle:
     def remove(self) -> None:
         self._roi.parent = None
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         return self._roi.cursor_at(pos)
 
 
@@ -487,7 +485,10 @@ class VispyViewerCanvas(PCanvas):
         self._canvas.update()
 
     def add_image(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        clims: tuple[float, float] | None = None,
     ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         img = scene.visuals.Image(data, parent=self._view.scene)
@@ -499,6 +500,8 @@ class VispyViewerCanvas(PCanvas):
             self.set_range()
         if cmap is not None:
             handle.cmap = cmap
+        if clims is not None:
+            handle.clim = clims
         return handle
 
     def add_volume(

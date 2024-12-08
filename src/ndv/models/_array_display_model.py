@@ -1,6 +1,7 @@
 """General model for ndv."""
 
 import warnings
+from enum import Enum
 from typing import Literal, Optional, Union, cast
 
 from pydantic import Field, computed_field, model_validator
@@ -19,10 +20,63 @@ IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]
 LutMap: TypeAlias = ValidatedEventedDict[Union[int, None], LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[Union[AxisKey, None], ReducerType]
-
+# used for visible_axes
 TwoOrThreeAxisTuple: TypeAlias = Union[
     tuple[AxisKey, AxisKey, AxisKey], tuple[AxisKey, AxisKey]
 ]
+
+
+def _default_luts() -> LutMap:
+    colors = ["green", "magenta", "cyan", "red", "blue", "yellow"]
+    return ValidatedEventedDict(
+        (i, LUTModel(cmap=color)) for i, color in enumerate(colors)
+    )
+
+
+class ChannelMode(str, Enum):
+    """Channel display mode.
+
+    Attributes
+    ----------
+    GRAYSCALE : str
+        The array is displayed as a single channel, with a single lookup table applied.
+        In this mode, there effective *is* no channel axis: all non-visible dimensions
+        have sliders, and there is a single LUT control (the `default_lut`).
+    COMPOSITE : str
+        Display all (or a subset of) channels as a composite image, with a different
+        lookup table applied to each channel.  In this mode, the slider for the channel
+        axis is hidden by default, and LUT controls for each channel are shown.
+    COLOR : str
+        Display a single channel at a time as a color image, with a channel-specific
+        lookup table applied.  In this mode, the slider for the channel axis is shown,
+        and the user can select which channel to display.  LUT controls are shown for
+        all channels.
+    RGBA : str
+        The array is displayed as an RGB image, with a single lookup table applied.
+        In this mode, the slider for the channel axis is hidden, and a single LUT
+        control is shown. Only valid when channel axis has length <= 4.
+    RGB : str
+        Alias for RGBA.
+    """
+
+    GRAYSCALE = "grayscale"
+    COMPOSITE = "composite"
+    COLOR = "color"
+    RGBA = "rgba"
+
+    def __str__(self) -> str:
+        return self.value
+
+    def is_multichannel(self) -> bool:
+        """Return whether this mode displays multiple channels.
+
+        If `is_multichannel` is True, then the `channel_axis` slider should be hidden.
+        """
+        return self in (ChannelMode.COMPOSITE, ChannelMode.RGBA)
+
+
+ChannelMode._member_map_["RGB"] = ChannelMode.RGBA  #  ChannelMode["RGB"]
+ChannelMode._value2member_map_["rgb"] = ChannelMode.RGBA  # ChannelMode("rgb")
 
 
 class ArrayDisplayModel(NDVModel):
@@ -50,6 +104,17 @@ class ArrayDisplayModel(NDVModel):
         Callable to reduce data along axes remaining after slicing.
         Ideally, the ufunc should accept an `axis` argument.
         (TODO: what happens if not?)
+    channel_mode : ChannelMode
+        How to display channel information:
+            - `GRAYSCALE`: ignore channel axis, use `default_lut`
+            - `COMPOSITE`: display all channels as a composite image, using `luts`
+            - `COLOR`: display a single channel at a time, using `luts`
+            - `RGBA`: display as an RGB image, using `default_lut` (except for cmap)
+
+        If `channel_mode` is set to anything other than `GRAYSCALE`, then `channel_axis`
+        must be set to a valid axis; if no `channel_axis` is set, at the time of
+        display, the `DataWrapper` MAY guess the `channel_axis`, and set it on the
+        model.
     channel_axis : AxisKey | None
         The dimension index or name of the channel dimension.
         The implication of setting channel_axis is that *all* elements along the channel
@@ -64,11 +129,10 @@ class ArrayDisplayModel(NDVModel):
         and is used when `channel_axis` is None.  It should always be present
     """
 
-    visible_axes: TwoOrThreeAxisTuple = (
-        -2,
-        -1,
-    )
+    visible_axes: TwoOrThreeAxisTuple = (-2, -1)
     current_index: IndexMap = Field(default_factory=IndexMap, frozen=True)
+
+    channel_mode: ChannelMode = ChannelMode.GRAYSCALE
     channel_axis: Optional[AxisKey] = None
 
     # map of axis to reducer (function that can reduce dimensionality along that axis)
@@ -76,7 +140,7 @@ class ArrayDisplayModel(NDVModel):
     default_reducer: ReducerType = "numpy.max"  # type: ignore [assignment]  # FIXME
 
     # map of index along channel axis to LUTModel object
-    luts: LutMap = Field(default_factory=LutMap)
+    luts: LutMap = Field(default_factory=_default_luts)
     default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
 
     @computed_field  # type: ignore [prop-decorator]

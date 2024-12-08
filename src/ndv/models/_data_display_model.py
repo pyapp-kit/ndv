@@ -1,11 +1,14 @@
-from collections.abc import Hashable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
+from concurrent.futures import Future
+from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol, Union, cast
 
 import numpy as np
-from pydantic import Field
+from pydantic import Field, model_validator
+from typing_extensions import Self
 
-from ndv.models._array_display_model import ArrayDisplayModel
+from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._base_model import NDVModel
 
 from .data_wrappers import DataWrapper
@@ -23,6 +26,24 @@ class DataWrapperP(Protocol):
     def isel(self, index: Mapping[int, Union[int, slice]]) -> np.ndarray: ...
 
 
+@dataclass
+class DataResponse:
+    """Response object for data requests."""
+
+    data: np.ndarray
+    channel_key: Optional[int]
+
+
+@dataclass
+class DataRequest:
+    """Request object for data slicing."""
+
+    wrapper: DataWrapper
+    index: Mapping[int, Union[int, slice]]
+    visible_axes: tuple[int, ...]
+    channel_axis: Optional[int]
+
+
 class DataDisplayModel(NDVModel):
     """Combination of data and display models.
 
@@ -33,6 +54,21 @@ class DataDisplayModel(NDVModel):
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
     data_wrapper: Optional[DataWrapper] = None
+
+    @model_validator(mode="after")
+    def _validate_model(self) -> Self:
+        self.display.events.channel_mode.connect(self._on_channel_mode_change)
+        return self
+
+    def _on_channel_mode_change(self, mode: ChannelMode) -> None:
+        # if the mode is not grayscale, and the channel axis is not set,
+        # we let the data wrapper guess the channel axis
+        if (
+            mode != ChannelMode.GRAYSCALE
+            and self.display.channel_axis is None
+            and self.data_wrapper is not None
+        ):
+            self.display.channel_axis = self.data_wrapper.guess_channel_axis()
 
     @property
     def data(self) -> Any:
@@ -82,6 +118,13 @@ class DataDisplayModel(NDVModel):
         )
 
     @property
+    def canonical_channel_axis(self) -> Optional[int]:
+        """Return the channel axis in canonical form."""
+        if self.display.channel_axis is None:
+            return None
+        return self._canonicalize_axis_key(self.display.channel_axis)
+
+    @property
     def canonical_current_index(self) -> Mapping[int, Union[int, slice]]:
         """Return the current index in canonical form."""
         return {
@@ -89,7 +132,7 @@ class DataDisplayModel(NDVModel):
             for ax, v in self.display.current_index.items()
         }
 
-    def current_slice_request(self) -> Mapping[int, Union[int, slice]]:
+    def current_slice_requests(self) -> list[DataRequest]:
         """Return the current index request for the data.
 
         This reconciles the `current_index` and `visible_axes` attributes of the display
@@ -99,17 +142,25 @@ class DataDisplayModel(NDVModel):
         in `visible_axes` are guaranteed to be slices rather than integers).
         """
         if self.data_wrapper is None:
-            return {}
-
+            return []
+        # first ensure that all visible axes (those that will be displayed in the view)
+        # are slices and present in the request.
         requested_slice = dict(self.canonical_current_index)
         for ax in self.canonical_visible_axes:
             if not isinstance(requested_slice.get(ax), slice):
                 requested_slice[ax] = slice(None)
 
-        if (c_ax := self.display.channel_axis) is not None:
-            c_ax = self._canonicalize_axis_key(c_ax)
-            if not isinstance(requested_slice.get(c_ax), slice):
-                requested_slice[c_ax] = slice(None)
+        # if we need to request multiple channels (composite mode or RGB),
+        # ensure that the channel axis is also sliced
+        if c_ax := self.canonical_channel_axis:
+            if self.display.channel_mode.is_multichannel():
+                if not isinstance(requested_slice.get(c_ax), slice):
+                    requested_slice[c_ax] = slice(None)
+            else:
+                # somewhat of a hack.
+                # we heed DataRequest.channel_axis to be None if we want the view
+                # to use the default_lut
+                c_ax = None
 
         # ensure that all axes are slices, so that we don't lose any dimensions.
         # data will be squeezed to remove singleton dimensions later after
@@ -118,20 +169,54 @@ class DataDisplayModel(NDVModel):
         for ax, val in requested_slice.items():
             if isinstance(val, int):
                 requested_slice[ax] = slice(val, val + 1)
-        return requested_slice
+
+        return [
+            DataRequest(
+                wrapper=self.data_wrapper,
+                index=requested_slice,
+                visible_axes=self.canonical_visible_axes,
+                channel_axis=c_ax,
+            )
+        ]
 
     # TODO: make async
-    def current_data_slice(self) -> np.ndarray:
+    def request_sliced_data(self) -> list[Future[DataResponse]]:
         """Return the slice of data requested by the current index (synchronous)."""
         if self.data_wrapper is None:
             raise ValueError("Data not set")
 
-        # same shape, with singleton dims
-        data = self.data_wrapper.isel(self.current_slice_request())
-        # rearrange according to the order of visible axes
-        t_dims = self.canonical_visible_axes
-        t_dims += tuple(i for i in range(data.ndim) if i not in t_dims)
-        return data.transpose(*t_dims).squeeze()
+        if not (requests := self.current_slice_requests()):
+            return []
+
+        futures: list[Future[DataResponse]] = []
+        for req in requests:
+            data = req.wrapper.isel(req.index)
+
+            # for transposing according to the order of visible axes
+            vis_ax = req.visible_axes
+            t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
+
+            if (ch_ax := req.channel_axis) is not None:
+                ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
+            else:
+                ch_indices = (None,)
+
+            for i in ch_indices:
+                if i is None:
+                    ch_data = data
+                else:
+                    ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
+                    ch_data = data[ch_keepdims]
+                future = Future[DataResponse]()
+                future.set_result(
+                    DataResponse(
+                        data=ch_data.transpose(*t_dims).squeeze(),
+                        channel_key=i,
+                    )
+                )
+                futures.append(future)
+
+        return futures
 
     # TODO: this needs to be cleared when data.dims changes
     @cached_property

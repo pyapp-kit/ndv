@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 import cmap
 from qtpy.QtCore import QEvent, QObject, Qt, Signal
-from qtpy.QtGui import QKeyEvent, QMouseEvent
+from qtpy.QtGui import QIcon, QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -15,12 +15,19 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
+from superqt import (
+    QCollapsible,
+    QElidingLabel,
+    QEnumComboBox,
+    QLabeledRangeSlider,
+    QLabeledSlider,
+)
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey, MouseMoveEvent
+from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -109,7 +116,7 @@ class QLUTWidget(QWidget):
 
         layout = QHBoxLayout(self)
         layout.setSpacing(5)
-        # layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._visible)
         layout.addWidget(self._cmap)
         layout.addWidget(self._clims)
@@ -201,11 +208,52 @@ class QDimsSliders(QWidget):
             self.currentIndexChanged.emit()
 
 
+class _UpCollapsible(QCollapsible):
+    def __init__(
+        self,
+        title: str = "",
+        parent: QWidget | None = None,
+        expandedIcon: QIcon | str | None = "▼",
+        collapsedIcon: QIcon | str | None = "▲",
+    ):
+        super().__init__(title, parent, expandedIcon, collapsedIcon)
+        # little hack to make the lut collapsible take up less space
+        layout = cast("QVBoxLayout", self.layout())
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        if (
+            # look-before-leap on private attribute that may change
+            hasattr(self, "_content") and (inner := self._content.layout()) is not None
+        ):
+            inner.setContentsMargins(0, 4, 0, 0)
+            inner.setSpacing(0)
+
+        self.setDuration(100)
+
+        # this is a little hack to allow the buttons on the main view (below)
+        # share the same row as the LUT toggle button
+        layout.removeWidget(self._toggle_btn)
+        self.btn_row = QHBoxLayout()
+        self.btn_row.setContentsMargins(0, 0, 0, 0)
+        self.btn_row.setSpacing(0)
+        self.btn_row.addWidget(self._toggle_btn)
+        self.btn_row.addStretch()
+        layout.addLayout(self.btn_row)
+
+    def setContent(self, content: QWidget) -> None:
+        """Replace central widget (the widget that gets expanded/collapsed)."""
+        self._content = content
+        # this is different from upstream
+        cast("QVBoxLayout", self.layout()).insertWidget(0, self._content)
+        self._animation.setTargetObject(content)
+
+
 # this is a PView ... but that would make a metaclass conflict
 class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     mouseMoved = Signal(MouseMoveEvent)
+    channelModeChanged = Signal(ChannelMode)
 
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
@@ -226,40 +274,28 @@ class QtViewerView(QWidget):
         self._hover_info_label = QElidingLabel("", self)
 
         # the button that controls the display mode of the channels
-        self._channel_mode_btn = QPushButton("Channel")
+        self._channel_mode_combo = QEnumComboBox(self, ChannelMode)
+        self._channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged)
+
         # button to reset the zoom of the canvas
         # TODO: unify icons across all the view frontends in a new file
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
         self._set_range_btn = QPushButton(set_range_icon, "", self)
         self._set_range_btn.clicked.connect(self.resetZoomClicked)
 
-        self._btns = btns = QHBoxLayout()
-        btns.setContentsMargins(0, 0, 0, 0)
-        btns.setSpacing(0)
-        btns.addStretch()
-        btns.addWidget(self._channel_mode_btn)
-        # btns.addWidget(self._ndims_btn)
-        btns.addWidget(self._set_range_btn)
-        # btns.addWidget(self._add_roi_btn)
-
-        self._luts = QCollapsible(
+        self._luts = _UpCollapsible(
             "LUTs",
             parent=self,
             expandedIcon=QIconifyIcon("bi:chevron-up", color="#888888"),
             collapsedIcon=QIconifyIcon("bi:chevron-down", color="#888888"),
         )
+        self._btns = self._luts.btn_row
+        self._luts.expand()
 
-        # little hack to make the lut collapsible take up less space
-        lut_layout = cast("QVBoxLayout", self._luts.layout())
-        lut_layout.setContentsMargins(0, 1, 0, 1)
-        lut_layout.setSpacing(0)
-        if (
-            # look-before-leap on private attribute that may change
-            hasattr(self._luts, "_content")
-            and (layout := self._luts._content.layout()) is not None
-        ):
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(0)
+        self._btns.addWidget(self._channel_mode_combo)
+        # self._btns.addWidget(self._ndims_btn)
+        self._btns.addWidget(self._set_range_btn)
+        # self._btns.addWidget(self._add_roi_btn)
 
         # above the canvas
         info_widget = QWidget()
@@ -277,12 +313,15 @@ class QtViewerView(QWidget):
         layout.addWidget(self._hover_info_label)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
-        layout.addLayout(btns)
+        layout.addLayout(self._btns)
 
     def add_lut_view(self) -> QLUTWidget:
         wdg = QLUTWidget(self)
         self._luts.addWidget(wdg)
         return wdg
+
+    def remove_lut_view(self, wdg: QLUTWidget) -> None:
+        self._luts.removeWidget(wdg)
 
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
@@ -309,6 +348,10 @@ class QtViewerView(QWidget):
     def set_hover_info(self, text: str) -> None:
         """Set the hover info text, below the canvas."""
         self._hover_info_label.setText(text)
+
+    def set_channel_mode(self, mode: ChannelMode) -> None:
+        """Set the channel mode button text."""
+        self._channel_mode_combo.setCurrentEnum(mode)
 
     def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
         """Event filter installed on the canvas to handle mouse events."""

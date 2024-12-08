@@ -467,7 +467,10 @@ class PyGFXViewerCanvas(PCanvas):
             cam.set_state(state)
 
     def add_image(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
+        self,
+        data: np.ndarray | None = None,
+        cmap: cmap.Colormap | None = None,
+        clims: tuple[float, float] | None = None,
     ) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
         tex = pygfx.Texture(data, dim=2)
@@ -488,6 +491,8 @@ class PyGFXViewerCanvas(PCanvas):
         handle = PyGFXImageHandle(image, self.refresh)
         if cmap is not None:
             handle.cmap = cmap
+        if clims is not None:
+            handle.clim = clims
         self._elements[image] = handle
         return handle
 
