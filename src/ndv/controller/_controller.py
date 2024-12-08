@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
@@ -8,7 +7,6 @@ from ndv.models import DataDisplayModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import get_canvas_class, get_view_frontend_class
-from ndv.views.protocols import PImageHandle
 
 if TYPE_CHECKING:
     import cmap
@@ -17,7 +15,7 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PLutView, PView
+    from ndv.views.protocols import PImageHandle, PLutView, PView
 
     LutKey: TypeAlias = int | None
 
@@ -34,14 +32,9 @@ class ViewerController:
     """
 
     def __init__(self, data: DataDisplayModel | None = None) -> None:
-        # mapping of channel/LUT index to image handle, where None is the default LUT
-        # PImageHandle is an object that allows this controller to update the canvas img
-        self._img_handles = defaultdict["LutKey", list[PImageHandle]](list)
-
-        # mapping of channel/LUT index to LutView, where None is the default LUT
-        # LutView is a front-end object that allows the user to interact with the LUT
-        # self._lut_views: dict[LutKey, PLutView] = {}
-        self._lut_controllers: dict[LutKey, LutController] = {}
+        # mapping of channel keys to their respective controllers
+        # where None is the default channel
+        self._lut_controllers: dict[LutKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
         frontend_cls = get_view_frontend_class()
@@ -220,20 +213,14 @@ class ViewerController:
                     # so we create a new LUT model for it
                     model = self.model.luts[key] = LUTModel()
 
-                self._lut_controllers[key] = lut_ctrl = LutController(
-                    key=key,
-                    view=self._view.add_lut_view(),
-                    model=model,
-                    handles=self._img_handles[key],
+                self._lut_controllers[key] = lut_ctrl = ChannelController(
+                    key=key, view=self._view.add_lut_view(), model=model
                 )
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
-                handle = self._canvas.add_image(
-                    data, cmap=lut_ctrl.lut_model.cmap, clims=lut_ctrl.lut_model.clims
-                )
-                lut_ctrl.handles.append(handle)
-                self._canvas.set_range()
+                lut_ctrl.add_handle(self._canvas.add_image(data))
+                # self._canvas.set_range()
             else:
                 lut_ctrl.update_texture_data(data)
 
@@ -245,20 +232,9 @@ class ViewerController:
             return {}
 
         values: dict[LutKey, float] = {}
-        for channel_key, handles in self._img_handles.items():
-            if not handles:
-                continue
-            # only getting one handle per channel for now
-            handle = handles[0]
-            with suppress(IndexError):  # skip out of bounds
-                # here, we're retrieving the value from the in-memory data
-                # stored by the backend visual, rather than querying the data itself
-                # this is a quick workaround to get the value without having to
-                # worry about other dimensions in the data source (since the
-                # texture has already been reduced to 2D). But a more complete
-                # implementation would gather the full current nD index and query
-                # the data source directly.
-                values[channel_key] = handle.data[y, x]
+        for key, ctrl in self._lut_controllers.items():
+            if (value := ctrl.get_value_at_index((y, x))) is not None:
+                values[key] = value
 
         return values
 
@@ -267,14 +243,20 @@ class ViewerController:
         self._view.show()
 
 
-class LutController:
-    def __init__(
-        self, key: LutKey, view: PLutView, model: LUTModel, handles: list[PImageHandle]
-    ) -> None:
+class ChannelController:
+    """Controller for a single channel in the viewer.
+
+    This manages the connection between the LUT model (settings like colormap,
+    contrast limits and visibility) and the LUT view (the front-end widget that
+    allows the user to interact with these settings), as well as the image handle
+    that displays the data, all for a single "channel" extracted from the data.
+    """
+
+    def __init__(self, key: LutKey, view: PLutView, model: LUTModel) -> None:
         self.key = key
         self.lut_view = view
         self.lut_model = model
-        self.handles = handles
+        self.handles: list[PImageHandle] = []
 
         # setup the initial state of the LUT view
         self._update_view_from_model()
@@ -370,3 +352,29 @@ class LutController:
             # controller listens to, and then updates the image handle
             # but this next line is more direct
             # self._handles[None].clim = (data.min(), data.max())
+
+    def add_handle(self, handle: PImageHandle) -> None:
+        """Add an image texture handle to the controller."""
+        self.handles.append(handle)
+        handle.cmap = self.lut_model.cmap
+        if self.lut_model.autoscale:
+            self.lut_model.clims = (handle.data.min(), handle.data.max())
+        if self.lut_model.clims:
+            handle.clim = self.lut_model.clims
+
+    def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
+        """Get the value of the data at the given index."""
+        if not (handles := self.handles):
+            return None
+        # only getting one handle per channel for now
+        handle = handles[0]
+        with suppress(IndexError):  # skip out of bounds
+            # here, we're retrieving the value from the in-memory data
+            # stored by the backend visual, rather than querying the data itself
+            # this is a quick workaround to get the value without having to
+            # worry about other dimensions in the data source (since the
+            # texture has already been reduced to 2D). But a more complete
+            # implementation would gather the full current nD index and query
+            # the data source directly.
+            return handle.data[idx]  # type: ignore [no-any-return]
+        return None

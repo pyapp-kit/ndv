@@ -228,7 +228,7 @@ class _UpCollapsible(QCollapsible):
             inner.setContentsMargins(0, 4, 0, 0)
             inner.setSpacing(0)
 
-        self.setDuration(200)
+        self.setDuration(100)
 
         # this is a little hack to allow the buttons on the main view (below)
         # share the same row as the LUT toggle button
