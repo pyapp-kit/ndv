@@ -151,9 +151,6 @@ class VispyHistogramCanvas(PHistogramCanvas):
         """
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
-        if self._clims is None:
-            self.set_clims((self._bin_edges[0], self._bin_edges[-1]))
-            self._resize()
 
     def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
         if bounds is not None:
@@ -405,5 +402,4 @@ def _hist_counts_to_mesh(
     offsets = 3 * np.arange(n_edges - 1, dtype=np.uint32)[:, np.newaxis]
     faces[::2] = np.array([0, 2, 1]) + offsets
     faces[1::2] = np.array([2, 0, 3]) + offsets
-
     return vertices, faces

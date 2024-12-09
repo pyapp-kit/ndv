@@ -326,15 +326,15 @@ class QtViewerView(QWidget):
         left_layout.addWidget(self._luts)
         left_layout.addLayout(self._btns)
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setSpacing(2)
-        right_layout.setContentsMargins(6, 2, 6, 6)
-        right_layout.addWidget(histogram_widget)
+        hist = QWidget()
+        hist_layout = QVBoxLayout(hist)
+        hist_layout.setSpacing(2)
+        hist_layout.setContentsMargins(6, 2, 6, 6)
+        hist_layout.addWidget(histogram_widget)
 
         splitter = QSplitter(Qt.Orientation.Vertical, self)
         splitter.addWidget(left)
-        splitter.addWidget(right)
+        splitter.addWidget(hist)
         splitter.setSizes([600, 100])
 
         layout = QVBoxLayout(self)

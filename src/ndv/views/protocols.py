@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._array_display_model import ChannelMode
-    from ndv.models._stats import Stats
 
 
 class PSignalInstance(Protocol):
@@ -125,24 +124,10 @@ class PHistogramCanvas(PLutView, Protocol):
 
     # TODO: Remove?
     def refresh(self) -> None: ...
-    # TODO: Shares some similarities with PCanvas
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType: ...
-    def on_mouse_press(self, pos: tuple[float, float]) -> bool: ...
-    def on_mouse_move(self, pos: tuple[float, float]) -> bool: ...
-    def on_mouse_release(self, pos: tuple[float, float]) -> bool: ...
 
     def widget(self) -> Any:
         """Returns an object understood by the widget frontend."""
         ...
-
-    def set_stats(self, stats: Stats) -> None:
-        """Sets the statistics for display.
-
-        Properties
-        ----------
-        stats : Stats
-            The statistics to be reflected in the histogram
-        """
 
     def set_domain(self, bounds: tuple[float, float] | None) -> None:
         """Sets the domain of the view.

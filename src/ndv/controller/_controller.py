@@ -50,7 +50,6 @@ class ViewerController:
         from ndv.views._vispy._histogram import VispyHistogramCanvas
 
         self._histogram = VispyHistogramCanvas()
-        self._bins = 256
         self._view = frontend_cls(self._canvas.qwidget(), self._histogram.widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
@@ -96,8 +95,6 @@ class ViewerController:
 
         iinfo = np.iinfo(data.dtype)
         self._histogram.set_domain((iinfo.min, iinfo.max))
-        max_val = np.iinfo(data.dtype).max
-        self._bins = np.linspace(0, max_val, 512)
 
     # -----------------------------------------------------------------------------
 
@@ -239,8 +236,13 @@ class ViewerController:
                 # self._canvas.set_range()
             else:
                 lut_ctrl.update_texture_data(data)
-                self._histogram.set_data(*np.histogram(data.flatten(), bins=self._bins))
-                self._histogram.set_range()
+
+                maxval = np.iinfo(data.dtype).max
+                counts = np.bincount(data.flatten(), minlength=maxval + 1)
+                bin_edges = np.arange(maxval + 2) - 0.5
+                # print zeros
+                self._histogram.set_data(counts, bin_edges)
+                # self._histogram.set_range()
 
         self._canvas.refresh()
 
