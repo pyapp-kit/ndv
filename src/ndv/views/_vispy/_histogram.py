@@ -34,7 +34,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
     climsChanged = Signal(tuple)
     gammaChanged = Signal(float)
 
-    def __init__(self, vertical: bool = False) -> None:
+    def __init__(self, *, vertical: bool = False) -> None:
         # ------------ data and state ------------ #
 
         self._values: Sequence[float] | np.ndarray | None = None
@@ -374,6 +374,8 @@ class VispyHistogramCanvas(PHistogramCanvas):
         else:
             scale = 0.98 * self.plot.yaxis.axis.domain[1]
             self._handle_transform.scale = (1, scale)
+
+    def setVisible(self, visible: bool) -> None: ...
 
 
 def _hist_counts_to_mesh(

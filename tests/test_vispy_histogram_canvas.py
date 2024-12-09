@@ -8,8 +8,7 @@ import numpy as np
 import pytest
 from vispy.color import Color
 
-from ndv.models._stats import Stats
-from ndv.views._vispy._vispy import Grabbable, VispyHistogramCanvas
+from ndv.views._vispy._histogram import Grabbable, VispyHistogramCanvas
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -23,19 +22,10 @@ PLOT_EPSILON = 1e-4
 
 
 @pytest.fixture
-def stats() -> Stats:
-    gen = np.random.default_rng(seed=0xDEADBEEF)
-    data = gen.normal(10, 10, 10000).astype(np.float64)
-    return Stats(data)
-
-
-@pytest.fixture
-def view(stats: Stats) -> VispyHistogramCanvas:
+def view() -> VispyHistogramCanvas:
     # Create view
     view = VispyHistogramCanvas()
     view._canvas.size = (100, 100)
-    # Set statistics
-    view.set_stats(stats)
 
     return view
 
@@ -73,36 +63,9 @@ def test_plot(view: VispyHistogramCanvas) -> None:
     assert np.all(np.isclose(_range, plot.yaxis.axis.domain))
 
 
-def test_clims(stats: Stats, view: VispyHistogramCanvas) -> None:
-    # on startup, clims should be at the extent of the data
-    clims = stats.minimum, stats.maximum
-    assert view._clims is not None
-    assert clims[0] == view._clims[0]
-    assert clims[1] == view._clims[1]
-    assert abs(clims[0] - view._lut_line._line.pos[0, 0]) <= EPSILON
-    assert abs(clims[1] - view._lut_line._line.pos[-1, 0]) <= EPSILON
-    # set clims, assert a change
-    clims = 9, 11
-    view.set_clims(clims)
-    assert clims[0] == view._clims[0]
-    assert clims[1] == view._clims[1]
-    assert abs(clims[0] - view._lut_line._line.pos[0, 0]) <= EPSILON
-    assert abs(clims[1] - view._lut_line._line.pos[-1, 0]) <= EPSILON
-    # set clims backwards - ensure the view flips them
-    clims = 5, 3
-    view.set_clims(clims)
-    assert clims[1] == view._clims[0]
-    assert clims[0] == view._clims[1]
-    assert abs(clims[1] - view._lut_line._line.pos[0, 0]) <= EPSILON
-    assert abs(clims[0] - view._lut_line._line.pos[-1, 0]) <= EPSILON
-
-
-def test_gamma(stats: Stats, view: VispyHistogramCanvas) -> None:
+def test_gamma(view: VispyHistogramCanvas) -> None:
     # on startup, gamma should be 1
     assert 1 == view._gamma
-    gx, gy = (stats.minimum + stats.maximum) / 2, 0.5**view._gamma
-    assert abs(gx - view._gamma_handle_pos[0, 0]) <= EPSILON
-    assert abs(gy - view._gamma_handle_pos[0, 1]) <= EPSILON
     # set gamma, assert a change
     g = 2
     view.set_gamma(g)
@@ -140,7 +103,7 @@ def test_visibility(view: VispyHistogramCanvas) -> None:
     assert not view._gamma_handle.visible
 
 
-def test_domain(stats: Stats, view: VispyHistogramCanvas) -> None:
+def test_domain(view: VispyHistogramCanvas) -> None:
     def assert_extent(min_x: float, max_x: float) -> None:
         domain = view.plot.xaxis.axis.domain
         assert abs(min_x - domain[0]) <= PLOT_EPSILON
@@ -169,7 +132,7 @@ def test_domain(stats: Stats, view: VispyHistogramCanvas) -> None:
     assert_extent(10, 12)
 
 
-def test_range(stats: Stats, view: VispyHistogramCanvas) -> None:
+def test_range(view: VispyHistogramCanvas) -> None:
     # FIXME: Why do we need a larger epsilon?
     _EPSILON = 1e-4
 

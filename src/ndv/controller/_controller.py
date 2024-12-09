@@ -236,11 +236,9 @@ class ViewerController:
                 # self._canvas.set_range()
             else:
                 lut_ctrl.update_texture_data(data)
-
-                maxval = np.iinfo(data.dtype).max
-                counts = np.bincount(data.flatten(), minlength=maxval + 1)
-                bin_edges = np.arange(maxval + 2) - 0.5
-                # print zeros
+                # TODO: once data comes in in chunks, we'll need a proper stateful
+                # stats object that calculates the histogram incrementally
+                counts, bin_edges = _calc_hist_bins(data)
                 self._histogram.set_data(counts, bin_edges)
                 # self._histogram.set_range()
 
@@ -261,3 +259,10 @@ class ViewerController:
     def show(self) -> None:
         """Show the viewer."""
         self._view.show()
+
+
+def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    maxval = np.iinfo(data.dtype).max
+    counts = np.bincount(data.flatten(), minlength=maxval + 1)
+    bin_edges = np.arange(maxval + 2) - 0.5
+    return counts, bin_edges
