@@ -12,6 +12,7 @@ from qtpy.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QPushButton,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -28,12 +29,10 @@ from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey, MouseMoveEvent
 from ndv.models._array_display_model import ChannelMode
-from ndv.views.protocols import CursorType
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
-    from ndv.views.protocols import PHistogramCanvas
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -261,7 +260,12 @@ class QtViewerView(QWidget):
     mouseMoved = Signal(MouseMoveEvent)
     channelModeChanged = Signal(ChannelMode)
 
-    def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
+    def __init__(
+        self,
+        canvas_widget: QWidget,
+        histogram_widget: QWidget,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
 
         self._qcanvas = canvas_widget
@@ -311,15 +315,31 @@ class QtViewerView(QWidget):
         info.addWidget(self._data_info_label)
         info_widget.setFixedHeight(16)
 
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setSpacing(2)
+        left_layout.setContentsMargins(6, 6, 6, 2)
+        left_layout.addWidget(info_widget)
+        left_layout.addWidget(self._qcanvas, 1)
+        left_layout.addWidget(self._hover_info_label)
+        left_layout.addWidget(self._dims_sliders)
+        left_layout.addWidget(self._luts)
+        left_layout.addLayout(self._btns)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setSpacing(2)
+        right_layout.setContentsMargins(6, 2, 6, 6)
+        right_layout.addWidget(histogram_widget)
+
+        splitter = QSplitter(Qt.Orientation.Vertical, self)
+        splitter.addWidget(left)
+        splitter.addWidget(right)
+        splitter.setSizes([600, 100])
+
         layout = QVBoxLayout(self)
-        layout.setSpacing(2)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.addWidget(info_widget)
-        layout.addWidget(self._qcanvas, 1)
-        layout.addWidget(self._hover_info_label)
-        layout.addWidget(self._dims_sliders)
-        layout.addWidget(self._luts)
-        layout.addLayout(self._btns)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(splitter)
 
     def add_lut_view(self) -> QLUTWidget:
         wdg = QLUTWidget(self)
@@ -385,98 +405,3 @@ class QtViewerView(QWidget):
         # if ev.type() == QEvent.Type.MouseButtonRelease:
         #     ...
         return False
-
-
-class QtHistogramView(QWidget):
-    """A 'frontend' Qt wrapper around a 'backend' PHistogramView.
-
-    Parameters
-    ----------
-    backend_widget: PHistogramView
-        If a widget, set as the parent of this widget
-    parent: QWidget | None
-        If a widget, set as the parent of this widget
-    """
-
-    def __init__(self, backend_widget: PHistogramCanvas, parent: QWidget | None = None):
-        super().__init__(parent)
-        self._backend = backend_widget
-        self._qwdg = cast(QWidget, self._backend.widget())
-        self._qwdg.installEventFilter(self)
-        self._pressed: bool = False
-
-        # Log box
-        self._log = QPushButton("Logarithmic")
-        self._log.setToolTip("Toggle logarithmic (base-10) range scaling")
-        self._log.setCheckable(True)
-        self._log.toggled.connect(self._backend.set_range_log)
-
-        # button to reset the zoom of the canvas
-        # TODO: unify icons across all the view frontends in a new file
-        set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
-        self._set_range_btn = QPushButton(set_range_icon, "", self)
-        self._set_range_btn.setToolTip("Reset Pan/Zoom")
-        self._set_range_btn.clicked.connect(self._resetZoom)
-
-        self._btns = btns = QHBoxLayout()
-        btns.setContentsMargins(0, 0, 0, 0)
-        btns.setSpacing(0)
-        btns.addStretch()
-        btns.addWidget(self._log)
-        btns.addWidget(self._set_range_btn)
-
-        # Layout
-        self._layout = QVBoxLayout(self)
-        self._layout.addWidget(self._qwdg)
-        self._layout.addLayout(self._btns)
-
-    def refresh(self) -> None:
-        self._backend.refresh()
-
-    # -- Private helpers -- #
-
-    def _resetZoom(self) -> None:
-        self._backend.set_domain(None)
-        self._backend.set_range(None)
-
-    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
-        """Event filter installed on the canvas to handle mouse events."""
-        if event is None:
-            return False  # pragma: no cover
-
-        # here is where we get a chance to intercept mouse events before allowing the
-        # canvas to respond to them.
-        # Return `True` to prevent the event from being passed to the canvas.
-        intercept = False
-        # use children in case backend has a subwidget stealing events.
-        if obj is self._qwdg or obj in (self._qwdg.children()):
-            if isinstance(event, QMouseEvent):
-                intercept |= self._canvas_mouse_event(event)
-            if event.type() == QEvent.Type.KeyPress:
-                self.keyPressEvent(cast("QKeyEvent", event))
-        return intercept
-
-    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
-        pos = (ev.pos().x(), ev.pos().y())
-        intercepted = False
-        if ev.type() == QEvent.Type.MouseButtonPress:
-            intercepted |= self._backend.on_mouse_press(pos)
-            self._pressed = True
-        if ev.type() == QEvent.Type.MouseMove:
-            intercepted |= self._backend.on_mouse_move(pos)
-            if not self._pressed:
-                self._set_cursor(self._backend.get_cursor(pos))
-        if ev.type() == QEvent.Type.MouseButtonRelease:
-            intercepted |= self._backend.on_mouse_release(pos)
-            self._pressed = False
-        return intercepted
-
-    def _set_cursor(self, type: CursorType) -> None:
-        if type is CursorType.V_ARROW:
-            self._qwdg.setCursor(Qt.CursorShape.SplitVCursor)
-        elif type is CursorType.H_ARROW:
-            self._qwdg.setCursor(Qt.CursorShape.SplitHCursor)
-        elif type is CursorType.ALL_ARROW:
-            self._qwdg.setCursor(Qt.CursorShape.SizeAllCursor)
-        else:
-            self._qwdg.unsetCursor()
