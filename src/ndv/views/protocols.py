@@ -212,10 +212,10 @@ class CursorType(Enum):
         from qtpy.QtCore import Qt
 
         return {
-            CursorType.DEFAULT: Qt.ArrowCursor,
-            CursorType.V_ARROW: Qt.SizeVerCursor,
-            CursorType.H_ARROW: Qt.SizeHorCursor,
-            CursorType.ALL_ARROW: Qt.SizeAllCursor,
-            CursorType.BDIAG_ARROW: Qt.SizeBDiagCursor,
-            CursorType.FDIAG_ARROW: Qt.SizeFDiagCursor,
+            CursorType.DEFAULT: Qt.CursorShape.ArrowCursor,
+            CursorType.V_ARROW: Qt.CursorShape.SizeVerCursor,
+            CursorType.H_ARROW: Qt.CursorShape.SizeHorCursor,
+            CursorType.ALL_ARROW: Qt.CursorShape.SizeAllCursor,
+            CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
+            CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
         }[self]
