@@ -430,7 +430,7 @@ class PyGFXViewerCanvas(PCanvas):
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
 
-    def qwidget(self) -> QWidget:
+    def frontend_widget(self) -> QWidget:
         return cast("QWidget", self._canvas)
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:

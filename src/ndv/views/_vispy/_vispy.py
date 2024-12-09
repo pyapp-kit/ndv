@@ -479,7 +479,7 @@ class VispyViewerCanvas(PCanvas):
             cam.set_state(state)
         self._view.camera = cam
 
-    def qwidget(self) -> QWidget:
+    def frontend_widget(self) -> QWidget:
         return cast("QWidget", self._canvas.native)
 
     def refresh(self) -> None:

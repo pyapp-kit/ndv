@@ -10,6 +10,7 @@ from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import (
     get_canvas_class,
+    get_histogram_canvas_class,
     get_view_frontend_class,
 )
 
@@ -42,13 +43,14 @@ class ViewerController:
         # get and create the front-end and canvas classes
         frontend_cls = get_view_frontend_class()
         canvas_cls = get_canvas_class()
+        histogram_cls = get_histogram_canvas_class()  # TODO: catch exceptions
+        self._histogram = histogram_cls()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
 
-        from ndv.views._vispy._histogram import VispyHistogramCanvas
-
-        self._histogram = VispyHistogramCanvas()
-        self._view = frontend_cls(self._canvas.qwidget(), self._histogram.widget())
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._histogram.frontend_widget()
+        )
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()

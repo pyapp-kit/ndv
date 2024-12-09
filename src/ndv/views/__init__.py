@@ -56,19 +56,13 @@ def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
 
 
 def get_histogram_canvas_class(backend: str | None = None) -> type[PHistogramCanvas]:
-    backend = backend or os.getenv("NDV_CANVAS_BACKEND", None)
-    if backend == "vispy" or (backend is None and "vispy" in sys.modules):
+    _backend = _determine_canvas_backend(backend)
+    if _backend == "vispy":
         from ndv.views._vispy._histogram import VispyHistogramCanvas
 
         return VispyHistogramCanvas
 
-    if backend is None:
-        if importlib.util.find_spec("vispy") is not None:
-            from ndv.views._vispy._histogram import VispyHistogramCanvas
-
-            return VispyHistogramCanvas
-
-    raise RuntimeError("No histogram backend found")
+    raise RuntimeError(f"Histogram not supported for backend: {backend}")
 
 
 def _is_running_in_notebook() -> bool:

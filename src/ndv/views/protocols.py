@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     import cmap
     import numpy as np
     from qtpy.QtCore import Qt
-    from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
     from ndv.models._array_display_model import ChannelMode
@@ -125,11 +124,10 @@ class PHistogramCanvas(PLutView, Protocol):
     # TODO: Remove?
     def refresh(self) -> None: ...
 
-    def widget(self) -> Any:
+    def frontend_widget(self) -> Any:
         """Returns an object understood by the widget frontend."""
-        ...
 
-    def set_domain(self, bounds: tuple[float, float] | None) -> None:
+    def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
         """Sets the domain of the view.
 
         TODO: What is the "extent of the data"? Is it the bounds of the
@@ -142,7 +140,7 @@ class PHistogramCanvas(PLutView, Protocol):
             values. If None, sets them to the extent of the data instead.
         """
 
-    def set_range(self, bounds: tuple[float, float] | None) -> None:
+    def set_range(self, bounds: tuple[float, float] | None = None) -> None:
         """Sets the range of the view.
 
         Properties
@@ -171,6 +169,17 @@ class PHistogramCanvas(PLutView, Protocol):
         enabled : bool
             If true, the range will be displayed with a logarithmic (base 10)
             scale. If false, the range will be displayed with a linear scale.
+        """
+
+    def set_data(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
+        """Sets the histogram data.
+
+        Properties
+        ----------
+        values : np.ndarray
+            The histogram values.
+        bin_edges : np.ndarray
+            The bin edges of the histogram.
         """
 
 
@@ -243,7 +252,12 @@ class PView(Protocol):
     mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
     channelModeChanged: PSignal
 
-    def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
+    def __init__(
+        self,
+        canvas_widget: Any,
+        histogram_widget: Any,
+        **kwargs: Any,
+    ) -> None: ...
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     def current_index(self) -> Mapping[AxisKey, int | slice]: ...
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
@@ -289,7 +303,7 @@ class PCanvas(Protocol):
         margin: float = ...,
     ) -> None: ...
     def refresh(self) -> None: ...
-    def qwidget(self) -> QWidget: ...
+    def frontend_widget(self) -> Any: ...
     def add_image(
         self,
         data: np.ndarray | None = ...,

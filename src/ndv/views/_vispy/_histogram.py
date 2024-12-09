@@ -188,7 +188,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
             self._update_lut_lines()
             self._resize()
 
-    def widget(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self._canvas.native
 
     # ------------- Private methods ------------- #
