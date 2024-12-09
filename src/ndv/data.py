@@ -63,7 +63,12 @@ def cells3d() -> np.ndarray:
         ) from e
 
     url = "https://gitlab.com/scikit-image/data/-/raw/2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba/cells3d.tif"
-    return volread(url)  # type: ignore [no-any-return]
+    data = np.asarray(volread(url), copy=False)
+
+    # this data has been stretched to 16 bit, and lacks certain intensity values
+    # add a small random integer to each pixel ... so the histogram is not silly
+    data = (data + np.random.randint(-24, 24, data.shape)).astype(np.uint16)
+    return data
 
 
 def cosem_dataset(
