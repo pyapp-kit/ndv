@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import Callable
 
-    from qtpy.QtWidgets import QWidget
-
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
@@ -478,8 +476,8 @@ class VispyViewerCanvas(PCanvas):
             cam.set_state(state)
         self._view.camera = cam
 
-    def qwidget(self) -> QWidget:
-        return cast("QWidget", self._canvas.native)
+    def frontend_widget(self) -> Any:
+        return self._canvas.native
 
     def refresh(self) -> None:
         self._canvas.update()

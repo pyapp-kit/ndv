@@ -11,5 +11,6 @@ __email__ = "talley.lambert@example.com"
 
 from . import data
 from .util import imshow
+from .views import run_app
 
-__all__ = ["DataWrapper", "NDViewer", "data", "imshow"]
+__all__ = ["DataWrapper", "NDViewer", "data", "imshow", "run_app"]

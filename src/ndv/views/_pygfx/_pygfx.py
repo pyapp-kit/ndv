@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
-    from qtpy.QtWidgets import QWidget
 
     from ndv.views.protocols import CanvasElement
 
@@ -430,8 +429,8 @@ class PyGFXViewerCanvas(PCanvas):
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
 
-    def qwidget(self) -> QWidget:
-        return cast("QWidget", self._canvas)
+    def frontend_widget(self) -> Any:
+        return self._canvas
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:
         """Set the number of dimensions of the displayed data."""

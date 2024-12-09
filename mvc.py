@@ -1,14 +1,14 @@
 """Example usage of new mvc pattern."""
 
-from qtpy.QtWidgets import QApplication
+# from qtpy.QtWidgets import QApplication
 
-from ndv import data
+from ndv import data, run_app
 from ndv.controller import ViewerController
 
 # TODO: we don't actually need to import/start a qapp anymore
 # this can all be done in get_view_frontend_class
 # but then we need a way to execute the app.exec() call
-app = QApplication([])
+# app = QApplication([])
 
 viewer = ViewerController()  # ultimately, this will be the public api
 
@@ -20,4 +20,5 @@ viewer.data = _data
 viewer.show()
 viewer.model.current_index.update({0: 32})
 viewer.model.channel_mode = "composite"
-app.exec()
+# app.exec()
+run_app()
