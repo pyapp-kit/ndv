@@ -4,6 +4,8 @@ from contextlib import suppress
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     import cmap
     import numpy as np
 
@@ -22,55 +24,72 @@ class ChannelController:
     that displays the data, all for a single "channel" extracted from the data.
     """
 
-    def __init__(self, key: LutKey, view: PLutView, model: LUTModel) -> None:
+    def __init__(self, key: LutKey, model: LUTModel, views: Sequence[PLutView]) -> None:
         self.key = key
-        self.lut_view = view
+        self.lut_views: list[PLutView] = []
         self.lut_model = model
         self.handles: list[PImageHandle] = []
 
-        # setup the initial state of the LUT view
-        self._update_view_from_model()
-
-        # connect view changes to controller callbacks that update the model
-        self.lut_view.visibleChanged.connect(self._on_view_lut_visible_changed)
-        self.lut_view.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
-        self.lut_view.cmapChanged.connect(self._on_view_lut_cmap_changed)
-        self.lut_view.climsChanged.connect(self._on_view_lut_clims_changed)
+        for v in views:
+            self.add_lut_view(v)
 
         # connect model changes to view callbacks that update the view
         self.lut_model.events.cmap.connect(self._on_model_cmap_changed)
         self.lut_model.events.clims.connect(self._on_model_clims_changed)
-        self.lut_model.events.autoscale.connect(view.set_auto_scale)
+        self.lut_model.events.autoscale.connect(self._on_model_autoscale_changed)
         self.lut_model.events.visible.connect(self._on_model_visible_changed)
+
+    def add_lut_view(self, view: PLutView) -> None:
+        """Add a LUT view to the controller."""
+        self.lut_views.append(view)
+        # connect view changes to controller callbacks that update the model
+        view.visibleChanged.connect(self._on_view_lut_visible_changed)
+        view.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
+        view.cmapChanged.connect(self._on_view_lut_cmap_changed)
+        view.climsChanged.connect(self._on_view_lut_clims_changed)
+        self._update_view_from_model()
 
     def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
         """The contrast limits in the model have changed."""
-        self.lut_view.set_clims(clims)
+        for v in self.lut_views:
+            v.set_clims(clims)
         for handle in self.handles:
             handle.clim = clims
 
+    def _on_model_autoscale_changed(self, autoscale: bool) -> None:
+        """The autoscale setting in the model has changed."""
+        for view in self.lut_views:
+            view.set_auto_scale(autoscale)
+        if autoscale:
+            for handle in self.handles:
+                handle.clim = (handle.data.min(), handle.data.max())
+
     def _on_model_cmap_changed(self, cmap: cmap.Colormap) -> None:
         """The colormap in the model has changed."""
-        self.lut_view.set_colormap(cmap)
+        for view in self.lut_views:
+            view.set_colormap(cmap)
         for handle in self.handles:
             handle.cmap = cmap
 
     def _on_model_visible_changed(self, visible: bool) -> None:
         """The visibility in the model has changed."""
-        self.lut_view.set_lut_visible(visible)
+        for view in self.lut_views:
+            view.set_lut_visible(visible)
         for handle in self.handles:
             handle.visible = visible
 
-    def _update_view_from_model(self) -> None:
+    def _update_view_from_model(self, *views: PLutView) -> None:
         """Make sure the view matches the model."""
-        self.lut_view.set_colormap(self.lut_model.cmap)
-        if self.lut_model.clims:
-            self.lut_view.set_clims(self.lut_model.clims)
-        # TODO: handle more complex autoscale types
-        self.lut_view.set_auto_scale(bool(self.lut_model.autoscale))
-        self.lut_view.set_lut_visible(True)
-        name = str(self.key) if self.key is not None else ""
-        self.lut_view.set_name(name)
+        _views: Iterable[PLutView] = views or self.lut_views
+        for view in _views:
+            view.set_colormap(self.lut_model.cmap)
+            if self.lut_model.clims:
+                view.set_clims(self.lut_model.clims)
+            # TODO: handle more complex autoscale types
+            view.set_auto_scale(bool(self.lut_model.autoscale))
+            view.set_lut_visible(True)
+            name = str(self.key) if self.key is not None else ""
+            view.set_name(name)
 
     def _on_view_lut_visible_changed(self, visible: bool, key: LutKey = None) -> None:
         """The visibility checkbox in the LUT widget has changed."""
@@ -82,7 +101,8 @@ class ChannelController:
     ) -> None:
         """The autoscale checkbox in the LUT widget has changed."""
         self.lut_model.autoscale = autoscale
-        self.lut_view.set_auto_scale(autoscale)
+        for view in self.lut_views:
+            view.set_auto_scale(autoscale)
 
         if autoscale:
             # TODO: or should we have a global min/max across all handles for this key?

@@ -27,11 +27,13 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
-from ndv._types import AxisKey, MouseMoveEvent
+from ndv._types import AxisKey, MouseMoveEvent, MousePressEvent
 from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
+
+    from ndv.views.protocols import CursorType
 
 
 SLIDER_STYLE = """
@@ -257,8 +259,11 @@ class _UpCollapsible(QCollapsible):
 class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
-    mouseMoved = Signal(MouseMoveEvent)
     channelModeChanged = Signal(ChannelMode)
+
+    mousePressed = Signal(MousePressEvent)
+    mouseMoved = Signal(MouseMoveEvent)
+    mouseReleased = Signal(MousePressEvent)
 
     def __init__(
         self,
@@ -269,11 +274,13 @@ class QtViewerView(QWidget):
         super().__init__(parent)
 
         self._qcanvas = canvas_widget
+        self._qhistogram = histogram_widget
         # TODO: this actually doesn't need to be in the QtViewerView at all
         # this could be patched at the level of the vispy/pygfx canvas
         # removing a need for the mouseMoved signal
         # Install an event filter so we can intercept mouse/key events
         self._qcanvas.installEventFilter(self)
+        self._qhistogram.installEventFilter(self)
 
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
@@ -389,19 +396,30 @@ class QtViewerView(QWidget):
         # Return `True` to prevent the event from being passed to the canvas.
         intercept = False
         # use children in case backend has a subwidget stealing events.
-        if obj is self._qcanvas or obj in (self._qcanvas.children()):
+
+        canvases: set[QObject] = {
+            *self._qcanvas.children(),
+            *self._qhistogram.children(),
+            self._qcanvas,
+            self._qhistogram,
+        }
+        if obj in canvases:
             if isinstance(event, QMouseEvent):
-                intercept |= self._canvas_mouse_event(event)
+                intercept |= self._canvas_mouse_event(obj, event)
             if event.type() == QEvent.Type.KeyPress:
                 self.keyPressEvent(cast("QKeyEvent", event))
+
         return intercept
 
-    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
-        # if ev.type() == QEvent.Type.MouseButtonPress:
-        # ...
+    def _canvas_mouse_event(self, obj: QObject, ev: QMouseEvent) -> bool:
+        pos = ev.pos()
+        if ev.type() == QEvent.Type.MouseButtonPress:
+            self.mousePressed.emit(MousePressEvent(x=pos.x(), y=pos.y()))
         if ev.type() == QEvent.Type.MouseMove:
-            pos = ev.pos()
             self.mouseMoved.emit(MouseMoveEvent(x=pos.x(), y=pos.y()))
-        # if ev.type() == QEvent.Type.MouseButtonRelease:
-        #     ...
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            self.mouseReleased.emit(MousePressEvent(x=pos.x(), y=pos.y()))
         return False
+
+    def set_cursor(self, cursor: CursorType) -> None:
+        self._qcanvas.setCursor(cursor.to_qt())

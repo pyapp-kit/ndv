@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
 
+from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
@@ -123,6 +125,9 @@ class PHistogramCanvas(PLutView, Protocol):
 
     # TODO: Remove?
     def refresh(self) -> None: ...
+    def on_mouse_press(self, event: MousePressEvent) -> bool: ...
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool: ...
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool: ...
 
     def frontend_widget(self) -> Any:
         """Returns an object understood by the widget frontend."""
@@ -250,6 +255,8 @@ class PView(Protocol):
     currentIndexChanged: PSignal
     resetZoomClicked: PSignal
     mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
+    mousePressed: PSignal  # Signal(_types.MousePressEvent)
+    mouseReleased: PSignal  # Signal(_types.MouseReleaseEvent)
     channelModeChanged: PSignal
 
     def __init__(

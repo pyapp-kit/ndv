@@ -59,6 +59,8 @@ class ViewerController:
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.mouseMoved.connect(self._on_view_mouse_moved)
+        self._view.mousePressed.connect(self._on_view_mouse_pressed)
+        self._view.mouseReleased.connect(self._on_view_mouse_released)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
@@ -147,7 +149,7 @@ class ViewerController:
         self._update_visible_sliders()
         show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
         for lut_ctrl in self._lut_controllers.values():
-            lut_ctrl.lut_view.setVisible(
+            lut_ctrl.lut_views.setVisible(
                 not show_channel_luts if lut_ctrl.key is None else show_channel_luts
             )
         # redraw
@@ -171,6 +173,8 @@ class ViewerController:
         """Reset the zoom level of the canvas."""
         self._canvas.set_range()
 
+    def _on_view_mouse_pressed(self, event: MouseMoveEvent) -> None: ...
+    def _on_view_mouse_released(self, event: MouseMoveEvent) -> None: ...
     def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
@@ -226,7 +230,9 @@ class ViewerController:
                     model = self.model.luts[key] = LUTModel()
 
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
-                    key=key, view=self._view.add_lut_view(), model=model
+                    key=key,
+                    model=model,
+                    views=[self._view.add_lut_view(), self._histogram],
                 )
 
             if not lut_ctrl.handles:

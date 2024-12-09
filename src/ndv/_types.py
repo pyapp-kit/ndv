@@ -48,3 +48,17 @@ class MouseMoveEvent(NamedTuple):
 
     x: float
     y: float
+
+
+class MousePressEvent(NamedTuple):
+    """Event emitted when the user clicks the mouse at a position."""
+
+    x: float
+    y: float
+
+
+class MouseReleaseEvent(NamedTuple):
+    """Event emitted when the user releases the mouse at a position."""
+
+    x: float
+    y: float

@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
+    from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+
 
 class Grabbable(Enum):
     NONE = auto()
@@ -274,7 +276,8 @@ class VispyHistogramCanvas(PHistogramCanvas):
             else:
                 return CursorType.DEFAULT
 
-    def on_mouse_press(self, pos: tuple[float, float]) -> bool:
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        pos = (event.x, event.y)
         if pos is None:
             return False  # pragma: no cover
         # check whether the user grabbed a node
@@ -284,13 +287,14 @@ class VispyHistogramCanvas(PHistogramCanvas):
             self.plot.camera.interactive = False
         return False
 
-    def on_mouse_release(self, pos: tuple[float, float]) -> bool:
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
         return False
 
-    def on_mouse_move(self, pos: tuple[float, float]) -> bool:
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         """Called whenever mouse moves over canvas."""
+        pos = (event.x, event.y)
         if pos is None:
             return False  # pragma: no cover
         if self._clims is None:
