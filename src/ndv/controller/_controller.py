@@ -18,9 +18,7 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import (
-        PView,
-    )
+    from ndv.views.protocols import PView
 
     LutKey: TypeAlias = int | None
 
