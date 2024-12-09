@@ -183,3 +183,6 @@ ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
 
 [tool.typos.default]
 extend-ignore-identifiers-re = ["(?i)nd2?.*", "(?i)ome", ".*ser_schema"]
+
+[tool.typos.files]
+extend-exclude = ["**/*.ipynb"]
