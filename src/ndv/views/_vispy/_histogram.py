@@ -8,6 +8,7 @@ import numpy as np
 from psygnal import Signal
 from vispy import scene
 
+from ndv.views._mouse_events import filter_mouse_events
 from ndv.views.protocols import CursorType, PHistogramCanvas
 
 from ._plot_widget import PlotWidget
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import numpy.typing as npt
+
+    from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
 
 class Grabbable(Enum):
@@ -56,6 +59,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
         # ------------ VisPy Canvas ------------ #
 
         self._canvas = scene.SceneCanvas()
+        self._disconnect_mouse_events = filter_mouse_events(self._canvas.native, self)
 
         ## -- Visuals -- ##
 
@@ -274,9 +278,8 @@ class VispyHistogramCanvas(PHistogramCanvas):
             else:
                 return CursorType.DEFAULT
 
-    def on_mouse_press(self, pos: tuple[float, float]) -> bool:
-        if pos is None:
-            return False  # pragma: no cover
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        pos = event.x, event.y
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(pos)
         if self._grabbed != Grabbable.NONE:
@@ -284,15 +287,14 @@ class VispyHistogramCanvas(PHistogramCanvas):
             self.plot.camera.interactive = False
         return False
 
-    def on_mouse_release(self, pos: tuple[float, float]) -> bool:
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
         return False
 
-    def on_mouse_move(self, pos: tuple[float, float]) -> bool:
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         """Called whenever mouse moves over canvas."""
-        if pos is None:
-            return False  # pragma: no cover
+        pos = event.x, event.y
         if self._clims is None:
             return False  # pragma: no cover
 

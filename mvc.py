@@ -10,5 +10,4 @@ img_data = data.cells3d()
 viewer.data = img_data
 viewer.show()
 viewer.model.current_index.update({0: 32})
-viewer.model.channel_mode = "composite"
 run_app()
