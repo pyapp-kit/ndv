@@ -14,13 +14,17 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views.protocols import CanvasElement, CursorType, PCanvas
+from ndv._types import MouseMoveEvent
+from ndv.views.protocols import CanvasElement, CursorType, PCanvas, Mouseable
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import Callable
+    import vispy.app
 
     from qtpy.QtWidgets import QWidget
+
+    from ndv._types import MousePressEvent, MouseReleaseEvent
 
 
 turn = np.sin(np.pi / 4)
@@ -445,6 +449,8 @@ class VispyViewerCanvas(PCanvas):
 
     def __init__(self) -> None:
         self._canvas = scene.SceneCanvas(size=(600, 600))
+        intercept_mouse_events(self._canvas, self)
+
         self._last_state: dict[Literal[2, 3], Any] = {}
 
         central_wdg: scene.Widget = self._canvas.central_widget
@@ -599,3 +605,44 @@ class VispyViewerCanvas(PCanvas):
             if (handle := self._elements.get(vis)) is not None:
                 elements.append(handle)
         return elements
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool: ...
+    def on_mouse_press(self, event: MousePressEvent) -> bool: ...
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool: ...
+
+
+def intercept_mouse_events(
+    scene_canvas: scene.SceneCanvas, receiver: Mouseable
+) -> None:
+    app = cast("vispy.app.Application", scene_canvas.app)
+    if "qt" in str(app.backend_name).lower():
+        from qtpy.QtCore import QEvent, QObject
+        from qtpy.QtGui import QMouseEvent
+
+        class Filter(QObject):
+            def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+                """Event filter installed on the canvas to handle mouse events."""
+                if event is None:
+                    return False  # pragma: no cover
+
+                # here is where we get a chance to intercept mouse events before allowing the
+                # canvas to respond to them.
+                # Return `True` to prevent the event from being passed to the canvas.
+                intercept = False
+                # use children in case backend has a subwidget stealing events.
+                if obj is scene_canvas or obj in (scene_canvas.children()):
+                    if isinstance(event, QMouseEvent):
+                        pos = event.pos()
+                        if event.type() == QEvent.Type.MouseMove:
+                            intercept |= receiver.on_mouse_move(
+                                MouseMoveEvent(x=pos.x(), y=pos.y())
+                            )
+                        elif event.type() == QEvent.Type.MouseButtonPress:
+                            intercept |= receiver.on_mouse_press(
+                                MousePressEvent(x=pos.x(), y=pos.y())
+                            )
+                        elif event.type() == QEvent.Type.MouseButtonRelease:
+                            intercept |= receiver.on_mouse_release(
+                                MouseReleaseEvent(x=pos.x(), y=pos.y())
+                            )
+                return intercept
