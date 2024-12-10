@@ -39,7 +39,7 @@ class ViewerController:
         canvas_cls = get_canvas_class()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
-        self._view = frontend_cls(self._canvas.qwidget())
+        self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
@@ -47,8 +47,9 @@ class ViewerController:
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
-        self._view.mouseMoved.connect(self._on_view_mouse_moved)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
+
+        self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -157,7 +158,7 @@ class ViewerController:
         """Reset the zoom level of the canvas."""
         self._canvas.set_range()
 
-    def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
+    def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
 
