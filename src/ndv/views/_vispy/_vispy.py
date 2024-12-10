@@ -304,7 +304,6 @@ class VispyImageHandle:
 
     @gamma.setter
     def gamma(self, gamma: float) -> None:
-        print("Setting gamma to", gamma)
         self._visual.gamma = gamma
 
     @property
