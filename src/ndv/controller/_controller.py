@@ -148,9 +148,10 @@ class ViewerController:
         self._update_visible_sliders()
         show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
         for lut_ctrl in self._lut_controllers.values():
-            lut_ctrl.lut_views.setVisible(
-                not show_channel_luts if lut_ctrl.key is None else show_channel_luts
-            )
+            for view in lut_ctrl.lut_views:
+                view.setVisible(
+                    not show_channel_luts if lut_ctrl.key is None else show_channel_luts
+                )
         # redraw
         self._clear_canvas()
         self._update_canvas()

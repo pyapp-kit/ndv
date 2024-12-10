@@ -38,6 +38,7 @@ class ChannelController:
         self.lut_model.events.clims.connect(self._on_model_clims_changed)
         self.lut_model.events.autoscale.connect(self._on_model_autoscale_changed)
         self.lut_model.events.visible.connect(self._on_model_visible_changed)
+        self.lut_model.events.gamma.connect(self._on_model_gamma_changed)
 
     def add_lut_view(self, view: PLutView) -> None:
         """Add a LUT view to the controller."""
@@ -47,6 +48,7 @@ class ChannelController:
         view.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
         view.cmapChanged.connect(self._on_view_lut_cmap_changed)
         view.climsChanged.connect(self._on_view_lut_clims_changed)
+        view.gammaChanged.connect(self._on_view_lut_gamma_changed)
         self._update_view_from_model()
 
     def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
@@ -55,6 +57,13 @@ class ChannelController:
             v.set_clims(clims)
         for handle in self.handles:
             handle.clim = clims
+
+    def _on_model_gamma_changed(self, gamma: float) -> None:
+        """The gamma value in the model has changed."""
+        for view in self.lut_views:
+            view.set_gamma(gamma)
+        for handle in self.handles:
+            handle.gamma = gamma
 
     def _on_model_autoscale_changed(self, autoscale: bool) -> None:
         """The autoscale setting in the model has changed."""
@@ -124,6 +133,10 @@ class ChannelController:
         self.lut_model.clims = clims
         # when the clims are manually adjusted in the view, we turn off autoscale
         self.lut_model.autoscale = False
+
+    def _on_view_lut_gamma_changed(self, gamma: float) -> None:
+        """The gamma slider in the LUT widget has changed."""
+        self.lut_model.gamma = gamma
 
     def update_texture_data(self, data: np.ndarray) -> None:
         """Update the data in the image handle."""

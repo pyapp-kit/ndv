@@ -89,6 +89,7 @@ class QLUTWidget(QWidget):
     autoscaleChanged = Signal(bool)
     cmapChanged = Signal(cmap.Colormap)
     climsChanged = Signal(tuple)
+    gammaChanged = Signal(float)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

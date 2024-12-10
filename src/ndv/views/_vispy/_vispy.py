@@ -247,7 +247,7 @@ class RectangularROI(scene.visuals.Rectangle):
 
 
 class VispyImageHandle:
-    def __init__(self, visual: scene.visuals.Image | scene.visuals.Volume) -> None:
+    def __init__(self, visual: scene.Image | scene.Volume) -> None:
         self._visual = visual
         self._ndim = 2 if isinstance(visual, scene.visuals.Image) else 3
 
@@ -297,6 +297,15 @@ class VispyImageHandle:
     def clim(self, clims: tuple[float, float]) -> None:
         with suppress(ZeroDivisionError):
             self._visual.clim = clims
+
+    @property
+    def gamma(self) -> float:
+        return self._visual.gamma  # type: ignore [no-any-return]
+
+    @gamma.setter
+    def gamma(self, gamma: float) -> None:
+        print("Setting gamma to", gamma)
+        self._visual.gamma = gamma
 
     @property
     def cmap(self) -> cmap.Colormap:
