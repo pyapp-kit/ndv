@@ -130,7 +130,6 @@ class PView(Protocol):
 
     currentIndexChanged: PSignal
     resetZoomClicked: PSignal
-    mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
     channelModeChanged: PSignal
 
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...

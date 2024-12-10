@@ -25,13 +25,14 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
-from ndv._types import AxisKey, MouseMoveEvent
 from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from qtpy.QtGui import QIcon
+
+    from ndv._types import AxisKey
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -253,7 +254,6 @@ class _UpCollapsible(QCollapsible):
 class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
-    mouseMoved = Signal(MouseMoveEvent)
     channelModeChanged = Signal(ChannelMode)
 
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
@@ -284,12 +284,13 @@ class QtViewerView(QWidget):
             expandedIcon=QIconifyIcon("bi:chevron-up", color="#888888"),
             collapsedIcon=QIconifyIcon("bi:chevron-down", color="#888888"),
         )
-        self._btns = self._luts.btn_row
+        self._btn_layout = self._luts.btn_row
+        self._btn_layout.setParent(None)
         self._luts.expand()
 
-        self._btns.addWidget(self._channel_mode_combo)
+        self._btn_layout.addWidget(self._channel_mode_combo)
         # self._btns.addWidget(self._ndims_btn)
-        self._btns.addWidget(self._set_range_btn)
+        self._btn_layout.addWidget(self._set_range_btn)
         # self._btns.addWidget(self._add_roi_btn)
 
         # above the canvas
@@ -308,7 +309,7 @@ class QtViewerView(QWidget):
         layout.addWidget(self._hover_info_label)
         layout.addWidget(self._dims_sliders)
         layout.addWidget(self._luts)
-        layout.addLayout(self._btns)
+        layout.addLayout(self._btn_layout)
 
     def add_lut_view(self) -> QLUTWidget:
         wdg = QLUTWidget(self)

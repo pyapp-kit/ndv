@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, cast
+from types import MethodType
+from typing import TYPE_CHECKING, Callable, cast
 
 import vispy.app
 from vispy import scene
@@ -10,7 +11,23 @@ if TYPE_CHECKING:
     from collections.abc import Container
 
 
-def intercept_mouse_events(scene_canvas: scene.SceneCanvas, receiver: Mouseable) -> Any:
+def filter_mouse_events(
+    scene_canvas: scene.SceneCanvas, receiver: Mouseable
+) -> Callable[[], None]:
+    """Intercept mouse events on `scene_canvas` and forward them to `receiver`.
+
+    Parameters
+    ----------
+    scene_canvas : scene.SceneCanvas
+        The vispy canvas to intercept mouse events from.
+    receiver : Mouseable
+        The object to forward mouse events to.
+
+    Returns
+    -------
+    Callable[[], None]
+        A function that can be called to remove the event filter.
+    """
     app = cast("vispy.app.Application", scene_canvas.app)
 
     if "qt" in str(app.backend_name).lower():
@@ -59,4 +76,35 @@ def intercept_mouse_events(scene_canvas: scene.SceneCanvas, receiver: Mouseable)
 
         f = Filter()
         native.installEventFilter(f)
-        return f
+        return lambda: native.removeEventFilter(f)
+
+    elif "jupyter" in str(app.backend_name).lower():
+        from vispy.app.backends._jupyter_rfb import CanvasBackend
+
+        if not isinstance((native := scene_canvas.native), CanvasBackend):
+            raise TypeError(f"Expected vispy canvas to be QObject, got {type(native)}")
+
+        # patch the handle_event from _jupyter_rfb.CanvasBackend
+        # to intercept various mouse events.
+        super_handle_event = native.handle_event
+
+        def handle_event(self: CanvasBackend, ev: dict) -> None:
+            etype = ev["event_type"]
+            if etype == "pointer_move":
+                mme = MouseMoveEvent(x=ev["x"], y=ev["y"])
+                receiver.on_mouse_move(mme)
+                receiver.mouseMoved.emit(mme)
+            elif etype == "pointer_down":
+                mpe = MousePressEvent(x=ev["x"], y=ev["y"])
+                receiver.on_mouse_press(mpe)
+                receiver.mousePressed.emit(mpe)
+            elif etype == "pointer_up":
+                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"])
+                receiver.on_mouse_release(mre)
+                receiver.mouseReleased.emit(mre)
+            super_handle_event(ev)
+
+        native.handle_event = MethodType(handle_event, native)
+        return lambda: setattr(native, "handle_event", super_handle_event)
+
+    raise NotImplementedError(f"Unsupported backend: {app.backend_name}")

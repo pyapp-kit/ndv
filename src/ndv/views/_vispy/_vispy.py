@@ -14,7 +14,7 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views._vispy._mouse_events import intercept_mouse_events
+from ndv.views._vispy._mouse_events import filter_mouse_events
 from ndv.views.protocols import CanvasElement, CursorType, PCanvas
 
 if TYPE_CHECKING:
@@ -450,7 +450,9 @@ class VispyViewerCanvas(PCanvas):
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
-        self._event_filter = intercept_mouse_events(self._canvas, self)
+        # the returned function can be called to remove the filter, (and it also
+        # closes on the event filter and keeps it in scope).
+        self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
         self._last_state: dict[Literal[2, 3], Any] = {}
 
