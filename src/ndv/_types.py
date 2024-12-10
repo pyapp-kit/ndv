@@ -2,6 +2,7 @@
 
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
+from enum import IntFlag, auto
 from typing import Annotated, Any, NamedTuple
 
 from pydantic import PlainSerializer, PlainValidator
@@ -43,8 +44,30 @@ AxisKey: TypeAlias = Annotated[
 ]
 
 
+class MouseButton(IntFlag):
+    LEFT = auto()
+    MIDDLE = auto()
+    RIGHT = auto()
+
+
 class MouseMoveEvent(NamedTuple):
     """Event emitted when the user moves the cursor."""
 
     x: float
     y: float
+
+
+class MousePressEvent(NamedTuple):
+    """Event emitted when mouse button is pressed."""
+
+    x: float
+    y: float
+    btn: MouseButton = MouseButton.LEFT
+
+
+class MouseReleaseEvent(NamedTuple):
+    """Event emitted when mouse button is released."""
+
+    x: float
+    y: float
+    btn: MouseButton = MouseButton.LEFT
