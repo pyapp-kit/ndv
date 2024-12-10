@@ -10,7 +10,7 @@ import numpy as np
 import pygfx
 import pylinalg as la
 
-from ndv.views._pygfx._mouse_events import filter_mouse_events
+from ndv.views._mouse_events import filter_mouse_events
 from ndv.views.protocols import CursorType, PCanvas
 
 if TYPE_CHECKING:

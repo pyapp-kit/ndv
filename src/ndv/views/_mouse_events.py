@@ -1,8 +1,5 @@
 from types import MethodType
-from typing import TYPE_CHECKING, Callable, cast
-
-import vispy.app
-from vispy import scene
+from typing import TYPE_CHECKING, Any, Callable
 
 from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 from ndv.views.protocols import Mouseable
@@ -11,15 +8,13 @@ if TYPE_CHECKING:
     from collections.abc import Container
 
 
-def filter_mouse_events(
-    scene_canvas: scene.SceneCanvas, receiver: Mouseable
-) -> Callable[[], None]:
+def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
     """Intercept mouse events on `scene_canvas` and forward them to `receiver`.
 
     Parameters
     ----------
-    scene_canvas : scene.SceneCanvas
-        The vispy canvas to intercept mouse events from.
+    canvas : Any
+        The front-end canvas widget to intercept mouse events from.
     receiver : Mouseable
         The object to forward mouse events to.
 
@@ -28,14 +23,15 @@ def filter_mouse_events(
     Callable[[], None]
         A function that can be called to remove the event filter.
     """
-    app = cast("vispy.app.Application", scene_canvas.app)
+    from ndv.views._app import GuiFrontend, gui_frontend
 
-    if "qt" in str(app.backend_name).lower():
+    frontend = gui_frontend()
+    if frontend == GuiFrontend.QT:
         from qtpy.QtCore import QEvent, QObject
         from qtpy.QtGui import QMouseEvent
 
-        if not isinstance((native := scene_canvas.native), QObject):
-            raise TypeError(f"Expected vispy canvas to be QObject, got {type(native)}")
+        if not isinstance(canvas, QObject):
+            raise TypeError(f"Expected vispy canvas to be QObject, got {type(canvas)}")
 
         class Filter(QObject):
             def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
@@ -50,13 +46,13 @@ def filter_mouse_events(
 
                 try:
                     # use children in case backend has a subwidget stealing events.
-                    children: Container = native.children()
+                    children: Container = canvas.children()
                 except RuntimeError:
                     # native is likely dead
                     return False
 
                 intercept = False
-                if obj is native or obj in children:
+                if obj is canvas or obj in children:
                     if isinstance(qevent, QMouseEvent):
                         pos = qevent.pos()
                         etype = qevent.type()
@@ -75,20 +71,20 @@ def filter_mouse_events(
                 return intercept
 
         f = Filter()
-        native.installEventFilter(f)
-        return lambda: native.removeEventFilter(f)
+        canvas.installEventFilter(f)
+        return lambda: canvas.removeEventFilter(f)
 
-    elif "jupyter" in str(app.backend_name).lower():
-        from vispy.app.backends._jupyter_rfb import CanvasBackend
+    elif frontend == GuiFrontend.JUPYTER:
+        from jupyter_rfb import RemoteFrameBuffer
 
-        if not isinstance((native := scene_canvas.native), CanvasBackend):
-            raise TypeError(f"Expected vispy canvas to be QObject, got {type(native)}")
+        if not isinstance(canvas, RemoteFrameBuffer):
+            raise TypeError(f"Expected vispy canvas to be QObject, got {type(canvas)}")
 
         # patch the handle_event from _jupyter_rfb.CanvasBackend
         # to intercept various mouse events.
-        super_handle_event = native.handle_event
+        super_handle_event = canvas.handle_event
 
-        def handle_event(self: CanvasBackend, ev: dict) -> None:
+        def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
             etype = ev["event_type"]
             if etype == "pointer_move":
                 mme = MouseMoveEvent(x=ev["x"], y=ev["y"])
@@ -104,7 +100,7 @@ def filter_mouse_events(
                 receiver.mouseReleased.emit(mre)
             super_handle_event(ev)
 
-        native.handle_event = MethodType(handle_event, native)
-        return lambda: setattr(native, "handle_event", super_handle_event)
+        canvas.handle_event = MethodType(handle_event, canvas)
+        return lambda: setattr(canvas, "handle_event", super_handle_event)
 
-    raise NotImplementedError(f"Unsupported backend: {app.backend_name}")
+    raise NotImplementedError(f"Unsupported frontend for mouse events: {frontend!r}")
