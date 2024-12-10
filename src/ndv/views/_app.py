@@ -32,47 +32,46 @@ class CanvasBackend(str, Enum):
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
 def get_view_frontend_class() -> type[PView]:
     frontend = gui_frontend()
-    if frontend == "jupyter":
-        from ._jupyter.jupyter_view import JupyterViewerView
-
-        return JupyterViewerView
-    if frontend == "qt":
+    if frontend == GuiFrontend.QT:
         from ._qt.qt_view import QtViewerView
 
         return QtViewerView
+
+    if frontend == GuiFrontend.JUPYTER:
+        from ._jupyter.jupyter_view import JupyterViewerView
+
+        return JupyterViewerView
 
     raise RuntimeError("No GUI frontend found")
 
 
 def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
     _backend = _determine_canvas_backend(backend)
-    _frontend = gui_frontend()
-    if _backend == "vispy":
+    if _backend == CanvasBackend.VISPY:
         from vispy.app import use_app
 
         from ndv.views._vispy._vispy import VispyViewerCanvas
 
-        if _frontend == "jupyter":
+        if gui_frontend() == GuiFrontend.JUPYTER:
             use_app("jupyter_rfb")
 
         return VispyViewerCanvas
 
-    if _backend == "pygfx":
+    if _backend == CanvasBackend.PYGFX:
         from ndv.views._pygfx._pygfx import PyGFXViewerCanvas
 
         return PyGFXViewerCanvas
 
-    raise RuntimeError("No canvas backend found")
+    raise RuntimeError(f"No canvas backend found for {_backend}")
 
 
 def get_histogram_canvas_class(backend: str | None = None) -> type[PHistogramCanvas]:
     _backend = _determine_canvas_backend(backend)
-    if _backend == "vispy":
+    if _backend == CanvasBackend.VISPY:
         from ndv.views._vispy._histogram import VispyHistogramCanvas
 
         return VispyHistogramCanvas
-
-    raise RuntimeError(f"Histogram not supported for backend: {backend}")
+    raise RuntimeError(f"Histogram not supported for backend: {_backend}")
 
 
 def _is_running_in_notebook() -> bool:
@@ -150,7 +149,7 @@ def _determine_canvas_backend(requested: str | None) -> CanvasBackend:
 def run_app() -> None:
     """Start the GUI application event loop."""
     frontend = gui_frontend()
-    if frontend == "qt":
+    if frontend == GuiFrontend.QT:
         from qtpy.QtWidgets import QApplication
 
         _try_start_qapp()
@@ -159,5 +158,5 @@ def run_app() -> None:
                 f"Got unexpected application type: {type(_APP_INSTANCE)}"
             )
         _APP_INSTANCE.exec()
-    elif frontend == "jupyter":
+    elif frontend == GuiFrontend.JUPYTER:
         pass  # nothing to do here
