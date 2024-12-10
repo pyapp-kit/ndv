@@ -309,7 +309,8 @@ class VispyHistogramCanvas(PHistogramCanvas):
                 newlims = (self._clims[0], max(self._clims[0], c))
             self.climsChanged.emit(newlims)
             return False
-        elif self._grabbed is Grabbable.GAMMA:
+
+        if self._grabbed is Grabbable.GAMMA:
             y0, y1 = (
                 self.plot.xaxis.axis.domain
                 if self._vertical
@@ -321,6 +322,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
             self.gammaChanged.emit(-np.log2(y / y1))
             return False
 
+        self.get_cursor(pos).apply_to(self.frontend_widget())
         return False
 
     def _find_nearby_node(

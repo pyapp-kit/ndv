@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union, cast
 
 from psygnal import Signal
 
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import cmap
     import numpy as np
     from qtpy.QtCore import Qt
+    from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
     from ndv.models._array_display_model import ChannelMode
@@ -355,6 +356,11 @@ class CursorType(Enum):
     ALL_ARROW = "all_arrow"
     BDIAG_ARROW = "bdiag_arrow"
     FDIAG_ARROW = "fdiag_arrow"
+
+    def apply_to(self, widget: Any) -> None:
+        """Applies the cursor type to the given widget."""
+        if hasattr(widget, "setCursor"):
+            cast("QWidget", widget).setCursor(self.to_qt())
 
     def to_qt(self) -> Qt.CursorShape:
         """Converts CursorType to Qt.CursorShape."""
