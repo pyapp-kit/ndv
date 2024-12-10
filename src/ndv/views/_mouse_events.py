@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 from types import MethodType
 from typing import TYPE_CHECKING, Any, Callable
 
 from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
-from ndv.views.protocols import Mouseable
 
 if TYPE_CHECKING:
     from collections.abc import Container
+
+    from ndv.views.protocols import Mouseable
 
 
 def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
