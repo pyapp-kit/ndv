@@ -4,8 +4,7 @@ import warnings
 from typing import TYPE_CHECKING, cast
 
 import cmap
-from qtpy.QtCore import QEvent, QObject, Qt, Signal
-from qtpy.QtGui import QIcon, QKeyEvent, QMouseEvent
+from qtpy.QtCore import Qt, Signal
 from qtpy.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -31,6 +30,8 @@ from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
+
+    from qtpy.QtGui import QIcon
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -259,12 +260,6 @@ class QtViewerView(QWidget):
         super().__init__(parent)
 
         self._qcanvas = canvas_widget
-        # TODO: this actually doesn't need to be in the QtViewerView at all
-        # this could be patched at the level of the vispy/pygfx canvas
-        # removing a need for the mouseMoved signal
-        # Install an event filter so we can intercept mouse/key events
-        self._qcanvas.installEventFilter(self)
-
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
 
@@ -352,30 +347,3 @@ class QtViewerView(QWidget):
     def set_channel_mode(self, mode: ChannelMode) -> None:
         """Set the channel mode button text."""
         self._channel_mode_combo.setCurrentEnum(mode)
-
-    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
-        """Event filter installed on the canvas to handle mouse events."""
-        if event is None:
-            return False  # pragma: no cover
-
-        # here is where we get a chance to intercept mouse events before allowing the
-        # canvas to respond to them.
-        # Return `True` to prevent the event from being passed to the canvas.
-        intercept = False
-        # use children in case backend has a subwidget stealing events.
-        if obj is self._qcanvas or obj in (self._qcanvas.children()):
-            if isinstance(event, QMouseEvent):
-                intercept |= self._canvas_mouse_event(event)
-            if event.type() == QEvent.Type.KeyPress:
-                self.keyPressEvent(cast("QKeyEvent", event))
-        return intercept
-
-    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
-        # if ev.type() == QEvent.Type.MouseButtonPress:
-        # ...
-        if ev.type() == QEvent.Type.MouseMove:
-            pos = ev.pos()
-            self.mouseMoved.emit(MouseMoveEvent(x=pos.x(), y=pos.y()))
-        # if ev.type() == QEvent.Type.MouseButtonRelease:
-        #     ...
-        return False

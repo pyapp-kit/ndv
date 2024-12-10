@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
 
+from psygnal import Signal
+
 from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
 if TYPE_CHECKING:
@@ -166,10 +168,22 @@ class PRoiHandle(CanvasElement, Protocol):
     def border_color(self, color: cmap.Color) -> None: ...
 
 
+# TODO: it's becoming confusing whether these are meant to be protocols or bases
+
+
 class Mouseable(Protocol):
-    def on_mouse_move(self, event: MouseMoveEvent) -> bool: ...
-    def on_mouse_press(self, event: MousePressEvent) -> bool: ...
-    def on_mouse_release(self, event: MouseReleaseEvent) -> bool: ...
+    mouseMoved: PSignal = Signal(MouseMoveEvent)
+    mousePressed: PSignal = Signal(MousePressEvent)
+    mouseReleased: PSignal = Signal(MouseReleaseEvent)
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        return False
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        return False
 
 
 class PCanvas(Mouseable, Protocol):
