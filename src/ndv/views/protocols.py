@@ -4,6 +4,8 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
 
+from psygnal import Signal
+
 from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
 if TYPE_CHECKING:
@@ -120,74 +122,6 @@ class PLutView(Protocol):
         """Sets the visibility of the view/widget itself."""
 
 
-class PHistogramCanvas(PLutView, Protocol):
-    """A histogram-based view for LookUp Table (LUT) adjustment."""
-
-    # TODO: Remove?
-    def refresh(self) -> None: ...
-    def on_mouse_press(self, event: MousePressEvent) -> bool: ...
-    def on_mouse_release(self, event: MouseReleaseEvent) -> bool: ...
-    def on_mouse_move(self, event: MouseMoveEvent) -> bool: ...
-
-    def frontend_widget(self) -> Any:
-        """Returns an object understood by the widget frontend."""
-
-    def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
-        """Sets the domain of the view.
-
-        TODO: What is the "extent of the data"? Is it the bounds of the
-        histogram, or the bounds of (clims + histogram)?
-
-        Properties
-        ----------
-        bounds : tuple[float, float] | None
-            If a tuple, sets the displayed extremes of the x axis to the passed
-            values. If None, sets them to the extent of the data instead.
-        """
-
-    def set_range(self, bounds: tuple[float, float] | None = None) -> None:
-        """Sets the range of the view.
-
-        Properties
-        ----------
-        bounds : tuple[float, float] | None
-            If a tuple, sets the displayed extremes of the y axis to the passed
-            values. If None, sets them to the extent of the data instead.
-        """
-
-    def set_vertical(self, vertical: bool) -> None:
-        """Sets the axis of the domain.
-
-        Properties
-        ----------
-        vertical : bool
-            If true, views the domain along the y axis and the range along the x
-            axis. If false, views the domain along the x axis and the range along
-            the y axis.
-        """
-
-    def set_range_log(self, enabled: bool) -> None:
-        """Sets the axis scale of the range.
-
-        Properties
-        ----------
-        enabled : bool
-            If true, the range will be displayed with a logarithmic (base 10)
-            scale. If false, the range will be displayed with a linear scale.
-        """
-
-    def set_data(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
-        """Sets the histogram data.
-
-        Properties
-        ----------
-        values : np.ndarray
-            The histogram values.
-        bin_edges : np.ndarray
-            The bin edges of the histogram.
-        """
-
-
 class CanvasElement(Protocol):
     """Protocol defining an interactive element on the Canvas."""
 
@@ -254,9 +188,6 @@ class PView(Protocol):
 
     currentIndexChanged: PSignal
     resetZoomClicked: PSignal
-    mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
-    mousePressed: PSignal  # Signal(_types.MousePressEvent)
-    mouseReleased: PSignal  # Signal(_types.MouseReleaseEvent)
     channelModeChanged: PSignal
 
     def __init__(
@@ -299,7 +230,25 @@ class PRoiHandle(CanvasElement, Protocol):
     def border_color(self, color: cmap.Color) -> None: ...
 
 
-class PCanvas(Protocol):
+# TODO: it's becoming confusing whether these are meant to be protocols or bases
+
+
+class Mouseable(Protocol):
+    mouseMoved: PSignal = Signal(MouseMoveEvent)
+    mousePressed: PSignal = Signal(MousePressEvent)
+    mouseReleased: PSignal = Signal(MouseReleaseEvent)
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        return False
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        return False
+
+
+class PCanvas(Mouseable, Protocol):
     def __init__(self) -> None: ...
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     def set_range(
@@ -332,6 +281,71 @@ class PCanvas(Protocol):
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
     ) -> PRoiHandle: ...
+
+
+class PHistogramCanvas(PLutView, Mouseable, Protocol):
+    """A histogram-based view for LookUp Table (LUT) adjustment."""
+
+    # TODO: Remove?
+    def refresh(self) -> None: ...
+
+    def frontend_widget(self) -> Any:
+        """Returns an object understood by the widget frontend."""
+
+    def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
+        """Sets the domain of the view.
+
+        TODO: What is the "extent of the data"? Is it the bounds of the
+        histogram, or the bounds of (clims + histogram)?
+
+        Properties
+        ----------
+        bounds : tuple[float, float] | None
+            If a tuple, sets the displayed extremes of the x axis to the passed
+            values. If None, sets them to the extent of the data instead.
+        """
+
+    def set_range(self, bounds: tuple[float, float] | None = None) -> None:
+        """Sets the range of the view.
+
+        Properties
+        ----------
+        bounds : tuple[float, float] | None
+            If a tuple, sets the displayed extremes of the y axis to the passed
+            values. If None, sets them to the extent of the data instead.
+        """
+
+    def set_vertical(self, vertical: bool) -> None:
+        """Sets the axis of the domain.
+
+        Properties
+        ----------
+        vertical : bool
+            If true, views the domain along the y axis and the range along the x
+            axis. If false, views the domain along the x axis and the range along
+            the y axis.
+        """
+
+    def set_range_log(self, enabled: bool) -> None:
+        """Sets the axis scale of the range.
+
+        Properties
+        ----------
+        enabled : bool
+            If true, the range will be displayed with a logarithmic (base 10)
+            scale. If false, the range will be displayed with a linear scale.
+        """
+
+    def set_data(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
+        """Sets the histogram data.
+
+        Properties
+        ----------
+        values : np.ndarray
+            The histogram values.
+        bin_edges : np.ndarray
+            The bin edges of the histogram.
+        """
 
 
 class CursorType(Enum):

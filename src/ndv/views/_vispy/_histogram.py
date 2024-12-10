@@ -8,6 +8,7 @@ import numpy as np
 from psygnal import Signal
 from vispy import scene
 
+from ndv.views._mouse_events import filter_mouse_events
 from ndv.views.protocols import CursorType, PHistogramCanvas
 
 from ._plot_widget import PlotWidget
@@ -58,6 +59,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
         # ------------ VisPy Canvas ------------ #
 
         self._canvas = scene.SceneCanvas()
+        self._disconnect_mouse_events = filter_mouse_events(self._canvas.native, self)
 
         ## -- Visuals -- ##
 
@@ -277,9 +279,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
                 return CursorType.DEFAULT
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
-        pos = (event.x, event.y)
-        if pos is None:
-            return False  # pragma: no cover
+        pos = event.x, event.y
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(pos)
         if self._grabbed != Grabbable.NONE:
@@ -294,9 +294,7 @@ class VispyHistogramCanvas(PHistogramCanvas):
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         """Called whenever mouse moves over canvas."""
-        pos = (event.x, event.y)
-        if pos is None:
-            return False  # pragma: no cover
+        pos = event.x, event.y
         if self._clims is None:
             return False  # pragma: no cover
 
