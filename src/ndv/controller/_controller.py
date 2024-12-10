@@ -39,7 +39,7 @@ class ViewerController:
         canvas_cls = get_canvas_class()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
-        self._view = frontend_cls(self._canvas.qwidget())
+        self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()

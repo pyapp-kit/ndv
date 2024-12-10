@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     import cmap
     import numpy as np
     from qtpy.QtCore import Qt
-    from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
     from ndv.models._array_display_model import ChannelMode
@@ -196,7 +195,7 @@ class PCanvas(Mouseable, Protocol):
         margin: float = ...,
     ) -> None: ...
     def refresh(self) -> None: ...
-    def qwidget(self) -> QWidget: ...
+    def frontend_widget(self) -> Any: ...
     def add_image(
         self,
         data: np.ndarray | None = ...,
