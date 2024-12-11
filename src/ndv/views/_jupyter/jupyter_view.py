@@ -26,6 +26,7 @@ class JupyterLutView:
     autoscaleChanged: PSignal = Signal(bool)
     cmapChanged: PSignal = Signal(cmap.Colormap)
     climsChanged: PSignal = Signal(tuple)
+    gammaChanged: PSignal = Signal(float)
 
     def __init__(self) -> None:
         # WIDGETS
@@ -107,6 +108,9 @@ class JupyterLutView:
         with self.visibleChanged.blocked():  # type: ignore [attr-defined]
             self._visible.value = visible
 
+    def set_gamma(self, gamma: float) -> None:
+        pass
+
     def setVisible(self, visible: bool) -> None:
         # show or hide the actual widget itself
         self.layout.layout.display = "flex" if visible else "none"
@@ -116,6 +120,7 @@ class JupyterLutView:
 class JupyterViewerView:
     currentIndexChanged: PSignal = Signal()
     resetZoomClicked: PSignal = Signal()
+    histogramRequested: PSignal = Signal()
     channelModeChanged: PSignal = Signal(ChannelMode)
 
     def __init__(
@@ -256,3 +261,10 @@ class JupyterViewerView:
     def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
+
+    def add_histogram(self, widget: Any) -> None:
+        """Add a histogram widget to the viewer."""
+        warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
+
+    def remove_histogram(self, widget: Any) -> None:
+        """Remove a histogram widget from the viewer."""

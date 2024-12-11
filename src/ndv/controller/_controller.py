@@ -2,18 +2,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from ndv.controller._channel_controller import ChannelController
 from ndv.models import DataDisplayModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
-from ndv.views import get_canvas_class, get_view_frontend_class
+from ndv.views import (
+    get_canvas_class,
+    get_histogram_canvas_class,
+    get_view_frontend_class,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PView
+    from ndv.views.protocols import PHistogramCanvas, PView
 
     LutKey: TypeAlias = int | None
 
@@ -39,6 +45,8 @@ class ViewerController:
         canvas_cls = get_canvas_class()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
+
+        self._histogram: PHistogramCanvas | None = None
         self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
@@ -47,6 +55,7 @@ class ViewerController:
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
+        self._view.histogramRequested.connect(self.add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
@@ -82,8 +91,28 @@ class ViewerController:
         """Set the data to be displayed."""
         self._dd_model.data = data
         self._fully_synchronize_view()
+        self._update_hist_domain_for_dtype(data.dtype)
 
     # -----------------------------------------------------------------------------
+
+    def add_histogram(self) -> None:
+        histogram_cls = get_histogram_canvas_class()  # will raise if not supported
+        self._histogram = histogram_cls()
+        self._view.add_histogram(self._histogram.frontend_widget())
+        for view in self._lut_controllers.values():
+            view.add_lut_view(self._histogram)
+
+        if self.data is not None:
+            self._update_hist_domain_for_dtype(self.data.dtype)
+
+    def _update_hist_domain_for_dtype(self, dtype: np.typing.DTypeLike) -> None:
+        if self._histogram is None:
+            return
+
+        dtype = np.dtype(dtype)
+        if dtype.kind in "iu":
+            iinfo = np.iinfo(dtype)
+            self._histogram.set_domain((iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -134,9 +163,10 @@ class ViewerController:
         self._update_visible_sliders()
         show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
         for lut_ctrl in self._lut_controllers.values():
-            lut_ctrl.lut_view.setVisible(
-                not show_channel_luts if lut_ctrl.key is None else show_channel_luts
-            )
+            for view in lut_ctrl.lut_views:
+                view.setVisible(
+                    not show_channel_luts if lut_ctrl.key is None else show_channel_luts
+                )
         # redraw
         self._clear_canvas()
         self._update_canvas()
@@ -212,16 +242,28 @@ class ViewerController:
                     # so we create a new LUT model for it
                     model = self.model.luts[key] = LUTModel()
 
+                lut_views = [self._view.add_lut_view()]
+                if self._histogram is not None:
+                    lut_views.append(self._histogram)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
-                    key=key, view=self._view.add_lut_view(), model=model
+                    key=key,
+                    model=model,
+                    views=lut_views,
                 )
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
                 lut_ctrl.add_handle(self._canvas.add_image(data))
-                # self._canvas.set_range()
             else:
                 lut_ctrl.update_texture_data(data)
+                if self._histogram is not None:
+                    # TODO: once data comes in in chunks, we'll need a proper stateful
+                    # stats object that calculates the histogram incrementally
+                    counts, bin_edges = _calc_hist_bins(data)
+                    # TODO: currently this is updating the histogram on *any*
+                    # channel index... so it doesn't work with composite mode
+                    self._histogram.set_data(counts, bin_edges)
+                    self._histogram.set_range()
 
         self._canvas.refresh()
 
@@ -240,3 +282,10 @@ class ViewerController:
     def show(self) -> None:
         """Show the viewer."""
         self._view.show()
+
+
+def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    maxval = np.iinfo(data.dtype).max
+    counts = np.bincount(data.flatten(), minlength=maxval + 1)
+    bin_edges = np.arange(maxval + 2) - 0.5
+    return counts, bin_edges
