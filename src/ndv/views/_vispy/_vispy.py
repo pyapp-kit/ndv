@@ -465,7 +465,7 @@ class VispyViewerCanvas(ArrayCanvas):
             cam.set_state(state)
         self._view.camera = cam
 
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self._canvas.native
 
     def set_visible(self, visible: bool) -> None: ...

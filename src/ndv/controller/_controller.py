@@ -47,7 +47,7 @@ class ViewerController:
         self._canvas.set_ndim(2)
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.native())
+        self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
@@ -98,7 +98,7 @@ class ViewerController:
     def add_histogram(self) -> None:
         histogram_cls = get_histogram_canvas_class()  # will raise if not supported
         self._histogram = histogram_cls()
-        self._view.add_histogram(self._histogram.native())
+        self._view.add_histogram(self._histogram.frontend_widget())
         for view in self._lut_controllers.values():
             view.add_lut_view(self._histogram)
             # FIXME: hack

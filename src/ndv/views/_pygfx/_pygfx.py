@@ -443,7 +443,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
         self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
 
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self._canvas
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:

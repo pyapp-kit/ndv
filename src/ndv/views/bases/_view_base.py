@@ -9,7 +9,7 @@ class Viewable(ABC):
     """
 
     @abstractmethod
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         """Return the native object backing the viewable objects."""
 
     @abstractmethod

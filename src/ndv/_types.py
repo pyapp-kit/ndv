@@ -91,7 +91,7 @@ class CursorType(Enum):
 
     def apply_to(self, widget: Viewable) -> None:
         """Applies the cursor type to the given widget."""
-        native = widget.native()
+        native = widget.frontend_widget()
         if hasattr(native, "setCursor"):
             cast("QWidget", native).setCursor(self.to_qt())
 

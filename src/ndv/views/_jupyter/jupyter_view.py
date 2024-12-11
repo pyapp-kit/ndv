@@ -101,7 +101,7 @@ class JupyterLutView(LutView):
         # show or hide the actual widget itself
         self.layout.layout.display = "flex" if visible else "none"
 
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self.layout
 
 
@@ -207,7 +207,7 @@ class JupyterArrayView(ArrayView):
         """Remove a LUT view from the viewer."""
         view = cast("JupyterLutView", view)
         self.layout.children = tuple(
-            wdg for wdg in self.layout.children if wdg != view.native()
+            wdg for wdg in self.layout.children if wdg != view.frontend_widget()
         )
 
     def set_data_info(self, data_info: str) -> None:
@@ -235,7 +235,7 @@ class JupyterArrayView(ArrayView):
     def remove_histogram(self, widget: Any) -> None:
         """Remove a histogram widget from the viewer."""
 
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self.layout
 
     def set_visible(self, visible: bool) -> None:

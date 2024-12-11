@@ -189,7 +189,7 @@ class NDViewer(QWidget):
         # the canvas that displays the images
         self._canvas: ArrayCanvas = get_canvas_class()()
         self._canvas.set_ndim(self._ndims)
-        self._qcanvas = self._canvas.native()
+        self._qcanvas = self._canvas.frontend_widget()
 
         # Install an event filter so we can intercept mouse/key events
         self._qcanvas.installEventFilter(self)
