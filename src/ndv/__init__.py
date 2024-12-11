@@ -16,7 +16,7 @@ from .util import imshow
 from .viewer._data_wrapper import DataWrapper
 from .viewer._viewer import NDViewer
 
-__all__ = ["NDViewer", "DataWrapper", "imshow", "data"]
+__all__ = ["DataWrapper", "NDViewer", "data", "imshow"]
 
 
 if TYPE_CHECKING:
