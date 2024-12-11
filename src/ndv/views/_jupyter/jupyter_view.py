@@ -105,7 +105,6 @@ class JupyterLutView(LutView):
         return self.layout
 
 
-# this is a PView
 class JupyterArrayView(ArrayView):
     def __init__(
         self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
@@ -211,18 +210,6 @@ class JupyterArrayView(ArrayView):
             wdg for wdg in self.layout.children if wdg != view.native()
         )
 
-    def show(self) -> None:
-        """Show the viewer."""
-        from IPython.display import display
-
-        display(self.layout)  # type: ignore [no-untyped-call]
-
-    def hide(self) -> None:
-        """Hide the viewer."""
-        from IPython.display import clear_output
-
-        clear_output()  # type: ignore [no-untyped-call]
-
     def set_data_info(self, data_info: str) -> None:
         self._data_info_label.value = data_info
 
@@ -247,3 +234,15 @@ class JupyterArrayView(ArrayView):
 
     def remove_histogram(self, widget: Any) -> None:
         """Remove a histogram widget from the viewer."""
+
+    def native(self) -> Any:
+        return self.layout
+
+    def set_visible(self, visible: bool) -> None:
+        # show or hide the actual widget itself
+        from IPython import display
+
+        if visible:
+            display.display(self.layout)  # type: ignore [no-untyped-call]
+        else:
+            display.clear_output()  # ype: ignore [no-untyped-call]
