@@ -346,7 +346,8 @@ class NDViewer(QWidget):
         # Remove the old ROI
         if self._roi:
             self._roi.remove()
-
+        color = cmap.Color(color) if color is not None else None
+        border_color = cmap.Color(border_color) if border_color is not None else None
         self._roi = self._canvas.add_roi(
             vertices=vertices, color=color, border_color=border_color
         )

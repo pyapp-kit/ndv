@@ -34,9 +34,9 @@ class CanvasBackend(str, Enum):
 def get_view_frontend_class() -> type[ArrayView]:
     frontend = gui_frontend()
     if frontend == GuiFrontend.QT:
-        from ._qt.qt_view import QArrayView
+        from ._qt.qt_view import QtArrayView
 
-        return QArrayView
+        return QtArrayView
 
     if frontend == GuiFrontend.JUPYTER:
         from ._jupyter.jupyter_view import JupyterArrayView

@@ -533,8 +533,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._scene.add(handle)
         if vertices:
             handle.vertices = vertices
-        handle.color = color
-        handle.border_color = border_color
+        handle.set_color(color)
+        handle.set_border_color(border_color)
 
         self._elements[handle] = handle
         return handle

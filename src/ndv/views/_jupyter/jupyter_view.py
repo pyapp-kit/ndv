@@ -245,4 +245,4 @@ class JupyterArrayView(ArrayView):
         if visible:
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
-            display.clear_output()  # ype: ignore [no-untyped-call]
+            display.clear_output()  # type: ignore [no-untyped-call]

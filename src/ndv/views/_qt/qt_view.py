@@ -322,7 +322,7 @@ class _QArrayViewer(QWidget):
         layout.addWidget(self.splitter)
 
 
-class QArrayView(ArrayView):
+class QtArrayView(ArrayView):
     def __init__(self, canvas_widget: QWidget) -> None:
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
