@@ -164,9 +164,10 @@ class ViewerController:
         show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
-                view.setVisible(
-                    not show_channel_luts if lut_ctrl.key is None else show_channel_luts
-                )
+                if lut_ctrl.key is None:
+                    view.set_visible(not show_channel_luts)
+                else:
+                    view.set_visible(show_channel_luts)
         # redraw
         self._clear_canvas()
         self._update_canvas()
@@ -281,7 +282,7 @@ class ViewerController:
 
     def show(self) -> None:
         """Show the viewer."""
-        self._view.show()
+        self._view.set_visible(True)
 
 
 def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

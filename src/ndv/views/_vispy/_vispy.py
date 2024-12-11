@@ -14,7 +14,7 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views._mouse_events import filter_mouse_events
+from ndv.views.bases import filter_mouse_events
 from ndv.views.protocols import CanvasElement, CursorType, PCanvas
 
 if TYPE_CHECKING:

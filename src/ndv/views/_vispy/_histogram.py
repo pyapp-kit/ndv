@@ -8,7 +8,7 @@ import numpy as np
 from psygnal import Signal
 from vispy import scene
 
-from ndv.views._mouse_events import filter_mouse_events
+from ndv.views.bases import filter_mouse_events
 from ndv.views.protocols import CursorType, PHistogramCanvas
 
 from ._plot_widget import PlotWidget

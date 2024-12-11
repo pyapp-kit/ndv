@@ -8,9 +8,8 @@ from functools import cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from ndv.views.bases._array_view import ArrayView
     from ndv.views.protocols import PCanvas, PHistogramCanvas
-
-    from .protocols import PView
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
@@ -30,12 +29,12 @@ class CanvasBackend(str, Enum):
 
 # TODO: add a way to set the frontend via an environment variable
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
-def get_view_frontend_class() -> type[PView]:
+def get_view_frontend_class() -> type[ArrayView]:
     frontend = gui_frontend()
     if frontend == GuiFrontend.QT:
-        from ._qt.qt_view import QtViewerView
+        from ._qt.qt_view import QArrayView
 
-        return QtViewerView
+        return QArrayView
 
     if frontend == GuiFrontend.JUPYTER:
         from ._jupyter.jupyter_view import JupyterViewerView
