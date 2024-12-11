@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union
+from typing import TYPE_CHECKING, Any, Callable, Literal, Protocol, Union, cast
+
+from psygnal import Signal
+
+from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -10,6 +14,7 @@ if TYPE_CHECKING:
     import cmap
     import numpy as np
     from qtpy.QtCore import Qt
+    from qtpy.QtWidgets import QWidget
 
     from ndv._types import AxisKey
     from ndv.models._array_display_model import ChannelMode
@@ -46,17 +51,76 @@ PSignal = Union[PSignalDescriptor, PSignalInstance]
 
 
 class PLutView(Protocol):
+    """An (interactive) view of a LookUp Table (LUT)."""
+
     visibleChanged: PSignal
     autoscaleChanged: PSignal
     cmapChanged: PSignal
     climsChanged: PSignal
+    gammaChanged: PSignal
 
-    def set_name(self, name: str) -> None: ...
-    def set_auto_scale(self, auto: bool) -> None: ...
-    def set_colormap(self, cmap: cmap.Colormap) -> None: ...
-    def set_clims(self, clims: tuple[float, float]) -> None: ...
-    def set_lut_visible(self, visible: bool) -> None: ...
-    def setVisible(self, visible: bool) -> None: ...
+    def set_name(self, name: str) -> None:
+        """Defines the name of the view.
+
+        Properties
+        ----------
+        name : str
+            The name (label) of the LUT
+        """
+
+    def set_auto_scale(self, auto: bool) -> None:
+        """Defines whether autoscale has been enabled.
+
+        Autoscale defines whether the contrast limits (clims) are adjusted when the
+        data changes.
+
+        Properties
+        ----------
+        autoscale : bool
+            True iff clims automatically changed on dataset alteration.
+        """
+
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
+        """Defines the colormap backing the view.
+
+        Properties
+        ----------
+        lut : cmap.Colormap
+            The object mapping scalar values to RGB(A) colors.
+        """
+
+    def set_clims(self, clims: tuple[float, float]) -> None:
+        """Defines the input clims.
+
+        The contrast limits (clims) are the input values mapped to the minimum and
+        maximum (respectively) of the LUT.
+
+        Properties
+        ----------
+        clims : tuple[float, float]
+            The clims
+        """
+
+    def set_lut_visible(self, visible: bool) -> None:
+        """Defines whether this view is visible.
+
+        Properties
+        ----------
+        visible : bool
+            True iff the view should be visible.
+        """
+
+    def set_gamma(self, gamma: float) -> None:
+        """Defines the input gamma.
+
+        properties
+        ----------
+        gamma : float
+            The gamma
+        """
+
+    def setVisible(self, visible: bool) -> None:
+        """Sets the visibility of the view/widget itself."""
 
 
 class CanvasElement(Protocol):
@@ -115,6 +179,10 @@ class PImageHandle(CanvasElement, Protocol):
     @clim.setter
     def clim(self, clims: tuple[float, float]) -> None: ...
     @property
+    def gamma(self) -> float: ...
+    @gamma.setter
+    def gamma(self, gamma: float) -> None: ...
+    @property
     def cmap(self) -> cmap.Colormap: ...
     @cmap.setter
     def cmap(self, cmap: cmap.Colormap) -> None: ...
@@ -125,7 +193,7 @@ class PView(Protocol):
 
     currentIndexChanged: PSignal
     resetZoomClicked: PSignal
-    mouseMoved: PSignal  # Signal(_types.MouseMoveEvent)
+    histogramRequested: PSignal
     channelModeChanged: PSignal
 
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
@@ -146,6 +214,8 @@ class PView(Protocol):
     def remove_lut_view(self, view: PLutView) -> None: ...
     def show(self) -> None: ...
     def hide(self) -> None: ...
+    def add_histogram(self, widget: Any) -> None: ...
+    def remove_histogram(self, widget: Any) -> None: ...
 
 
 class PRoiHandle(CanvasElement, Protocol):
@@ -163,7 +233,25 @@ class PRoiHandle(CanvasElement, Protocol):
     def border_color(self, color: cmap.Color) -> None: ...
 
 
-class PCanvas(Protocol):
+# TODO: it's becoming confusing whether these are meant to be protocols or bases
+
+
+class Mouseable(Protocol):
+    mouseMoved: PSignal = Signal(MouseMoveEvent)
+    mousePressed: PSignal = Signal(MousePressEvent)
+    mouseReleased: PSignal = Signal(MouseReleaseEvent)
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        return False
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        return False
+
+
+class PCanvas(Mouseable, Protocol):
     def __init__(self) -> None: ...
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     def set_range(
@@ -198,6 +286,71 @@ class PCanvas(Protocol):
     ) -> PRoiHandle: ...
 
 
+class PHistogramCanvas(PLutView, Mouseable, Protocol):
+    """A histogram-based view for LookUp Table (LUT) adjustment."""
+
+    # TODO: Remove?
+    def refresh(self) -> None: ...
+
+    def frontend_widget(self) -> Any:
+        """Returns an object understood by the widget frontend."""
+
+    def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
+        """Sets the domain of the view.
+
+        TODO: What is the "extent of the data"? Is it the bounds of the
+        histogram, or the bounds of (clims + histogram)?
+
+        Properties
+        ----------
+        bounds : tuple[float, float] | None
+            If a tuple, sets the displayed extremes of the x axis to the passed
+            values. If None, sets them to the extent of the data instead.
+        """
+
+    def set_range(self, bounds: tuple[float, float] | None = None) -> None:
+        """Sets the range of the view.
+
+        Properties
+        ----------
+        bounds : tuple[float, float] | None
+            If a tuple, sets the displayed extremes of the y axis to the passed
+            values. If None, sets them to the extent of the data instead.
+        """
+
+    def set_vertical(self, vertical: bool) -> None:
+        """Sets the axis of the domain.
+
+        Properties
+        ----------
+        vertical : bool
+            If true, views the domain along the y axis and the range along the x
+            axis. If false, views the domain along the x axis and the range along
+            the y axis.
+        """
+
+    def set_range_log(self, enabled: bool) -> None:
+        """Sets the axis scale of the range.
+
+        Properties
+        ----------
+        enabled : bool
+            If true, the range will be displayed with a logarithmic (base 10)
+            scale. If false, the range will be displayed with a linear scale.
+        """
+
+    def set_data(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
+        """Sets the histogram data.
+
+        Properties
+        ----------
+        values : np.ndarray
+            The histogram values.
+        bin_edges : np.ndarray
+            The bin edges of the histogram.
+        """
+
+
 class CursorType(Enum):
     DEFAULT = "default"
     V_ARROW = "v_arrow"
@@ -206,15 +359,20 @@ class CursorType(Enum):
     BDIAG_ARROW = "bdiag_arrow"
     FDIAG_ARROW = "fdiag_arrow"
 
+    def apply_to(self, widget: Any) -> None:
+        """Applies the cursor type to the given widget."""
+        if hasattr(widget, "setCursor"):
+            cast("QWidget", widget).setCursor(self.to_qt())
+
     def to_qt(self) -> Qt.CursorShape:
         """Converts CursorType to Qt.CursorShape."""
         from qtpy.QtCore import Qt
 
         return {
-            CursorType.DEFAULT: Qt.ArrowCursor,
-            CursorType.V_ARROW: Qt.SizeVerCursor,
-            CursorType.H_ARROW: Qt.SizeHorCursor,
-            CursorType.ALL_ARROW: Qt.SizeAllCursor,
-            CursorType.BDIAG_ARROW: Qt.SizeBDiagCursor,
-            CursorType.FDIAG_ARROW: Qt.SizeFDiagCursor,
+            CursorType.DEFAULT: Qt.CursorShape.ArrowCursor,
+            CursorType.V_ARROW: Qt.CursorShape.SizeVerCursor,
+            CursorType.H_ARROW: Qt.CursorShape.SizeHorCursor,
+            CursorType.ALL_ARROW: Qt.CursorShape.SizeAllCursor,
+            CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
+            CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
         }[self]

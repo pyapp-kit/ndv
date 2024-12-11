@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 from weakref import WeakKeyDictionary
 
@@ -8,18 +9,22 @@ import cmap
 import numpy as np
 import pygfx
 import pylinalg as la
-from qtpy.QtCore import QSize, Qt
-from wgpu.gui.qt import QWgpuCanvas
 
-from ndv.views.protocols import PCanvas
+from ndv.views._mouse_events import filter_mouse_events
+from ndv.views.protocols import CursorType, PCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import TypeAlias
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
+    from wgpu.gui.jupyter import JupyterWgpuCanvas
+    from wgpu.gui.qt import QWgpuCanvas
 
     from ndv.views.protocols import CanvasElement
+
+    WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas
 
 
 def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:
@@ -78,6 +83,16 @@ class PyGFXImageHandle:
         self._render()
 
     @property
+    def gamma(self) -> float:
+        return 1
+
+    @gamma.setter
+    def gamma(self, gamma: float) -> None:
+        # self._material.gamma = gamma
+        # self._render()
+        warnings.warn("Gamma correction is not supported in pygfx", stacklevel=2)
+
+    @property
     def cmap(self) -> cmap.Colormap:
         return self._cmap
 
@@ -97,7 +112,7 @@ class PyGFXImageHandle:
         if (par := self._image.parent) is not None:
             par.remove(self._image)
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         return None
 
 
@@ -219,7 +234,7 @@ class PyGFXRoiHandle(pygfx.WorldObject):
         if (par := self.parent) is not None:
             par.remove(self)
 
-    def cursor_at(self, pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
         # To be implemented by subclasses
         raise NotImplementedError("Must be implemented in subclasses")
 
@@ -377,7 +392,7 @@ class RectangularROIHandle(PyGFXRoiHandle):
                 return i
         return None
 
-    def cursor_at(self, canvas_pos: Sequence[float]) -> Qt.CursorShape | None:
+    def cursor_at(self, canvas_pos: Sequence[float]) -> CursorType | None:
         # Convert canvas -> world
         world_pos = self._canvas_to_world(canvas_pos)
         # Step 1: Check if over handle
@@ -385,23 +400,41 @@ class RectangularROIHandle(PyGFXRoiHandle):
             if np.array_equal(
                 self._positions[idx], self._positions.min(axis=0)
             ) or np.array_equal(self._positions[idx], self._positions.max(axis=0)):
-                return Qt.CursorShape.SizeFDiagCursor
-            return Qt.CursorShape.SizeBDiagCursor
+                return CursorType.FDIAG_ARROW
+            return CursorType.BDIAG_ARROW
 
         # Step 2: Check if over ROI
         if self._outline:
             roi_bb = self._outline.geometry.get_bounding_box()
             if _is_inside(roi_bb, world_pos):
-                return Qt.CursorShape.SizeAllCursor
+                return CursorType.ALL_ARROW
         return None
 
 
-class _QWgpuCanvas(QWgpuCanvas):
-    def installEventFilter(self, filter: Any) -> None:
-        self._subwidget.installEventFilter(filter)
+def get_canvas_class() -> WgpuCanvas:
+    from ndv.views._app import GuiFrontend, gui_frontend
 
-    def sizeHint(self) -> QSize:
-        return QSize(self.width(), self.height())
+    frontend = gui_frontend()
+    if frontend == GuiFrontend.QT:
+        from qtpy.QtCore import QSize
+        from wgpu.gui import qt
+
+        class QWgpuCanvas(qt.QWgpuCanvas):
+            def installEventFilter(self, filter: Any) -> None:
+                self._subwidget.installEventFilter(filter)
+
+            def sizeHint(self) -> QSize:
+                return QSize(self.width(), self.height())
+
+        return QWgpuCanvas
+    if frontend == GuiFrontend.JUPYTER:
+        from wgpu.gui.jupyter import JupyterWgpuCanvas
+
+        return JupyterWgpuCanvas
+    if frontend == GuiFrontend.WX:
+        from wgpu.gui.wx import WxWgpuCanvas
+
+        return WxWgpuCanvas
 
 
 class PyGFXViewerCanvas(PCanvas):
@@ -411,7 +444,14 @@ class PyGFXViewerCanvas(PCanvas):
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
-        self._canvas = _QWgpuCanvas(size=(600, 600))
+        cls = get_canvas_class()
+        self._canvas = cls(size=(600, 600))
+        # this filter needs to remain in scope for the lifetime of the canvas
+        # or mouse events will not be intercepted
+        # the returned function can be called to remove the filter, (and it also
+        # closes on the event filter and keeps it in scope).
+        self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
+
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
         try:
             # requires https://github.com/pygfx/pygfx/pull/752
@@ -566,7 +606,8 @@ class PyGFXViewerCanvas(PCanvas):
         self.refresh()
 
     def refresh(self) -> None:
-        self._canvas.update()
+        with suppress(AttributeError):
+            self._canvas.update()
         self._canvas.request_draw(self._animate)
 
     def _animate(self) -> None:

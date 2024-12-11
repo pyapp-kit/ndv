@@ -7,7 +7,6 @@ import cmap
 import ipywidgets as widgets
 from psygnal import Signal
 
-from ndv._types import MouseMoveEvent
 from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
@@ -27,6 +26,7 @@ class JupyterLutView:
     autoscaleChanged: PSignal = Signal(bool)
     cmapChanged: PSignal = Signal(cmap.Colormap)
     climsChanged: PSignal = Signal(tuple)
+    gammaChanged: PSignal = Signal(float)
 
     def __init__(self) -> None:
         # WIDGETS
@@ -108,6 +108,9 @@ class JupyterLutView:
         with self.visibleChanged.blocked():  # type: ignore [attr-defined]
             self._visible.value = visible
 
+    def set_gamma(self, gamma: float) -> None:
+        pass
+
     def setVisible(self, visible: bool) -> None:
         # show or hide the actual widget itself
         self.layout.layout.display = "flex" if visible else "none"
@@ -117,7 +120,7 @@ class JupyterLutView:
 class JupyterViewerView:
     currentIndexChanged: PSignal = Signal()
     resetZoomClicked: PSignal = Signal()
-    mouseMoved: PSignal = Signal(MouseMoveEvent)
+    histogramRequested: PSignal = Signal()
     channelModeChanged: PSignal = Signal(ChannelMode)
 
     def __init__(
@@ -127,11 +130,6 @@ class JupyterViewerView:
 
         # WIDGETS
         self._canvas_widget = canvas_widget
-        # patch the handle_event from _jupyter_rfb.CanvasBackend
-        # to intercept various mouse events.
-        if hasattr(canvas_widget, "handle_event"):
-            self._original_handle_event = canvas_widget.handle_event
-            canvas_widget.handle_event = self.handle_event
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
@@ -160,12 +158,6 @@ class JupyterViewerView:
         # CONNECTIONS
 
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
-
-    def handle_event(self, ev: dict) -> None:
-        etype = ev["event_type"]
-        if etype == "pointer_move":
-            self.mouseMoved.emit(MouseMoveEvent(x=ev["x"], y=ev["y"]))
-        self._original_handle_event(ev)
 
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
@@ -269,3 +261,10 @@ class JupyterViewerView:
     def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
+
+    def add_histogram(self, widget: Any) -> None:
+        """Add a histogram widget to the viewer."""
+        warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
+
+    def remove_histogram(self, widget: Any) -> None:
+        """Remove a histogram widget from the viewer."""

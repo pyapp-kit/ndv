@@ -4,14 +4,14 @@ import warnings
 from typing import TYPE_CHECKING, cast
 
 import cmap
-from qtpy.QtCore import QEvent, QObject, Qt, Signal
-from qtpy.QtGui import QIcon, QKeyEvent, QMouseEvent
+from qtpy.QtCore import Qt, Signal
 from qtpy.QtWidgets import (
     QCheckBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
     QPushButton,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -26,11 +26,15 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
-from ndv._types import AxisKey, MouseMoveEvent
+from ndv._types import AxisKey, MouseMoveEvent, MousePressEvent
 from ndv.models._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
+
+    from qtpy.QtGui import QIcon
+
+    from ndv._types import AxisKey
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -85,6 +89,7 @@ class QLUTWidget(QWidget):
     autoscaleChanged = Signal(bool)
     cmapChanged = Signal(cmap.Colormap)
     climsChanged = Signal(tuple)
+    gammaChanged = Signal(float)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -143,6 +148,9 @@ class QLUTWidget(QWidget):
     def set_lut_visible(self, visible: bool) -> None:
         with signals_blocked(self):
             self._visible.setChecked(visible)
+
+    def set_gamma(self, gamma: float) -> None:
+        pass
 
 
 class QDimsSliders(QWidget):
@@ -252,19 +260,21 @@ class _UpCollapsible(QCollapsible):
 class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
-    mouseMoved = Signal(MouseMoveEvent)
+    histogramRequested = Signal()
     channelModeChanged = Signal(ChannelMode)
 
-    def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
+    mousePressed = Signal(MousePressEvent)
+    mouseMoved = Signal(MouseMoveEvent)
+    mouseReleased = Signal(MousePressEvent)
+
+    def __init__(
+        self,
+        canvas_widget: QWidget,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
 
         self._qcanvas = canvas_widget
-        # TODO: this actually doesn't need to be in the QtViewerView at all
-        # this could be patched at the level of the vispy/pygfx canvas
-        # removing a need for the mouseMoved signal
-        # Install an event filter so we can intercept mouse/key events
-        self._qcanvas.installEventFilter(self)
-
         self._dims_sliders = QDimsSliders(self)
         self._dims_sliders.currentIndexChanged.connect(self.currentIndexChanged)
 
@@ -283,18 +293,25 @@ class QtViewerView(QWidget):
         self._set_range_btn = QPushButton(set_range_icon, "", self)
         self._set_range_btn.clicked.connect(self.resetZoomClicked)
 
+        # button to add a histogram
+        add_histogram_icon = QIconifyIcon("foundation:graph-bar")
+        self._add_histogram_btn = QPushButton(add_histogram_icon, "", self)
+        self._add_histogram_btn.clicked.connect(self._on_add_histogram_clicked)
+
         self._luts = _UpCollapsible(
             "LUTs",
             parent=self,
             expandedIcon=QIconifyIcon("bi:chevron-up", color="#888888"),
             collapsedIcon=QIconifyIcon("bi:chevron-down", color="#888888"),
         )
-        self._btns = self._luts.btn_row
+        self._btn_layout = self._luts.btn_row
+        self._btn_layout.setParent(None)
         self._luts.expand()
 
-        self._btns.addWidget(self._channel_mode_combo)
+        self._btn_layout.addWidget(self._channel_mode_combo)
         # self._btns.addWidget(self._ndims_btn)
-        self._btns.addWidget(self._set_range_btn)
+        self._btn_layout.addWidget(self._add_histogram_btn)
+        self._btn_layout.addWidget(self._set_range_btn)
         # self._btns.addWidget(self._add_roi_btn)
 
         # above the canvas
@@ -305,20 +322,50 @@ class QtViewerView(QWidget):
         info.addWidget(self._data_info_label)
         info_widget.setFixedHeight(16)
 
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setSpacing(2)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(info_widget)
+        left_layout.addWidget(self._qcanvas, 1)
+        left_layout.addWidget(self._hover_info_label)
+        left_layout.addWidget(self._dims_sliders)
+        left_layout.addWidget(self._luts)
+        left_layout.addLayout(self._btn_layout)
+
+        self._splitter = QSplitter(Qt.Orientation.Vertical, self)
+        self._splitter.addWidget(left)
+
         layout = QVBoxLayout(self)
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.addWidget(info_widget)
-        layout.addWidget(self._qcanvas, 1)
-        layout.addWidget(self._hover_info_label)
-        layout.addWidget(self._dims_sliders)
-        layout.addWidget(self._luts)
-        layout.addLayout(self._btns)
+        layout.addWidget(self._splitter)
 
     def add_lut_view(self) -> QLUTWidget:
         wdg = QLUTWidget(self)
         self._luts.addWidget(wdg)
         return wdg
+
+    def _on_add_histogram_clicked(self) -> None:
+        if hasattr(self, "_hist"):
+            sizes = self._splitter.sizes()
+            if not sizes[-1]:
+                self._splitter.setSizes([self.height() - 100, 100])
+            else:
+                self._splitter.setSizes([sum(sizes), 0])
+        else:
+            self.histogramRequested.emit()
+
+    def add_histogram(self, widget: QWidget) -> None:
+        if hasattr(self, "_hist"):
+            raise RuntimeError("Only one histogram can be added at a time")
+        self._hist = widget
+        self._splitter.addWidget(widget)
+        self._splitter.setSizes([self.height() - 100, 100])
+
+    def remove_histogram(self, widget: QWidget) -> None:
+        widget.setParent(None)
+        widget.deleteLater()
 
     def remove_lut_view(self, wdg: QLUTWidget) -> None:
         self._luts.removeWidget(wdg)
@@ -352,30 +399,3 @@ class QtViewerView(QWidget):
     def set_channel_mode(self, mode: ChannelMode) -> None:
         """Set the channel mode button text."""
         self._channel_mode_combo.setCurrentEnum(mode)
-
-    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
-        """Event filter installed on the canvas to handle mouse events."""
-        if event is None:
-            return False  # pragma: no cover
-
-        # here is where we get a chance to intercept mouse events before allowing the
-        # canvas to respond to them.
-        # Return `True` to prevent the event from being passed to the canvas.
-        intercept = False
-        # use children in case backend has a subwidget stealing events.
-        if obj is self._qcanvas or obj in (self._qcanvas.children()):
-            if isinstance(event, QMouseEvent):
-                intercept |= self._canvas_mouse_event(event)
-            if event.type() == QEvent.Type.KeyPress:
-                self.keyPressEvent(cast("QKeyEvent", event))
-        return intercept
-
-    def _canvas_mouse_event(self, ev: QMouseEvent) -> bool:
-        # if ev.type() == QEvent.Type.MouseButtonPress:
-        # ...
-        if ev.type() == QEvent.Type.MouseMove:
-            pos = ev.pos()
-            self.mouseMoved.emit(MouseMoveEvent(x=pos.x(), y=pos.y()))
-        # if ev.type() == QEvent.Type.MouseButtonRelease:
-        #     ...
-        return False

@@ -25,6 +25,7 @@ class WxLUTWidget(wx.Panel):
     autoscaleChanged = WxSignal()
     cmapChanged = WxSignal()
     climsChanged = WxSignal()
+    gammaChanged = WxSignal()
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -194,6 +195,7 @@ class WxDimsSliders(wx.Panel):
 class WxViewerView(wx.Frame):
     currentIndexChanged = WxSignal()
     resetZoomClicked = WxSignal()
+    histogramRequested = WxSignal()
     mouseMoved = WxSignal()
     channelModeChanged = WxSignal()
 

@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
+from ndv.controller._channel_controller import ChannelController
 from ndv.models import DataDisplayModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
-from ndv.views import get_canvas_class, get_view_frontend_class
+from ndv.views import (
+    get_canvas_class,
+    get_histogram_canvas_class,
+    get_view_frontend_class,
+)
 
 if TYPE_CHECKING:
-    import cmap
-    import numpy as np
     from typing_extensions import TypeAlias
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PImageHandle, PLutView, PView
+    from ndv.views.protocols import PHistogramCanvas, PView
 
     LutKey: TypeAlias = int | None
 
@@ -41,8 +45,9 @@ class ViewerController:
         canvas_cls = get_canvas_class()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
-        canvas_widget = self._canvas.frontend_widget()
-        self._view = frontend_cls(canvas_widget)
+
+        self._histogram: PHistogramCanvas | None = None
+        self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
@@ -50,8 +55,10 @@ class ViewerController:
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
-        self._view.mouseMoved.connect(self._on_view_mouse_moved)
+        self._view.histogramRequested.connect(self.add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
+
+        self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -84,8 +91,28 @@ class ViewerController:
         """Set the data to be displayed."""
         self._dd_model.data = data
         self._fully_synchronize_view()
+        self._update_hist_domain_for_dtype(data.dtype)
 
     # -----------------------------------------------------------------------------
+
+    def add_histogram(self) -> None:
+        histogram_cls = get_histogram_canvas_class()  # will raise if not supported
+        self._histogram = histogram_cls()
+        self._view.add_histogram(self._histogram.frontend_widget())
+        for view in self._lut_controllers.values():
+            view.add_lut_view(self._histogram)
+
+        if self.data is not None:
+            self._update_hist_domain_for_dtype(self.data.dtype)
+
+    def _update_hist_domain_for_dtype(self, dtype: np.typing.DTypeLike) -> None:
+        if self._histogram is None:
+            return
+
+        dtype = np.dtype(dtype)
+        if dtype.kind in "iu":
+            iinfo = np.iinfo(dtype)
+            self._histogram.set_domain((iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -136,9 +163,10 @@ class ViewerController:
         self._update_visible_sliders()
         show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
         for lut_ctrl in self._lut_controllers.values():
-            lut_ctrl.lut_view.setVisible(
-                not show_channel_luts if lut_ctrl.key is None else show_channel_luts
-            )
+            for view in lut_ctrl.lut_views:
+                view.setVisible(
+                    not show_channel_luts if lut_ctrl.key is None else show_channel_luts
+                )
         # redraw
         self._clear_canvas()
         self._update_canvas()
@@ -160,7 +188,7 @@ class ViewerController:
         """Reset the zoom level of the canvas."""
         self._canvas.set_range()
 
-    def _on_view_mouse_moved(self, event: MouseMoveEvent) -> None:
+    def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
 
@@ -214,16 +242,28 @@ class ViewerController:
                     # so we create a new LUT model for it
                     model = self.model.luts[key] = LUTModel()
 
+                lut_views = [self._view.add_lut_view()]
+                if self._histogram is not None:
+                    lut_views.append(self._histogram)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
-                    key=key, view=self._view.add_lut_view(), model=model
+                    key=key,
+                    model=model,
+                    views=lut_views,
                 )
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
                 lut_ctrl.add_handle(self._canvas.add_image(data))
-                # self._canvas.set_range()
             else:
                 lut_ctrl.update_texture_data(data)
+                if self._histogram is not None:
+                    # TODO: once data comes in in chunks, we'll need a proper stateful
+                    # stats object that calculates the histogram incrementally
+                    counts, bin_edges = _calc_hist_bins(data)
+                    # TODO: currently this is updating the histogram on *any*
+                    # channel index... so it doesn't work with composite mode
+                    self._histogram.set_data(counts, bin_edges)
+                    self._histogram.set_range()
 
         self._canvas.refresh()
 
@@ -244,138 +284,8 @@ class ViewerController:
         self._view.show()
 
 
-class ChannelController:
-    """Controller for a single channel in the viewer.
-
-    This manages the connection between the LUT model (settings like colormap,
-    contrast limits and visibility) and the LUT view (the front-end widget that
-    allows the user to interact with these settings), as well as the image handle
-    that displays the data, all for a single "channel" extracted from the data.
-    """
-
-    def __init__(self, key: LutKey, view: PLutView, model: LUTModel) -> None:
-        self.key = key
-        self.lut_view = view
-        self.lut_model = model
-        self.handles: list[PImageHandle] = []
-
-        # setup the initial state of the LUT view
-        self._update_view_from_model()
-
-        # connect view changes to controller callbacks that update the model
-        self.lut_view.visibleChanged.connect(self._on_view_lut_visible_changed)
-        self.lut_view.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
-        self.lut_view.cmapChanged.connect(self._on_view_lut_cmap_changed)
-        self.lut_view.climsChanged.connect(self._on_view_lut_clims_changed)
-
-        # connect model changes to view callbacks that update the view
-        self.lut_model.events.cmap.connect(self._on_model_cmap_changed)
-        self.lut_model.events.clims.connect(self._on_model_clims_changed)
-        self.lut_model.events.autoscale.connect(view.set_auto_scale)
-        self.lut_model.events.visible.connect(self._on_model_visible_changed)
-
-    def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
-        """The contrast limits in the model have changed."""
-        self.lut_view.set_clims(clims)
-        for handle in self.handles:
-            handle.clim = clims
-
-    def _on_model_cmap_changed(self, cmap: cmap.Colormap) -> None:
-        """The colormap in the model has changed."""
-        self.lut_view.set_colormap(cmap)
-        for handle in self.handles:
-            handle.cmap = cmap
-
-    def _on_model_visible_changed(self, visible: bool) -> None:
-        """The visibility in the model has changed."""
-        self.lut_view.set_lut_visible(visible)
-        for handle in self.handles:
-            handle.visible = visible
-
-    def _update_view_from_model(self) -> None:
-        """Make sure the view matches the model."""
-        self.lut_view.set_colormap(self.lut_model.cmap)
-        if self.lut_model.clims:
-            self.lut_view.set_clims(self.lut_model.clims)
-        # TODO: handle more complex autoscale types
-        self.lut_view.set_auto_scale(bool(self.lut_model.autoscale))
-        self.lut_view.set_lut_visible(True)
-        name = str(self.key) if self.key is not None else ""
-        self.lut_view.set_name(name)
-
-    def _on_view_lut_visible_changed(self, visible: bool, key: LutKey = None) -> None:
-        """The visibility checkbox in the LUT widget has changed."""
-        for handle in self.handles:
-            handle.visible = visible
-
-    def _on_view_lut_autoscale_changed(
-        self, autoscale: bool, key: LutKey = None
-    ) -> None:
-        """The autoscale checkbox in the LUT widget has changed."""
-        self.lut_model.autoscale = autoscale
-        self.lut_view.set_auto_scale(autoscale)
-
-        if autoscale:
-            # TODO: or should we have a global min/max across all handles for this key?
-            for handle in self.handles:
-                data = handle.data
-                # update the model with the new clim values
-                self.lut_model.clims = (data.min(), data.max())
-
-    def _on_view_lut_cmap_changed(
-        self, cmap: cmap.Colormap, key: LutKey = None
-    ) -> None:
-        """The colormap in the LUT widget has changed."""
-        for handle in self.handles:
-            handle.cmap = cmap  # actually apply it to the Image texture
-            self.lut_model.cmap = cmap  # update the model as well
-
-    def _on_view_lut_clims_changed(self, clims: tuple[float, float]) -> None:
-        """The contrast limits slider in the LUT widget has changed."""
-        self.lut_model.clims = clims
-        # when the clims are manually adjusted in the view, we turn off autoscale
-        self.lut_model.autoscale = False
-
-    def update_texture_data(self, data: np.ndarray) -> None:
-        """Update the data in the image handle."""
-        # WIP:
-        # until we have a more sophisticated way to handle updating data
-        # for multiple handles, we'll just update the first one
-        if not (handles := self.handles):
-            return
-        handles[0].data = data
-        # if this image handle is visible and autoscale is on, then we need
-        # to update the clim values
-        if self.lut_model.autoscale:
-            self.lut_model.clims = (data.min(), data.max())
-            # lut_view.setClims((data.min(), data.max()))
-            # technically... the LutView may also emit a signal that the
-            # controller listens to, and then updates the image handle
-            # but this next line is more direct
-            # self._handles[None].clim = (data.min(), data.max())
-
-    def add_handle(self, handle: PImageHandle) -> None:
-        """Add an image texture handle to the controller."""
-        self.handles.append(handle)
-        handle.cmap = self.lut_model.cmap
-        if self.lut_model.autoscale:
-            self.lut_model.clims = (handle.data.min(), handle.data.max())
-        if self.lut_model.clims:
-            handle.clim = self.lut_model.clims
-
-    def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
-        """Get the value of the data at the given index."""
-        if not (handles := self.handles):
-            return None
-        # only getting one handle per channel for now
-        handle = handles[0]
-        with suppress(IndexError):  # skip out of bounds
-            # here, we're retrieving the value from the in-memory data
-            # stored by the backend visual, rather than querying the data itself
-            # this is a quick workaround to get the value without having to
-            # worry about other dimensions in the data source (since the
-            # texture has already been reduced to 2D). But a more complete
-            # implementation would gather the full current nD index and query
-            # the data source directly.
-            return handle.data[idx]  # type: ignore [no-any-return]
-        return None
+def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    maxval = np.iinfo(data.dtype).max
+    counts = np.bincount(data.flatten(), minlength=maxval + 1)
+    bin_edges = np.arange(maxval + 2) - 0.5
+    return counts, bin_edges

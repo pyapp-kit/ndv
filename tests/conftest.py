@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from ndv.views import _determine_gui_frontend
+from ndv.views import gui_frontend
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -77,7 +77,7 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     # this fixture will use the appropriate application depending on the env var
     # NDV_GUI_FRONTEND='qt' pytest
     # NDV_GUI_FRONTEND='jupyter' pytest
-    if _determine_gui_frontend() == "qt":
+    if gui_frontend() == "qt":
         yield request.getfixturevalue("qapp")
-    elif _determine_gui_frontend() == "jupyter":
+    elif gui_frontend() == "jupyter":
         yield request.getfixturevalue("asyncio_app")
