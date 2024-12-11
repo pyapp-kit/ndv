@@ -27,16 +27,24 @@ class ArrayView(Viewable):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     histogramRequested = Signal()
+    visibleAxesChanged = Signal()
     channelModeChanged = Signal(ChannelMode)
 
     @abstractmethod
     def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
     @abstractmethod
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
+
     @abstractmethod
     def current_index(self) -> Mapping[AxisKey, int | slice]: ...
     @abstractmethod
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
+
+    @abstractmethod
+    def visible_axes(self) -> Sequence[AxisKey]: ...
+    @abstractmethod
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None: ...
+
     @abstractmethod
     def set_channel_mode(self, mode: ChannelMode) -> None: ...
     @abstractmethod

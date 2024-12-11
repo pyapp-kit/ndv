@@ -208,12 +208,11 @@ class DataDisplayModel(NDVModel):
                     ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
                     ch_data = data[ch_keepdims]
                 future = Future[DataResponse]()
-                future.set_result(
-                    DataResponse(
-                        data=ch_data.transpose(*t_dims).squeeze(),
-                        channel_key=i,
-                    )
+                result = DataResponse(
+                    data=ch_data.transpose(*t_dims).squeeze(),
+                    channel_key=i,
                 )
+                future.set_result(result)
                 futures.append(future)
 
         return futures

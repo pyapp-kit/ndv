@@ -113,12 +113,7 @@ def _install_excepthook() -> None:
     This is necessary to prevent the application from closing when an exception
     is raised.
     """
-    try:
-        from rich.traceback import install
-
-        install(show_locals=True)
-    except ImportError:
-        sys.excepthook = _no_exit_excepthook
+    sys.excepthook = _no_exit_excepthook
 
 
 def _no_exit_excepthook(

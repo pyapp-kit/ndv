@@ -84,6 +84,14 @@ class _CmapCombo(QColormapComboBox):
         popup.move(popup.x(), popup.y() - self.height() - popup.height())
 
 
+class _DimToggleButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        icn = QIconifyIcon("f7:view-2d", color="#333333")
+        icn.addKey("f7:view-3d")
+        super().__init__(icn, "", parent)
+        self.setCheckable(True)
+
+
 class _QLUTWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -288,8 +296,11 @@ class _QArrayViewer(QWidget):
         self._btn_layout.setParent(None)
         self.luts.expand()
 
+        # button to change number of displayed dimensions
+        self.ndims_btn = _DimToggleButton(self)
+
         self._btn_layout.addWidget(self.channel_mode_combo)
-        # self._btns.addWidget(self._ndims_btn)
+        self._btn_layout.addWidget(self.ndims_btn)
         self._btn_layout.addWidget(self.histogram_btn)
         self._btn_layout.addWidget(self.set_range_btn)
         # self._btns.addWidget(self._add_roi_btn)
@@ -331,6 +342,9 @@ class QtArrayView(ArrayView):
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
         qwdg.channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged.emit)
         qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit)
+        qwdg.ndims_btn.toggled.connect(self._on_ndims_toggled)
+
+        self._visible_axes: Sequence[AxisKey] = []
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()
@@ -378,6 +392,26 @@ class QtArrayView(ArrayView):
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         """Set the current value of the sliders."""
         self._qwidget.dims_sliders.set_current_index(value)
+
+    def _on_ndims_toggled(self, checked: bool) -> None:
+        was_3d = len(self._visible_axes) > 2
+        is_3d = checked
+        if was_3d and not is_3d:
+            self._visible_axes = self._visible_axes[-2:]
+        elif not was_3d and is_3d:
+            # FIXME
+            # HACCCCCKKK
+            # need a better way to add the next dimension in the GUI
+            new_ax = -3
+            self._visible_axes = (new_ax, *self._visible_axes)
+        self.visibleAxesChanged.emit()
+
+    def visible_axes(self) -> Sequence[AxisKey]:
+        return self._visible_axes  # no widget to control this yet
+
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
+        self._visible_axes = tuple(axes)
+        self._qwidget.ndims_btn.setChecked(len(axes) > 2)
 
     def set_data_info(self, text: str) -> None:
         """Set the data info text, above the canvas."""
