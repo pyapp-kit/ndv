@@ -177,7 +177,7 @@ class RangeSlider(wx.Panel):
             lowValue, highValue = highValue, lowValue
         lowValue = max(lowValue, self.min_value)
         highValue = min(highValue, self.max_value)
-
+        self.track_height = 8
         self.border_width = 8
 
         self.thumbs = {
@@ -290,15 +290,14 @@ class RangeSlider(wx.Panel):
         dc.SetBackground(background_brush)
         dc.Clear()
         # Draw slider
-        track_height = 12
         dc.SetPen(wx.Pen(self.slider_outline_color, width=1, style=wx.PENSTYLE_SOLID))
         dc.SetBrush(wx.Brush(self.slider_background_color, style=wx.BRUSHSTYLE_SOLID))
 
         dc.DrawRectangle(
             int(self.border_width),
-            int(h / 2 - track_height / 2),
+            int(h / 2 - self.track_height / 2),
             int(w - 2 * self.border_width),
-            int(track_height),
+            self.track_height,
         )
         # Draw selected range
         if self.IsEnabled():
@@ -317,9 +316,9 @@ class RangeSlider(wx.Panel):
         high_pos = self.thumbs["high"].GetPosition()[0]
         dc.DrawRectangle(
             int(low_pos),
-            int(h / 2 - track_height / 4),
+            int(h / 2 - self.track_height / 4),
             int(high_pos - low_pos),
-            int(track_height / 2),
+            int(self.track_height / 2),
         )
         # Draw thumbs
         for thumb in self.thumbs.values():
