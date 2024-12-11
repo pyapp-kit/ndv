@@ -3,8 +3,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
-from ndv.views.bases._mouseable import Mouseable
-from ndv.views.bases._view_base import Viewable
+import numpy as np
+
+from ndv.views.bases import LutView, Mouseable, Viewable
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -55,3 +56,34 @@ class ArrayCanvas(GraphicsCanvas):
         color: cmap.Color | None = None,
         border_color: cmap.Color | None = None,
     ) -> RoiHandle: ...
+
+
+class HistogramCanvas(GraphicsCanvas, LutView):
+    """A histogram-based view for LookUp Table (LUT) adjustment."""
+
+    # TODO: Remove?
+    def refresh(self) -> None: ...
+
+    def set_vertical(self, vertical: bool) -> None:
+        """If True, orient axes vertically (x-axis on left)."""
+
+    def set_log_base(self, base: float | None) -> None:
+        """Sets the axis scale of the range.
+
+        Properties
+        ----------
+        enabled : bool
+            If true, the range will be displayed with a logarithmic (base 10)
+            scale. If false, the range will be displayed with a linear scale.
+        """
+
+    def set_data(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
+        """Sets the histogram data.
+
+        Properties
+        ----------
+        values : np.ndarray
+            The histogram values.
+        bin_edges : np.ndarray
+            The bin edges of the histogram.
+        """

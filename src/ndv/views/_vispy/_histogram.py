@@ -41,7 +41,7 @@ class VispyHistogramCanvas(HistogramCanvas):
         # the currently grabbed object
         self._grabbed: Grabbable = Grabbable.NONE
         # whether the y-axis is logarithmic
-        self._log_y: bool = False
+        self._log_base: float | None = None
         # whether the histogram is vertical
         self._vertical: bool = vertical
         # The values of the left and right edges on the canvas (respectively)
@@ -181,9 +181,9 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._update_lut_lines()
         self._resize()
 
-    def set_range_log(self, enabled: bool) -> None:
-        if enabled != self._log_y:
-            self._log_y = enabled
+    def set_log_base(self, base: float | None) -> None:
+        if base != self._log_base:
+            self._log_base = base
             self._update_histogram()
             self._update_lut_lines()
             self._resize()
@@ -213,10 +213,10 @@ class VispyHistogramCanvas(HistogramCanvas):
         if self._values is None or self._bin_edges is None:
             return  # pragma: no cover
         values = self._values
-        if self._log_y:
-            # Replace zero values with 1 (which will be log10(1) = 0)
+        if self._log_base:
+            #  Replace zero values with 1
             values = np.where(values == 0, 1, values)
-            values = np.log10(values)
+            values = np.log(values) / np.log(self._log_base)
 
         verts, faces = _hist_counts_to_mesh(values, self._bin_edges, self._vertical)
         self._hist_mesh.set_data(vertices=verts, faces=faces)

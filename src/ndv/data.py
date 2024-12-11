@@ -63,7 +63,7 @@ def cells3d() -> np.ndarray:
         ) from e
 
     url = "https://gitlab.com/scikit-image/data/-/raw/2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba/cells3d.tif"
-    data = np.asarray(volread(url), copy=False)
+    data = np.asarray(volread(url))
 
     # this data has been stretched to 16 bit, and lacks certain intensity values
     # add a small random integer to each pixel ... so the histogram is not silly
