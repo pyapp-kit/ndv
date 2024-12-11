@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
+    from ndv.views.bases._view_base import Viewable
+
 
 def _maybe_int(val: Any) -> Any:
     # try to convert to int if possible
@@ -87,10 +89,11 @@ class CursorType(Enum):
     BDIAG_ARROW = "bdiag_arrow"
     FDIAG_ARROW = "fdiag_arrow"
 
-    def apply_to(self, widget: Any) -> None:
+    def apply_to(self, widget: Viewable) -> None:
         """Applies the cursor type to the given widget."""
-        if hasattr(widget, "setCursor"):
-            cast("QWidget", widget).setCursor(self.to_qt())
+        native = widget.native()
+        if hasattr(native, "setCursor"):
+            cast("QWidget", native).setCursor(self.to_qt())
 
     def to_qt(self) -> Qt.CursorShape:
         """Converts CursorType to Qt.CursorShape."""
