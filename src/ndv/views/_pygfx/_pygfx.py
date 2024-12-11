@@ -10,8 +10,9 @@ import numpy as np
 import pygfx
 import pylinalg as la
 
+from ndv._types import CursorType
 from ndv.views.bases import filter_mouse_events
-from ndv.views.protocols import CursorType, PCanvas
+from ndv.views.protocols import PCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

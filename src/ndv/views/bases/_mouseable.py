@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class Mouseable:
-    """Base class for objects that receive mouse events.
+    """Mixin class for objects that can be interacted with using the mouse.
 
     The signals here are to be emitted by the view object that inherits this class;
     usually by intercepting native mouse events with `filter_mouse_events`.

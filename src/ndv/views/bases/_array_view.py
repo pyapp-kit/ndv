@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
+from ndv.views.bases._view_base import Viewable
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from ndv.views.bases._lut_view import LutView
 
 
-class ArrayView(ABC):
+class ArrayView(Viewable):
     """ABC for ND Array viewers widget.
 
     Currently, this is the "main" widget that contains the array display and
@@ -50,8 +51,7 @@ class ArrayView(ABC):
     def add_lut_view(self) -> LutView: ...
     @abstractmethod
     def remove_lut_view(self, view: LutView) -> None: ...
-    @abstractmethod
-    def set_visible(self, visible: bool) -> None: ...
+
     @abstractmethod
     def add_histogram(self, widget: Any) -> None: ...
     @abstractmethod

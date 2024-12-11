@@ -14,17 +14,15 @@ from vispy import scene
 from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
-from ndv.views.bases import filter_mouse_events
-from ndv.views.protocols import CanvasElement, CursorType, PCanvas
+from ndv._types import CursorType
+from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import Callable
 
     import vispy.app
-    from qtpy.QtWidgets import QWidget
 
-    from ndv.views.protocols import CanvasElement
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
@@ -246,20 +244,18 @@ class RectangularROI(scene.visuals.Rectangle):
     # ------------------- End EditableROI interface -------------------------
 
 
-class VispyImageHandle:
+class VispyImageHandle(ImageHandle):
     def __init__(self, visual: scene.Image | scene.Volume) -> None:
         self._visual = visual
         self._ndim = 2 if isinstance(visual, scene.visuals.Image) else 3
 
-    @property
     def data(self) -> np.ndarray:
         try:
             return self._visual._data  # type: ignore [no-any-return]
         except AttributeError:
             return self._visual._last_data  # type: ignore [no-any-return]
 
-    @data.setter
-    def data(self, data: np.ndarray) -> None:
+    def set_data(self, data: np.ndarray) -> None:
         if not data.ndim == self._ndim:
             warnings.warn(
                 f"Got wrong number of dimensions ({data.ndim}) for vispy "
@@ -269,58 +265,46 @@ class VispyImageHandle:
             return
         self._visual.set_data(data)
 
-    @property
     def visible(self) -> bool:
         return bool(self._visual.visible)
 
-    @visible.setter
-    def visible(self, visible: bool) -> None:
+    def set_visible(self, visible: bool) -> None:
         self._visual.visible = visible
 
-    @property
+    # TODO: shouldn't be needed
     def can_select(self) -> bool:
         return False
 
-    @property
     def selected(self) -> bool:
         return False
 
-    @selected.setter
-    def selected(self, selected: bool) -> None:
+    def set_selected(self, selected: bool) -> None:
         raise NotImplementedError("Images cannot be selected")
 
-    @property
     def clim(self) -> Any:
         return self._visual.clim
 
-    @clim.setter
-    def clim(self, clims: tuple[float, float]) -> None:
+    def set_clim(self, clims: tuple[float, float]) -> None:
         with suppress(ZeroDivisionError):
             self._visual.clim = clims
 
-    @property
     def gamma(self) -> float:
         return self._visual.gamma  # type: ignore [no-any-return]
 
-    @gamma.setter
-    def gamma(self, gamma: float) -> None:
+    def set_gamma(self, gamma: float) -> None:
         self._visual.gamma = gamma
 
-    @property
     def cmap(self) -> cmap.Colormap:
-        return self._cmap
+        return self._cmap  # FIXME
 
-    @cmap.setter
-    def cmap(self, cmap: cmap.Colormap) -> None:
+    def set_cmap(self, cmap: cmap.Colormap) -> None:
         self._cmap = cmap
         self._visual.cmap = cmap.to_vispy()
 
-    @property
     def transform(self) -> np.ndarray:
         raise NotImplementedError
 
-    @transform.setter
-    def transform(self, transform: np.ndarray) -> None:
+    def set_transform(self, transform: np.ndarray) -> None:
         raise NotImplementedError
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -375,7 +359,7 @@ class VispyHandleHandle:
         return self._handle.cursor_at(pos)
 
 
-class VispyRoiHandle:
+class VispyRoiHandle(CanvasElement):
     def __init__(self, roi: RectangularROI) -> None:
         self._roi = roi
 
@@ -387,24 +371,19 @@ class VispyRoiHandle:
     def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
         self._roi.vertices = vertices
 
-    @property
     def visible(self) -> bool:
         return bool(self._roi.visible)
 
-    @visible.setter
-    def visible(self, visible: bool) -> None:
+    def set_visible(self, visible: bool) -> None:
         self._roi.visible = visible
 
-    @property
     def can_select(self) -> bool:
         return True
 
-    @property
     def selected(self) -> bool:
         return self._roi.selected
 
-    @selected.setter
-    def selected(self, selected: bool) -> None:
+    def set_selected(self, selected: bool) -> None:
         self._roi.selected = selected
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -447,7 +426,7 @@ class VispyRoiHandle:
         return self._roi.cursor_at(pos)
 
 
-class VispyViewerCanvas(PCanvas):
+class VispyViewerCanvas(ArrayCanvas):
     """Vispy-based viewer for data.
 
     All vispy-specific code is encapsulated in this class (and non-vispy canvases
@@ -496,8 +475,10 @@ class VispyViewerCanvas(PCanvas):
             cam.set_state(state)
         self._view.camera = cam
 
-    def frontend_widget(self) -> QWidget:
-        return cast("QWidget", self._canvas.native)
+    def native(self) -> Any:
+        return self._canvas.native
+
+    def set_visible(self, visible: bool) -> None: ...
 
     def refresh(self) -> None:
         self._canvas.update()

@@ -3,19 +3,18 @@ from __future__ import annotations
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
-import cmap
 import numpy as np
-from psygnal import Signal
 from vispy import scene
 
-from ndv.views.bases import filter_mouse_events
-from ndv.views.protocols import CursorType, PHistogramCanvas
+from ndv._types import CursorType
+from ndv.views.bases import HistogramCanvas, filter_mouse_events
 
 from ._plot_widget import PlotWidget
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    import cmap
     import numpy.typing as npt
 
     from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
@@ -28,14 +27,8 @@ class Grabbable(Enum):
     GAMMA = auto()
 
 
-class VispyHistogramCanvas(PHistogramCanvas):
+class VispyHistogramCanvas(HistogramCanvas):
     """A HistogramCanvas utilizing VisPy."""
-
-    visibleChanged = Signal(bool)
-    autoscaleChanged = Signal(bool)
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
-    gammaChanged = Signal(float)
 
     def __init__(self, *, vertical: bool = False) -> None:
         # ------------ data and state ------------ #
@@ -115,14 +108,16 @@ class VispyHistogramCanvas(PHistogramCanvas):
     def refresh(self) -> None:
         self._canvas.update()
 
+    def set_visible(self, visible: bool) -> None: ...
+
     # ------------- LutView Protocol methods ------------- #
 
-    def set_name(self, name: str) -> None:
+    def set_channel_name(self, name: str) -> None:
         # Nothing to do
         # TODO: maybe show text somewhere
         pass
 
-    def set_lut_visible(self, visible: bool) -> None:
+    def set_channel_visible(self, visible: bool) -> None:
         self._lut_line.visible = visible
         self._gamma_handle.visible = visible
 
@@ -166,7 +161,8 @@ class VispyHistogramCanvas(PHistogramCanvas):
         self._domain = bounds
         self._resize()
 
-    def set_range(self, bounds: tuple[float, float] | None = None) -> None:
+    # FIXME!  incompatible with super class
+    def set_range(self, bounds: tuple[float, float] | None = None) -> None:  # type: ignore
         if bounds is not None:
             if bounds[0] is None or bounds[1] is None:
                 # TODO: Sensible defaults?
@@ -192,8 +188,17 @@ class VispyHistogramCanvas(PHistogramCanvas):
             self._update_lut_lines()
             self._resize()
 
-    def frontend_widget(self) -> Any:
+    def native(self) -> Any:
         return self._canvas.native
+
+    def canvas_to_world(
+        self, pos_xy: tuple[float, float]
+    ) -> tuple[float, float, float]:
+        """Map XY canvas position (pixels) to XYZ coordinate in world space."""
+        raise NotImplementedError
+
+    def elements_at(self, pos_xy: tuple[float, float]) -> list:
+        raise NotImplementedError
 
     # ------------- Private methods ------------- #
 

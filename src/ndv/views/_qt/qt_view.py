@@ -119,32 +119,35 @@ class _QLUTWidget(QWidget):
 class QLutView(LutView):
     def __init__(self) -> None:
         super().__init__()
-        self._widget = _QLUTWidget()
-        self._widget.visible.toggled.connect(self.visibilityChanged.emit_fast)
-        self._widget.cmap.currentColormapChanged.connect(self.cmapChanged.emit_fast)
-        self._widget.clims.valueChanged.connect(self.climsChanged.emit_fast)
-        self._widget.auto_clim.toggled.connect(self.autoscaleChanged.emit_fast)
+        self._qwidget = _QLUTWidget()
+        self._qwidget.visible.toggled.connect(self.visibilityChanged.emit_fast)
+        self._qwidget.cmap.currentColormapChanged.connect(self.cmapChanged.emit_fast)
+        self._qwidget.clims.valueChanged.connect(self.climsChanged.emit_fast)
+        self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit_fast)
+
+    def native(self) -> QWidget:
+        return self._qwidget
 
     def set_channel_name(self, name: str) -> None:
-        self._widget.visible.setText(name)
+        self._qwidget.visible.setText(name)
 
     def set_auto_scale(self, auto: bool) -> None:
-        self._widget.auto_clim.setChecked(auto)
+        self._qwidget.auto_clim.setChecked(auto)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._widget.cmap.setCurrentColormap(cmap)
+        self._qwidget.cmap.setCurrentColormap(cmap)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        self._widget.clims.setValue(clims)
+        self._qwidget.clims.setValue(clims)
 
     def set_gamma(self, gamma: float) -> None:
         pass
 
     def set_channel_visible(self, visible: bool) -> None:
-        self._widget.visible.setChecked(visible)
+        self._qwidget.visible.setChecked(visible)
 
     def set_visible(self, visible: bool) -> None:
-        self._widget.setVisible(visible)
+        self._qwidget.setVisible(visible)
 
 
 class _QDimsSliders(QWidget):
@@ -322,17 +325,21 @@ class QArrayView(ArrayView):
     def __init__(self, canvas_widget: QWidget) -> None:
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
-        qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit_fast)
-        qwdg.channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged.emit_fast)
+        qwdg.dims_sliders.currentIndexChanged.connect(
+            self.currentIndexChanged.emit_fast
+        )
+        qwdg.channel_mode_combo.currentEnumChanged.connect(
+            self.channelModeChanged.emit_fast
+        )
         qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit_fast)
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()
-        self._qwidget.luts.addWidget(view._widget)
+        self._qwidget.luts.addWidget(view.native())
         return view
 
     def remove_lut_view(self, view: LutView) -> None:
-        self._qwidget.luts.removeWidget(cast("QLutView", view)._widget)
+        self._qwidget.luts.removeWidget(cast("QLutView", view).native())
 
     def _on_add_histogram_clicked(self) -> None:
         splitter = self._qwidget.splitter
@@ -387,3 +394,6 @@ class QArrayView(ArrayView):
 
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
+
+    def native(self) -> QWidget:
+        return self._qwidget

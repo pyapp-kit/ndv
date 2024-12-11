@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PHistogramCanvas, PView
+    from ndv.views.bases import ArrayView, HistogramCanvas
 
     LutKey: TypeAlias = int | None
 
@@ -46,8 +46,8 @@ class ViewerController:
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
 
-        self._histogram: PHistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.frontend_widget())
+        self._histogram: HistogramCanvas | None = None
+        self._view = frontend_cls(self._canvas.native())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
@@ -62,7 +62,7 @@ class ViewerController:
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
-    def view(self) -> PView:
+    def view(self) -> ArrayView:
         """Return the front-end view object."""
         return self._view
 
@@ -98,9 +98,13 @@ class ViewerController:
     def add_histogram(self) -> None:
         histogram_cls = get_histogram_canvas_class()  # will raise if not supported
         self._histogram = histogram_cls()
-        self._view.add_histogram(self._histogram.frontend_widget())
+        self._view.add_histogram(self._histogram.native())
         for view in self._lut_controllers.values():
             view.add_lut_view(self._histogram)
+            # FIXME: hack
+            if handles := view.handles:
+                bins, edges = _calc_hist_bins(handles[0].data)
+                self._histogram.set_data(bins, edges)
 
         if self.data is not None:
             self._update_hist_domain_for_dtype(self.data.dtype)

@@ -1,11 +1,13 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import final
 
 import cmap
 from psygnal import Signal
 
+from ._view_base import Viewable
 
-class LutView(ABC):
+
+class LutView(Viewable):
     """Manages LUT properties (contrast, colormap, etc...) in a view object."""
 
     visibilityChanged = Signal(bool)
@@ -47,10 +49,6 @@ class LutView(ABC):
     def set_gamma(self, gamma: float) -> None:
         """Set the gamma value of the LUT."""
         return None
-
-    @abstractmethod
-    def set_visible(self, visible: bool) -> None:
-        """Sets the visibility of the view/widget itself."""
 
     # These methods apply a value to the view without re-emitting the signal.
 
