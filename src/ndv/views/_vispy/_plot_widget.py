@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, cast
 
 from vispy import scene
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import TypeVar
 
     # just here cause vispy has poor type hints
+    T = TypeVar("T")
 
-    class Grid(scene.Grid):
+    class Grid(scene.Grid, Generic[T]):
         def add_view(
             self,
             row: int | None = None,
@@ -31,6 +33,9 @@ if TYPE_CHECKING:
             **kwargs: Any,
         ) -> scene.Widget:
             super().add_widget(...)
+
+        def __getitem__(self, idxs: int | tuple[int, int]) -> T:
+            return super().__getitem__(idxs)  # type: ignore [no-any-return]
 
     class WidgetKwargs(TypedDict, total=False):
         pos: tuple[float, float]

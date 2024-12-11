@@ -120,6 +120,7 @@ class JupyterLutView:
 class JupyterViewerView:
     currentIndexChanged: PSignal = Signal()
     resetZoomClicked: PSignal = Signal()
+    histogramRequested: PSignal = Signal()
     channelModeChanged: PSignal = Signal(ChannelMode)
 
     def __init__(
@@ -260,3 +261,10 @@ class JupyterViewerView:
     def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
+
+    def add_histogram(self, widget: Any) -> None:
+        """Add a histogram widget to the viewer."""
+        warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
+
+    def remove_histogram(self, widget: Any) -> None:
+        """Remove a histogram widget from the viewer."""

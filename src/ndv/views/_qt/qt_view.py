@@ -260,6 +260,7 @@ class _UpCollapsible(QCollapsible):
 class QtViewerView(QWidget):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
+    histogramRequested = Signal()
     channelModeChanged = Signal(ChannelMode)
 
     mousePressed = Signal(MousePressEvent)
@@ -269,7 +270,6 @@ class QtViewerView(QWidget):
     def __init__(
         self,
         canvas_widget: QWidget,
-        histogram_widget: QWidget,
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
@@ -293,6 +293,11 @@ class QtViewerView(QWidget):
         self._set_range_btn = QPushButton(set_range_icon, "", self)
         self._set_range_btn.clicked.connect(self.resetZoomClicked)
 
+        # button to add a histogram
+        add_histogram_icon = QIconifyIcon("foundation:graph-bar")
+        self._add_histogram_btn = QPushButton(add_histogram_icon, "", self)
+        self._add_histogram_btn.clicked.connect(self._on_add_histogram_clicked)
+
         self._luts = _UpCollapsible(
             "LUTs",
             parent=self,
@@ -305,6 +310,7 @@ class QtViewerView(QWidget):
 
         self._btn_layout.addWidget(self._channel_mode_combo)
         # self._btns.addWidget(self._ndims_btn)
+        self._btn_layout.addWidget(self._add_histogram_btn)
         self._btn_layout.addWidget(self._set_range_btn)
         # self._btns.addWidget(self._add_roi_btn)
 
@@ -327,26 +333,39 @@ class QtViewerView(QWidget):
         left_layout.addWidget(self._luts)
         left_layout.addLayout(self._btn_layout)
 
-        hist = QWidget()
-        hist_layout = QVBoxLayout(hist)
-        hist_layout.setSpacing(2)
-        hist_layout.setContentsMargins(0, 4, 0, 0)
-        hist_layout.addWidget(histogram_widget)
-
-        splitter = QSplitter(Qt.Orientation.Vertical, self)
-        splitter.addWidget(left)
-        splitter.addWidget(hist)
-        splitter.setSizes([600, 100])
+        self._splitter = QSplitter(Qt.Orientation.Vertical, self)
+        self._splitter.addWidget(left)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.addWidget(splitter)
+        layout.addWidget(self._splitter)
 
     def add_lut_view(self) -> QLUTWidget:
         wdg = QLUTWidget(self)
         self._luts.addWidget(wdg)
         return wdg
+
+    def _on_add_histogram_clicked(self) -> None:
+        if hasattr(self, "_hist"):
+            sizes = self._splitter.sizes()
+            if not sizes[-1]:
+                self._splitter.setSizes([self.height() - 100, 100])
+            else:
+                self._splitter.setSizes([sum(sizes), 0])
+        else:
+            self.histogramRequested.emit()
+
+    def add_histogram(self, widget: QWidget) -> None:
+        if hasattr(self, "_hist"):
+            raise RuntimeError("Only one histogram can be added at a time")
+        self._hist = widget
+        self._splitter.addWidget(widget)
+        self._splitter.setSizes([self.height() - 100, 100])
+
+    def remove_histogram(self, widget: QWidget) -> None:
+        widget.setParent(None)
+        widget.deleteLater()
 
     def remove_lut_view(self, wdg: QLUTWidget) -> None:
         self._luts.removeWidget(wdg)

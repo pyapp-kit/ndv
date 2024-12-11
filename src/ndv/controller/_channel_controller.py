@@ -49,7 +49,7 @@ class ChannelController:
         view.cmapChanged.connect(self._on_view_lut_cmap_changed)
         view.climsChanged.connect(self._on_view_lut_clims_changed)
         view.gammaChanged.connect(self._on_view_lut_gamma_changed)
-        self._update_view_from_model()
+        self._update_view_from_model(view)
 
     def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
         """The contrast limits in the model have changed."""

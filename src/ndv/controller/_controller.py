@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PView
+    from ndv.views.protocols import PHistogramCanvas, PView
 
     LutKey: TypeAlias = int | None
 
@@ -43,14 +43,11 @@ class ViewerController:
         # get and create the front-end and canvas classes
         frontend_cls = get_view_frontend_class()
         canvas_cls = get_canvas_class()
-        histogram_cls = get_histogram_canvas_class()  # TODO: catch exceptions
-        self._histogram = histogram_cls()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
 
-        self._view = frontend_cls(
-            self._canvas.frontend_widget(), self._histogram.frontend_widget()
-        )
+        self._histogram: PHistogramCanvas | None = None
+        self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
@@ -58,6 +55,7 @@ class ViewerController:
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
+        self._view.histogramRequested.connect(self.add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
@@ -93,11 +91,28 @@ class ViewerController:
         """Set the data to be displayed."""
         self._dd_model.data = data
         self._fully_synchronize_view()
-
-        iinfo = np.iinfo(data.dtype)
-        self._histogram.set_domain((iinfo.min, iinfo.max))
+        self._update_hist_domain_for_dtype(data.dtype)
 
     # -----------------------------------------------------------------------------
+
+    def add_histogram(self) -> None:
+        histogram_cls = get_histogram_canvas_class()  # will raise if not supported
+        self._histogram = histogram_cls()
+        self._view.add_histogram(self._histogram.frontend_widget())
+        for view in self._lut_controllers.values():
+            view.add_lut_view(self._histogram)
+
+        if self.data is not None:
+            self._update_hist_domain_for_dtype(self.data.dtype)
+
+    def _update_hist_domain_for_dtype(self, dtype: np.typing.DTypeLike) -> None:
+        if self._histogram is None:
+            return
+
+        dtype = np.dtype(dtype)
+        if dtype.kind in "iu":
+            iinfo = np.iinfo(dtype)
+            self._histogram.set_domain((iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -227,24 +242,28 @@ class ViewerController:
                     # so we create a new LUT model for it
                     model = self.model.luts[key] = LUTModel()
 
+                lut_views = [self._view.add_lut_view()]
+                if self._histogram is not None:
+                    lut_views.append(self._histogram)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
                     key=key,
                     model=model,
-                    views=[self._view.add_lut_view(), self._histogram],
+                    views=lut_views,
                 )
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
                 lut_ctrl.add_handle(self._canvas.add_image(data))
-                self._histogram.set_range()
-                # self._canvas.set_range()
             else:
                 lut_ctrl.update_texture_data(data)
-                # TODO: once data comes in in chunks, we'll need a proper stateful
-                # stats object that calculates the histogram incrementally
-                counts, bin_edges = _calc_hist_bins(data)
-                self._histogram.set_data(counts, bin_edges)
-                # self._histogram.set_range()
+                if self._histogram is not None:
+                    # TODO: once data comes in in chunks, we'll need a proper stateful
+                    # stats object that calculates the histogram incrementally
+                    counts, bin_edges = _calc_hist_bins(data)
+                    # TODO: currently this is updating the histogram on *any*
+                    # channel index... so it doesn't work with composite mode
+                    self._histogram.set_data(counts, bin_edges)
+                    self._histogram.set_range()
 
         self._canvas.refresh()
 
