@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from qtpy.QtCore import QSize
+from qtpy.QtCore import QSize, Qt
 from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import QLabel, QPushButton, QWidget
-from superqt import QIconifyIcon
+from superqt import QEnumComboBox, QIconifyIcon
+
+if TYPE_CHECKING:
+    from qtpy.QtGui import QStandardItem, QStandardItemModel
 
 SPIN_GIF = str(Path(__file__).parent / "spin.gif")
 
@@ -35,35 +39,41 @@ class QSpinner(QLabel):
 
 class ChannelMode(str, Enum):
     COMPOSITE = "composite"
+    RGBA = "rgba"
     MONO = "mono"
+
+    @classmethod
+    def _missing_(cls, value: object) -> ChannelMode | None:
+        if value == "rgb":
+            return ChannelMode.RGBA
+        return None
 
     def __str__(self) -> str:
         return self.value
 
 
-class ChannelModeButton(QPushButton):
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        self.setCheckable(True)
-        self.toggled.connect(self.next_mode)
+class ChannelModeCombo(QEnumComboBox):
+    """A ComboBox for ChannelMode, where the RGBA enum can be removed."""
 
-        # set minimum width to the width of the larger string 'composite'
-        self.setMinimumWidth(92)  # magic number :/
+    def __init__(self, parent: QWidget | None = None, allow_rgba: bool = False):
+        super().__init__(parent, enum_class=ChannelMode)
+        # Find the RGBA item
+        idx = list(ChannelMode.__members__.keys()).index("RGBA")
+        model: QStandardItemModel = self.model()
+        self._rgba_item: QStandardItem = model.item(idx)
 
-    def next_mode(self) -> None:
-        if self.isChecked():
-            self.setMode(ChannelMode.MONO)
-        else:
-            self.setMode(ChannelMode.COMPOSITE)
+        self.allow_rgba(allow_rgba)
 
-    def mode(self) -> ChannelMode:
-        return ChannelMode.MONO if self.isChecked() else ChannelMode.COMPOSITE
-
-    def setMode(self, mode: ChannelMode) -> None:
-        # we show the name of the next mode, not the current one
-        other = ChannelMode.COMPOSITE if mode is ChannelMode.MONO else ChannelMode.MONO
-        self.setText(str(other))
-        self.setChecked(mode == ChannelMode.MONO)
+    def allow_rgba(self, enable: bool) -> None:
+        flags = self._rgba_item.flags()
+        self._rgba_item.setFlags(
+            flags | Qt.ItemFlag.ItemIsEnabled
+            if enable
+            else flags & ~Qt.ItemFlag.ItemIsEnabled
+        )
+        if self.currentEnum() == ChannelMode.RGBA and not enable:
+            # Arbitrary fallback mode
+            self.setCurrentEnum(ChannelMode.COMPOSITE)
 
 
 class ROIButton(QPushButton):
