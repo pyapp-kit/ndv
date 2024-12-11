@@ -45,6 +45,7 @@ dependencies = [
 [project.optional-dependencies]
 qt = ["vispy", "pyopengl", "pyqt6", "imageio[tifffile]"]
 jupyter = ["vispy", "pyopengl", "ipywidgets", "jupyter", "jupyter_rfb", "glfw", "imageio[tifffile]"]
+wx = ["vispy", "pyopengl", "wxpython", "imageio[tifffile]"]
 pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]

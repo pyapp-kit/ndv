@@ -21,6 +21,7 @@ _APP_INSTANCE: Any | None = None  # pointer to the global app instsance.
 class GuiFrontend(str, Enum):
     QT = "qt"
     JUPYTER = "jupyter"
+    WX = "wx"
 
 
 class CanvasBackend(str, Enum):
@@ -41,6 +42,11 @@ def get_view_frontend_class() -> type[PView]:
         from ._jupyter.jupyter_view import JupyterViewerView
 
         return JupyterViewerView
+
+    if frontend == GuiFrontend.WX:
+        from ._wx.wx_view import WxViewerView
+
+        return WxViewerView
 
     raise RuntimeError("No GUI frontend found")
 
@@ -89,6 +95,12 @@ def _is_running_in_qapp() -> bool:
     return False
 
 
+def _is_running_in_wxapp() -> bool:
+    if wx := sys.modules.get("wx"):
+        return wx.App.Get() is not None
+    return False
+
+
 def _try_start_qapp() -> bool:
     global _APP_INSTANCE
     try:
@@ -99,6 +111,20 @@ def _try_start_qapp() -> bool:
             qapp.setOrganizationName("ndv")
             qapp.setApplicationName("ndv")
         _APP_INSTANCE = qapp
+        return True
+    except Exception:
+        return False
+
+
+def _try_start_wxapp() -> bool:
+    global _APP_INSTANCE
+    try:
+        import wx
+
+        if (wxapp := wx.App.Get()) is None:
+            wxapp = wx.App()
+        _APP_INSTANCE = wxapp
+
         return True
     except Exception:
         return False
@@ -118,8 +144,12 @@ def gui_frontend() -> GuiFrontend:
         return GuiFrontend.JUPYTER
     if _is_running_in_qapp():
         return GuiFrontend.QT
+    if _is_running_in_wxapp():
+        return GuiFrontend.WX
     if _try_start_qapp():
         return GuiFrontend.QT
+    if _try_start_wxapp():
+        return GuiFrontend.WX
     raise RuntimeError(f"Could not find an appropriate GUI frontend: {valid!r}")
 
 
@@ -158,5 +188,14 @@ def run_app() -> None:
                 f"Got unexpected application type: {type(_APP_INSTANCE)}"
             )
         _APP_INSTANCE.exec()
+    elif frontend == GuiFrontend.WX:
+        import wx
+
+        _try_start_wxapp()
+        if not isinstance(_APP_INSTANCE, wx.App):
+            raise RuntimeError(
+                f"Got unexpected application type: {type(_APP_INSTANCE)}"
+            )
+        _APP_INSTANCE.MainLoop()
     elif frontend == GuiFrontend.JUPYTER:
         pass  # nothing to do here

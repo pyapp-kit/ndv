@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -231,6 +232,13 @@ class ViewerController:
             response = future.result()
             key = response.channel_key
             data = response.data
+            if data.ndim != 2:
+                warnings.warn(
+                    f"Received data with shape {data.shape}, but expected 2D data.",
+                    RuntimeWarning,
+                    stacklevel=1,
+                )
+                return
 
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:

@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from typing import Callable
 
     import vispy.app
-    from qtpy.QtWidgets import QWidget
 
     from ndv.views.protocols import CanvasElement
 
@@ -496,8 +495,8 @@ class VispyViewerCanvas(PCanvas):
             cam.set_state(state)
         self._view.camera = cam
 
-    def frontend_widget(self) -> QWidget:
-        return cast("QWidget", self._canvas.native)
+    def frontend_widget(self) -> Any:
+        return self._canvas.native
 
     def refresh(self) -> None:
         self._canvas.update()
