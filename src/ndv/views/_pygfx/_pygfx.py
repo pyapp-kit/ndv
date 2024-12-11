@@ -620,3 +620,7 @@ class GfxArrayCanvas(ArrayCanvas):
             if _is_inside(bb, pos) and (element := self._elements.get(c)):
                 elements.append(element)
         return elements
+
+    def set_visible(self, visible: bool) -> None:
+        """Set the visibility of the canvas."""
+        self._canvas.visible = visible
