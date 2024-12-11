@@ -16,29 +16,6 @@ class HistogramCanvas(GraphicsCanvas, LutView):
     def frontend_widget(self) -> Any:
         """Returns an object understood by the widget frontend."""
 
-    def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
-        """Sets the domain of the view.
-
-        TODO: What is the "extent of the data"? Is it the bounds of the
-        histogram, or the bounds of (clims + histogram)?
-
-        Properties
-        ----------
-        bounds : tuple[float, float] | None
-            If a tuple, sets the displayed extremes of the x axis to the passed
-            values. If None, sets them to the extent of the data instead.
-        """
-
-    def set_range(self, bounds: tuple[float, float] | None = None) -> None:
-        """Sets the range of the view.
-
-        Properties
-        ----------
-        bounds : tuple[float, float] | None
-            If a tuple, sets the displayed extremes of the y axis to the passed
-            values. If None, sets them to the extent of the data instead.
-        """
-
     def set_vertical(self, vertical: bool) -> None:
         """Sets the axis of the domain.
 

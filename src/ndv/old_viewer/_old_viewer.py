@@ -567,9 +567,13 @@ class NDViewer(QWidget):
                 else GRAYS
             )
             if datum.ndim == 2:
-                handles.append(self._canvas.add_image(datum, cmap=cm))
+                handle = self._canvas.add_image(datum)
+                handle.set_cmap(cm)
+                handles.append(handle)
             elif datum.ndim == 3:
-                handles.append(self._canvas.add_volume(datum, cmap=cm))
+                handle = self._canvas.add_volume(datum)
+                handle.set_cmap(cm)
+                handles.append(handle)
             if imkey not in self._lut_ctrls:
                 ch_index = index.get(self._channel_axis, 0)
                 self._lut_ctrls[imkey] = c = LutControl(

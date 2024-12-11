@@ -39,9 +39,9 @@ def get_view_frontend_class() -> type[ArrayView]:
         return QArrayView
 
     if frontend == GuiFrontend.JUPYTER:
-        from ._jupyter.jupyter_view import JupyterViewerView
+        from ._jupyter.jupyter_view import JupyterArrayView
 
-        return JupyterViewerView
+        return JupyterArrayView
 
     raise RuntimeError("No GUI frontend found")
 
@@ -59,9 +59,9 @@ def get_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
         return VispyViewerCanvas
 
     if _backend == CanvasBackend.PYGFX:
-        from ndv.views._pygfx._pygfx import PyGFXViewerCanvas
+        from ndv.views._pygfx._pygfx import GfxArrayCanvas
 
-        return PyGFXViewerCanvas
+        return GfxArrayCanvas
 
     raise RuntimeError(f"No canvas backend found for {_backend}")
 

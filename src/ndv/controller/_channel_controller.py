@@ -10,7 +10,8 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ndv.models._lut_model import LUTModel
-    from ndv.views.bases import ImageHandle, LutView
+    from ndv.views.bases import LutView
+    from ndv.views.bases.graphics._canvas_elements import ImageHandle
 
     LutKey = int | None
 

@@ -151,25 +151,19 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
 
-    def set_domain(self, bounds: tuple[float, float] | None = None) -> None:
-        if bounds is not None:
-            if bounds[0] is None or bounds[1] is None:
-                # TODO: Sensible defaults?
-                raise ValueError("Domain min/max cannot be None!")
-            if bounds[0] > bounds[1]:
-                bounds = (bounds[1], bounds[0])
-        self._domain = bounds
-        self._resize()
-
-    # FIXME!  incompatible with super class
-    def set_range(self, bounds: tuple[float, float] | None = None) -> None:  # type: ignore
-        if bounds is not None:
-            if bounds[0] is None or bounds[1] is None:
-                # TODO: Sensible defaults?
-                raise ValueError("Range min/max cannot be None!")
-            if bounds[0] > bounds[1]:
-                bounds = (bounds[1], bounds[0])
-        self._range = bounds
+    def set_range(
+        self,
+        x: tuple[float, float] | None = None,
+        y: tuple[float, float] | None = None,
+        z: tuple[float, float] | None = None,
+        margin: float = 0,
+    ) -> None:
+        if x and x[0] > x[1]:
+            x = (x[1], x[0])
+        if y and y[0] > y[1]:
+            y = (y[1], y[0])
+        self._range = x
+        self._domain = y
         self._resize()
 
     def set_vertical(self, vertical: bool) -> None:

@@ -120,10 +120,11 @@ class QLutView(LutView):
     def __init__(self) -> None:
         super().__init__()
         self._qwidget = _QLUTWidget()
-        self._qwidget.visible.toggled.connect(self.visibilityChanged.emit_fast)
-        self._qwidget.cmap.currentColormapChanged.connect(self.cmapChanged.emit_fast)
-        self._qwidget.clims.valueChanged.connect(self.climsChanged.emit_fast)
-        self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit_fast)
+        # TODO: use emit_fast
+        self._qwidget.visible.toggled.connect(self.visibilityChanged.emit)
+        self._qwidget.cmap.currentColormapChanged.connect(self.cmapChanged.emit)
+        self._qwidget.clims.valueChanged.connect(self.climsChanged.emit)
+        self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit)
 
     def native(self) -> QWidget:
         return self._qwidget
@@ -325,13 +326,11 @@ class QArrayView(ArrayView):
     def __init__(self, canvas_widget: QWidget) -> None:
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
-        qwdg.dims_sliders.currentIndexChanged.connect(
-            self.currentIndexChanged.emit_fast
-        )
-        qwdg.channel_mode_combo.currentEnumChanged.connect(
-            self.channelModeChanged.emit_fast
-        )
-        qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit_fast)
+
+        # TODO: use emit_fast
+        qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
+        qwdg.channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged.emit)
+        qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit)
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()

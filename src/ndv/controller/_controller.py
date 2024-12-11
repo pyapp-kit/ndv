@@ -103,7 +103,7 @@ class ViewerController:
             view.add_lut_view(self._histogram)
             # FIXME: hack
             if handles := view.handles:
-                bins, edges = _calc_hist_bins(handles[0].data)
+                bins, edges = _calc_hist_bins(handles[0].data())
                 self._histogram.set_data(bins, edges)
 
         if self.data is not None:
@@ -116,7 +116,7 @@ class ViewerController:
         dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
-            self._histogram.set_domain((iinfo.min, iinfo.max))
+            self._histogram.set_range(x=(iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True

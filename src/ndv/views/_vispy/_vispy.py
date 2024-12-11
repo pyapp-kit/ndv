@@ -5,7 +5,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
 from weakref import WeakKeyDictionary
 
-import cmap
+import cmap as _cmap
 import numpy as np
 import vispy
 import vispy.scene
@@ -15,7 +15,12 @@ from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
 from ndv._types import CursorType
-from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
+from ndv.views.bases import ArrayCanvas, filter_mouse_events
+from ndv.views.bases.graphics._canvas_elements import (
+    CanvasElement,
+    ImageHandle,
+    RoiHandle,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -294,10 +299,10 @@ class VispyImageHandle(ImageHandle):
     def set_gamma(self, gamma: float) -> None:
         self._visual.gamma = gamma
 
-    def cmap(self) -> cmap.Colormap:
+    def cmap(self) -> _cmap.Colormap:
         return self._cmap  # FIXME
 
-    def set_cmap(self, cmap: cmap.Colormap) -> None:
+    def set_cmap(self, cmap: _cmap.Colormap) -> None:
         self._cmap = cmap
         self._visual.cmap = cmap.to_vispy()
 
@@ -359,16 +364,14 @@ class VispyHandleHandle:
         return self._handle.cursor_at(pos)
 
 
-class VispyRoiHandle(CanvasElement):
+class VispyRoiHandle(RoiHandle):
     def __init__(self, roi: RectangularROI) -> None:
         self._roi = roi
 
-    @property
     def vertices(self) -> Sequence[Sequence[float]]:
         return self._roi.vertices
 
-    @vertices.setter
-    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
+    def set_vertices(self, vertices: Sequence[Sequence[float]]) -> None:
         self._roi.vertices = vertices
 
     def visible(self) -> bool:
@@ -392,31 +395,23 @@ class VispyRoiHandle(CanvasElement):
     def move(self, pos: Sequence[float]) -> None:
         self._roi.move(pos)
 
-    @property
     def color(self) -> Any:
         return self._roi.color
 
-    @color.setter
-    def color(self, color: Any | None = None) -> None:
+    def set_color(self, color: _cmap.Color | None) -> None:
         if color is None:
-            color = cmap.Color("transparent")
-        if not isinstance(color, cmap.Color):
-            color = cmap.Color(color)
+            color = _cmap.Color("transparent")
         # NB: To enable dragging the shape within the border,
         # we require a positive alpha.
         alpha = max(color.alpha, 1e-6)
         self._roi.color = Color(color.hex, alpha=alpha)
 
-    @property
-    def border_color(self) -> Any:
-        return self._roi.border_color
+    def border_color(self) -> _cmap.Color:
+        return _cmap.Color(self._roi.border_color.rgba)
 
-    @border_color.setter
-    def border_color(self, color: Any | None = None) -> None:
+    def set_border_color(self, color: _cmap.Color | None) -> None:
         if color is None:
-            color = cmap.Color("yellow")
-        if not isinstance(color, cmap.Color):
-            color = cmap.Color(color)
+            color = _cmap.Color("yellow")
         self._roi.border_color = Color(color.hex, alpha=color.alpha)
 
     def remove(self) -> None:
@@ -483,12 +478,7 @@ class VispyViewerCanvas(ArrayCanvas):
     def refresh(self) -> None:
         self._canvas.update()
 
-    def add_image(
-        self,
-        data: np.ndarray | None = None,
-        cmap: cmap.Colormap | None = None,
-        clims: tuple[float, float] | None = None,
-    ) -> VispyImageHandle:
+    def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         img = scene.visuals.Image(data, parent=self._view.scene)
         img.set_gl_state("additive", depth_test=False)
@@ -497,15 +487,9 @@ class VispyViewerCanvas(ArrayCanvas):
         self._elements[img] = handle
         if data is not None:
             self.set_range()
-        if cmap is not None:
-            handle.cmap = cmap
-        if clims is not None:
-            handle.clim = clims
         return handle
 
-    def add_volume(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
-    ) -> VispyImageHandle:
+    def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
         vol = scene.visuals.Volume(
             data, parent=self._view.scene, interpolation="nearest"
         )
@@ -515,15 +499,13 @@ class VispyViewerCanvas(ArrayCanvas):
         self._elements[vol] = handle
         if data is not None:
             self.set_range()
-        if cmap is not None:
-            handle.cmap = cmap
         return handle
 
     def add_roi(
         self,
         vertices: Sequence[tuple[float, float]] | None = None,
-        color: cmap.Color | None = None,
-        border_color: cmap.Color | None = None,
+        color: _cmap.Color | None = None,
+        border_color: _cmap.Color | None = None,
     ) -> VispyRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         roi = RectangularROI(parent=self._view.scene)
@@ -532,10 +514,10 @@ class VispyViewerCanvas(ArrayCanvas):
         for h in roi._handles:
             self._elements[h] = VispyHandleHandle(h, handle)
         if vertices:
-            handle.vertices = vertices
+            handle.set_vertices(vertices)
             self.set_range()
-        handle.color = color
-        handle.border_color = border_color
+        handle.set_color(color)
+        handle.set_border_color(border_color)
         return handle
 
     def set_range(

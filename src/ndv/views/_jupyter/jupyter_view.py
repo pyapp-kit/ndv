@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 import cmap
 import ipywidgets as widgets
-from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
+from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -15,22 +15,14 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
-    from ndv.views.protocols import PLutView, PSignal
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
 
 
-class JupyterLutView:
-    visibleChanged: PSignal = Signal(bool)
-    autoscaleChanged: PSignal = Signal(bool)
-    cmapChanged: PSignal = Signal(cmap.Colormap)
-    climsChanged: PSignal = Signal(tuple)
-    gammaChanged: PSignal = Signal(float)
-
+class JupyterLutView(LutView):
     def __init__(self) -> None:
         # WIDGETS
-
         self._visible = widgets.Checkbox(value=True)
         self._cmap = widgets.Dropdown(
             options=["gray", "green", "magenta", "cubehelix"], value="gray"
@@ -55,16 +47,10 @@ class JupyterLutView:
         # LAYOUT
 
         self.layout = widgets.HBox(
-            [
-                self._visible,
-                self._cmap,
-                self._clims,
-                self._auto_clim,
-            ]
+            [self._visible, self._cmap, self._clims, self._auto_clim]
         )
 
         # CONNECTIONS
-
         self._visible.observe(self._on_visible_changed, names="value")
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
@@ -76,7 +62,7 @@ class JupyterLutView:
         self.climsChanged.emit(self._clims.value)
 
     def _on_visible_changed(self, change: dict[str, Any]) -> None:
-        self.visibleChanged.emit(self._visible.value)
+        self.visibilityChanged.emit(self._visible.value)
 
     def _on_cmap_changed(self, change: dict[str, Any]) -> None:
         self.cmapChanged.emit(cmap.Colormap(self._cmap.value))
@@ -86,48 +72,44 @@ class JupyterLutView:
 
     # ------------------ receive changes from the controller ---------------
 
-    def set_name(self, name: str) -> None:
+    def set_channel_name(self, name: str) -> None:
         self._visible.description = name
 
     # NOTE: it's important to block signals when setting values from the controller
     # to avoid loops, unnecessary updates, and unexpected behavior
 
     def set_auto_scale(self, auto: bool) -> None:
-        with self.autoscaleChanged.blocked():  # type: ignore [attr-defined]
+        with self.autoscaleChanged.blocked():
             self._auto_clim.value = auto
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        with self.cmapChanged.blocked():  # type: ignore [attr-defined]
+        with self.cmapChanged.blocked():
             self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        with self.climsChanged.blocked():  # type: ignore [attr-defined]
+        with self.climsChanged.blocked():
             self._clims.value = clims
 
-    def set_lut_visible(self, visible: bool) -> None:
-        with self.visibleChanged.blocked():  # type: ignore [attr-defined]
+    def set_channel_visible(self, visible: bool) -> None:
+        with self.visibilityChanged.blocked():
             self._visible.value = visible
 
     def set_gamma(self, gamma: float) -> None:
         pass
 
-    def setVisible(self, visible: bool) -> None:
+    def set_visible(self, visible: bool) -> None:
         # show or hide the actual widget itself
         self.layout.layout.display = "flex" if visible else "none"
 
+    def native(self) -> Any:
+        return self.layout
+
 
 # this is a PView
-class JupyterViewerView:
-    currentIndexChanged: PSignal = Signal()
-    resetZoomClicked: PSignal = Signal()
-    histogramRequested: PSignal = Signal()
-    channelModeChanged: PSignal = Signal(ChannelMode)
-
+class JupyterArrayView(ArrayView):
     def __init__(
         self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
     ) -> None:
-        super().__init__()
-
         # WIDGETS
         self._canvas_widget = canvas_widget
 
@@ -202,7 +184,7 @@ class JupyterViewerView:
         changed = False
         # this type ignore is only necessary because we had to override the signal
         # to be a PSignal in the class def above :(
-        with self.currentIndexChanged.blocked():  # type: ignore [attr-defined]
+        with self.currentIndexChanged.blocked():
             for axis, val in value.items():
                 if isinstance(val, slice):
                     raise NotImplementedError("Slices are not supported yet")
@@ -220,16 +202,13 @@ class JupyterViewerView:
         """Add a LUT view to the viewer."""
         wdg = JupyterLutView()
         self.layout.children = (*self.layout.children, wdg.layout)
-
-        # this cast is necessary because psygnal.Signal() is not being recognized
-        # as a PSignalDescriptor by the type checker
         return wdg
 
-    def remove_lut_view(self, view: PLutView) -> None:
+    def remove_lut_view(self, view: LutView) -> None:
         """Remove a LUT view from the viewer."""
-        _view = cast("JupyterLutView", view)
+        view = cast("JupyterLutView", view)
         self.layout.children = tuple(
-            wdg for wdg in self.layout.children if wdg != _view.layout
+            wdg for wdg in self.layout.children if wdg != view.native()
         )
 
     def show(self) -> None:
@@ -251,7 +230,7 @@ class JupyterViewerView:
         self._hover_info_label.value = hover_info
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
-        with self.channelModeChanged.blocked():  # type: ignore [attr-defined]
+        with self.channelModeChanged.blocked():
             self._channel_mode_combo.value = mode.value
 
     def _on_slider_change(self, change: dict[str, Any]) -> None:
