@@ -158,12 +158,18 @@ class VispyHistogramCanvas(HistogramCanvas):
         z: tuple[float, float] | None = None,
         margin: float = 0,
     ) -> None:
-        if x and x[0] > x[1]:
-            x = (x[1], x[0])
-        if y and y[0] > y[1]:
-            y = (y[1], y[0])
-        self._range = x
-        self._domain = y
+        if x:
+            if x[0] > x[1]:
+                x = (x[1], x[0])
+        elif self._bin_edges is not None:
+            x = self._bin_edges[0], self._bin_edges[-1]
+        if y:
+            if y[0] > y[1]:
+                y = (y[1], y[0])
+        elif self._values is not None:
+            y = (0, np.max(self._values))
+        self._range = y
+        self._domain = x
         self._resize()
 
     def set_vertical(self, vertical: bool) -> None:

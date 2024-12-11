@@ -103,8 +103,9 @@ class ViewerController:
             view.add_lut_view(self._histogram)
             # FIXME: hack
             if handles := view.handles:
-                bins, edges = _calc_hist_bins(handles[0].data())
-                self._histogram.set_data(bins, edges)
+                data = handles[0].data()
+                counts, edges = _calc_hist_bins(data)
+                self._histogram.set_data(counts, edges)
 
         if self.data is not None:
             self._update_hist_domain_for_dtype(self.data.dtype)
