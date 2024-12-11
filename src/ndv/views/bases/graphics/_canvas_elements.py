@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
-from ndv.views.bases.graphics._mouseable import Mouseable
+from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
