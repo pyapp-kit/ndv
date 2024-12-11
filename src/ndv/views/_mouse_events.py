@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from types import MethodType
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -35,7 +34,7 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         from qtpy.QtGui import QMouseEvent
 
         if not isinstance(canvas, QObject):
-            raise TypeError(f"Expected vispy canvas to be QObject, got {type(canvas)}")
+            raise TypeError(f"Expected canvas to be QObject, got {type(canvas)}")
 
         class Filter(QObject):
             def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
@@ -82,7 +81,9 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         from jupyter_rfb import RemoteFrameBuffer
 
         if not isinstance(canvas, RemoteFrameBuffer):
-            raise TypeError(f"Expected vispy canvas to be QObject, got {type(canvas)}")
+            raise TypeError(
+                f"Expected canvas to be RemoteFrameBuffer, got {type(canvas)}"
+            )
 
         # patch the handle_event from _jupyter_rfb.CanvasBackend
         # to intercept various mouse events.
@@ -108,8 +109,40 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         return lambda: setattr(canvas, "handle_event", super_handle_event)
 
     elif frontend == GuiFrontend.WX:
-        warnings.warn(
-            "wx backend doesn't support mouse events", RuntimeWarning, stacklevel=2
-        )
-        return lambda: None
+        from wx import EVT_LEFT_DOWN, EVT_LEFT_UP, EVT_MOTION, EvtHandler, MouseEvent
+
+        if not isinstance(canvas, EvtHandler):
+            raise TypeError(
+                f"Expected vispy canvas to be wx EvtHandler, got {type(canvas)}"
+            )
+
+        # TIP: event.Skip() can be used to allow the event to propagate to other
+        # handlers.
+
+        def on_mouse_move(event: MouseEvent) -> None:
+            mme = MouseMoveEvent(x=event.GetX(), y=event.GetY())
+            receiver.on_mouse_move(mme)
+            receiver.mouseMoved.emit(mme)
+
+        def on_mouse_press(event: MouseEvent) -> None:
+            mpe = MousePressEvent(x=event.GetX(), y=event.GetY())
+            receiver.on_mouse_press(mpe)
+            receiver.mousePressed.emit(mpe)
+
+        def on_mouse_release(event: MouseEvent) -> None:
+            mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY())
+            receiver.on_mouse_release(mre)
+            receiver.mouseReleased.emit(mre)
+
+        canvas.Bind(EVT_MOTION, on_mouse_move)
+        canvas.Bind(EVT_LEFT_DOWN, on_mouse_press)
+        canvas.Bind(EVT_LEFT_UP, on_mouse_release)
+
+        def _unbind() -> None:
+            canvas.Unbind(EVT_MOTION, on_mouse_move)
+            canvas.Unbind(EVT_LEFT_DOWN, on_mouse_press)
+            canvas.Unbind(EVT_LEFT_UP, on_mouse_release)
+
+        return _unbind
+
     raise RuntimeError(f"Unsupported frontend: {frontend}")
