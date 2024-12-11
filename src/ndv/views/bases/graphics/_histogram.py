@@ -1,5 +1,3 @@
-from typing import Any
-
 import numpy as np
 
 from ndv.views.bases._lut_view import LutView
@@ -12,9 +10,6 @@ class HistogramCanvas(GraphicsCanvas, LutView):
 
     # TODO: Remove?
     def refresh(self) -> None: ...
-
-    def frontend_widget(self) -> Any:
-        """Returns an object understood by the widget frontend."""
 
     def set_vertical(self, vertical: bool) -> None:
         """Sets the axis of the domain.

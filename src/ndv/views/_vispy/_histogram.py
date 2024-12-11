@@ -327,7 +327,9 @@ class VispyHistogramCanvas(HistogramCanvas):
             self.gammaChanged.emit(-np.log2(y / y1))
             return False
 
-        self.get_cursor(pos).apply_to(self.frontend_widget())
+        cursor = self.get_cursor(pos)
+        print("cursor:", cursor)
+        cursor.apply_to(self.native())
         return False
 
     def _find_nearby_node(

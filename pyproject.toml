@@ -135,10 +135,7 @@ show_error_codes = true
 pretty = true
 plugins = ["pydantic.mypy"]
 
-# Alternatively, if _old_viewer is a submodule of ndv
-[[tool.mypy.overrides]]
-module = "ndv.old_viewer.*"
-ignore_errors = true
+
 
 [[tool.mypy.overrides]]
 module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]

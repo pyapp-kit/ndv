@@ -26,21 +26,26 @@ from ._qt._dims_slider import DimsSliders
 from ._qt._lut_control import LutControl
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
     from concurrent.futures import Future
     from typing import Any, Callable, TypeAlias
 
     from qtpy.QtCore import QObject
     from qtpy.QtGui import QCloseEvent, QKeyEvent
 
-    DimKey = Hashable
+    from ndv.views.bases.graphics._canvas import ArrayCanvas
+    from ndv.views.bases.graphics._canvas_elements import (
+        CanvasElement,
+        ImageHandle,
+        RoiHandle,
+    )
+
+    DimKey = int
     Index = int | slice
-    Indices = Mapping[Hashable, Index]
-    Sizes = Mapping[Hashable, int]
+    Indices = Mapping[Any, Index]
+    Sizes = Mapping[Any, int]
 
-    from ndv.views.protocols import CanvasElement, PCanvas, PImageHandle, PRoiHandle
-
-    ImgKey: TypeAlias = Hashable
+    ImgKey: TypeAlias = Any
     # any mapping of dimensions to sizes
     SizesLike: TypeAlias = Sizes | Iterable[int | tuple[DimKey, int] | Sequence]
 
@@ -129,7 +134,7 @@ class NDViewer(QWidget):
         self._data_wrapper: DataWrapper | None = None
 
         # mapping of key to a list of objects that control image nodes in the canvas
-        self._img_handles: defaultdict[ImgKey, list[PImageHandle]] = defaultdict(list)
+        self._img_handles: defaultdict[ImgKey, list[ImageHandle]] = defaultdict(list)
         # mapping of same keys to the LutControl objects control image display props
         self._lut_ctrls: dict[ImgKey, LutControl] = {}
         self._lut_ctrl_state: dict[ImgKey, dict] = {}
@@ -155,7 +160,7 @@ class NDViewer(QWidget):
         # Canvas selection
         self._selection: CanvasElement | None = None
         # ROI
-        self._roi: PRoiHandle | None = None
+        self._roi: RoiHandle | None = None
 
         # WIDGETS ----------------------------------------------------
 
@@ -182,9 +187,9 @@ class NDViewer(QWidget):
         # place to display arbitrary text
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
-        self._canvas: PCanvas = get_canvas_class()()
+        self._canvas: ArrayCanvas = get_canvas_class()()
         self._canvas.set_ndim(self._ndims)
-        self._qcanvas = self._canvas.frontend_widget()
+        self._qcanvas = self._canvas.native()
 
         # Install an event filter so we can intercept mouse/key events
         self._qcanvas.installEventFilter(self)
@@ -447,7 +452,7 @@ class NDViewer(QWidget):
         self._add_roi_btn.setEnabled(self._ndims == 2)
         # FIXME: When toggling 2D again, ROIs cannot be selected
         if self._roi:
-            self._roi.visible = self._ndims == 2
+            self._roi.set_visible(self._ndims == 2)
 
     def _update_slider_ranges(self) -> None:
         """Set the maximum values of the sliders.
@@ -557,7 +562,7 @@ class NDViewer(QWidget):
         datum = self._reduce_data_for_display(data)
         if handles := self._img_handles[imkey]:
             for handle in handles:
-                handle.data = datum
+                handle.set_data(datum)
             if ctrl := self._lut_ctrls.get(imkey, None):
                 ctrl.update_autoscale()
         else:
@@ -680,7 +685,7 @@ class NDViewer(QWidget):
             ev_pos = event.position()
             pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
             self._roi.move(pos)
-            self._roi.visible = True
+            self._roi.set_visible(True)
         return False
 
     def _press_element(self, event: QMouseEvent) -> bool:
@@ -690,19 +695,19 @@ class NDViewer(QWidget):
         elements = self._canvas.elements_at(ev_pos)
         # Deselect prior selection before editing new selection
         if self._selection:
-            self._selection.selected = False
+            self._selection.set_selected(False)
         for e in elements:
-            if e.can_select:
+            if e.can_select():
                 e.start_move(pos)
                 # Select new selection
                 self._selection = e
-                self._selection.selected = True
+                self._selection.set_selected(True)
                 return False
         return False
 
     def _move_selection(self, event: QMouseEvent) -> bool:
         if event.buttons() == Qt.MouseButton.LeftButton:
-            if self._selection and self._selection.selected:
+            if self._selection and self._selection.selected():
                 ev_pos = event.pos()
                 pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
                 self._selection.move(pos)
@@ -752,7 +757,7 @@ class NDViewer(QWidget):
                     # texture has already been reduced to 2D). But a more complete
                     # implementation would gather the full current nD index and query
                     # the data source directly.
-                    value = handle.data[y, x]
+                    value = handle.data()[y, x]
                     if isinstance(value, (np.floating, float)):
                         value = f"{value:.2f}"
                     channels.append(f" {n}: {value}")

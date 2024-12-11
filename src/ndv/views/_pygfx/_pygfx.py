@@ -159,30 +159,25 @@ class PyGFXRoiHandle(pygfx.WorldObject):
             handles.visible = self.selected
         self._render()
 
-    @property
     def can_select(self) -> bool:
         return True
 
-    @property
     def selected(self) -> bool:
         if self._handles:
             return bool(self._handles.visible)
         # Can't be selected without handles
         return False
 
-    @selected.setter
-    def selected(self, selected: bool) -> None:
+    def set_selected(self, selected: bool) -> None:
         if self._handles:
             self._handles.visible = selected
 
-    @property
     def color(self) -> Any:
         if self._fill:
             return _cmap.Color(self._fill.material.color)
         return _cmap.Color("transparent")
 
-    @color.setter
-    def color(self, color: _cmap.Color | None = None) -> None:
+    def set_color(self, color: _cmap.Color | None = None) -> None:
         if self._fill:
             if color is None:
                 color = _cmap.Color("transparent")
@@ -191,14 +186,12 @@ class PyGFXRoiHandle(pygfx.WorldObject):
             self._fill.material.color = color.rgba
             self._render()
 
-    @property
     def border_color(self) -> Any:
         if self._outline:
             return _cmap.Color(self._outline.material.color)
         return _cmap.Color("transparent")
 
-    @border_color.setter
-    def border_color(self, color: _cmap.Color | None = None) -> None:
+    def set_border_color(self, color: _cmap.Color | None = None) -> None:
         if self._outline:
             if color is None:
                 color = _cmap.Color("yellow")
@@ -450,7 +443,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
         self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
 
-    def frontend_widget(self) -> Any:
+    def native(self) -> Any:
         return self._canvas
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:

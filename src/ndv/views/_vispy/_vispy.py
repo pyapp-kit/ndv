@@ -326,29 +326,24 @@ class VispyImageHandle(ImageHandle):
 
 
 # FIXME: Unfortunate naming :)
-class VispyHandleHandle:
+class VispyHandleHandle(CanvasElement):
     def __init__(self, handle: Handle, parent: CanvasElement) -> None:
         self._handle = handle
         self._parent = parent
 
-    @property
     def visible(self) -> bool:
         return cast("bool", self._handle.visible)
 
-    @visible.setter
-    def visible(self, visible: bool) -> None:
+    def set_visible(self, visible: bool) -> None:
         self._handle.visible = visible
 
-    @property
     def can_select(self) -> bool:
         return True
 
-    @property
     def selected(self) -> bool:
         return self._handle.selected
 
-    @selected.setter
-    def selected(self, selected: bool) -> None:
+    def set_selected(self, selected: bool) -> None:
         self._handle.selected = selected
 
     def start_move(self, pos: Sequence[float]) -> None:
