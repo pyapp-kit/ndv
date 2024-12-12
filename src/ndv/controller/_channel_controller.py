@@ -10,7 +10,8 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ndv.models._lut_model import LUTModel
-    from ndv.views.protocols import PImageHandle, PLutView
+    from ndv.views.bases import LutView
+    from ndv.views.bases.graphics._canvas_elements import ImageHandle
 
     LutKey = int | None
 
@@ -24,11 +25,11 @@ class ChannelController:
     that displays the data, all for a single "channel" extracted from the data.
     """
 
-    def __init__(self, key: LutKey, model: LUTModel, views: Sequence[PLutView]) -> None:
+    def __init__(self, key: LutKey, model: LUTModel, views: Sequence[LutView]) -> None:
         self.key = key
-        self.lut_views: list[PLutView] = []
+        self.lut_views: list[LutView] = []
         self.lut_model = model
-        self.handles: list[PImageHandle] = []
+        self.handles: list[ImageHandle] = []
 
         for v in views:
             self.add_lut_view(v)
@@ -40,11 +41,11 @@ class ChannelController:
         self.lut_model.events.visible.connect(self._on_model_visible_changed)
         self.lut_model.events.gamma.connect(self._on_model_gamma_changed)
 
-    def add_lut_view(self, view: PLutView) -> None:
+    def add_lut_view(self, view: LutView) -> None:
         """Add a LUT view to the controller."""
         self.lut_views.append(view)
         # connect view changes to controller callbacks that update the model
-        view.visibleChanged.connect(self._on_view_lut_visible_changed)
+        view.visibilityChanged.connect(self._on_view_lut_visible_changed)
         view.autoscaleChanged.connect(self._on_view_lut_autoscale_changed)
         view.cmapChanged.connect(self._on_view_lut_cmap_changed)
         view.climsChanged.connect(self._on_view_lut_clims_changed)
@@ -54,56 +55,57 @@ class ChannelController:
     def _on_model_clims_changed(self, clims: tuple[float, float]) -> None:
         """The contrast limits in the model have changed."""
         for v in self.lut_views:
-            v.set_clims(clims)
+            v.set_clims_without_signal(clims)
         for handle in self.handles:
-            handle.clim = clims
+            handle.set_clims(clims)
 
     def _on_model_gamma_changed(self, gamma: float) -> None:
         """The gamma value in the model has changed."""
         for view in self.lut_views:
-            view.set_gamma(gamma)
+            view.set_gamma_without_signal(gamma)
         for handle in self.handles:
-            handle.gamma = gamma
+            handle.set_gamma(gamma)
 
     def _on_model_autoscale_changed(self, autoscale: bool) -> None:
         """The autoscale setting in the model has changed."""
         for view in self.lut_views:
-            view.set_auto_scale(autoscale)
+            view.set_auto_scale_without_signal(autoscale)
         if autoscale:
             for handle in self.handles:
-                handle.clim = (handle.data.min(), handle.data.max())
+                d = handle.data()
+                handle.set_clims((d.min(), d.max()))
 
     def _on_model_cmap_changed(self, cmap: cmap.Colormap) -> None:
         """The colormap in the model has changed."""
         for view in self.lut_views:
-            view.set_colormap(cmap)
+            view.set_colormap_without_signal(cmap)
         for handle in self.handles:
-            handle.cmap = cmap
+            handle.set_cmap(cmap)
 
     def _on_model_visible_changed(self, visible: bool) -> None:
         """The visibility in the model has changed."""
         for view in self.lut_views:
-            view.set_lut_visible(visible)
+            view.set_channel_visible_without_signal(visible)
         for handle in self.handles:
-            handle.visible = visible
+            handle.set_visible(visible)
 
-    def _update_view_from_model(self, *views: PLutView) -> None:
+    def _update_view_from_model(self, *views: LutView) -> None:
         """Make sure the view matches the model."""
-        _views: Iterable[PLutView] = views or self.lut_views
+        _views: Iterable[LutView] = views or self.lut_views
         for view in _views:
-            view.set_colormap(self.lut_model.cmap)
+            view.set_colormap_without_signal(self.lut_model.cmap)
             if self.lut_model.clims:
-                view.set_clims(self.lut_model.clims)
+                view.set_clims_without_signal(self.lut_model.clims)
             # TODO: handle more complex autoscale types
-            view.set_auto_scale(bool(self.lut_model.autoscale))
-            view.set_lut_visible(True)
+            view.set_auto_scale_without_signal(bool(self.lut_model.autoscale))
+            view.set_channel_visible_without_signal(True)
             name = str(self.key) if self.key is not None else ""
-            view.set_name(name)
+            view.set_channel_name(name)
 
     def _on_view_lut_visible_changed(self, visible: bool, key: LutKey = None) -> None:
         """The visibility checkbox in the LUT widget has changed."""
         for handle in self.handles:
-            handle.visible = visible
+            handle.set_visible(visible)
 
     def _on_view_lut_autoscale_changed(
         self, autoscale: bool, key: LutKey = None
@@ -111,12 +113,12 @@ class ChannelController:
         """The autoscale checkbox in the LUT widget has changed."""
         self.lut_model.autoscale = autoscale
         for view in self.lut_views:
-            view.set_auto_scale(autoscale)
+            view.set_auto_scale_without_signal(autoscale)
 
         if autoscale:
             # TODO: or should we have a global min/max across all handles for this key?
             for handle in self.handles:
-                data = handle.data
+                data = handle.data()
                 # update the model with the new clim values
                 self.lut_model.clims = (data.min(), data.max())
 
@@ -125,7 +127,7 @@ class ChannelController:
     ) -> None:
         """The colormap in the LUT widget has changed."""
         for handle in self.handles:
-            handle.cmap = cmap  # actually apply it to the Image texture
+            handle.set_cmap(cmap)  # actually apply it to the Image texture
             self.lut_model.cmap = cmap  # update the model as well
 
     def _on_view_lut_clims_changed(self, clims: tuple[float, float]) -> None:
@@ -145,7 +147,7 @@ class ChannelController:
         # for multiple handles, we'll just update the first one
         if not (handles := self.handles):
             return
-        handles[0].data = data
+        handles[0].set_data(data)
         # if this image handle is visible and autoscale is on, then we need
         # to update the clim values
         if self.lut_model.autoscale:
@@ -156,14 +158,15 @@ class ChannelController:
             # but this next line is more direct
             # self._handles[None].clim = (data.min(), data.max())
 
-    def add_handle(self, handle: PImageHandle) -> None:
+    def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""
         self.handles.append(handle)
-        handle.cmap = self.lut_model.cmap
+        handle.set_cmap(self.lut_model.cmap)
         if self.lut_model.autoscale:
-            self.lut_model.clims = (handle.data.min(), handle.data.max())
+            data = handle.data()
+            self.lut_model.clims = (data.min(), data.max())
         if self.lut_model.clims:
-            handle.clim = self.lut_model.clims
+            handle.set_clims(self.lut_model.clims)
 
     def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
         """Get the value of the data at the given index."""
@@ -179,5 +182,5 @@ class ChannelController:
             # texture has already been reduced to 2D). But a more complete
             # implementation would gather the full current nD index and query
             # the data source directly.
-            return handle.data[idx]  # type: ignore [no-any-return]
+            return handle.data()[idx]  # type: ignore [no-any-return]
         return None

@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["cells3d", "nd_sine_wave"]
+__all__ = ["astronaut", "cat", "cells3d", "cosem_dataset", "nd_sine_wave"]
 
 
 def nd_sine_wave(
@@ -14,7 +14,7 @@ def nd_sine_wave(
     amplitude: float = 240,
     base_frequency: float = 5,
 ) -> np.ndarray:
-    """5D dataset."""
+    """5D dataset: (10, 3, 5, 512, 512), float64."""
     # Unpack the dimensions
     if not len(shape) == 5:
         raise ValueError("Shape must have 5 dimensions")
@@ -54,7 +54,7 @@ def nd_sine_wave(
 
 
 def cells3d() -> np.ndarray:
-    """Load cells3d data from scikit-image."""
+    """Load cells3d from scikit-image (60, 2, 256, 256) uint16."""
     try:
         from imageio.v2 import volread
     except ImportError as e:
@@ -63,12 +63,30 @@ def cells3d() -> np.ndarray:
         ) from e
 
     url = "https://gitlab.com/scikit-image/data/-/raw/2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba/cells3d.tif"
-    data = np.asarray(volread(url), copy=False)
+    data = np.asarray(volread(url))
 
     # this data has been stretched to 16 bit, and lacks certain intensity values
     # add a small random integer to each pixel ... so the histogram is not silly
     data = (data + np.random.randint(-24, 24, data.shape)).astype(np.uint16)
     return data
+
+
+def cat() -> np.ndarray:
+    """Load RGB cat data (300, 451, 3), uint8."""
+    return _imread("imageio:chelsea.png")
+
+
+def astronaut() -> np.ndarray:
+    """Load RGB data (512, 512, 3), uint8."""
+    return _imread("imageio:astronaut.png")
+
+
+def _imread(uri: str) -> np.ndarray:
+    try:
+        import imageio.v3 as iio
+    except ImportError:
+        raise ImportError("Please install imageio fetch data") from None
+    return iio.imread(uri)  # type: ignore [no-any-return]
 
 
 def cosem_dataset(

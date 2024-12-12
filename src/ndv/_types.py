@@ -1,12 +1,20 @@
 """General model for ndv."""
 
+from __future__ import annotations
+
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
-from enum import IntFlag, auto
-from typing import Annotated, Any, NamedTuple
+from enum import Enum, IntFlag, auto
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from pydantic import PlainSerializer, PlainValidator
 from typing_extensions import TypeAlias
+
+if TYPE_CHECKING:
+    from qtpy.QtCore import Qt
+    from qtpy.QtWidgets import QWidget
+
+    from ndv.views.bases._view_base import Viewable
 
 
 def _maybe_int(val: Any) -> Any:
@@ -71,3 +79,31 @@ class MouseReleaseEvent(NamedTuple):
     x: float
     y: float
     btn: MouseButton = MouseButton.LEFT
+
+
+class CursorType(Enum):
+    DEFAULT = "default"
+    V_ARROW = "v_arrow"
+    H_ARROW = "h_arrow"
+    ALL_ARROW = "all_arrow"
+    BDIAG_ARROW = "bdiag_arrow"
+    FDIAG_ARROW = "fdiag_arrow"
+
+    def apply_to(self, widget: Viewable) -> None:
+        """Applies the cursor type to the given widget."""
+        native = widget.frontend_widget()
+        if hasattr(native, "setCursor"):
+            cast("QWidget", native).setCursor(self.to_qt())
+
+    def to_qt(self) -> Qt.CursorShape:
+        """Converts CursorType to Qt.CursorShape."""
+        from qtpy.QtCore import Qt
+
+        return {
+            CursorType.DEFAULT: Qt.CursorShape.ArrowCursor,
+            CursorType.V_ARROW: Qt.CursorShape.SizeVerCursor,
+            CursorType.H_ARROW: Qt.CursorShape.SizeHorCursor,
+            CursorType.ALL_ARROW: Qt.CursorShape.SizeAllCursor,
+            CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
+            CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
+        }[self]

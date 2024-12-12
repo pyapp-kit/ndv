@@ -5,13 +5,13 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 from weakref import WeakKeyDictionary
 
-import cmap
+import cmap as _cmap
 import numpy as np
 import pygfx
 import pylinalg as la
 
-from ndv.views._mouse_events import filter_mouse_events
-from ndv.views.protocols import CursorType, PCanvas
+from ndv._types import CursorType
+from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -21,8 +21,6 @@ if TYPE_CHECKING:
     from pygfx.resources import Texture
     from wgpu.gui.jupyter import JupyterWgpuCanvas
     from wgpu.gui.qt import QWgpuCanvas
-
-    from ndv.views.protocols import CanvasElement
 
     WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas
 
@@ -36,68 +34,55 @@ def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:
     )
 
 
-class PyGFXImageHandle:
+class PyGFXImageHandle(ImageHandle):
     def __init__(self, image: pygfx.Image | pygfx.Volume, render: Callable) -> None:
         self._image = image
         self._render = render
         self._grid = cast("Texture", image.geometry.grid)
         self._material = cast("ImageBasicMaterial", image.material)
 
-    @property
     def data(self) -> np.ndarray:
         return self._grid.data  # type: ignore [no-any-return]
 
-    @data.setter
-    def data(self, data: np.ndarray) -> None:
+    def set_data(self, data: np.ndarray) -> None:
         self._grid.data[:] = data
         self._grid.update_range((0, 0, 0), self._grid.size)
 
-    @property
     def visible(self) -> bool:
         return bool(self._image.visible)
 
-    @visible.setter
-    def visible(self, visible: bool) -> None:
+    def set_visible(self, visible: bool) -> None:
         self._image.visible = visible
         self._render()
 
-    @property
     def can_select(self) -> bool:
         return False
 
-    @property
     def selected(self) -> bool:
         return False
 
-    @selected.setter
-    def selected(self, selected: bool) -> None:
+    def set_selected(self, selected: bool) -> None:
         raise NotImplementedError("Images cannot be selected")
 
-    @property
     def clim(self) -> Any:
         return self._material.clim
 
-    @clim.setter
-    def clim(self, clims: tuple[float, float]) -> None:
+    def set_clims(self, clims: tuple[float, float]) -> None:
         self._material.clim = clims
         self._render()
 
-    @property
     def gamma(self) -> float:
         return 1
 
-    @gamma.setter
-    def gamma(self, gamma: float) -> None:
+    def set_gamma(self, gamma: float) -> None:
         # self._material.gamma = gamma
         # self._render()
         warnings.warn("Gamma correction is not supported in pygfx", stacklevel=2)
 
-    @property
-    def cmap(self) -> cmap.Colormap:
+    def cmap(self) -> _cmap.Colormap:
         return self._cmap
 
-    @cmap.setter
-    def cmap(self, cmap: cmap.Colormap) -> None:
+    def set_cmap(self, cmap: _cmap.Colormap) -> None:
         self._cmap = cmap
         self._material.map = cmap.to_pygfx()
         self._render()
@@ -174,51 +159,44 @@ class PyGFXRoiHandle(pygfx.WorldObject):
             handles.visible = self.selected
         self._render()
 
-    @property
     def can_select(self) -> bool:
         return True
 
-    @property
     def selected(self) -> bool:
         if self._handles:
             return bool(self._handles.visible)
         # Can't be selected without handles
         return False
 
-    @selected.setter
-    def selected(self, selected: bool) -> None:
+    def set_selected(self, selected: bool) -> None:
         if self._handles:
             self._handles.visible = selected
 
-    @property
     def color(self) -> Any:
         if self._fill:
-            return cmap.Color(self._fill.material.color)
-        return cmap.Color("transparent")
+            return _cmap.Color(self._fill.material.color)
+        return _cmap.Color("transparent")
 
-    @color.setter
-    def color(self, color: cmap.Color | None = None) -> None:
+    def set_color(self, color: _cmap.Color | None = None) -> None:
         if self._fill:
             if color is None:
-                color = cmap.Color("transparent")
-            if not isinstance(color, cmap.Color):
-                color = cmap.Color(color)
+                color = _cmap.Color("transparent")
+            if not isinstance(color, _cmap.Color):
+                color = _cmap.Color(color)
             self._fill.material.color = color.rgba
             self._render()
 
-    @property
     def border_color(self) -> Any:
         if self._outline:
-            return cmap.Color(self._outline.material.color)
-        return cmap.Color("transparent")
+            return _cmap.Color(self._outline.material.color)
+        return _cmap.Color("transparent")
 
-    @border_color.setter
-    def border_color(self, color: cmap.Color | None = None) -> None:
+    def set_border_color(self, color: _cmap.Color | None = None) -> None:
         if self._outline:
             if color is None:
-                color = cmap.Color("yellow")
-            if not isinstance(color, cmap.Color):
-                color = cmap.Color(color)
+                color = _cmap.Color("yellow")
+            if not isinstance(color, _cmap.Color):
+                color = _cmap.Color(color)
             self._outline.material.color = color.rgba
             self._render()
 
@@ -437,7 +415,7 @@ def get_canvas_class() -> WgpuCanvas:
         return WxWgpuCanvas
 
 
-class PyGFXViewerCanvas(PCanvas):
+class GfxArrayCanvas(ArrayCanvas):
     """pygfx-based canvas wrapper."""
 
     def __init__(self) -> None:
@@ -467,7 +445,7 @@ class PyGFXViewerCanvas(PCanvas):
         self._camera: pygfx.Camera | None = None
         self._ndim: Literal[2, 3] | None = None
 
-        self._elements: WeakKeyDictionary = WeakKeyDictionary()
+        self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -505,12 +483,7 @@ class PyGFXViewerCanvas(PCanvas):
         if state := self._last_state.get(ndim):
             cam.set_state(state)
 
-    def add_image(
-        self,
-        data: np.ndarray | None = None,
-        cmap: cmap.Colormap | None = None,
-        clims: tuple[float, float] | None = None,
-    ) -> PyGFXImageHandle:
+    def add_image(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
         tex = pygfx.Texture(data, dim=2)
         image = pygfx.Image(
@@ -528,16 +501,10 @@ class PyGFXViewerCanvas(PCanvas):
         # FIXME: I suspect there are more performant ways to refresh the canvas
         # look into it.
         handle = PyGFXImageHandle(image, self.refresh)
-        if cmap is not None:
-            handle.cmap = cmap
-        if clims is not None:
-            handle.clim = clims
         self._elements[image] = handle
         return handle
 
-    def add_volume(
-        self, data: np.ndarray | None = None, cmap: cmap.Colormap | None = None
-    ) -> PyGFXImageHandle:
+    def add_volume(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
             pygfx.Geometry(grid=tex),
@@ -555,16 +522,14 @@ class PyGFXViewerCanvas(PCanvas):
         # FIXME: I suspect there are more performant ways to refresh the canvas
         # look into it.
         handle = PyGFXImageHandle(vol, self.refresh)
-        if cmap is not None:
-            handle.cmap = cmap
         self._elements[vol] = handle
         return handle
 
     def add_roi(
         self,
         vertices: Sequence[tuple[float, float]] | None = None,
-        color: cmap.Color | None = None,
-        border_color: cmap.Color | None = None,
+        color: _cmap.Color | None = None,
+        border_color: _cmap.Color | None = None,
     ) -> PyGFXRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         handle = RectangularROIHandle(self.refresh, self.canvas_to_world)
@@ -572,8 +537,8 @@ class PyGFXViewerCanvas(PCanvas):
         self._scene.add(handle)
         if vertices:
             handle.vertices = vertices
-        handle.color = color
-        handle.border_color = border_color
+        handle.set_color(color)
+        handle.set_border_color(border_color)
 
         self._elements[handle] = handle
         return handle
@@ -656,7 +621,10 @@ class PyGFXViewerCanvas(PCanvas):
         pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
             bb = c.get_bounding_box()
-            if _is_inside(bb, pos):
-                element = cast("CanvasElement", self._elements.get(c))
+            if _is_inside(bb, pos) and (element := self._elements.get(c)):
                 elements.append(element)
         return elements
+
+    def set_visible(self, visible: bool) -> None:
+        """Set the visibility of the canvas."""
+        self._canvas.visible = visible
