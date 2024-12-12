@@ -141,23 +141,25 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
                 f"Expected vispy canvas to be wx EvtHandler, got {type(canvas)}"
             )
 
-        # TIP: event.Skip() can be used to allow the event to propagate to other
-        # handlers.
+        # TIP: event.Skip() allows the event to propagate to other handlers.
 
         def on_mouse_move(event: MouseEvent) -> None:
             mme = MouseMoveEvent(x=event.GetX(), y=event.GetY())
-            receiver.on_mouse_move(mme)
-            receiver.mouseMoved.emit(mme)
+            if not receiver.on_mouse_move(mme):
+                receiver.mouseMoved.emit(mme)
+                event.Skip()
 
         def on_mouse_press(event: MouseEvent) -> None:
             mpe = MousePressEvent(x=event.GetX(), y=event.GetY())
-            receiver.on_mouse_press(mpe)
-            receiver.mousePressed.emit(mpe)
+            if not receiver.on_mouse_press(mpe):
+                receiver.mousePressed.emit(mpe)
+                event.Skip()
 
         def on_mouse_release(event: MouseEvent) -> None:
             mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY())
-            receiver.on_mouse_release(mre)
-            receiver.mouseReleased.emit(mre)
+            if not receiver.on_mouse_release(mre):
+                receiver.mouseReleased.emit(mre)
+                event.Skip()
 
         canvas.Bind(EVT_MOTION, on_mouse_move)
         canvas.Bind(EVT_LEFT_DOWN, on_mouse_press)

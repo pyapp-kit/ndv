@@ -45,9 +45,9 @@ def get_view_frontend_class() -> type[ArrayView]:
         return JupyterArrayView
 
     if frontend == GuiFrontend.WX:
-        from ._wx.wx_view import WxViewerView
+        from ._wx.wx_view import WxArrayView
 
-        return WxViewerView
+        return WxArrayView
 
     raise RuntimeError("No GUI frontend found")
 
@@ -124,10 +124,12 @@ def _try_start_wxapp() -> bool:
     try:
         import wx
 
+        wxapp: wx.App | None
         if (wxapp := wx.App.Get()) is None:
             wxapp = wx.App()
-        _APP_INSTANCE = wxapp
 
+        _install_excepthook()
+        _APP_INSTANCE = wxapp
         return True
     except Exception:
         return False
