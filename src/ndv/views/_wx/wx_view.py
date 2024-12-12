@@ -172,14 +172,15 @@ class _WxArrayViewer(wx.Frame):
     def __init__(self, canvas_widget: wx.Window, parent: wx.Window = None):
         super().__init__(parent)
 
-        self._canvas = canvas_widget
-        if canvas_widget.GetParent() is not self:
-            parent = canvas_widget.GetParent()
+        # FIXME: pygfx backend needs this to be canvas_widget._subwidget
+
+        if (parent := canvas_widget.GetParent()) and parent is not self:
             canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
             if parent:
                 parent.Destroy()
+            canvas_widget.Show()
 
-        canvas_widget.Show()
+        self._canvas = canvas_widget
 
         # Dynamic sliders for dimensions
         self.dims_sliders = _WxDimsSliders(self)
