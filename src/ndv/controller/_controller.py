@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
-    from ndv.views.protocols import PHistogramCanvas, PView
+    from ndv.views.bases import ArrayView, HistogramCanvas
 
     LutKey: TypeAlias = int | None
 
@@ -46,7 +46,7 @@ class ViewerController:
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
 
-        self._histogram: PHistogramCanvas | None = None
+        self._histogram: HistogramCanvas | None = None
         self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
@@ -62,7 +62,7 @@ class ViewerController:
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
-    def view(self) -> PView:
+    def view(self) -> ArrayView:
         """Return the front-end view object."""
         return self._view
 
@@ -101,6 +101,11 @@ class ViewerController:
         self._view.add_histogram(self._histogram.frontend_widget())
         for view in self._lut_controllers.values():
             view.add_lut_view(self._histogram)
+            # FIXME: hack
+            if handles := view.handles:
+                data = handles[0].data()
+                counts, edges = _calc_hist_bins(data)
+                self._histogram.set_data(counts, edges)
 
         if self.data is not None:
             self._update_hist_domain_for_dtype(self.data.dtype)
@@ -112,7 +117,7 @@ class ViewerController:
         dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
-            self._histogram.set_domain((iinfo.min, iinfo.max))
+            self._histogram.set_range(x=(iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -164,9 +169,10 @@ class ViewerController:
         show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
-                view.setVisible(
-                    not show_channel_luts if lut_ctrl.key is None else show_channel_luts
-                )
+                if lut_ctrl.key is None:
+                    view.set_visible(not show_channel_luts)
+                else:
+                    view.set_visible(show_channel_luts)
         # redraw
         self._clear_canvas()
         self._update_canvas()
@@ -281,7 +287,7 @@ class ViewerController:
 
     def show(self) -> None:
         """Show the viewer."""
-        self._view.show()
+        self._view.set_visible(True)
 
 
 def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

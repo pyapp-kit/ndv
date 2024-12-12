@@ -12,7 +12,7 @@ from ndv.views import gui_frontend
 @pytest.mark.usefixtures("any_app")
 def test_mvc_viewer() -> None:
     """Example usage of new mvc pattern."""
-    viewer = ViewerController()  # ultimately, this will be the public api
+    viewer = ViewerController()
     assert gui_frontend() in type(viewer._view).__name__.lower()
     viewer.show()
 

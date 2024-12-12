@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     import cmap
 
-    from ndv.views.protocols import PImageHandle
+    from ndv.views.bases.graphics._canvas_elements import ImageHandle
 
 
 class CmapCombo(QColormapComboBox):
@@ -36,7 +36,7 @@ class LutControl(QWidget):
     def __init__(
         self,
         name: str = "",
-        handles: Iterable[PImageHandle] = (),
+        handles: Iterable[ImageHandle] = (),
         parent: QWidget | None = None,
         cmaplist: Iterable[Any] = (),
         auto_clim: bool = True,
@@ -52,7 +52,7 @@ class LutControl(QWidget):
         self._cmap = CmapCombo()
         self._cmap.currentColormapChanged.connect(self._on_cmap_changed)
         for handle in self._handles:
-            self._cmap.addColormap(handle.cmap)
+            self._cmap.addColormap(handle.cmap())
         for color in cmaplist:
             self._cmap.addColormap(color)
 
@@ -100,17 +100,17 @@ class LutControl(QWidget):
     def _on_clims_changed(self, clims: tuple[float, float]) -> None:
         self._auto_clim.setChecked(False)
         for handle in self._handles:
-            handle.clim = clims
+            handle.set_clims(clims)
 
     def _on_visible_changed(self, visible: bool) -> None:
         for handle in self._handles:
-            handle.visible = visible
+            handle.set_visible(visible)
         if visible:
             self.update_autoscale()
 
     def _on_cmap_changed(self, cmap: cmap.Colormap) -> None:
         for handle in self._handles:
-            handle.cmap = cmap
+            handle.set_cmap(cmap)
 
     def update_autoscale(self) -> None:
         if (
@@ -123,12 +123,13 @@ class LutControl(QWidget):
         # find the min and max values for the current channel
         clims = [np.inf, -np.inf]
         for handle in self._handles:
-            clims[0] = min(clims[0], np.nanmin(handle.data))
-            clims[1] = max(clims[1], np.nanmax(handle.data))
+            data = handle.data()
+            clims[0] = min(clims[0], np.nanmin(data))
+            clims[1] = max(clims[1], np.nanmax(data))
 
         mi, ma = tuple(int(x) for x in clims)
         for handle in self._handles:
-            handle.clim = (mi, ma)
+            handle.set_clims((mi, ma))
 
         # set the slider values to the new clims
         with signals_blocked(self._clims):
@@ -136,7 +137,7 @@ class LutControl(QWidget):
             self._clims.setMaximum(max(ma, self._clims.maximum()))
             self._clims.setValue((mi, ma))
 
-    def add_handle(self, handle: PImageHandle) -> None:
+    def add_handle(self, handle: ImageHandle) -> None:
         self._handles.append(handle)
-        self._cmap.addColormap(handle.cmap)
+        self._cmap.addColormap(handle.cmap())
         self.update_autoscale()

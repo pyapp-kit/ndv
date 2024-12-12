@@ -44,7 +44,15 @@ dependencies = [
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 qt = ["vispy", "pyopengl", "pyqt6", "imageio[tifffile]"]
-jupyter = ["vispy", "pyopengl", "ipywidgets", "jupyter", "jupyter_rfb", "glfw", "imageio[tifffile]"]
+jupyter = [
+    "vispy",
+    "pyopengl",
+    "ipywidgets",
+    "jupyter",
+    "jupyter_rfb",
+    "glfw",
+    "imageio[tifffile]",
+]
 pyqt = ["pyqt6"]
 vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
@@ -134,11 +142,6 @@ disallow_subclassing_any = false
 show_error_codes = true
 pretty = true
 plugins = ["pydantic.mypy"]
-
-# Alternatively, if _old_viewer is a submodule of ndv
-[[tool.mypy.overrides]]
-module = "ndv.old_viewer.*"
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]

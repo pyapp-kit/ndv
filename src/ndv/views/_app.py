@@ -3,14 +3,15 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import traceback
 from enum import Enum
 from functools import cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ndv.views.protocols import PCanvas, PHistogramCanvas
+    from types import TracebackType
 
-    from .protocols import PView
+    from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
@@ -30,22 +31,22 @@ class CanvasBackend(str, Enum):
 
 # TODO: add a way to set the frontend via an environment variable
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
-def get_view_frontend_class() -> type[PView]:
+def get_view_frontend_class() -> type[ArrayView]:
     frontend = gui_frontend()
     if frontend == GuiFrontend.QT:
-        from ._qt.qt_view import QtViewerView
+        from ._qt.qt_view import QtArrayView
 
-        return QtViewerView
+        return QtArrayView
 
     if frontend == GuiFrontend.JUPYTER:
-        from ._jupyter.jupyter_view import JupyterViewerView
+        from ._jupyter.jupyter_view import JupyterArrayView
 
-        return JupyterViewerView
+        return JupyterArrayView
 
     raise RuntimeError("No GUI frontend found")
 
 
-def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
+def get_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
     _backend = _determine_canvas_backend(backend)
     if _backend == CanvasBackend.VISPY:
         from vispy.app import use_app
@@ -58,14 +59,14 @@ def get_canvas_class(backend: str | None = None) -> type[PCanvas]:
         return VispyViewerCanvas
 
     if _backend == CanvasBackend.PYGFX:
-        from ndv.views._pygfx._pygfx import PyGFXViewerCanvas
+        from ndv.views._pygfx._pygfx import GfxArrayCanvas
 
-        return PyGFXViewerCanvas
+        return GfxArrayCanvas
 
     raise RuntimeError(f"No canvas backend found for {_backend}")
 
 
-def get_histogram_canvas_class(backend: str | None = None) -> type[PHistogramCanvas]:
+def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanvas]:
     _backend = _determine_canvas_backend(backend)
     if _backend == CanvasBackend.VISPY:
         from ndv.views._vispy._histogram import VispyHistogramCanvas
@@ -98,10 +99,38 @@ def _try_start_qapp() -> bool:
             qapp = QApplication([])
             qapp.setOrganizationName("ndv")
             qapp.setApplicationName("ndv")
+
+        _install_excepthook()
         _APP_INSTANCE = qapp
         return True
     except Exception:
         return False
+
+
+def _install_excepthook() -> None:
+    """Install a custom excepthook that does not raise sys.exit().
+
+    This is necessary to prevent the application from closing when an exception
+    is raised.
+    """
+    try:
+        from rich.traceback import install
+
+        install(show_locals=True)
+    except ImportError:
+        sys.excepthook = _no_exit_excepthook
+
+
+def _no_exit_excepthook(
+    type: type[BaseException], value: BaseException, tb: TracebackType | None
+) -> None:
+    """Excepthook that prints the traceback to the console.
+
+    By default, Qt's excepthook raises sys.exit(), which is not what we want.
+    """
+    # this could be elaborated to do all kinds of things...
+    print("\n-----------------------")
+    traceback.print_exception(type, value, tb)
 
 
 @cache  # not allowed to change

@@ -31,7 +31,9 @@ if TYPE_CHECKING:
     import zarr
     from torch._tensor import Tensor
 
-    from ._dims_slider import Index, Indices, Sizes
+    Index = int | slice
+    Indices = Mapping[Any, Index]
+    Sizes = Mapping[Any, int]
 
     _T_contra = TypeVar("_T_contra", contravariant=True)
 
@@ -130,7 +132,7 @@ class DataWrapper(Generic[ArrayT]):
         """Asynchronous version of isel."""
         return _EXECUTOR.submit(lambda: [(idx, self.isel(idx)) for idx in indexers])
 
-    def guess_channel_axis(self) -> Hashable | None:
+    def guess_channel_axis(self) -> Any | None:
         """Return the (best guess) axis name for the channel dimension."""
         # for arrays with labeled dimensions,
         # see if any of the dimensions are named "channel"
