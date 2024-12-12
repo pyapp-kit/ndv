@@ -1,12 +1,12 @@
 """Example usage of new mvc pattern."""
 
-import os
 from collections.abc import Sequence
 
 from ndv import data, run_app
 from ndv.controller import ViewerController
 
-os.environ["NDV_CANVAS_BACKEND"] = "pygfx"
+# import os
+# os.environ["NDV_CANVAS_BACKEND"] = "pygfx"
 viewer = ViewerController()
 
 

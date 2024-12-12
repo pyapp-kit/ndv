@@ -65,10 +65,10 @@ class ViewerController:
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self.add_histogram)
         self._view.roiRequested.connect(self._on_roi_requested)
+        self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         # FIXME
         self._canvas.mouseReleased.connect(self._view.mouse_release)
-        self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
-        # self._view.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
+        self._canvas.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
@@ -239,11 +239,19 @@ class ViewerController:
             (ma[0], ma[1]),
             (mi[0], ma[1]),
         ]
-        if self._roi_handle:
-            self._roi_handle.remove()
-        self._roi_handle = self._canvas.add_roi(vertices=verts, visible=True)
+        if not self._roi_handle:
+            self._roi_handle = self._canvas.add_roi(vertices=verts, visible=True)
+        else:
+            self._roi_handle.set_vertices(verts)
 
         self._update_canvas()
+
+    def _on_view_bounding_box_changed(
+        self, bbox: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
+        if self._roi:
+            # FIXME: Ugly
+            self._roi.bounding_box = tuple(tuple(float(f) for f in a) for a in bbox)
 
     # ------------------ View callbacks ------------------
 

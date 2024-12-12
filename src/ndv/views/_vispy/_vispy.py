@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from typing import Callable
 
     import vispy.app
+    from psygnal import Signal
 
 
 turn = np.sin(np.pi / 4)
@@ -366,8 +367,9 @@ class VispyHandleHandle(CanvasElement):
 
 
 class VispyRoiHandle(RoiHandle):
-    def __init__(self, roi: RectangularROI) -> None:
+    def __init__(self, roi: RectangularROI, on_move: Signal) -> None:
         self._roi = roi
+        self._on_move = on_move
 
     def vertices(self) -> Sequence[Sequence[float]]:
         return self._roi.vertices
@@ -395,6 +397,8 @@ class VispyRoiHandle(RoiHandle):
 
     def move(self, pos: Sequence[float]) -> None:
         self._roi.move(pos)
+        mi, ma = np.min(self._roi.vertices, axis=0), np.max(self._roi.vertices, axis=0)
+        self._on_move.emit((mi, ma))
 
     def color(self) -> Any:
         return self._roi.color
@@ -515,7 +519,7 @@ class VispyViewerCanvas(ArrayCanvas):
     ) -> VispyRoiHandle:
         """Add a new Rectangular ROI node to the scene."""
         roi = RectangularROI(parent=self._view.scene)
-        handle = VispyRoiHandle(roi)
+        handle = VispyRoiHandle(roi, on_move=self.boundingBoxChanged)
         self._elements[roi] = handle
         for h in roi._handles:
             self._elements[h] = VispyHandleHandle(h, handle)

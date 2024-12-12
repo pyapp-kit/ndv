@@ -4,6 +4,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
+from psygnal import Signal
 
 from ndv.views.bases._lut_view import LutView
 from ndv.views.bases._view_base import Viewable
@@ -45,6 +46,9 @@ class GraphicsCanvas(Viewable, Mouseable):
 
 
 class ArrayCanvas(GraphicsCanvas):
+    # TODO: Consider some ROIView
+    boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
+
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod
