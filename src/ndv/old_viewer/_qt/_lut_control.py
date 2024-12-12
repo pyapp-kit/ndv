@@ -100,7 +100,7 @@ class LutControl(QWidget):
     def _on_clims_changed(self, clims: tuple[float, float]) -> None:
         self._auto_clim.setChecked(False)
         for handle in self._handles:
-            handle.set_clim(clims)
+            handle.set_clims(clims)
 
     def _on_visible_changed(self, visible: bool) -> None:
         for handle in self._handles:
@@ -129,7 +129,7 @@ class LutControl(QWidget):
 
         mi, ma = tuple(int(x) for x in clims)
         for handle in self._handles:
-            handle.set_clim((mi, ma))
+            handle.set_clims((mi, ma))
 
         # set the slider values to the new clims
         with signals_blocked(self._clims):
