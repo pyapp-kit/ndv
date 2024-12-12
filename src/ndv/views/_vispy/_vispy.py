@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from typing import Callable
 
     import vispy.app
-    from psygnal import Signal
+    from psygnal import SignalInstance
 
 
 turn = np.sin(np.pi / 4)
@@ -95,7 +95,7 @@ class Handle(scene.visuals.Markers):
         self._selected = selected
         self.parent.selected = selected
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         return self._cursor_at(self.pos)
 
 
@@ -250,7 +250,7 @@ class RectangularROI(scene.visuals.Rectangle):
             ]
         self.center = new_center
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         return CursorType.ALL_ARROW
 
     # ------------------- End EditableROI interface -------------------------
@@ -328,7 +328,7 @@ class VispyImageHandle(ImageHandle):
     def remove(self) -> None:
         self._visual.parent = None
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         return None
 
 
@@ -362,12 +362,12 @@ class VispyHandleHandle(CanvasElement):
     def remove(self) -> None:
         self._parent.remove()
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
-        return self._handle.get_cursor(x, y)
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
+        return self._handle.get_cursor(pos)
 
 
 class VispyRoiHandle(RoiHandle):
-    def __init__(self, roi: RectangularROI, on_move: Signal) -> None:
+    def __init__(self, roi: RectangularROI, on_move: SignalInstance) -> None:
         self._roi = roi
         self._on_move = on_move
 
@@ -422,8 +422,8 @@ class VispyRoiHandle(RoiHandle):
     def remove(self) -> None:
         self._roi.parent = None
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
-        return self._roi.get_cursor(x, y)
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
+        return self._roi.get_cursor(pos)
 
 
 class VispyViewerCanvas(ArrayCanvas):
@@ -634,10 +634,10 @@ class VispyViewerCanvas(ArrayCanvas):
         self._camera.interactive = True
         return False
 
-    def get_cursor(self, x: float, y: float) -> CursorType:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
         if self._initializing_roi:
             return CursorType.CROSS
-        for element in self.elements_at((x, y)):
-            if cursor := element.get_cursor(x, y):
+        for element in self.elements_at(pos):
+            if cursor := element.get_cursor(pos):
                 return cursor
         return CursorType.DEFAULT

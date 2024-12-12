@@ -111,3 +111,15 @@ class CursorType(Enum):
             CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
             CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
         }[self]
+
+    def to_jupyter(self) -> str:
+        """Converts CursorType to jupyter cursor strings."""
+        return {
+            CursorType.DEFAULT: "default",
+            CursorType.CROSS: "crosshair",
+            CursorType.V_ARROW: "ns-resize",
+            CursorType.H_ARROW: "ew-resize",
+            CursorType.ALL_ARROW: "move",
+            CursorType.BDIAG_ARROW: "nesw-resize",
+            CursorType.FDIAG_ARROW: "nwse-resize",
+        }[self]

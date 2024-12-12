@@ -728,7 +728,7 @@ class NDViewer(QWidget):
         # If any local elements have a preference, use it
         pos = (event.pos().x(), event.pos().y())
         for e in self._canvas.elements_at(pos):
-            if (pref := e.cursor_at(pos)) is not None:
+            if (pref := e.get_cursor(pos)) is not None:
                 self._qcanvas.setCursor(pref.to_qt())
                 return False
         # Otherwise, normal cursor

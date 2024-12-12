@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from vispy.app.backends import _jupyter_rfb
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, MouseReleaseEvent
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -246,3 +246,6 @@ class JupyterArrayView(ArrayView):
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
             display.clear_output()  # type: ignore [no-untyped-call]
+
+    def mouse_release(self, event: MouseReleaseEvent) -> None:
+        pass

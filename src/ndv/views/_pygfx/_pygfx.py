@@ -103,7 +103,7 @@ class PyGFXImageHandle(ImageHandle):
         if (par := self._image.parent) is not None:
             par.remove(self._image)
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         return None
 
 
@@ -216,7 +216,7 @@ class PyGFXRoiHandle(pygfx.WorldObject):
         if (par := self.parent) is not None:
             par.remove(self)
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         # To be implemented by subclasses
         raise NotImplementedError("Must be implemented in subclasses")
 
@@ -374,9 +374,9 @@ class RectangularROIHandle(PyGFXRoiHandle):
                 return i
         return None
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         # Convert canvas -> world
-        world_pos = self._canvas_to_world((x, y))
+        world_pos = self._canvas_to_world(pos)
         # Step 1: Check if over handle
         if (idx := self._handle_hover_idx(world_pos)) is not None:
             if np.array_equal(
@@ -673,10 +673,10 @@ class GfxArrayCanvas(ArrayCanvas):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
-    def get_cursor(self, x: float, y: float) -> CursorType:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
         if self._initializing_roi:
             return CursorType.CROSS
-        for element in self.elements_at((x, y)):
-            if cursor := element.get_cursor(x, y):
+        for element in self.elements_at(pos):
+            if cursor := element.get_cursor(pos):
                 return cursor
         return CursorType.DEFAULT

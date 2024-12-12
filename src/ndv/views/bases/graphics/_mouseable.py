@@ -16,8 +16,6 @@ from ndv._types import (
 if TYPE_CHECKING:
     from collections.abc import Container
 
-    from qtpy.QtWidgets import QWidget
-
 
 class Mouseable:
     """Mixin class for objects that can be interacted with using the mouse.
@@ -43,7 +41,7 @@ class Mouseable:
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
-    def get_cursor(self, x: float, y: float) -> CursorType | None:
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
         return None
 
 
@@ -75,7 +73,7 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         class Filter(QObject):
             pressed: MouseButton = MouseButton.NONE
 
-            def eventFilter(self, obj: QWidget | None, qevent: QEvent | None) -> bool:
+            def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
                 """Event filter installed on the canvas to handle mouse events.
 
                 here is where we get a chance to intercept mouse events before allowing
@@ -125,14 +123,15 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
                             self.pressed = MouseButton.NONE
                             intercept |= receiver.on_mouse_release(mre)
                             receiver.mouseReleased.emit(mre)
-                        if obj is not None:
-                            if cursor := receiver.get_cursor(pos.x(), pos.y()):
+                        # FIXME: Ugly
+                        if obj and hasattr(obj, "setCursor"):
+                            if cursor := receiver.get_cursor((pos.x(), pos.y())):
                                 obj.setCursor(cursor.to_qt())
                 return intercept
 
-        f = Filter()
-        canvas.installEventFilter(f)
-        return lambda: canvas.removeEventFilter(f)
+        qfilter = Filter()
+        canvas.installEventFilter(qfilter)
+        return lambda: canvas.removeEventFilter(qfilter)
 
     elif frontend == GuiFrontend.JUPYTER:
         from jupyter_rfb import RemoteFrameBuffer
@@ -144,23 +143,47 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         # to intercept various mouse events.
         super_handle_event = canvas.handle_event
 
-        def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
-            etype = ev["event_type"]
-            if etype == "pointer_move":
-                mme = MouseMoveEvent(x=ev["x"], y=ev["y"], )
-                receiver.on_mouse_move(mme)
-                receiver.mouseMoved.emit(mme)
-            elif etype == "pointer_down":
-                mpe = MousePressEvent(x=ev["x"], y=ev["y"])
-                receiver.on_mouse_press(mpe)
-                receiver.mousePressed.emit(mpe)
-            elif etype == "pointer_up":
-                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"])
-                receiver.on_mouse_release(mre)
-                receiver.mouseReleased.emit(mre)
-            super_handle_event(ev)
+        # NB A closure is used here to retain state of current button press.
+        class JupyterFilter:
+            pressed = MouseButton.NONE
 
-        canvas.handle_event = MethodType(handle_event, canvas)
+            def handle(self, rfb: RemoteFrameBuffer, ev: dict) -> None:
+                intercepted = False
+                etype = ev["event_type"]
+                if etype in ["pointer_move", "pointer_down", "pointer_up"]:
+                    btn = ev.get("button", 3)
+                    x, y = ev["x"], ev["y"]
+                    if etype == "pointer_move":
+                        mme = MouseMoveEvent(x=x, y=y, btn=self.pressed)
+                        intercepted |= receiver.on_mouse_move(mme)
+                        receiver.mouseMoved.emit(mme)
+                    elif etype == "pointer_down":
+                        self.pressed = (
+                            MouseButton.LEFT
+                            if btn == 1
+                            else MouseButton.RIGHT
+                            if btn == 2
+                            else MouseButton.MIDDLE
+                            if btn == 3
+                            else MouseButton.NONE
+                        )
+                        mpe = MousePressEvent(x=x, y=y, btn=self.pressed)
+                        intercepted |= receiver.on_mouse_press(mpe)
+                        receiver.mousePressed.emit(mpe)
+                    elif etype == "pointer_up":
+                        mre = MouseReleaseEvent(x=x, y=y, btn=self.pressed)
+                        self.pressed = MouseButton.NONE
+                        intercepted |= receiver.on_mouse_release(mre)
+                        receiver.mouseReleased.emit(mre)
+
+                    if cursor := receiver.get_cursor((x, y)):
+                        canvas.cursor = cursor.to_jupyter()
+
+                if not intercepted:
+                    super_handle_event(ev)
+
+        jfilter = JupyterFilter()
+        canvas.handle_event = MethodType(jfilter.handle, canvas)
         return lambda: setattr(canvas, "handle_event", super_handle_event)
 
     raise NotImplementedError(f"Unsupported frontend for mouse events: {frontend!r}")
