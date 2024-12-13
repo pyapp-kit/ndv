@@ -59,6 +59,7 @@ class ViewerController:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+        self._fully_synchronize_view()
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -144,15 +145,19 @@ class ViewerController:
 
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
-        self._view.create_sliders(self._dd_model.canonical_data_coords)
+        with self.view.currentIndexChanged.blocked():
+            self._view.create_sliders(self._dd_model.canonical_data_coords)
         self._view.set_channel_mode(self.model.channel_mode)
         if self.data is not None:
             self._update_visible_sliders()
-            # if we have data:
+            self._view.set_current_index(self.model.current_index)
             if wrapper := self._dd_model.data_wrapper:
                 self._view.set_data_info(wrapper.summary_info())
 
+            self._clear_canvas()
             self._update_canvas()
+            for lut_ctr in self._lut_controllers.values():
+                lut_ctr._update_view_from_model()
 
     def _on_model_visible_axes_changed(self) -> None:
         self._update_visible_sliders()

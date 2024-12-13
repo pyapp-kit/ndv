@@ -1,15 +1,10 @@
 """Example usage of new mvc pattern."""
 
-import numpy as np
+from ndv import data, imshow
 
-from ndv import data, run_app
-from ndv.controller import ViewerController
-
-viewer = ViewerController()
-
-img_data = data.cells3d()
-img_data = np.tile(img_data, (1, 1, 3, 4))
-viewer.data = img_data
-viewer.show()
-viewer.model.current_index.update({0: 32, 1: 1})
-run_app()
+imshow(
+    data.cells3d(),
+    default_lut={"cmap": "cubehelix"},
+    current_index={0: 20},
+    visible_axes=(0, 2),
+)

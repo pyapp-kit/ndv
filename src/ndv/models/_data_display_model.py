@@ -53,6 +53,7 @@ class DataDisplayModel(NDVModel):
     """
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
+    # TODO: add validator
     data_wrapper: Optional[DataWrapper] = None
 
     @model_validator(mode="after")

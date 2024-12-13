@@ -74,7 +74,7 @@ QRangeSlider { qproperty-barColor: qlineargradient(
 class _CmapCombo(QColormapComboBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent, allow_user_colormaps=True, add_colormap_text="Add...")
-        self.setMinimumSize(120, 21)
+        self.setMinimumSize(140, 21)
         # self.setStyleSheet("background-color: transparent;")
 
     def showPopup(self) -> None:
@@ -82,6 +82,16 @@ class _CmapCombo(QColormapComboBox):
         popup = self.findChild(QFrame)
         popup.setMinimumWidth(self.width() + 100)
         popup.move(popup.x(), popup.y() - self.height() - popup.height())
+
+    # TODO: upstream me
+    def setCurrentColormap(self, cmap_: cmap.Colormap) -> None:
+        """Adds the color to the QComboBox and selects it."""
+        for idx in range(self.count()):
+            if item := self.itemColormap(idx):
+                if item.name == cmap_.name:
+                    self.setCurrentIndex(idx)
+        else:
+            self.addColormap(cmap_)
 
 
 class _QLUTWidget(QWidget):

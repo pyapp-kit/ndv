@@ -114,9 +114,10 @@ def _install_excepthook() -> None:
     is raised.
     """
     try:
+        import psygnal
         from rich.traceback import install
 
-        install(show_locals=True)
+        install(show_locals=False, suppress=[psygnal])
     except ImportError:
         sys.excepthook = _no_exit_excepthook
 
@@ -186,6 +187,12 @@ def run_app() -> None:
             raise RuntimeError(
                 f"Got unexpected application type: {type(_APP_INSTANCE)}"
             )
-        _APP_INSTANCE.exec()
+
+        is_ipython_qt = False
+        if (ipy := sys.modules.get("IPython")) and (shell := ipy.get_ipython()):
+            is_ipython_qt = str(shell.active_eventloop).startswith("qt")
+
+        if not is_ipython_qt:
+            _APP_INSTANCE.exec()
     elif frontend == GuiFrontend.JUPYTER:
         pass  # nothing to do here
