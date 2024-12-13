@@ -9,7 +9,7 @@ import pytest
 from qtpy.QtCore import QEvent, QPointF, Qt
 from qtpy.QtGui import QMouseEvent
 
-from ndv.old_viewer import NDViewer
+from ndv.v1 import NDViewer
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot

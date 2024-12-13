@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-import ndv.old_viewer
+import ndv.v1
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Mapping
@@ -19,7 +19,7 @@ class MyArrayThing:
         return self._data[item]  # type: ignore [no-any-return]
 
 
-class MyWrapper(ndv.old_viewer.DataWrapper[MyArrayThing]):
+class MyWrapper(ndv.v1.DataWrapper[MyArrayThing]):
     @classmethod
     def supports(cls, data: Any) -> bool:
         if isinstance(data, MyArrayThing):
