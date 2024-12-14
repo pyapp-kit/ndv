@@ -111,6 +111,7 @@ class JupyterArrayView(ArrayView):
     ) -> None:
         # WIDGETS
         self._canvas_widget = canvas_widget
+        self._visible_axes: Sequence[AxisKey] = []
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
@@ -124,6 +125,15 @@ class JupyterArrayView(ArrayView):
 
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
+        self._ndims_btn = widgets.ToggleButton(
+            value=False,
+            description="3D",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="View in 3D",
+            icon="check",
+        )
+        self._ndims_btn.observe(self._on_ndims_toggled, names="value")
+
         # LAYOUT
 
         self.layout = widgets.VBox(
@@ -133,6 +143,7 @@ class JupyterArrayView(ArrayView):
                 self._hover_info_label,
                 self._slider_box,
                 self._channel_mode_combo,
+                self._ndims_btn,
             ]
         )
 
@@ -246,3 +257,23 @@ class JupyterArrayView(ArrayView):
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
             display.clear_output()  # type: ignore [no-untyped-call]
+
+    def visible_axes(self) -> Sequence[AxisKey]:
+        return self._visible_axes
+
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
+        self._visible_axes = tuple(axes)
+        self._ndims_btn.value = len(axes) == 3
+
+    def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
+        was_3d = len(self._visible_axes) > 2
+        is_3d = change["new"]
+        if was_3d and not is_3d:
+            self._visible_axes = self._visible_axes[-2:]
+        elif not was_3d and is_3d:
+            # FIXME
+            # HACCCCCKKK
+            # need a better way to add the next dimension in the GUI
+            new_ax = 0
+            self._visible_axes = (new_ax, *self._visible_axes)
+        self.visibleAxesChanged.emit()
