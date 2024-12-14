@@ -188,7 +188,7 @@ class VispyHistogramCanvas(HistogramCanvas):
             self._update_lut_lines()
             self._resize()
 
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self._canvas.native
 
     def canvas_to_world(
