@@ -402,7 +402,7 @@ class QtArrayView(ArrayView):
             # FIXME
             # HACCCCCKKK
             # need a better way to add the next dimension in the GUI
-            new_ax = -3
+            new_ax = 0
             self._visible_axes = (new_ax, *self._visible_axes)
         self.visibleAxesChanged.emit()
 

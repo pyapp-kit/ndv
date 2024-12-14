@@ -159,6 +159,8 @@ class ViewerController:
     def _on_model_visible_axes_changed(self) -> None:
         self._view.set_visible_axes(self.model.visible_axes)
         self._update_visible_sliders()
+        self._clear_canvas()
+        self._canvas.set_ndim(self.model.n_visible_axes)
         self._update_canvas()
 
     def _on_model_current_index_changed(self) -> None:
@@ -266,7 +268,14 @@ class ViewerController:
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
-                lut_ctrl.add_handle(self._canvas.add_image(data))
+                if response.n_visible_axes == 2:
+                    handle = self._canvas.add_image(data)
+                    lut_ctrl.add_handle(handle)
+                elif response.n_visible_axes == 3:
+                    print("Adding volume")
+                    handle = self._canvas.add_volume(data)
+                    lut_ctrl.add_handle(handle)
+
             else:
                 lut_ctrl.update_texture_data(data)
                 if self._histogram is not None:

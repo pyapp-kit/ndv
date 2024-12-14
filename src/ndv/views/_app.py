@@ -117,7 +117,7 @@ def _install_excepthook() -> None:
         import psygnal
         from rich.traceback import install
 
-        install(show_locals=True, suppress=[psygnal])
+        install(show_locals=False, suppress=[psygnal], max_frames=6)
     except ImportError:
         sys.excepthook = _no_exit_excepthook
 
