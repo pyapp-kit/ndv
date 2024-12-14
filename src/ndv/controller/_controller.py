@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ndv.controller._channel_controller import ChannelController
-from ndv.models import DataDisplayModel, ROIModel
+from ndv.models import BoundingBoxModel, DataDisplayModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import (
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
     from ndv.views.bases import ArrayView, HistogramCanvas
-    from ndv.views.bases.graphics._canvas_elements import RoiHandle
+    from ndv.views.bases.graphics._canvas_elements import BoundingBox
 
     LutKey: TypeAlias = int | None
 
@@ -37,7 +37,7 @@ class ViewerController:
     """
 
     def __init__(
-        self, data: DataDisplayModel | None = None, roi: ROIModel | None = None
+        self, data: DataDisplayModel | None = None, roi: BoundingBoxModel | None = None
     ) -> None:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -55,22 +55,21 @@ class ViewerController:
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
         # FIXME
-        self._roi = roi or ROIModel()
-        # FIXME: Remove this
-        self._roi_handle: RoiHandle | None = None
+        self._roi = roi or BoundingBoxModel()
+        self._bb: BoundingBox = self._canvas.add_bounding_box()
 
         self._set_model_connected(self._dd_model.display)
         self._set_roi_connected(self._roi)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self.add_histogram)
-        self._view.roiRequested.connect(self._on_roi_requested)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
+
         # FIXME
         self._canvas.mouseReleased.connect(self._view.mouse_release)
-        self._canvas.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
-
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+
+        self._bb.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -106,7 +105,7 @@ class ViewerController:
         self._update_hist_domain_for_dtype(data.dtype)
 
     @property
-    def roi(self) -> ROIModel:
+    def roi(self) -> BoundingBoxModel:
         return self._roi
 
     # -----------------------------------------------------------------------------
@@ -157,7 +156,7 @@ class ViewerController:
             getattr(obj, _connect)(callback)
 
     # FIXME
-    def _set_roi_connected(self, model: ROIModel, connect: bool = True) -> None:
+    def _set_roi_connected(self, model: BoundingBoxModel, connect: bool = True) -> None:
         """Connect or disconnect the model to/from the viewer.
 
         We do this in a single method so that we are sure to connect and disconnect
@@ -166,7 +165,8 @@ class ViewerController:
         _connect = "connect" if connect else "disconnect"
 
         for obj, callback in [
-            (model.events.bounding_box, self._on_model_bounding_box_changed),
+            (model.events.bounding_box, self._on_roi_bounding_box_changed),
+            (model.events.visible, self._on_roi_visibility_changed),
         ]:
             getattr(obj, _connect)(callback)
 
@@ -214,44 +214,13 @@ class ViewerController:
                 lut_ctrl.handles.pop().remove()
         # do we need to cleanup the lut views themselves?
 
-    # FIXME
-    def _on_roi_requested(self) -> None:
-        if self._roi_handle:
-            self._roi_handle.remove()
-        # FIXME: probably want some sync_bounding_box or something.
-        # self.roi.bounding_box = ((0, 0), (0, 0))
-        # verts = [
-        #     (0, 0),
-        #     (0, 0),
-        #     (0, 0),
-        #     (0, 0),
-        # ]
-        self._roi_handle = self._canvas.add_roi(visible=False)
-
-        self._update_canvas()
-
-    # FIXME
-    def _on_model_bounding_box_changed(self) -> None:
-        mi, ma = [(0, 0), (0, 0)] if self.roi is None else self._roi.bounding_box
-        verts = [
-            (mi[0], mi[1]),
-            (ma[0], mi[1]),
-            (ma[0], ma[1]),
-            (mi[0], ma[1]),
-        ]
-        if not self._roi_handle:
-            self._roi_handle = self._canvas.add_roi(vertices=verts, visible=True)
-        else:
-            self._roi_handle.set_vertices(verts)
-
-        self._update_canvas()
-
-    def _on_view_bounding_box_changed(
-        self, bbox: tuple[tuple[float, float], tuple[float, float]]
+    def _on_roi_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
-        if self._roi:
-            # FIXME: Ugly
-            self._roi.bounding_box = tuple(tuple(float(f) for f in a) for a in bbox)
+        self._bb.set_bounding_box(bb[0], bb[1])
+
+    def _on_roi_visibility_changed(self, visible: bool) -> None:
+        self._bb.set_visible(visible)
 
     # ------------------ View callbacks ------------------
 
@@ -280,6 +249,11 @@ class ViewerController:
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self.model.channel_mode = mode
+
+    def _on_view_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
+        self._roi.bounding_box = bb
 
     # ------------------ Helper methods ------------------
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from psygnal import Signal
+
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
@@ -74,16 +76,19 @@ class ImageHandle(CanvasElement):
     def set_cmap(self, cmap: _cmap.Colormap) -> None: ...
 
 
-class RoiHandle(CanvasElement):
-    @abstractmethod
-    def vertices(self) -> Sequence[Sequence[float]]: ...
-    @abstractmethod
-    def set_vertices(self, data: Sequence[Sequence[float]]) -> None: ...
-    @abstractmethod
-    def color(self) -> Any: ...
-    @abstractmethod
-    def set_color(self, color: _cmap.Color | None) -> None: ...
-    @abstractmethod
-    def border_color(self) -> Any: ...
-    @abstractmethod
-    def set_border_color(self, color: _cmap.Color | None) -> None: ...
+class BoundingBox(CanvasElement):
+    boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
+
+    def set_bounding_box(
+        self, minimum: tuple[float, float], maximum: tuple[float, float]
+    ) -> None:
+        """Sets the bounding box."""
+
+    def set_fill(self, color: Any) -> None:
+        """Sets the fill color."""
+
+    def set_border(self, color: Any) -> None:
+        """Sets the border color."""
+
+    def set_handles(self, color: Any) -> None:
+        """Sets the handle face color."""

@@ -4,7 +4,6 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
-from psygnal import Signal
 
 from ndv.views.bases._lut_view import LutView
 from ndv.views.bases._view_base import Viewable
@@ -12,15 +11,12 @@ from ndv.views.bases._view_base import Viewable
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import cmap
     import numpy as np
 
     from ndv.views.bases.graphics._canvas_elements import (
+        BoundingBox,
         CanvasElement,
         ImageHandle,
-        RoiHandle,
     )
 
 
@@ -46,9 +42,6 @@ class GraphicsCanvas(Viewable, Mouseable):
 
 
 class ArrayCanvas(GraphicsCanvas):
-    # TODO: Consider some ROIView
-    boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
-
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod
@@ -57,13 +50,7 @@ class ArrayCanvas(GraphicsCanvas):
     @abstractmethod
     def add_volume(self, data: np.ndarray | None = ...) -> ImageHandle: ...
     @abstractmethod
-    def add_roi(
-        self,
-        vertices: Sequence[tuple[float, float]] | None = None,
-        color: cmap.Color | None = None,
-        border_color: cmap.Color | None = None,
-        visible: bool = False,
-    ) -> RoiHandle: ...
+    def add_bounding_box(self) -> BoundingBox: ...
 
 
 class HistogramCanvas(GraphicsCanvas, LutView):
