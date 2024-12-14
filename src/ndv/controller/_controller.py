@@ -272,7 +272,6 @@ class ViewerController:
                     handle = self._canvas.add_image(data)
                     lut_ctrl.add_handle(handle)
                 elif response.n_visible_axes == 3:
-                    print("Adding volume")
                     handle = self._canvas.add_volume(data)
                     lut_ctrl.add_handle(handle)
 

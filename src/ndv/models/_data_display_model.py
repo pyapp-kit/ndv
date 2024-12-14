@@ -6,7 +6,6 @@ from typing import Any, Optional, Protocol, Union, cast
 
 import numpy as np
 from pydantic import Field, model_validator
-from rich import print
 from typing_extensions import Self
 
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
@@ -184,8 +183,6 @@ class DataDisplayModel(NDVModel):
             visible_axes=self.canonical_visible_axes,
             channel_axis=c_ax,
         )
-        print("\n-----------------")
-        print("request:", request)
         return [request]
 
     # TODO: make async
@@ -222,7 +219,6 @@ class DataDisplayModel(NDVModel):
                     channel_key=i,
                     n_visible_axes=len(vis_ax),
                 )
-                print("  >>response:", response)
                 future.set_result(response)
                 futures.append(future)
 
