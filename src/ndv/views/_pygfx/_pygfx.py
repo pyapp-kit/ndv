@@ -67,7 +67,7 @@ class PyGFXImageHandle(ImageHandle):
     def clim(self) -> Any:
         return self._material.clim
 
-    def set_clim(self, clims: tuple[float, float]) -> None:
+    def set_clims(self, clims: tuple[float, float]) -> None:
         self._material.clim = clims
         self._render()
 

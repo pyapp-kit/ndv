@@ -53,26 +53,26 @@ class LutView(Viewable):
     # These methods apply a value to the view without re-emitting the signal.
 
     @final
-    def update_auto_scale(self, auto: bool) -> None:
+    def set_auto_scale_without_signal(self, auto: bool) -> None:
         with self.autoscaleChanged.blocked():
             self.set_auto_scale(auto)
 
     @final
-    def update_colormap(self, cmap: cmap.Colormap) -> None:
+    def set_colormap_without_signal(self, cmap: cmap.Colormap) -> None:
         with self.cmapChanged.blocked():
             self.set_colormap(cmap)
 
     @final
-    def update_clims(self, clims: tuple[float, float]) -> None:
+    def set_clims_without_signal(self, clims: tuple[float, float]) -> None:
         with self.climsChanged.blocked():
             self.set_clims(clims)
 
     @final
-    def update_gamma(self, gamma: float) -> None:
+    def set_gamma_without_signal(self, gamma: float) -> None:
         with self.gammaChanged.blocked():
             self.set_gamma(gamma)
 
     @final
-    def update_channel_visible(self, visible: bool) -> None:
+    def set_channel_visible_without_signal(self, visible: bool) -> None:
         with self.visibilityChanged.blocked():
             self.set_channel_visible(visible)

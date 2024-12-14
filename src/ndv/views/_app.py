@@ -113,7 +113,13 @@ def _install_excepthook() -> None:
     This is necessary to prevent the application from closing when an exception
     is raised.
     """
-    sys.excepthook = _no_exit_excepthook
+    try:
+        import psygnal
+        from rich.traceback import install
+
+        install(show_locals=True, suppress=[psygnal])
+    except ImportError:
+        sys.excepthook = _no_exit_excepthook
 
 
 def _no_exit_excepthook(

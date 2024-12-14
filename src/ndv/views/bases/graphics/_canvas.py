@@ -64,9 +64,6 @@ class ArrayCanvas(GraphicsCanvas):
 class HistogramCanvas(GraphicsCanvas, LutView):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
-    # TODO: Remove?
-    def refresh(self) -> None: ...
-
     def set_vertical(self, vertical: bool) -> None:
         """If True, orient axes vertically (x-axis on left)."""
 

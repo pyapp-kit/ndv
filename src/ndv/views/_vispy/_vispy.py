@@ -289,7 +289,7 @@ class VispyImageHandle(ImageHandle):
     def clim(self) -> Any:
         return self._visual.clim
 
-    def set_clim(self, clims: tuple[float, float]) -> None:
+    def set_clims(self, clims: tuple[float, float]) -> None:
         with suppress(ZeroDivisionError):
             self._visual.clim = clims
 
@@ -465,7 +465,7 @@ class VispyViewerCanvas(ArrayCanvas):
             cam.set_state(state)
         self._view.camera = cam
 
-    def native(self) -> Any:
+    def frontend_widget(self) -> Any:
         return self._canvas.native
 
     def set_visible(self, visible: bool) -> None: ...

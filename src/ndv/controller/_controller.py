@@ -46,7 +46,7 @@ class ViewerController:
         self._canvas = canvas_cls()
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.native())
+        self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = display_model or DataDisplayModel()
@@ -100,7 +100,7 @@ class ViewerController:
     def add_histogram(self) -> None:
         histogram_cls = get_histogram_canvas_class()  # will raise if not supported
         self._histogram = histogram_cls()
-        self._view.add_histogram(self._histogram.native())
+        self._view.add_histogram(self._histogram.frontend_widget())
         for view in self._lut_controllers.values():
             view.add_lut_view(self._histogram)
             # FIXME: hack
@@ -195,7 +195,7 @@ class ViewerController:
 
     def _on_view_visible_axes_changed(self) -> None:
         """Update the model when the visible axes change."""
-        self.model.visible_axes = self._view.visible_axes()
+        self.model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""

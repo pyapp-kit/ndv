@@ -134,7 +134,7 @@ class QLutView(LutView):
         self._qwidget.clims.valueChanged.connect(self.climsChanged.emit)
         self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit)
 
-    def native(self) -> QWidget:
+    def frontend_widget(self) -> QWidget:
         return self._qwidget
 
     def set_channel_name(self, name: str) -> None:
@@ -348,11 +348,11 @@ class QtArrayView(ArrayView):
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()
-        self._qwidget.luts.addWidget(view.native())
+        self._qwidget.luts.addWidget(view.frontend_widget())
         return view
 
     def remove_lut_view(self, view: LutView) -> None:
-        self._qwidget.luts.removeWidget(cast("QLutView", view).native())
+        self._qwidget.luts.removeWidget(cast("QLutView", view).frontend_widget())
 
     def _on_add_histogram_clicked(self) -> None:
         splitter = self._qwidget.splitter
@@ -428,5 +428,5 @@ class QtArrayView(ArrayView):
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
 
-    def native(self) -> QWidget:
+    def frontend_widget(self) -> QWidget:
         return self._qwidget
