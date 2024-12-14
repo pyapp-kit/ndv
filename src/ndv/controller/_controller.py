@@ -160,8 +160,8 @@ class ViewerController:
         self._view.set_visible_axes(self.model.visible_axes)
         self._update_visible_sliders()
         self._clear_canvas()
-        self._canvas.set_ndim(self.model.n_visible_axes)
         self._update_canvas()
+        self._canvas.set_ndim(self.model.n_visible_axes)
 
     def _on_model_current_index_changed(self) -> None:
         value = self.model.current_index
@@ -240,7 +240,6 @@ class ViewerController:
         """
         if not self._dd_model.data_wrapper:
             return
-
         # TODO: make asynchronous
         for future in self._dd_model.request_sliced_data():
             response = future.result()

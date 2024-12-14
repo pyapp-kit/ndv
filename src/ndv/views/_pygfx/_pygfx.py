@@ -457,7 +457,13 @@ class GfxArrayCanvas(ArrayCanvas):
         self._ndim = ndim
         if ndim == 3:
             self._camera = cam = pygfx.PerspectiveCamera(0, 1)
-            cam.show_object(self._scene, up=(0, -1, 0), view_dir=(0, 0, 1))
+            with suppress(ValueError):
+                # if the scene has no children yet, this will raise a ValueErrors
+                # FIXME: there's a bit of order-of-call problem here:
+                # this method needs to be called *after* the scene is constructed...
+                # that's what controller._on_model_visible_axes_changed does, but
+                # it seems fragile and should be fixed.
+                cam.show_object(self._scene, up=(0, -1, 0), view_dir=(0, 0, 1))
             controller = pygfx.OrbitController(cam, register_events=self._renderer)
             zoom = "zoom"
             # FIXME: there is still an issue with rotational centration.
@@ -481,6 +487,11 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def add_image(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
+        if data is not None:
+            # pygfx uses a view of the data without copy, so if we don't
+            # copy it here, the original data will be modified when the
+            # texture changes.
+            data = data.copy()
         tex = pygfx.Texture(data, dim=2)
         image = pygfx.Image(
             pygfx.Geometry(grid=tex),
@@ -501,6 +512,11 @@ class GfxArrayCanvas(ArrayCanvas):
         return handle
 
     def add_volume(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
+        if data is not None:
+            # pygfx uses a view of the data without copy, so if we don't
+            # copy it here, the original data will be modified when the
+            # texture changes.
+            data = data.copy()
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
             pygfx.Geometry(grid=tex),
