@@ -6,6 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
+
+if (gui := os.getenv("NDV_GUI_FRONTEND")) and gui != "qt":
+    pytest.skip("This module requires qt frontend", allow_module_level=True)
+
+
 from qtpy.QtCore import QEvent, QPointF, Qt
 from qtpy.QtGui import QMouseEvent
 

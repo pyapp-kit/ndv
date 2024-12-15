@@ -43,20 +43,17 @@ dependencies = [
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
-qt = ["vispy", "pyopengl", "pyqt6", "imageio[tifffile]"]
-jupyter = [
-    "vispy",
-    "pyopengl",
-    "ipywidgets",
-    "jupyter",
-    "jupyter_rfb",
-    "glfw",
-    "imageio[tifffile]",
-]
+# GUI frontends
+jup = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
 pyqt = ["pyqt6"]
-vispy = ["vispy", "pyopengl"]
 pyside = ["pyside6"]
+# Canavs backends
+vispy = ["vispy", "pyopengl"]
 pygfx = ["pygfx"]
+# ready to go bundles with vispy
+qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
+jupyter = ["ndv[jup,vispy]", "imageio[tifffile]"]
+
 third_party_arrays = [
     "aiohttp",                                 # for zarr example
     "jax[cpu]",
@@ -70,7 +67,7 @@ third_party_arrays = [
     "zarr",
 ]
 test = [
-    "ndv[vispy,pygfx]",
+    "ndv",
     "dask[array]",
     "imageio[tifffile]",
     "pytest-cov",
@@ -78,6 +75,7 @@ test = [
     "pytest",
 ]
 dev = [
+    "ndv[test,vispy,pygfx,pyqt,jupyter]",
     "ipython",
     "mypy",
     "pdbpp",
@@ -86,7 +84,6 @@ dev = [
     "ruff",
     "ipykernel",
     "jupyter_rfb",
-    "pyqt6",
     "notebook",
 ]
 
