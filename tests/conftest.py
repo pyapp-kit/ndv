@@ -59,12 +59,15 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     # if the test failed, don't worry about checking widgets
     if request.session.testsfailed - failures_before:
         return
-    from vispy.app.backends._qt import CanvasBackendDesktop
+    try:
+        from vispy.app.backends._qt import CanvasBackendDesktop
+
+        allow: tuple[type, ...] = (CanvasBackendDesktop,)
+    except ImportError:
+        allow = ()
 
     # This is a known widget that is not cleaned up properly
-    remaining = [
-        w for w in qapp.topLevelWidgets() if not isinstance(w, CanvasBackendDesktop)
-    ]
+    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, allow)]
     if len(remaining) > nbefore:
         test_node = request.node
 

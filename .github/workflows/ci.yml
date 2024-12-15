@@ -47,12 +47,12 @@ jobs:
           python -m pip install -e '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
 
       - uses: pyvista/setup-headless-display-action@v3
-        if: ${{ matrix.gui == 'pyside' }} || ${{ matrix.gui == 'pyqt' }}
+        if: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
         with:
           qt: true
 
       - name: install pytest-qt
-        if: ${{ matrix.gui == 'pyside' }} || ${{ matrix.gui == 'pyqt' }}
+        if: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
         run: pip install pytest-qt
 
       - name: 🧪 Test

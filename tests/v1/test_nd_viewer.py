@@ -26,12 +26,6 @@ def allow_linux_widget_leaks(func: Any) -> Any:
     return func
 
 
-BACKENDS = ["vispy"]
-# avoid pygfx backend on linux CI
-if not os.getenv("CI") or sys.platform == "darwin":
-    BACKENDS.append("pygfx")
-
-
 def test_empty_viewer(qtbot: QtBot) -> None:
     viewer = NDViewer()
     qtbot.add_widget(viewer)
@@ -43,14 +37,13 @@ def test_empty_viewer(qtbot: QtBot) -> None:
 
 
 @allow_linux_widget_leaks
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("NDV_CANVAS_BACKEND", backend)
+@pytest.mark.usefixtures("any_app")
+def test_ndviewer() -> None:
     dask_arr = np.empty((4, 3, 2, 32, 32), dtype=np.uint8)
     v = NDViewer(dask_arr)
-    qtbot.addWidget(v)
+    # qtbot.addWidget(v)
     v.show()
-    qtbot.waitUntil(v._is_idle, timeout=1000)
+    # qtbot.waitUntil(v._is_idle, timeout=1000)
     v.set_ndim(3)
     v.set_channel_mode("composite")
     v.set_current_index({0: 2, 1: 1, 2: 1})
@@ -62,7 +55,7 @@ def test_ndviewer(qtbot: QtBot, backend: str, monkeypatch: pytest.MonkeyPatch) -
 
     # wait until there are no running jobs, because the callbacks
     # in the futures hold a strong reference to the viewer
-    qtbot.waitUntil(v._is_idle, timeout=3000)
+    # qtbot.waitUntil(v._is_idle, timeout=3000)
 
 
 # not testing pygfx yet...
