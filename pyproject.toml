@@ -71,7 +71,6 @@ test = [
     "dask[array]",
     "imageio[tifffile]",
     "pytest-cov",
-    "pytest-qt",
     "pytest",
 ]
 dev = [
