@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import os
 import runpy
 from pathlib import Path
 
 import pytest
 
-if (gui := os.getenv("NDV_GUI_FRONTEND")) and gui != "qt":
+try:
+    import pytestqt  # noqa: F401
+except ImportError:
     pytest.skip("This module requires qt frontend", allow_module_level=True)
 
 from qtpy.QtWidgets import QApplication
