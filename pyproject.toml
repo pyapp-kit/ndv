@@ -46,7 +46,7 @@ dependencies = [
 # GUI frontends
 jup = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
 pyqt = ["pyqt6"]
-pyside = ["pyside6"]
+pyside = ["pyside6<6.8"]
 # Canavs backends
 vispy = ["vispy", "pyopengl"]
 pygfx = ["pygfx"]
