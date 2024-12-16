@@ -32,7 +32,12 @@ jobs:
         python-version: ["3.10", "3.12"]
         gui: [pyside, pyqt, jup]
         # canvas: [vispy, pygfx]
-        canvas: [pygfx]
+        canvas: [vispy]
+        exclude:
+          # unsolved intermittent segfaults on this combo
+          - python-version: "3.10"
+            gui: pyside
+            canvas: pygfx
 
     steps:
       - uses: actions/checkout@v4
