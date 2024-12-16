@@ -49,6 +49,7 @@ jobs:
             python-version: "3.13"
             gui: jup
             canvas: pygfx
+          # pyside6 is struggling with 3.9
           - os: ubuntu-latest
             python-version: "3.9"
             gui: pyqt
