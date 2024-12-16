@@ -43,20 +43,31 @@ dependencies = [
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
-qt = ["vispy", "pyopengl", "pyqt6", "imageio[tifffile]"]
-jupyter = [
-    "vispy",
-    "pyopengl",
-    "ipywidgets",
-    "jupyter",
-    "jupyter_rfb",
-    "glfw",
-    "imageio[tifffile]",
-]
+# Supported GUI frontends
+jup = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
 pyqt = ["pyqt6"]
-vispy = ["vispy", "pyopengl"]
-pyside = ["pyside6"]
-pygfx = ["pygfx"]
+pyside = ["pyside6<6.8"]
+
+# Supported Canavs backends
+vispy = ["vispy>=0.14.3", "pyopengl"]
+pygfx = ["pygfx>=0.6.0"]
+
+# ready to go bundles with vispy
+qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
+jupyter = ["ndv[jup,vispy]", "imageio[tifffile]"]
+
+test = ["imageio[tifffile]", "pytest-cov", "pytest"]
+dev = [
+    "ndv[test,vispy,pygfx,pyqt,jupyter]",
+    "ipython",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "rich",
+    "ruff",
+    "ipykernel",
+]
+
 third_party_arrays = [
     "aiohttp",                                 # for zarr example
     "jax[cpu]",
@@ -68,26 +79,7 @@ third_party_arrays = [
     "torch",
     "xarray",
     "zarr",
-]
-test = [
-    "ndv[vispy,pygfx]",
     "dask[array]",
-    "imageio[tifffile]",
-    "pytest-cov",
-    "pytest-qt",
-    "pytest",
-]
-dev = [
-    "ipython",
-    "mypy",
-    "pdbpp",
-    "pre-commit",
-    "rich",
-    "ruff",
-    "ipykernel",
-    "jupyter_rfb",
-    "pyqt6",
-    "notebook",
 ]
 
 [project.urls]
@@ -115,7 +107,7 @@ select = [
     "B",    # flake8-bugbear
     "A001", # flake8-builtins
     "RUF",  # ruff-specific rules
-    "TCH",  # flake8-type-checking
+    "TC",   # flake8-type-checking
     "TID",  # flake8-tidy-imports
 ]
 ignore = [
@@ -157,9 +149,9 @@ filterwarnings = [
     "ignore:Method has been garbage collected::superqt",
     # occasionally happens on linux CI with vispy
     "ignore:Got wrong number of dimensions",
-    # requires pygfx > 0.2.0
-    "ignore:This version of pygfx does not yet support additive blending",
     "ignore:Unable to import recommended hash",
+    # CI-only error on jupyter, vispy, macos
+    "ignore:.*Failed to find a suitable pixel format",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
