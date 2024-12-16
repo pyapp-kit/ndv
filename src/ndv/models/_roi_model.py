@@ -7,7 +7,6 @@ from pydantic import field_validator
 from ndv.models._base_model import NDVModel
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from typing import Any
 
 
@@ -26,11 +25,13 @@ class BoundingBoxModel(NDVModel):
     """
 
     visible: bool = True
-    bounding_box: tuple[Sequence[float], Sequence[float]] = ([0, 0], [0, 0])
+    bounding_box: tuple[tuple[float, float], tuple[float, float]] = ([0, 0], [0, 0])
 
     @field_validator("bounding_box")
     @classmethod
-    def _validate_bounding_box(cls, bb: Any) -> tuple[Sequence[float], Sequence[float]]:
+    def _validate_bounding_box(
+        cls, bb: Any
+    ) -> tuple[tuple[float, float], tuple[float, float]]:
         if not isinstance(bb, tuple):
             raise ValueError(f"{bb} not a tuple of points!")
         x1 = min(bb[0][0], bb[1][0])
