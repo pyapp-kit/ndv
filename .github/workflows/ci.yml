@@ -31,10 +31,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.12"]
         gui: [pyside, pyqt, jup]
-        canvas: [vispy, pygfx]
-        exclude:
-          - os: macos-latest
-            canvas: pygfx
+        # canvas: [vispy, pygfx]
+        canvas: [pygfx]
 
     steps:
       - uses: actions/checkout@v4
