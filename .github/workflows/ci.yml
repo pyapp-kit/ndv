@@ -37,14 +37,9 @@ jobs:
           - python-version: "3.10"
             gui: pyside
         include:
-          - os: macos-latest
-            python-version: "3.13"
-            gui: pyqt
-            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.13"
             gui: jup
-            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.9"
             gui: pyqt
