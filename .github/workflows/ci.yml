@@ -38,7 +38,7 @@ jobs:
             gui: pyside
             canvas: pygfx
         include:
-          - os: ubuntu-latest
+          - os: macos-latest
             python-version: "3.13"
             gui: pyqt
             canvas: vispy
