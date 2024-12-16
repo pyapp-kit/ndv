@@ -38,6 +38,9 @@ jobs:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
             gui: pyside
+          # wxpython does not build wheels for ubuntu
+          - os: ubuntu-latest
+            gui: wxpython
         include:
           # test a couple more python variants, without
           # full os/gui/canvas matrix coverage
