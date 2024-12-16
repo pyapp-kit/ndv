@@ -31,13 +31,25 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.12"]
         gui: [pyside, pyqt, jup]
-        # canvas: [vispy, pygfx]
-        canvas: [vispy]
+        canvas: [vispy, pygfx]
         exclude:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
             gui: pyside
             canvas: pygfx
+        include:
+          - os: ubuntu-latest
+            python-version: "3.13"
+            gui: pyqt
+            canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.13"
+            gui: jup
+            canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.9"
+            gui: pyqt
+            canvas: vispy
 
     steps:
       - uses: actions/checkout@v4
