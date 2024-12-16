@@ -36,7 +36,6 @@ jobs:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
             gui: pyside
-            canvas: pygfx
         include:
           - os: macos-latest
             python-version: "3.13"
