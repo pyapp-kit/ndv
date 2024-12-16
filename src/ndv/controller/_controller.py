@@ -225,7 +225,7 @@ class ViewerController:
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
         """
-        if not self._dd_model.data_wrapper or not self.model.current_index:
+        if not self._dd_model.data_wrapper:
             return  # pragma: no cover
 
         # TODO: make asynchronous
