@@ -5,10 +5,6 @@ from typing import Any
 
 import numpy as np
 import pytest
-from qtpy.QtCore import QEvent, QPointF, Qt
-from qtpy.QtGui import QMouseEvent
-
-from ndv.old_viewer import NDViewer
 
 try:
     import pytestqt
@@ -18,6 +14,12 @@ try:
 
 except ImportError:
     pytest.skip("This module requires qt frontend", allow_module_level=True)
+
+
+from qtpy.QtCore import QEvent, QPointF, Qt
+from qtpy.QtGui import QMouseEvent
+
+from ndv.old_viewer import NDViewer
 
 
 def allow_linux_widget_leaks(func: Any) -> Any:
@@ -37,12 +39,12 @@ def test_empty_viewer() -> None:
 
 
 @allow_linux_widget_leaks
-def test_ndviewer(any_app) -> None:
+def test_ndviewer(any_app: Any) -> None:
     dask_arr = np.empty((4, 3, 2, 32, 32), dtype=np.uint8)
     v = NDViewer(dask_arr)
     # qtbot.addWidget(v)
     v.show()
-    # temorary workaround for qtbot access ... review when dropping v1
+    # temporary workaround for qtbot access ... review when dropping v1
     if isinstance(any_app, tuple) and len(any_app) == 2:
         qtbot = any_app[1]
         qtbot.waitUntil(v._is_idle, timeout=1000)
@@ -62,11 +64,11 @@ def test_ndviewer(any_app) -> None:
 
 # not testing pygfx yet...
 @pytest.mark.skipif(sys.platform != "darwin", reason="the mouse event is tricky")
-def test_hover_info(any_app) -> None:
+def test_hover_info(any_app: Any) -> None:
     data = np.ones((4, 3, 32, 32), dtype=np.float32)
     viewer = NDViewer(data)
     viewer.show()
-    # temorary workaround for qtbot access ... review when dropping v1
+    # temporary workaround for qtbot access ... review when dropping v1
     if isinstance(any_app, tuple) and len(any_app) == 2:
         qtbot = any_app[1]
         qtbot.waitUntil(viewer._is_idle, timeout=1000)
