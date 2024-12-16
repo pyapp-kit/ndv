@@ -8,11 +8,7 @@ from ndv.controller._channel_controller import ChannelController
 from ndv.models import DataDisplayModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
-from ndv.views import (
-    get_canvas_class,
-    get_histogram_canvas_class,
-    get_view_frontend_class,
-)
+from ndv.views import _app
 
 if TYPE_CHECKING:
     from typing_extensions import TypeAlias
@@ -41,8 +37,8 @@ class ViewerController:
         self._lut_controllers: dict[LutKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
-        frontend_cls = get_view_frontend_class()
-        canvas_cls = get_canvas_class()
+        frontend_cls = _app.get_view_frontend_class()
+        canvas_cls = _app.get_canvas_class()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
 
@@ -82,7 +78,7 @@ class ViewerController:
     def data(self) -> Any:
         """Return data being displayed."""
         if self._dd_model.data_wrapper is None:
-            return None
+            return None  # pragma: no cover
         # returning the actual data, not the wrapper
         return self._dd_model.data_wrapper.data
 
@@ -96,7 +92,7 @@ class ViewerController:
     # -----------------------------------------------------------------------------
 
     def add_histogram(self) -> None:
-        histogram_cls = get_histogram_canvas_class()  # will raise if not supported
+        histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         self._histogram = histogram_cls()
         self._view.add_histogram(self._histogram.frontend_widget())
         for view in self._lut_controllers.values():
@@ -230,7 +226,7 @@ class ViewerController:
         It fetches the current data slice from the model and updates the image handle.
         """
         if not self._dd_model.data_wrapper:
-            return
+            return  # pragma: no cover
 
         # TODO: make asynchronous
         for future in self._dd_model.request_sliced_data():
