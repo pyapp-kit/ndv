@@ -5,6 +5,8 @@ Gabriel Pasa
 gabrieldp
 """
 
+from __future__ import annotations
+
 from typing import Any, no_type_check
 
 import wx
@@ -19,7 +21,7 @@ def value_to_fraction(value: float, min_value: float, max_value: float) -> float
 
 
 class SliderThumb:
-    def __init__(self, parent: "RangeSlider", value: int):
+    def __init__(self, parent: RangeSlider, value: int):
         self.parent = parent
         self.dragged = False
         self.mouse_over = False
@@ -108,7 +110,7 @@ class SliderThumb:
             in_hitbox = in_hitbox and (boundary_low <= mouse_coord <= boundary_high)
         return in_hitbox
 
-    def GetOtherThumb(self) -> tuple[str, "SliderThumb"]:
+    def GetOtherThumb(self) -> tuple[str, SliderThumb]:
         if self.parent.thumbs["low"] != self:
             return "low", self.parent.thumbs["low"]
         else:
