@@ -64,6 +64,10 @@ jobs:
             gui: wxpython
             python-version: "3.9"
             canvas: vispy
+          - os: windows-latest
+            gui: jup
+            python-version: "3.9"
+            canvas: pygfx
 
     steps:
       - uses: actions/checkout@v4
