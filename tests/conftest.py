@@ -4,6 +4,7 @@ import gc
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 
@@ -45,8 +46,10 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     # NDV_GUI_FRONTEND='jupyter' pytest
     if (frontend := gui_frontend()) == GuiFrontend.QT:
         app = request.getfixturevalue("qapp")
-        with _catch_qt_leaks(request, app):
-            yield app
+        qtbot = request.getfixturevalue("qtbot")
+        with patch.object(app, "exec", lambda *_: None):
+            with _catch_qt_leaks(request, app):
+                yield app, qtbot
     elif frontend == GuiFrontend.JUPYTER:
         yield request.getfixturevalue("asyncio_app")
     elif frontend == GuiFrontend.WX:
