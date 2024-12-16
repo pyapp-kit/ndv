@@ -61,6 +61,7 @@ wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
 test = ["imageio[tifffile]", "pytest-cov", "pytest"]
 dev = [
     "ndv[test,vispy,pygfx,pyqt,jupyter]",
+    "pytest-qt",
     "ipython",
     "mypy",
     "pdbpp",
