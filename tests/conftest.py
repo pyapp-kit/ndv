@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import gc
+import importlib
+import importlib.util
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -31,6 +34,11 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     # this fixture will use the appropriate application depending on the env var
     # NDV_GUI_FRONTEND='qt' pytest
     # NDV_GUI_FRONTEND='jupyter' pytest
+
+    if not importlib.util.find_spec("pytestqt"):
+        # pytestqt isn't available ... this can't be a qt test
+        os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+
     if gui_frontend() == "qt":
         app = request.getfixturevalue("qapp")
         with _catch_qt_leaks(request, app):
@@ -59,12 +67,15 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     # if the test failed, don't worry about checking widgets
     if request.session.testsfailed - failures_before:
         return
-    from vispy.app.backends._qt import CanvasBackendDesktop
+    try:
+        from vispy.app.backends._qt import CanvasBackendDesktop
+
+        allow: tuple[type, ...] = (CanvasBackendDesktop,)
+    except ImportError:
+        allow = ()
 
     # This is a known widget that is not cleaned up properly
-    remaining = [
-        w for w in qapp.topLevelWidgets() if not isinstance(w, CanvasBackendDesktop)
-    ]
+    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, allow)]
     if len(remaining) > nbefore:
         test_node = request.node
 
