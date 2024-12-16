@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, cast
 
 import wx
 import wx.lib.newevent
+from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
 from ndv.views.bases._array_view import ArrayView
 from ndv.views.bases._lut_view import LutView
 
-from ._wx_signal import WxSignal
 from .range_slider import RangeSlider
 
 if TYPE_CHECKING:
@@ -105,7 +105,12 @@ class WxLutView(LutView):
 
 # mostly copied from _qt.qt_view._QDimsSliders
 class _WxDimsSliders(wx.Panel):
-    currentIndexChanged = WxSignal()
+    # note to self... I first started with a wxSignal, but found that it was not
+    # being emitted as "soon" on initialization as psygnal.Signal.  This can be
+    # looked into ... or we can just use psygnal here.  It's also possible, if we
+    # end up passing the model into the views, that views won't need these sorts
+    # of signals at all.  Open GH issue to discuss if you are here :)
+    currentIndexChanged = Signal()
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -129,7 +134,6 @@ class _WxDimsSliders(wx.Panel):
 
             self.layout.Add(slider, 0, wx.EXPAND | wx.ALL, 5)
             self._sliders[axis] = slider
-
         self.currentIndexChanged.emit()
 
     def hide_dimensions(

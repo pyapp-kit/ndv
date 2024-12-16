@@ -59,8 +59,11 @@ def get_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
 
         from ndv.views._vispy._vispy import VispyViewerCanvas
 
-        if gui_frontend() == GuiFrontend.JUPYTER:
+        _frontend = gui_frontend()
+        if _frontend == GuiFrontend.JUPYTER:
             use_app("jupyter_rfb")
+        elif _frontend == GuiFrontend.WX:
+            use_app("wx")
 
         return VispyViewerCanvas
 

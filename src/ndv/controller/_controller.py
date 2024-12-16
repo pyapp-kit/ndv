@@ -226,7 +226,7 @@ class ViewerController:
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
         """
-        if not self._dd_model.data_wrapper:
+        if not self._dd_model.data_wrapper or not self.model.current_index:
             return  # pragma: no cover
 
         # TODO: make asynchronous
@@ -234,13 +234,6 @@ class ViewerController:
             response = future.result()
             key = response.channel_key
             data = response.data
-            if data.ndim != 2:
-                warnings.warn(
-                    f"Received data with shape {data.shape}, but expected 2D data.",
-                    RuntimeWarning,
-                    stacklevel=1,
-                )
-                return
 
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
