@@ -156,6 +156,8 @@ filterwarnings = [
     # requires pygfx > 0.2.0
     "ignore:This version of pygfx does not yet support additive blending",
     "ignore:Unable to import recommended hash",
+    # CI-only error on jupyter, vispy, macos
+    "ignore:.*Failed to find a suitable pixel format"
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
