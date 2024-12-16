@@ -74,8 +74,9 @@ jobs:
     with:
       os: ${{ matrix.os }}
       python-version: ${{ matrix.python-version }}
-      extras: "test,third_party_arrays"
+      extras: "test,vispy,third_party_arrays"
       coverage-upload: artifact
+      pip-post-installs: "pytest-qt"
       qt: pyqt6
     strategy:
       fail-fast: false
