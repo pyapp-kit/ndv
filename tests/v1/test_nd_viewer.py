@@ -28,6 +28,7 @@ def allow_linux_widget_leaks(func: Any) -> Any:
     return func
 
 
+@allow_linux_widget_leaks
 @pytest.mark.usefixtures("any_app")
 def test_empty_viewer() -> None:
     viewer = NDViewer()
@@ -35,7 +36,7 @@ def test_empty_viewer() -> None:
     viewer.set_data(np.random.rand(4, 3, 32, 32))
     assert isinstance(viewer.data, np.ndarray)
     viewer.set_data(None)
-    # assert viewer.data is None
+    assert viewer.data is None
 
 
 @allow_linux_widget_leaks
