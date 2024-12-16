@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import gc
+import importlib
+import importlib.util
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -44,7 +47,18 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     # this fixture will use the appropriate application depending on the env var
     # NDV_GUI_FRONTEND='qt' pytest
     # NDV_GUI_FRONTEND='jupyter' pytest
-    if (frontend := gui_frontend()) == GuiFrontend.QT:
+    try:
+        frontend = gui_frontend()
+    except RuntimeError:
+        # if we don't find any frontend, and jupyter is available, use that
+        # since it requires very little setup
+        if importlib.util.find_spec("jupyter"):
+            os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+            gui_frontend.cache_clear()
+
+        frontend = gui_frontend()
+
+    if frontend == GuiFrontend.QT:
         app = request.getfixturevalue("qapp")
         qtbot = request.getfixturevalue("qtbot")
         with patch.object(app, "exec", lambda *_: None):
