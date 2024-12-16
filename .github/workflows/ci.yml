@@ -63,7 +63,7 @@ jobs:
 
       - name: 🧪 Test
         run: |
-          pytest --cov=pyapp --cov-report=xml -v --color yes tests
+          pytest --cov --cov-report=xml -v --color yes tests
 
       - uses: codecov/codecov-action@v5
         with:
