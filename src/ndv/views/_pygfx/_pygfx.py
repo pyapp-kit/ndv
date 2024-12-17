@@ -409,6 +409,10 @@ def get_canvas_class() -> WgpuCanvas:
         from wgpu.gui.jupyter import JupyterWgpuCanvas
 
         return JupyterWgpuCanvas
+    if frontend == GuiFrontend.WX:
+        from wgpu.gui.wx import WxWgpuCanvas
+
+        return WxWgpuCanvas
 
 
 class GfxArrayCanvas(ArrayCanvas):

@@ -45,7 +45,6 @@ class LutView(Viewable):
         Usually corresponsds to a checkbox.
         """
 
-    @abstractmethod
     def set_gamma(self, gamma: float) -> None:
         """Set the gamma value of the LUT."""
         return None
