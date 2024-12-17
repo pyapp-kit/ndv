@@ -4,6 +4,7 @@ import importlib.util
 import os
 import sys
 import traceback
+from contextlib import suppress
 from enum import Enum
 from functools import cache
 from typing import TYPE_CHECKING, Any
@@ -113,25 +114,66 @@ def _install_excepthook() -> None:
     This is necessary to prevent the application from closing when an exception
     is raised.
     """
+    if hasattr(sys, "_original_excepthook_"):
+        return
+    sys._original_excepthook_ = sys.excepthook  # type: ignore
+    sys.excepthook = ndv_excepthook
+
+
+def _print_exception(
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    exc_traceback: TracebackType | None,
+) -> None:
     try:
         import psygnal
-        from rich.traceback import install
+        from rich.console import Console
+        from rich.traceback import Traceback
 
-        install(show_locals=False, suppress=[psygnal], max_frames=6)
+        tb = Traceback.from_exception(
+            exc_type, exc_value, exc_traceback, suppress=[psygnal], max_frames=10
+        )
+        Console(stderr=True).print(tb)
     except ImportError:
-        sys.excepthook = _no_exit_excepthook
+        traceback.print_exception(exc_type, value=exc_value, tb=exc_traceback)
 
 
-def _no_exit_excepthook(
-    type: type[BaseException], value: BaseException, tb: TracebackType | None
+def ndv_excepthook(
+    exc_type: type[BaseException], exc_value: BaseException, tb: TracebackType | None
 ) -> None:
-    """Excepthook that prints the traceback to the console.
+    _print_exception(exc_type, exc_value, tb)
+    if not tb:
+        return
 
-    By default, Qt's excepthook raises sys.exit(), which is not what we want.
-    """
-    # this could be elaborated to do all kinds of things...
-    print("\n-----------------------")
-    traceback.print_exception(type, value, tb)
+    if (
+        (debugpy := sys.modules.get("debugpy"))
+        and debugpy.is_client_connected()
+        and ("pydevd" in sys.modules)
+    ):
+        with suppress(Exception):
+            import threading
+
+            import pydevd
+
+            py_db = pydevd.get_global_debugger()
+            thread = threading.current_thread()
+            additional_info = py_db.set_additional_thread_info(thread)
+            additional_info.is_tracing += 1
+
+            try:
+                arg = (exc_type, exc_value, tb)
+                py_db.stop_on_unhandled_exception(py_db, thread, additional_info, arg)
+            finally:
+                additional_info.is_tracing -= 1
+    elif os.getenv("NDV_DEBUG_EXCEPTIONS"):
+        # Default to pdb if no better option is available
+        import pdb
+
+        pdb.post_mortem(tb)
+
+    if os.getenv("NDV_EXIT_ON_EXCEPTION"):
+        print("\nNDV_EXIT_ON_EXCEPTION is set, exiting.")
+        sys.exit(1)
 
 
 @cache  # not allowed to change
