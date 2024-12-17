@@ -31,7 +31,7 @@ class ViewerController:
     This is the primary public interface for the viewer.
     """
 
-    def __init__(self, data: DataDisplayModel | None = None) -> None:
+    def __init__(self, display_model: DataDisplayModel | None = None) -> None:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
@@ -40,19 +40,21 @@ class ViewerController:
         frontend_cls = _app.get_view_frontend_class()
         canvas_cls = _app.get_canvas_class()
         self._canvas = canvas_cls()
-        self._canvas.set_ndim(2)
 
         self._histogram: HistogramCanvas | None = None
         self._view = frontend_cls(self._canvas.frontend_widget())
 
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
-        self._dd_model = data or DataDisplayModel()
+        self._dd_model = display_model or DataDisplayModel()
+        self._canvas.set_ndim(self._dd_model.display.n_visible_axes)
+        self._view.set_visible_axes(self._dd_model.display.visible_axes)
 
         self._set_model_connected(self._dd_model.display)
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self.add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
+        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
@@ -151,8 +153,11 @@ class ViewerController:
             self._update_canvas()
 
     def _on_model_visible_axes_changed(self) -> None:
+        self._view.set_visible_axes(self.model.visible_axes)
         self._update_visible_sliders()
+        self._clear_canvas()
         self._update_canvas()
+        self._canvas.set_ndim(self.model.n_visible_axes)
 
     def _on_model_current_index_changed(self) -> None:
         value = self.model.current_index
@@ -185,6 +190,10 @@ class ViewerController:
     def _on_view_current_index_changed(self) -> None:
         """Update the model when slider value changes."""
         self.model.current_index.update(self._view.current_index())
+
+    def _on_view_visible_axes_changed(self) -> None:
+        """Update the model when the visible axes change."""
+        self.model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
@@ -255,7 +264,13 @@ class ViewerController:
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
-                lut_ctrl.add_handle(self._canvas.add_image(data))
+                if response.n_visible_axes == 2:
+                    handle = self._canvas.add_image(data)
+                    lut_ctrl.add_handle(handle)
+                elif response.n_visible_axes == 3:
+                    handle = self._canvas.add_volume(data)
+                    lut_ctrl.add_handle(handle)
+
             else:
                 lut_ctrl.update_texture_data(data)
                 if self._histogram is not None:
