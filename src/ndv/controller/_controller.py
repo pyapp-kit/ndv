@@ -8,7 +8,7 @@ from ndv.controller._channel_controller import ChannelController
 from ndv.models import DataDisplayModel, RectangularROIModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
-from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
+from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views import (
     get_canvas_class,
     get_histogram_canvas_class,
@@ -64,10 +64,6 @@ class ViewerController:
 
         self._set_model_connected(self._dd_model.display)
 
-        self._array_viewer_model.events.interaction_mode.connect(
-            self._on_view_model_mode_changed
-        )
-
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self.add_histogram)
@@ -114,7 +110,7 @@ class ViewerController:
     def roi(self) -> RectangularROIModel:
         if self._roi is None:
             self._roi = RectangularROIModel(visible=True)
-            self.add_roi(self._roi)
+            self._set_roi_connected(self._roi, True)
         return self._roi
 
     # -----------------------------------------------------------------------------
@@ -133,18 +129,6 @@ class ViewerController:
 
         if self.data is not None:
             self._update_hist_domain_for_dtype(self.data.dtype)
-
-    def add_roi(self, roi: RectangularROIModel | None) -> None:
-        # TODO: Enable no ROIs
-        if roi is None:
-            raise ValueError("TODO: Enable no ROIs")
-        # Remove the old ROI
-        # TODO: Enable multiple ROIs
-        if self._roi is not None:
-            self._set_roi_connected(self._roi, False)
-        self._roi = roi
-        if self._roi is not None:
-            self._set_roi_connected(roi, True)
 
     def _update_hist_domain_for_dtype(self, dtype: np.typing.DTypeLike) -> None:
         if self._histogram is None:
@@ -245,17 +229,6 @@ class ViewerController:
 
     def _on_roi_visibility_changed(self) -> None:
         self._bb.set_visible(self.roi.visible)
-
-    def _on_view_model_mode_changed(self, mode: InteractionMode) -> None:
-        if mode == InteractionMode.CREATE_ROI:
-            # Discard the old ROI
-            # TODO: Support multiple ROIS
-            self._set_roi_connected(self.roi, connect=False)
-            self._bb.remove()
-            # Create a new ROI
-            self._bb = self._canvas.add_bounding_box()
-            self._bb.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
-            self._set_roi_connected(self.roi, connect=True)
 
     # ------------------ View callbacks ------------------
 
