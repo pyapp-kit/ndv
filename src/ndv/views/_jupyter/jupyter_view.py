@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from vispy.app.backends import _jupyter_rfb
 
-    from ndv._types import AxisKey, MouseReleaseEvent
+    from ndv._types import AxisKey
     from ndv.views.bases.graphics._canvas import ArrayCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -112,6 +112,7 @@ class JupyterArrayView(ArrayView):
         self, canvas: ArrayCanvas, viewer_model: ArrayViewerModel, **kwargs: Any
     ) -> None:
         self._viewer_model = viewer_model
+        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
         # WIDGETS
         self._canvas_widget: _jupyter_rfb.CanvasBackend = canvas.frontend_widget()
 
@@ -247,6 +248,13 @@ class JupyterArrayView(ArrayView):
             InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
         )
 
+    def _on_model_mode_changed(
+        self, new: InteractionMode, old: InteractionMode
+    ) -> None:
+        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+        if old == InteractionMode.CREATE_ROI:
+            self._add_roi_btn.value = False
+
     def add_histogram(self, widget: Any) -> None:
         """Add a histogram widget to the viewer."""
         warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
@@ -265,6 +273,3 @@ class JupyterArrayView(ArrayView):
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
             display.clear_output()  # type: ignore [no-untyped-call]
-
-    def mouse_release(self, event: MouseReleaseEvent) -> None:
-        pass
