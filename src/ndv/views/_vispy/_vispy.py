@@ -117,32 +117,31 @@ class VispyImageHandle(ImageHandle):
 
 
 class VispyBoundingBox(RectangularROI):
-    owner_of: WeakKeyDictionary[scene.Node, VispyBoundingBox] = WeakKeyDictionary()
-
     def __init__(self, parent: Any) -> None:
         self._selected = False
-        self._hover_marker: scene.Markers | None = None
         self._move_mode: ROIMoveMode | None = None
         # NB _move_anchor has different meanings depending on _move_mode
         self._move_anchor: tuple[float, float] = (0, 0)
 
-        self._rect = scene.Rectangle(
-            center=[0, 0], width=1, height=1, border_color="yellow", parent=parent
-        )
+        # Rectangle handles both fill and border
+        self._rect = scene.Rectangle(center=[0, 0], width=1, height=1, parent=parent)
         # NB: Should be greater than image orders BUT NOT handle order
         self._rect.order = 10
-        VispyBoundingBox.owner_of[self._rect] = self
         self._rect.interactive = True
 
-        self._handle_data = np.zeros((4, 1, 2))
-        self._handles: list[scene.Markers] = []
-        for i in range(4):
-            h = scene.Markers(pos=self._handle_data[i], parent=parent)
-            # NB: Should be greater than image orders and rect order
-            h.order = 100
-            h.interactive = True
-            VispyBoundingBox.owner_of[h] = self
-            self._handles.append(h)
+        self._handle_data = np.zeros((4, 2))
+        self._handle_size = 10  # px
+        self._handles = scene.Markers(
+            pos=self._handle_data,
+            size=self._handle_size,
+            scaling="fixed",
+            parent=parent,
+        )
+        # NB: Should be greater than image orders and rect order
+        self._handles.order = 100
+        self._handles.interactive = True
+
+        self._tform = self._rect.transforms.get_transform("canvas", "scene")
 
         self.set_fill("transparent")
         self.set_border("yellow")
@@ -157,12 +156,7 @@ class VispyBoundingBox(RectangularROI):
 
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
-        visible = self.visible()
-        for h in self._handles:
-            h.visible = selected and visible
-
-    def _set_hover(self, vis: scene.Node) -> None:
-        self._hover_marker = vis if isinstance(vis, scene.Markers) else None
+        self._handles.visible = selected and self.visible()
 
     def set_fill(self, color: Any) -> None:
         color = vispy.color.Color(color)
@@ -175,8 +169,7 @@ class VispyBoundingBox(RectangularROI):
 
     # TODO: Misleading name?
     def set_handles(self, color: Any) -> None:
-        for h in self._handles:
-            h.set_data(face_color=color)
+        self._handles.set_data(face_color=color)
 
     def set_bounding_box(
         self, mi: tuple[float, float], ma: tuple[float, float]
@@ -197,20 +190,19 @@ class VispyBoundingBox(RectangularROI):
         self._handle_data[1] = x2, y1
         self._handle_data[2] = x2, y2
         self._handle_data[3] = x1, y2
-        for i, h in enumerate(self._handles):
-            h.set_data(pos=self._handle_data[i])
+        self._handles.set_data(pos=self._handle_data)
 
         # FIXME: These should be called internally upon set_data, right?
         # Looks like https://github.com/vispy/vispy/issues/1899
         self._rect._bounds_changed()
         for v in self._rect._subvisuals:
             v._bounds_changed()
-        for h in self._handles:
-            h._bounds_changed()
+        self._handles._bounds_changed()
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         # Convert canvas -> world
-        world_pos = (event.x, event.y)
+        canvas_pos = (event.x, event.y)
+        world_pos = self._tform.map(canvas_pos)[:2]
         # moving a handle
         if self._move_mode == ROIMoveMode.HANDLE:
             # The anchor is set to the opposite handle, which never moves.
@@ -222,8 +214,8 @@ class VispyBoundingBox(RectangularROI):
             dy = world_pos[1] - self._move_anchor[1]
             # If the mouse moved (dx, dy) between events, the whole ROI needs to be
             # translated that amount.
-            new_min = (self._handle_data[0, 0, 0] + dx, self._handle_data[0, 0, 1] + dy)
-            new_max = (self._handle_data[2, 0, 0] + dx, self._handle_data[2, 0, 1] + dy)
+            new_min = (self._handle_data[0, 0] + dx, self._handle_data[0, 1] + dy)
+            new_max = (self._handle_data[2, 0] + dx, self._handle_data[2, 1] + dy)
             self.boundingBoxChanged.emit((new_min, new_max))
             self._move_anchor = world_pos
 
@@ -232,13 +224,14 @@ class VispyBoundingBox(RectangularROI):
     def on_mouse_press(self, event: MousePressEvent) -> bool:
         self.set_selected(True)
         # Convert canvas -> world
-        world_pos = (event.x, event.y)
+        canvas_pos = (event.x, event.y)
+        world_pos = self._tform.map(canvas_pos)[:2]
+        drag_idx = self._handle_under(world_pos)
         # If a marker is pressed
-        if self._hover_marker is not None:
-            idx = self._handles.index(self._hover_marker)
-            opposite_idx = (idx + 2) % 4
+        if drag_idx is not None:
+            opposite_idx = (drag_idx + 2) % 4
             self._move_mode = ROIMoveMode.HANDLE
-            self._move_anchor = tuple(self._handle_data[opposite_idx, 0].copy())
+            self._move_anchor = tuple(self._handle_data[opposite_idx].copy())
         # If the rectangle is pressed
         else:
             self._move_mode = ROIMoveMode.TRANSLATE
@@ -248,8 +241,9 @@ class VispyBoundingBox(RectangularROI):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
-        if self._hover_marker:
+    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType | None:
+        pos = self._tform.map(canvas_pos)[:2]
+        if self._handle_under(pos) is not None:
             center = self._rect.center
             if pos[0] < center[0] and pos[1] < center[1]:
                 return CursorType.FDIAG_ARROW
@@ -263,13 +257,23 @@ class VispyBoundingBox(RectangularROI):
 
     def set_visible(self, visible: bool) -> None:
         self._rect.visible = visible
-        for h in self._handles:
-            h.visible = visible and self._selected
+        self._handles.visible = visible and self.selected()
 
     def remove(self) -> None:
         self._rect.parent = None
-        for h in self._handles:
-            h.parent = None
+        self._handles.parent = None
+
+    def _handle_under(self, pos: Sequence[float]) -> int | None:
+        """Returns an int in [0, 3], or None.
+
+        If an int i, means that the handle at self._positions[i] is at pos.
+        If None, there is no handle at pos.
+        """
+        rad2 = (self._handle_size / 2) ** 2
+        for i, p in enumerate(self._handle_data):
+            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= rad2:
+                return i
+        return None
 
 
 class VispyViewerCanvas(ArrayCanvas):
@@ -298,7 +302,7 @@ class VispyViewerCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
-        self._selection: VispyBoundingBox | None = None
+        self._selection: CanvasElement | None = None
         # TODO: Weak Reference?
         self._last_roi_created: VispyBoundingBox | None = None
 
@@ -361,6 +365,8 @@ class VispyViewerCanvas(ArrayCanvas):
     def add_bounding_box(self) -> VispyBoundingBox:
         """Add a new Rectangular ROI node to the scene."""
         self._last_roi_created = VispyBoundingBox(parent=self._view.scene)
+        self._elements[self._last_roi_created._handles] = self._last_roi_created
+        self._elements[self._last_roi_created._rect] = self._last_roi_created
         return self._last_roi_created
 
     def set_range(
@@ -431,46 +437,41 @@ class VispyViewerCanvas(ArrayCanvas):
         canvas_pos = (event.x, event.y)
         world_pos = self.canvas_to_world(canvas_pos)[:2]
 
+        # If in CREATE_ROI mode, the new ROI should "start" here.
         if self._viewer.mode == CanvasMode.CREATE_ROI:
             if self._last_roi_created is None:
                 raise ValueError("No ROI to create!")
-            self._selection = self._last_roi_created
+            new_roi = self._last_roi_created
             # HACK: Provide a non-zero starting size so that if the user clicks
             # and immediately releases, it's visible and can be selected again
             _min = world_pos
             _max = (world_pos[0] + 1, world_pos[1] + 1)
-            self._selection.set_bounding_box(_min, _max)
-            self._selection.set_visible(True)
-            self._selection.set_selected(True)
-            self._selection._set_hover(self._selection._handles[2])
+            # Put the ROI where the user clicked
+            new_roi.set_bounding_box(_min, _max)
+            # Make it visible
+            new_roi.set_visible(True)
+            # Select it so the mouse press event below triggers ROIMoveMode.HANDLE
+            # TODO: Make behavior more direct
+            new_roi.set_selected(True)
+
+            # All done - exit the mode
             self._viewer.mode = CanvasMode.PAN_ZOOM
 
         # Find all visuals at the point
-        for vis in self._canvas.visuals_at(canvas_pos):
-            # If any belong to a bounding box, direct output there
-            if bbox := VispyBoundingBox.owner_of.get(vis, None):
-                self._selection = bbox
+        for vis in self.elements_at(canvas_pos):
+            if vis.can_select():
+                self._selection = vis
                 # FIXME: Use the same event?
-                self._selection.on_mouse_press(
-                    MousePressEvent(world_pos[0], world_pos[1], event.btn)
-                )
+                self._selection.on_mouse_press(event)
                 self._camera.interactive = False
                 return False
 
         return False
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
-        ev_pos = (event.x, event.y)
-        for vis in self._canvas.visuals_at(ev_pos):
-            if bbox := VispyBoundingBox.owner_of.get(vis, None):
-                bbox._set_hover(vis)
-                break
         if event.btn == MouseButton.LEFT:
             if self._selection and self._selection.selected():
-                ev_pos = (event.x, event.y)
-                pos = self.canvas_to_world(ev_pos)
-                # FIXME: Use the same event?
-                self._selection.on_mouse_move(MouseMoveEvent(pos[0], pos[1], event.btn))
+                self._selection.on_mouse_move(event)
                 # If we are moving the object, we don't want to move the camera
                 return True
         return False
@@ -478,17 +479,13 @@ class VispyViewerCanvas(ArrayCanvas):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         if self._selection:
             self._selection.on_mouse_release(event)
-        if self._viewer.mode == CanvasMode.CREATE_ROI:
-            self._viewer.mode = CanvasMode.PAN_ZOOM
         self._camera.interactive = True
         return False
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType:
         if self._viewer.mode == CanvasMode.CREATE_ROI:
             return CursorType.CROSS
-        for vis in self._canvas.visuals_at(pos):
-            if bbox := VispyBoundingBox.owner_of.get(vis, None):
-                world_pos = self.canvas_to_world(pos)[:2]
-                if cursor := bbox.get_cursor(world_pos):
-                    return cursor
+        for vis in self.elements_at(canvas_pos):
+            if cursor := vis.get_cursor(canvas_pos):
+                return cursor
         return CursorType.DEFAULT

@@ -110,11 +110,6 @@ class PyGFXImageHandle(ImageHandle):
 
 
 class PyGFXBoundingBox(RectangularROI):
-    # Dictionary points each scene object back to its BoundingBox
-    owner_of: WeakKeyDictionary[pygfx.WorldObject, PyGFXBoundingBox] = (
-        WeakKeyDictionary()
-    )
-
     def __init__(
         self,
         render: Callable,
@@ -138,7 +133,6 @@ class PyGFXBoundingBox(RectangularROI):
 
         # containing all ROI objects makes selection easier.
         self._container = pygfx.WorldObject(*args, **kwargs)
-        PyGFXBoundingBox.owner_of[self._container] = self
         self._container.add(self._fill, self._outline, self._handles)
         if parent:
             parent.add(self._container)
@@ -506,6 +500,7 @@ class GfxArrayCanvas(ArrayCanvas):
             canvas_to_world=self.canvas_to_world,
             parent=self._scene,
         )
+        self._elements[self._last_roi_created._container] = self._last_roi_created
         return self._last_roi_created
 
     def set_range(
@@ -578,7 +573,7 @@ class GfxArrayCanvas(ArrayCanvas):
         else:
             return (-1, -1, -1)
 
-    def elements_at(self, pos_xy: tuple[float, float]) -> list[pygfx.WorldObject]:
+    def elements_at(self, pos_xy: tuple[float, float]) -> list[CanvasElement]:
         """Obtains all elements located at pos."""
         # FIXME: Ideally, Renderer.get_pick_info would do this and
         # canvas_to_world for us. But it seems broken.
@@ -587,7 +582,7 @@ class GfxArrayCanvas(ArrayCanvas):
         for c in self._scene.children:
             bb = c.get_bounding_box()
             if _is_inside(bb, pos):
-                elements.append(c)
+                elements.append(self._elements[c])
         return elements
 
     def set_visible(self, visible: bool) -> None:
@@ -598,28 +593,34 @@ class GfxArrayCanvas(ArrayCanvas):
         if self._selection:
             self._selection.set_selected(False)
             self._selection = None
-        ev_pos = (event.x, event.y)
+        canvas_pos = (event.x, event.y)
+        world_pos = self.canvas_to_world(canvas_pos)[:2]
+
+        # If in CREATE_ROI mode, the new ROI should "start" here.
         if self._viewer.mode == CanvasMode.CREATE_ROI:
             if self._last_roi_created is None:
                 raise ValueError("No ROI to create!")
-            self._selection = self._last_roi_created
+            new_roi = self._last_roi_created
             # HACK: Provide a non-zero starting size so that if the user clicks
             # and immediately releases, it's visible and can be selected again
-            _min = self.canvas_to_world(ev_pos)[:2]
-            _max = (_min[0] + 1, _min[1] + 1)
-            self._selection.set_bounding_box(_min, _max)
-            self._selection.set_visible(True)
-            self._selection.set_selected(True)
+            _min = world_pos
+            _max = (world_pos[0] + 1, world_pos[1] + 1)
+            # Put the ROI where the user clicked
+            new_roi.set_bounding_box(_min, _max)
+            # Make it visible
+            new_roi.set_visible(True)
+            # Select it so the mouse press event below triggers ROIMoveMode.HANDLE
+            # TODO: Make behavior more direct
+            new_roi.set_selected(True)
+
+            # All done - exit the mode
             self._viewer.mode = CanvasMode.PAN_ZOOM
 
         # Find all visuals at the point
-        ev_pos = (event.x, event.y)
-        for vis in self.elements_at(ev_pos):
-            # If any belong to a bounding box, direct output there
-            if bbox := PyGFXBoundingBox.owner_of.get(vis, None):
-                self._selection = bbox
+        for vis in self.elements_at(canvas_pos):
+            if vis.can_select():
+                self._selection = vis
                 self._selection.on_mouse_press(event)
-                # self._camera.interactive = False
                 return False
 
         return False
@@ -635,16 +636,13 @@ class GfxArrayCanvas(ArrayCanvas):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         if self._selection:
             self._selection.on_mouse_release(event)
-        if self._viewer.mode == CanvasMode.CREATE_ROI:
-            self._viewer.mode = CanvasMode.PAN_ZOOM
         return False
 
     def get_cursor(self, pos: tuple[float, float]) -> CursorType:
         if self._viewer.mode == CanvasMode.CREATE_ROI:
             return CursorType.CROSS
         for vis in self.elements_at(pos):
-            if bbox := PyGFXBoundingBox.owner_of.get(vis, None):
-                self.canvas_to_world(pos)[:2]
-                if cursor := bbox.get_cursor(pos):
-                    return cursor
+            self.canvas_to_world(pos)[:2]
+            if cursor := vis.get_cursor(pos):
+                return cursor
         return CursorType.DEFAULT

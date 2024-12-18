@@ -371,8 +371,9 @@ class QtArrayView(ArrayView):
         else:
             self.histogramRequested.emit()
 
-    def _on_model_mode_changed(self, new: CanvasMode) -> None:
-        if new != CanvasMode.CREATE_ROI:
+    def _on_model_mode_changed(self, new: CanvasMode, old: CanvasMode) -> None:
+        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+        if old == CanvasMode.CREATE_ROI:
             self._qwidget.add_roi_btn.setChecked(False)
 
     def add_histogram(self, widget: QWidget) -> None:

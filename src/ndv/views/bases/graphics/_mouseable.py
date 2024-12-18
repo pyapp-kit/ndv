@@ -41,7 +41,7 @@ class Mouseable:
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
+    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType | None:
         return None
 
 
