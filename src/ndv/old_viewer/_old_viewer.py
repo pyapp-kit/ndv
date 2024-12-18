@@ -731,7 +731,6 @@ class NDViewer(QWidget):
 
     def _press_element(self, event: QMouseEvent) -> bool:
         ev_pos = (event.position().x(), event.position().y())
-        print(f"Event position: {ev_pos}")
         elements = self._canvas.elements_at(ev_pos)
         # Deselect prior selection before editing new selection
         if self._selection:
