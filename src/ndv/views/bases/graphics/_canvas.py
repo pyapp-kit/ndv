@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
     from ndv.models._viewer_model import ViewerModel
     from ndv.views.bases.graphics._canvas_elements import (
-        BoundingBox,
         CanvasElement,
         ImageHandle,
+        RectangularROI,
     )
 
 
@@ -53,7 +53,7 @@ class ArrayCanvas(GraphicsCanvas):
     @abstractmethod
     def add_volume(self, data: np.ndarray | None = ...) -> ImageHandle: ...
     @abstractmethod
-    def add_bounding_box(self) -> BoundingBox: ...
+    def add_bounding_box(self) -> RectangularROI: ...
 
 
 class HistogramCanvas(GraphicsCanvas, LutView):

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
     from ndv.views.bases import ArrayView, HistogramCanvas
-    from ndv.views.bases.graphics._canvas_elements import BoundingBox
+    from ndv.views.bases.graphics._canvas_elements import RectangularROI
 
     LutKey: TypeAlias = int | None
 
@@ -61,7 +61,7 @@ class ViewerController:
         self._dd_model = data or DataDisplayModel()
         # FIXME
         self._roi = roi or RectangularROIModel()
-        self._bb: BoundingBox = self._canvas.add_bounding_box()
+        self._bb: RectangularROI = self._canvas.add_bounding_box()
 
         self._set_model_connected(self._dd_model.display)
         self._set_roi_connected(self._roi)

@@ -24,9 +24,10 @@ from ndv._types import (
 from ndv.models._viewer_model import CanvasMode, ViewerModel
 from ndv.views.bases import ArrayCanvas, filter_mouse_events
 from ndv.views.bases.graphics._canvas_elements import (
-    BoundingBox,
     CanvasElement,
     ImageHandle,
+    RectangularROI,
+    ROIMoveMode,
 )
 
 if TYPE_CHECKING:
@@ -115,13 +116,13 @@ class VispyImageHandle(ImageHandle):
         return None
 
 
-class VispyBoundingBox(BoundingBox):
+class VispyBoundingBox(RectangularROI):
     owner_of: WeakKeyDictionary[scene.Node, VispyBoundingBox] = WeakKeyDictionary()
 
     def __init__(self, parent: Any) -> None:
         self._selected = False
         self._hover_marker: scene.Markers | None = None
-        self._move_mode: BoundingBox.MoveMode | None = None
+        self._move_mode: ROIMoveMode | None = None
         # NB _move_anchor has different meanings depending on _move_mode
         self._move_anchor: tuple[float, float] = (0, 0)
 
@@ -211,11 +212,11 @@ class VispyBoundingBox(BoundingBox):
         # Convert canvas -> world
         world_pos = (event.x, event.y)
         # moving a handle
-        if self._move_mode == BoundingBox.MoveMode.HANDLE:
+        if self._move_mode == ROIMoveMode.HANDLE:
             # The anchor is set to the opposite handle, which never moves.
             self.boundingBoxChanged.emit((world_pos, self._move_anchor))
         # translating the whole roi
-        elif self._move_mode == BoundingBox.MoveMode.TRANSLATE:
+        elif self._move_mode == ROIMoveMode.TRANSLATE:
             # The anchor is the mouse position reported in the previous mouse event.
             dx = world_pos[0] - self._move_anchor[0]
             dy = world_pos[1] - self._move_anchor[1]
@@ -236,11 +237,11 @@ class VispyBoundingBox(BoundingBox):
         if self._hover_marker is not None:
             idx = self._handles.index(self._hover_marker)
             opposite_idx = (idx + 2) % 4
-            self._move_mode = BoundingBox.MoveMode.HANDLE
+            self._move_mode = ROIMoveMode.HANDLE
             self._move_anchor = tuple(self._handle_data[opposite_idx, 0].copy())
         # If the rectangle is pressed
         else:
-            self._move_mode = BoundingBox.MoveMode.TRANSLATE
+            self._move_mode = ROIMoveMode.TRANSLATE
             self._move_anchor = world_pos
         return False
 

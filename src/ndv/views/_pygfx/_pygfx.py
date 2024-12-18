@@ -19,7 +19,7 @@ from ndv._types import (
 )
 from ndv.models._viewer_model import CanvasMode, ViewerModel
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
-from ndv.views.bases.graphics._canvas_elements import BoundingBox
+from ndv.views.bases.graphics._canvas_elements import RectangularROI, ROIMoveMode
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -109,7 +109,7 @@ class PyGFXImageHandle(ImageHandle):
         return None
 
 
-class PyGFXBoundingBox(BoundingBox):
+class PyGFXBoundingBox(RectangularROI):
     # Dictionary points each scene object back to its BoundingBox
     owner_of: WeakKeyDictionary[pygfx.WorldObject, PyGFXBoundingBox] = (
         WeakKeyDictionary()
@@ -145,7 +145,7 @@ class PyGFXBoundingBox(BoundingBox):
 
         # Utilities for moving ROI
         self._selected = False
-        self._move_mode: BoundingBox.MoveMode | None = None
+        self._move_mode: ROIMoveMode | None = None
         # NB _move_anchor has different meanings depending on _move_mode
         self._move_anchor: tuple[float, float] = (0, 0)
         self._render: Callable = render
@@ -272,11 +272,11 @@ class PyGFXBoundingBox(BoundingBox):
         # Convert canvas -> world
         world_pos = tuple(self._canvas_to_world((event.x, event.y))[:2])
         # moving a handle
-        if self._move_mode == BoundingBox.MoveMode.HANDLE:
+        if self._move_mode == ROIMoveMode.HANDLE:
             # The anchor is set to the opposite handle, which never moves.
             self.boundingBoxChanged.emit((world_pos, self._move_anchor))
         # translating the whole roi
-        elif self._move_mode == BoundingBox.MoveMode.TRANSLATE:
+        elif self._move_mode == ROIMoveMode.TRANSLATE:
             # The anchor is the mouse position reported in the previous mouse event.
             dx = world_pos[0] - self._move_anchor[0]
             dy = world_pos[1] - self._move_anchor[1]
@@ -297,11 +297,11 @@ class PyGFXBoundingBox(BoundingBox):
         # If a marker is pressed
         if drag_idx is not None:
             opposite_idx = (drag_idx + 2) % 4
-            self._move_mode = BoundingBox.MoveMode.HANDLE
+            self._move_mode = ROIMoveMode.HANDLE
             self._move_anchor = tuple(self._positions[opposite_idx, :2].copy())
         # If the rectangle is pressed
         else:
-            self._move_mode = BoundingBox.MoveMode.TRANSLATE
+            self._move_mode = ROIMoveMode.TRANSLATE
             self._move_anchor = world_pos
         return False
 

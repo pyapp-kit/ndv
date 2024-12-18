@@ -77,10 +77,15 @@ class ImageHandle(CanvasElement):
     def set_cmap(self, cmap: _cmap.Colormap) -> None: ...
 
 
-class BoundingBox(CanvasElement):
-    class MoveMode(Enum):
-        HANDLE = auto()  # Moving one handle
-        TRANSLATE = auto()  # Translating everything
+class ROIMoveMode(Enum):
+    """Describes graphical mechanisms for ROI translation."""
+
+    HANDLE = auto()  # Moving one handle (but not all)
+    TRANSLATE = auto()  # Translating everything
+
+
+class RectangularROI(CanvasElement):
+    """An axis-aligned rectanglular ROI."""
 
     boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
 
