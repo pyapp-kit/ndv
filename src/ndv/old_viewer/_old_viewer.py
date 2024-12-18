@@ -499,6 +499,7 @@ class NDViewer(QWidget):
     def _on_view_model_mode_changed(self, mode: InteractionMode) -> None:
         if mode == InteractionMode.CREATE_ROI:
             self.set_roi()
+            # Since we have no ROIModel, HACK the view to listen to itself
             if (roi := self._roi) is not None:
 
                 def on_bounding_box_edited(
