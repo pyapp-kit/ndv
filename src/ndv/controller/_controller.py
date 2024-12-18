@@ -58,6 +58,7 @@ class ViewerController:
         self._view = frontend_cls(self._canvas, self._array_viewer_model)
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
+        # TODO: Create a dedicated object for wrangling (multiple) ROIs
         self._roi: RectangularROIModel | None = None
         self._bb: RectangularROI = self._canvas.add_bounding_box()
 
