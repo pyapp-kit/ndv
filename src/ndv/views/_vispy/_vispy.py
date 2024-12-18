@@ -290,7 +290,6 @@ class VispyViewerCanvas(ArrayCanvas):
         self._viewer = viewer_model
 
         self._canvas = scene.SceneCanvas(size=(600, 600))
-        self._canvas.measure_fps()
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted

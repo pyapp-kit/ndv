@@ -385,7 +385,7 @@ class GfxArrayCanvas(ArrayCanvas):
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
-        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas, show_fps=True)
+        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
         try:
             # requires https://github.com/pygfx/pygfx/pull/752
             self._renderer.blend_mode = "additive"
@@ -567,7 +567,7 @@ class GfxArrayCanvas(ArrayCanvas):
         """Obtains all elements located at pos."""
         # FIXME: Ideally, Renderer.get_pick_info would do this and
         # canvas_to_world for us. But it seems broken.
-        elements: list[pygfx.WorldObject] = []
+        elements: list[CanvasElement] = []
         pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
             bb = c.get_bounding_box()
