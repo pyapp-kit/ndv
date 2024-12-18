@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from ndv import data, run_app
 from ndv.controller import ViewerController
 
+# import os
 # os.environ["NDV_CANVAS_BACKEND"] = "pygfx"
 viewer = ViewerController()
 
@@ -22,6 +23,6 @@ viewer.data = img_data
 viewer.show()
 viewer.model.current_index.update({0: 32, 1: 1})
 viewer.roi.events.bounding_box.connect(foo)
-viewer.roi.bounding_box = ([10, 10], [100, 100])
+viewer.roi.bounding_box = ((10, 10), (100, 100))
 
 run_app()

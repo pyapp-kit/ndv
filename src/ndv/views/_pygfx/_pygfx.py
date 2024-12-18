@@ -146,8 +146,10 @@ class PyGFXBoundingBox(RectangularROI):
         self._canvas_to_world: Callable = canvas_to_world
 
         # Initialize
-        self.set_selected(False)
-        self.set_visible(True)
+        self.set_fill(_cmap.Color("transparent"))
+        self.set_border(_cmap.Color("yellow"))
+        self.set_handles(_cmap.Color("white"))
+        self.set_visible(False)
 
     # -- BoundingBox methods -- #
 
@@ -168,31 +170,19 @@ class PyGFXBoundingBox(RectangularROI):
         self._positions[4, :2] = [x1, y1]
         self._refresh()
 
-    def set_fill(self, color: Any) -> None:
+    def set_fill(self, color: _cmap.Color) -> None:
         if self._fill:
-            if color is None:
-                color = _cmap.Color("transparent")
-            if not isinstance(color, _cmap.Color):
-                color = _cmap.Color(color)
             self._fill.material.color = color.rgba
             self._render()
 
-    def set_border(self, color: Any) -> None:
+    def set_border(self, color: _cmap.Color) -> None:
         if self._outline:
-            if color is None:
-                color = _cmap.Color("yellow")
-            if not isinstance(color, _cmap.Color):
-                color = _cmap.Color(color)
             self._outline.material.color = color.rgba
             self._render()
 
     # TODO: Misleading name?
-    def set_handles(self, color: Any) -> None:
+    def set_handles(self, color: _cmap.Color) -> None:
         if self._handles:
-            if color is None:
-                color = _cmap.Color("white")
-            if not isinstance(color, _cmap.Color):
-                color = _cmap.Color(color)
             self._handles.material.color = color.rgba
             self._render()
 
@@ -202,7 +192,7 @@ class PyGFXBoundingBox(RectangularROI):
                 positions=self._positions,
                 indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
             ),
-            material=pygfx.MeshBasicMaterial(color=(0, 0, 0, 0)),
+            material=pygfx.MeshBasicMaterial(),
         )
         return fill
 
@@ -212,7 +202,7 @@ class PyGFXBoundingBox(RectangularROI):
                 positions=self._positions,
                 indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
             ),
-            material=pygfx.LineMaterial(thickness=1, color=(1, 1, 0, 1)),
+            material=pygfx.LineMaterial(thickness=1),
         )
         return outline
 
@@ -222,7 +212,7 @@ class PyGFXBoundingBox(RectangularROI):
             geometry=geometry,
             # FIXME Size in pixels is not ideal for selection.
             # TODO investigate what size_mode = vertex does...
-            material=pygfx.PointsMaterial(color=(1, 1, 1), size=1.5 * self._handle_rad),
+            material=pygfx.PointsMaterial(size=1.5 * self._handle_rad),
         )
 
         # NB: Default bounding box for points does not consider the radius of

@@ -9,8 +9,6 @@ from psygnal import Signal
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     import cmap as _cmap
     import numpy as np
 
@@ -37,22 +35,6 @@ class CanvasElement(Mouseable):
     @abstractmethod
     def set_selected(self, selected: bool) -> None:
         """Sets element selection status."""
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        """
-        Behavior executed at the beginning of a "move" operation.
-
-        In layman's terms, this is the behavior executed during the the "click"
-        of a "click-and-drag".
-        """
-
-    def move(self, pos: Sequence[float]) -> None:
-        """
-        Behavior executed throughout a "move" operation.
-
-        In layman's terms, this is the behavior executed during the "drag"
-        of a "click-and-drag".
-        """
 
     def remove(self) -> None:
         """Removes the element from the canvas."""
@@ -94,11 +76,11 @@ class RectangularROI(CanvasElement):
     ) -> None:
         """Sets the bounding box."""
 
-    def set_fill(self, color: Any) -> None:
+    def set_fill(self, color: _cmap.Color) -> None:
         """Sets the fill color."""
 
-    def set_border(self, color: Any) -> None:
+    def set_border(self, color: _cmap.Color) -> None:
         """Sets the border color."""
 
-    def set_handles(self, color: Any) -> None:
+    def set_handles(self, color: _cmap.Color) -> None:
         """Sets the handle face color."""

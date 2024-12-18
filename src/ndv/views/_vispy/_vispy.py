@@ -5,6 +5,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
 from weakref import WeakKeyDictionary
 
+import cmap as _cmap
 import numpy as np
 import vispy
 import vispy.app
@@ -32,8 +33,6 @@ from ndv.views.bases.graphics._canvas_elements import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    import cmap as _cmap
 
 
 turn = np.sin(np.pi / 4)
@@ -143,9 +142,9 @@ class VispyBoundingBox(RectangularROI):
 
         self._tform = self._rect.transforms.get_transform("canvas", "scene")
 
-        self.set_fill("transparent")
-        self.set_border("yellow")
-        self.set_handles("white")
+        self.set_fill(_cmap.Color("transparent"))
+        self.set_border(_cmap.Color("yellow"))
+        self.set_handles(_cmap.Color("white"))
         self.set_visible(False)
 
     def can_select(self) -> bool:
@@ -158,18 +157,22 @@ class VispyBoundingBox(RectangularROI):
         self._selected = selected
         self._handles.visible = selected and self.visible()
 
-    def set_fill(self, color: Any) -> None:
-        color = vispy.color.Color(color)
+    def set_fill(self, color: _cmap.Color) -> None:
+        _vis_color = vispy.color.Color(color.hex)
         # NB We need alpha>0 for selection
-        color.alpha = max(color.alpha, 1e-6)
-        self._rect.color = color
+        _vis_color.alpha = max(color.alpha, 1e-6)
+        self._rect.color = _vis_color
 
-    def set_border(self, color: Any) -> None:
-        self._rect.border_color = color
+    def set_border(self, color: _cmap.Color) -> None:
+        _vis_color = vispy.color.Color(color.hex)
+        _vis_color.alpha = color.alpha
+        self._rect.border_color = _vis_color
 
     # TODO: Misleading name?
-    def set_handles(self, color: Any) -> None:
-        self._handles.set_data(face_color=color)
+    def set_handles(self, color: _cmap.Color) -> None:
+        _vis_color = vispy.color.Color(color.hex)
+        _vis_color.alpha = color.alpha
+        self._handles.set_data(face_color=_vis_color)
 
     def set_bounding_box(
         self, mi: tuple[float, float], ma: tuple[float, float]
@@ -461,7 +464,6 @@ class VispyViewerCanvas(ArrayCanvas):
         for vis in self.elements_at(canvas_pos):
             if vis.can_select():
                 self._selection = vis
-                # FIXME: Use the same event?
                 self._selection.on_mouse_press(event)
                 self._camera.interactive = False
                 return False

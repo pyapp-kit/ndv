@@ -58,8 +58,7 @@ class ViewerController:
         self._view = frontend_cls(self._canvas, self._array_viewer_model)
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
-        # TODO: Don't prematurely create the ROIModel?
-        self._roi: RectangularROIModel = RectangularROIModel(visible=False)
+        self._roi: RectangularROIModel | None = None
         self._bb: RectangularROI = self._canvas.add_bounding_box()
 
         self._set_model_connected(self._dd_model.display)
@@ -113,7 +112,7 @@ class ViewerController:
     @property
     def roi(self) -> RectangularROIModel:
         if self._roi is None:
-            self._roi = RectangularROIModel()
+            self._roi = RectangularROIModel(visible=True)
             self.add_roi(self._roi)
         return self._roi
 
@@ -240,7 +239,7 @@ class ViewerController:
         # do we need to cleanup the lut views themselves?
 
     def _on_roi_bounding_box_changed(self) -> None:
-        box_min, box_max = self._roi.bounding_box
+        box_min, box_max = self.roi.bounding_box
         self._bb.set_bounding_box(box_min, box_max)
 
     def _on_roi_visibility_changed(self) -> None:
@@ -250,12 +249,12 @@ class ViewerController:
         if mode == InteractionMode.CREATE_ROI:
             # Discard the old ROI
             # TODO: Support multiple ROIS
-            self._set_roi_connected(self._roi, connect=False)
+            self._set_roi_connected(self.roi, connect=False)
             self._bb.remove()
             # Create a new ROI
             self._bb = self._canvas.add_bounding_box()
             self._bb.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
-            self._set_roi_connected(self._roi, connect=True)
+            self._set_roi_connected(self.roi, connect=True)
 
     # ------------------ View callbacks ------------------
 
