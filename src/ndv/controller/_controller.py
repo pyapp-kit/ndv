@@ -280,45 +280,47 @@ class ViewerController:
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
         """
-        if self._dd_model.data_wrapper:
-            # TODO: make asynchronous
-            for future in self._dd_model.request_sliced_data():
-                response = future.result()
-                key = response.channel_key
-                data = response.data
+        if not self._dd_model.data_wrapper:
+            return
 
-                if (lut_ctrl := self._lut_controllers.get(key)) is None:
-                    if key is None:
-                        model = self.model.default_lut
-                    elif key in self.model.luts:
-                        model = self.model.luts[key]
-                    else:
-                        # we received a new channel key that has not been set in the model
-                        # so we create a new LUT model for it
-                        model = self.model.luts[key] = LUTModel()
+        # TODO: make asynchronous
+        for future in self._dd_model.request_sliced_data():
+            response = future.result()
+            key = response.channel_key
+            data = response.data
 
-                    lut_views = [self._view.add_lut_view()]
-                    if self._histogram is not None:
-                        lut_views.append(self._histogram)
-                    self._lut_controllers[key] = lut_ctrl = ChannelController(
-                        key=key,
-                        model=model,
-                        views=lut_views,
-                    )
-
-                if not lut_ctrl.handles:
-                    # we don't yet have any handles for this channel
-                    lut_ctrl.add_handle(self._canvas.add_image(data))
+            if (lut_ctrl := self._lut_controllers.get(key)) is None:
+                if key is None:
+                    model = self.model.default_lut
+                elif key in self.model.luts:
+                    model = self.model.luts[key]
                 else:
-                    lut_ctrl.update_texture_data(data)
-                    if self._histogram is not None:
-                        # TODO: once data comes in in chunks, we'll need a proper stateful
-                        # stats object that calculates the histogram incrementally
-                        counts, bin_edges = _calc_hist_bins(data)
-                        # TODO: currently this is updating the histogram on *any*
-                        # channel index... so it doesn't work with composite mode
-                        self._histogram.set_data(counts, bin_edges)
-                        self._histogram.set_range()
+                    # we received a new channel key that has not been set in the model
+                    # so we create a new LUT model for it
+                    model = self.model.luts[key] = LUTModel()
+
+                lut_views = [self._view.add_lut_view()]
+                if self._histogram is not None:
+                    lut_views.append(self._histogram)
+                self._lut_controllers[key] = lut_ctrl = ChannelController(
+                    key=key,
+                    model=model,
+                    views=lut_views,
+                )
+
+            if not lut_ctrl.handles:
+                # we don't yet have any handles for this channel
+                lut_ctrl.add_handle(self._canvas.add_image(data))
+            else:
+                lut_ctrl.update_texture_data(data)
+                if self._histogram is not None:
+                    # TODO: once data comes in in chunks, we'll need a proper stateful
+                    # stats object that calculates the histogram incrementally
+                    counts, bin_edges = _calc_hist_bins(data)
+                    # TODO: currently this is updating the histogram on *any*
+                    # channel index... so it doesn't work with composite mode
+                    self._histogram.set_data(counts, bin_edges)
+                    self._histogram.set_range()
 
         self._canvas.refresh()
 
