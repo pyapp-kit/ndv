@@ -37,7 +37,6 @@ if TYPE_CHECKING:
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey
-    from ndv.views.bases.graphics._canvas import ArrayCanvas
     from ndv.views.protocols import CanvasElement, PRoiHandle
 
 SLIDER_STYLE = """
@@ -340,10 +339,9 @@ class _QArrayViewer(QWidget):
 
 
 class QtArrayView(ArrayView):
-    def __init__(self, canvas: ArrayCanvas, viewer_model: ArrayViewerModel) -> None:
+    def __init__(self, canvas_widget: QWidget, viewer_model: ArrayViewerModel) -> None:
         self._model = viewer_model
-        self._canvas = canvas
-        self._qwidget = qwdg = _QArrayViewer(canvas.frontend_widget())
+        self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
         self._model.events.interaction_mode.connect(self._on_model_mode_changed)

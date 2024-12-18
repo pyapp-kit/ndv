@@ -55,7 +55,9 @@ class ViewerController:
         self._canvas.set_ndim(2)
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas, self._array_viewer_model)
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._array_viewer_model
+        )
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
         # TODO: Create a dedicated object for wrangling (multiple) ROIs

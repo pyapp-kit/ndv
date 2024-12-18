@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
-    from ndv.views.bases.graphics._canvas import ArrayCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -109,12 +108,15 @@ class JupyterLutView(LutView):
 
 class JupyterArrayView(ArrayView):
     def __init__(
-        self, canvas: ArrayCanvas, viewer_model: ArrayViewerModel, **kwargs: Any
+        self,
+        canvas_widget: _jupyter_rfb.CanvasBackend,
+        viewer_model: ArrayViewerModel,
+        **kwargs: Any,
     ) -> None:
         self._viewer_model = viewer_model
         self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
         # WIDGETS
-        self._canvas_widget: _jupyter_rfb.CanvasBackend = canvas.frontend_widget()
+        self._canvas_widget = canvas_widget
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])
