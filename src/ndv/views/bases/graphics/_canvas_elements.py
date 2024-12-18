@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
@@ -77,6 +78,10 @@ class ImageHandle(CanvasElement):
 
 
 class BoundingBox(CanvasElement):
+    class MoveMode(Enum):
+        HANDLE = auto()  # Moving one handle
+        TRANSLATE = auto()  # Translating everything
+
     boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
 
     def set_bounding_box(

@@ -17,6 +17,7 @@ from ndv._types import (
     MousePressEvent,
     MouseReleaseEvent,
 )
+from ndv.models._viewer_model import CanvasMode, ViewerModel
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
 from ndv.views.bases.graphics._canvas_elements import BoundingBox
 
@@ -109,6 +110,7 @@ class PyGFXImageHandle(ImageHandle):
 
 
 class PyGFXBoundingBox(BoundingBox):
+    # Dictionary points each scene object back to its BoundingBox
     owner_of: WeakKeyDictionary[pygfx.WorldObject, PyGFXBoundingBox] = (
         WeakKeyDictionary()
     )
@@ -121,98 +123,56 @@ class PyGFXBoundingBox(BoundingBox):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        self._selected = False
-        # self._hover_marker: scene.Markers | None = None
-        # self._on_move: Callable[[tuple[float, float]], None] | None = None
-        # self._move_offset: tuple[float, float] = (0, 0)
+        # Positional array backing visual objects
+        # NB we need five points for the outline
+        # The first and last rows should be identical
+        self._positions: np.ndarray = np.zeros((5, 3), dtype=np.float32)
 
-        # self._rect = scene.Rectangle(
-        #     center=[0, 0], width=1, height=1, border_color="yellow", parent=parent
-        # )
+        # Visual objects
+        self._fill = self._create_fill()
+        self._outline = self._create_outline()
+
+        # Handles used for ROI manipulation
+        self._handle_rad = 5  # PIXELS
+        self._handles = self._create_handles()
+
+        # containing all ROI objects makes selection easier.
         self._container = pygfx.WorldObject(*args, **kwargs)
+        PyGFXBoundingBox.owner_of[self._container] = self
+        self._container.add(self._fill, self._outline, self._handles)
         if parent:
             parent.add(self._container)
 
-        self._point_rad = 5  # PIXELS
-        self._drag_pos: tuple[float, float] | None = None
-        self._move_offset: tuple[float, float] | None = None
-        self._offset = np.zeros((5, 2))
-        self._on_move = None
-        # NB we need 5 points, where self._positions[4] == self._positions[0]
-        self._positions: np.ndarray = np.zeros((5, 3), dtype=np.float32)
-        self._fill = self._create_fill()
-        if self._fill:
-            self._container.add(self._fill)
-        self._outline = self._create_outline()
-        if self._outline:
-            self._container.add(self._outline)
-        self._handles = self._create_handles()
-        if self._handles:
-            self._container.add(self._handles)
-        PyGFXBoundingBox.owner_of[self._container] = self
-
+        # Utilities for moving ROI
+        self._selected = False
+        self._move_mode: BoundingBox.MoveMode | None = None
+        # NB _move_anchor has different meanings depending on _move_mode
+        self._move_anchor: tuple[float, float] = (0, 0)
         self._render: Callable = render
         self._canvas_to_world: Callable = canvas_to_world
 
+        # Initialize
         self.set_selected(False)
         self.set_visible(True)
 
-    def _create_fill(self) -> pygfx.Mesh | None:
-        fill = pygfx.Mesh(
-            geometry=pygfx.Geometry(
-                positions=self._positions,
-                indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
-            ),
-            material=pygfx.MeshBasicMaterial(color=(0, 0, 0, 0)),
-        )
-        return fill
+    # -- BoundingBox methods -- #
 
-    def _create_outline(self) -> pygfx.Line | None:
-        outline = pygfx.Line(
-            geometry=pygfx.Geometry(
-                positions=self._positions,
-                indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
-            ),
-            material=pygfx.LineMaterial(thickness=1, color=(1, 1, 0, 0)),
-        )
-        return outline
+    def set_bounding_box(
+        self, minimum: tuple[float, float], maximum: tuple[float, float]
+    ) -> None:
+        # NB: Support two diagonal points, not necessarily true min/max
+        x1 = float(min(minimum[0], maximum[0]))
+        y1 = float(min(minimum[1], maximum[1]))
+        x2 = float(max(minimum[0], maximum[0]))
+        y2 = float(max(minimum[1], maximum[1]))
 
-    def _create_handles(self) -> pygfx.Points | None:
-        geometry = pygfx.Geometry(positions=self._positions[:-1])
-        handles = pygfx.Points(
-            geometry=geometry,
-            # FIXME Size in pixels is not ideal for selection.
-            # TODO investigate what size_mode = vertex does...
-            material=pygfx.PointsMaterial(color=(1, 1, 1), size=1.5 * self._point_rad),
-        )
-
-        # NB: Default bounding box for points does not consider the radius of
-        # those points. We need to HACK it for handle selection
-        def get_handle_bb(old: Callable[[], np.ndarray]) -> Callable[[], np.ndarray]:
-            def new_get_bb() -> np.ndarray:
-                bb = old().copy()
-                bb[0, :2] -= self._point_rad
-                bb[1, :2] += self._point_rad
-                return bb
-
-            return new_get_bb
-
-        geometry.get_bounding_box = get_handle_bb(geometry.get_bounding_box)
-        return handles
-
-    def can_select(self) -> bool:
-        return True
-
-    def selected(self) -> bool:
-        return self._selected
-
-    def set_selected(self, selected: bool) -> None:
-        self._selected = selected
-        if self._handles:
-            self._handles.visible = selected
-
-    # def _set_hover(self, vis: scene.Node) -> None:
-    #     self._hover_marker = vis if isinstance(vis, scene.Markers) else None
+        # Update each handle
+        self._positions[0, :2] = [x1, y1]
+        self._positions[1, :2] = [x2, y1]
+        self._positions[2, :2] = [x2, y2]
+        self._positions[3, :2] = [x1, y2]
+        self._positions[4, :2] = [x1, y1]
+        self._refresh()
 
     def set_fill(self, color: Any) -> None:
         if self._fill:
@@ -242,317 +202,6 @@ class PyGFXBoundingBox(BoundingBox):
             self._handles.material.color = color.rgba
             self._render()
 
-    def set_bounding_box(
-        self, mi: tuple[float, float], ma: tuple[float, float]
-    ) -> None:
-        # NB: Support two diagonal points, not necessarily true min/max
-        x1 = float(min(mi[0], ma[0]))
-        y1 = float(min(mi[1], ma[1]))
-        x2 = float(max(mi[0], ma[0]))
-        y2 = float(max(mi[1], ma[1]))
-
-        # Update each handle
-        self._positions[0, :2] = [x1, y1]
-        self._positions[1, :2] = [x2, y1]
-        self._positions[2, :2] = [x2, y2]
-        self._positions[3, :2] = [x1, y2]
-        self._positions[4, :2] = [x1, y1]
-        self._refresh()
-
-    def _refresh(self) -> None:
-        if self._fill:
-            self._fill.geometry.positions.data[:, :] = self._positions
-            self._fill.geometry.positions.update_range()
-        if self._outline:
-            self._outline.geometry.positions.data[:, :] = self._positions
-            self._outline.geometry.positions.update_range()
-        if self._handles:
-            self._handles.geometry.positions.data[:, :] = self._positions[:-1]
-            self._handles.geometry.positions.update_range()
-        self._render()
-
-    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
-        if self._drag_pos is not None:
-            # And, on move, put the bounding box between these two points
-            self.boundingBoxChanged.emit(((event.x, event.y), self._drag_pos))
-        else:
-            dx = event.x - self._move_offset[0]
-            dy = event.y - self._move_offset[1]
-            new_min = (self._positions[0, 0] + dx, self._positions[0, 1] + dy)
-            new_max = (self._positions[2, 0] + dx, self._positions[2, 1] + dy)
-            self.boundingBoxChanged.emit((new_min, new_max))
-            self._move_offset = (event.x, event.y)
-
-        return False
-
-    def on_mouse_press(self, event: MousePressEvent) -> bool:
-        self.set_selected(True)
-        # Convert canvas -> world
-        world_pos = self._canvas_to_world((event.x, event.y))
-        drag_idx = self._handle_hover_idx(world_pos)
-        # If a marker is pressed
-        if drag_idx is not None:
-            opposite_idx = (drag_idx + 2) % 4
-            self._drag_pos = tuple(self._positions[opposite_idx, :2].copy())
-        # If the rectangle is pressed
-        else:
-            self._drag_pos = None
-            self._move_offset = world_pos
-        return False
-
-    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
-        self._on_move = None
-        return False
-
-    def visible(self) -> bool:
-        if self._outline:
-            return bool(self._outline.visible)
-        if self._fill:
-            return bool(self._fill.visible)
-        # Nothing to see
-        return False
-
-    def set_visible(self, visible: bool) -> None:
-        if fill := getattr(self, "_fill", None):
-            fill.visible = visible
-        if outline := getattr(self, "_outline", None):
-            outline.visible = visible
-        if handles := getattr(self, "_handles", None):
-            handles.visible = visible and self.selected()
-        self._render()
-
-    def _handle_hover_idx(self, pos: Sequence[float]) -> int | None:
-        # FIXME: Ideally, Renderer.get_pick_info would do this for us. But it
-        # seems broken.
-        for i, p in enumerate(self._positions[:-1]):
-            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= self._point_rad**2:
-                return i
-        return None
-
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
-        # Convert canvas -> world
-        world_pos = self._canvas_to_world(pos)
-        # Step 1: Check if over handle
-        if self._selected:
-            if (idx := self._handle_hover_idx(world_pos)) is not None:
-                if np.array_equal(
-                    self._positions[idx], self._positions.min(axis=0)
-                ) or np.array_equal(self._positions[idx], self._positions.max(axis=0)):
-                    return CursorType.FDIAG_ARROW
-                return CursorType.BDIAG_ARROW
-
-        # Step 2: Check if over ROI
-        if self._outline:
-            roi_bb = self._outline.geometry.get_bounding_box()
-            if _is_inside(roi_bb, world_pos):
-                return CursorType.ALL_ARROW
-        return None
-
-
-class PyGFXRoiHandle(pygfx.WorldObject):
-    _render: Callable = lambda _: None
-
-    def __init__(self, render: Callable, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, *kwargs)
-        self._fill = self._create_fill()
-        if self._fill:
-            self.add(self._fill)
-        self._outline = self._create_outline()
-        if self._outline:
-            self.add(self._outline)
-        self._handles = self._create_handles()
-        if self._handles:
-            self.add(self._handles)
-
-        self._render = render
-
-    def _create_fill(self) -> pygfx.Mesh | None:
-        # To be implemented by subclasses needing a fill
-        return None
-
-    def _create_outline(self) -> pygfx.Line | None:
-        # To be implemented by subclasses needing an outline
-        return None
-
-    def _create_handles(self) -> pygfx.Points | None:
-        # To be implemented by subclasses needing handles
-        return None
-
-    @property
-    def vertices(self) -> Sequence[Sequence[float]]:
-        # To be implemented by subclasses
-        raise NotImplementedError("Must be implemented in subclasses")
-
-    @vertices.setter
-    def vertices(self, data: Sequence[Sequence[float]]) -> None:
-        # To be implemented by subclasses
-        raise NotImplementedError("Must be implemented in subclasses")
-
-    def visible(self) -> bool:
-        if self._outline:
-            return bool(self._outline.visible)
-        if self._fill:
-            return bool(self._fill.visible)
-        # Nothing to see
-        return False
-
-    def set_visible(self, visible: bool) -> None:
-        if fill := getattr(self, "_fill", None):
-            fill.visible = visible
-        if outline := getattr(self, "_outline", None):
-            outline.visible = visible
-        if handles := getattr(self, "_handles", None):
-            handles.visible = visible and self.selected()
-        self._render()
-
-    def can_select(self) -> bool:
-        return True
-
-    def selected(self) -> bool:
-        if self._handles:
-            return bool(self._handles.visible)
-        # Can't be selected without handles
-        return False
-
-    def set_selected(self, selected: bool) -> None:
-        if self._handles:
-            self._handles.visible = selected
-
-    def color(self) -> Any:
-        if self._fill:
-            return _cmap.Color(self._fill.material.color)
-        return _cmap.Color("transparent")
-
-    def set_color(self, color: _cmap.Color | None = None) -> None:
-        if self._fill:
-            if color is None:
-                color = _cmap.Color("transparent")
-            if not isinstance(color, _cmap.Color):
-                color = _cmap.Color(color)
-            self._fill.material.color = color.rgba
-            self._render()
-
-    def border_color(self) -> Any:
-        if self._outline:
-            return _cmap.Color(self._outline.material.color)
-        return _cmap.Color("transparent")
-
-    def set_border_color(self, color: _cmap.Color | None = None) -> None:
-        if self._outline:
-            if color is None:
-                color = _cmap.Color("yellow")
-            if not isinstance(color, _cmap.Color):
-                color = _cmap.Color(color)
-            self._outline.material.color = color.rgba
-            self._render()
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        # To be implemented by subclasses
-        raise NotImplementedError("Must be implemented in subclasses")
-
-    def move(self, pos: Sequence[float]) -> None:
-        # To be implemented by subclasses
-        raise NotImplementedError("Must be implemented in subclasses")
-
-    def remove(self) -> None:
-        if (par := self.parent) is not None:
-            par.remove(self)
-
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
-        # To be implemented by subclasses
-        raise NotImplementedError("Must be implemented in subclasses")
-
-
-class RectangularROIHandle(PyGFXRoiHandle):
-    def __init__(
-        self, render: Callable, canvas_to_world: Callable, *args: Any, **kwargs: Any
-    ) -> None:
-        self._point_rad = 5  # PIXELS
-        self._positions: np.ndarray = np.zeros((5, 3), dtype=np.float32)
-
-        super().__init__(render, *args, *kwargs)
-        self._canvas_to_world = canvas_to_world
-
-        # drag_reference defines the offset between where the user clicks and the center
-        # of the rectangle
-        self._drag_idx: int | None = None
-        self._offset = np.zeros((5, 2))
-        self._on_drag = [
-            self._move_handle_0,
-            self._move_handle_1,
-            self._move_handle_2,
-            self._move_handle_3,
-        ]
-
-    @property
-    def vertices(self) -> Sequence[Sequence[float]]:
-        # Buffer object
-        return [p[:2] for p in self._positions]
-
-    @vertices.setter
-    def vertices(self, vertices: Sequence[Sequence[float]]) -> None:
-        if len(vertices) != 4 or any(len(v) != 2 for v in vertices):
-            raise Exception("Only 2D rectangles are currently supported")
-        is_aligned = (
-            vertices[0][1] == vertices[1][1]
-            and vertices[1][0] == vertices[2][0]
-            and vertices[2][1] == vertices[3][1]
-            and vertices[3][0] == vertices[0][0]
-        )
-        if not is_aligned:
-            raise Exception(
-                "Only rectangles aligned with the axes are currently supported"
-            )
-
-        # Update each handle
-        self._positions[:-1, :2] = vertices
-        self._positions[-1, :2] = vertices[0]
-        self._refresh()
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        self._drag_idx = self._handle_hover_idx(pos)
-
-        if self._drag_idx is None:
-            self._offset[:, :] = self._positions[:, :2] - pos[:2]
-
-    def move(self, pos: Sequence[float]) -> None:
-        if self._drag_idx is not None:
-            self._on_drag[self._drag_idx](pos)
-        else:
-            # TODO: We could potentially do this smarter via transforms
-            self._positions[:, :2] = self._offset[:, :2] + pos[:2]
-        self._refresh()
-
-    def _move_handle_0(self, pos: Sequence[float]) -> None:
-        # NB pygfx requires (idx 0) = (idx 4)
-        self._positions[0, :2] = pos[:2]
-        self._positions[4, :2] = pos[:2]
-
-        self._positions[3, 0] = pos[0]
-        self._positions[1, 1] = pos[1]
-
-    def _move_handle_1(self, pos: Sequence[float]) -> None:
-        self._positions[1, :2] = pos[:2]
-
-        self._positions[2, 0] = pos[0]
-        # NB pygfx requires (idx 0) = (idx 4)
-        self._positions[0, 1] = pos[1]
-        self._positions[4, 1] = pos[1]
-
-    def _move_handle_2(self, pos: Sequence[float]) -> None:
-        self._positions[2, :2] = pos[:2]
-
-        self._positions[1, 0] = pos[0]
-        self._positions[3, 1] = pos[1]
-
-    def _move_handle_3(self, pos: Sequence[float]) -> None:
-        self._positions[3, :2] = pos[:2]
-
-        # NB pygfx requires (idx 0) = (idx 4)
-        self._positions[0, 0] = pos[0]
-        self._positions[4, 0] = pos[0]
-        self._positions[2, 1] = pos[1]
-
     def _create_fill(self) -> pygfx.Mesh | None:
         fill = pygfx.Mesh(
             geometry=pygfx.Geometry(
@@ -569,7 +218,7 @@ class RectangularROIHandle(PyGFXRoiHandle):
                 positions=self._positions,
                 indices=np.array([[0, 1, 2, 3]], dtype=np.int32),
             ),
-            material=pygfx.LineMaterial(thickness=1, color=(0, 0, 0, 0)),
+            material=pygfx.LineMaterial(thickness=1, color=(1, 1, 0, 1)),
         )
         return outline
 
@@ -579,7 +228,7 @@ class RectangularROIHandle(PyGFXRoiHandle):
             geometry=geometry,
             # FIXME Size in pixels is not ideal for selection.
             # TODO investigate what size_mode = vertex does...
-            material=pygfx.PointsMaterial(color=(1, 1, 1), size=1.5 * self._point_rad),
+            material=pygfx.PointsMaterial(color=(1, 1, 1), size=1.5 * self._handle_rad),
         )
 
         # NB: Default bounding box for points does not consider the radius of
@@ -587,14 +236,25 @@ class RectangularROIHandle(PyGFXRoiHandle):
         def get_handle_bb(old: Callable[[], np.ndarray]) -> Callable[[], np.ndarray]:
             def new_get_bb() -> np.ndarray:
                 bb = old().copy()
-                bb[0, :2] -= self._point_rad
-                bb[1, :2] += self._point_rad
+                bb[0, :2] -= self._handle_rad
+                bb[1, :2] += self._handle_rad
                 return bb
 
             return new_get_bb
 
         geometry.get_bounding_box = get_handle_bb(geometry.get_bounding_box)
         return handles
+
+    def can_select(self) -> bool:
+        return True
+
+    def selected(self) -> bool:
+        return self._selected
+
+    def set_selected(self, selected: bool) -> None:
+        self._selected = selected
+        if self._handles:
+            self._handles.visible = selected
 
     def _refresh(self) -> None:
         if self._fill:
@@ -608,31 +268,98 @@ class RectangularROIHandle(PyGFXRoiHandle):
             self._handles.geometry.positions.update_range()
         self._render()
 
-    def _handle_hover_idx(self, pos: Sequence[float]) -> int | None:
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        # Convert canvas -> world
+        world_pos = tuple(self._canvas_to_world((event.x, event.y))[:2])
+        # moving a handle
+        if self._move_mode == BoundingBox.MoveMode.HANDLE:
+            # The anchor is set to the opposite handle, which never moves.
+            self.boundingBoxChanged.emit((world_pos, self._move_anchor))
+        # translating the whole roi
+        elif self._move_mode == BoundingBox.MoveMode.TRANSLATE:
+            # The anchor is the mouse position reported in the previous mouse event.
+            dx = world_pos[0] - self._move_anchor[0]
+            dy = world_pos[1] - self._move_anchor[1]
+            # If the mouse moved (dx, dy) between events, the whole ROI needs to be
+            # translated that amount.
+            new_min = (self._positions[0, 0] + dx, self._positions[0, 1] + dy)
+            new_max = (self._positions[2, 0] + dx, self._positions[2, 1] + dy)
+            self.boundingBoxChanged.emit((new_min, new_max))
+            self._move_anchor = world_pos
+
+        return False
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        self.set_selected(True)
+        # Convert canvas -> world
+        world_pos = self._canvas_to_world((event.x, event.y))
+        drag_idx = self._handle_under(world_pos)
+        # If a marker is pressed
+        if drag_idx is not None:
+            opposite_idx = (drag_idx + 2) % 4
+            self._move_mode = BoundingBox.MoveMode.HANDLE
+            self._move_anchor = tuple(self._positions[opposite_idx, :2].copy())
+        # If the rectangle is pressed
+        else:
+            self._move_mode = BoundingBox.MoveMode.TRANSLATE
+            self._move_anchor = world_pos
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        return False
+
+    def visible(self) -> bool:
+        if self._outline:
+            return bool(self._outline.visible)
+        if self._fill:
+            return bool(self._fill.visible)
+        # Nothing to see
+        return False
+
+    def set_visible(self, visible: bool) -> None:
+        if fill := getattr(self, "_fill", None):
+            fill.visible = visible
+        if outline := getattr(self, "_outline", None):
+            outline.visible = visible
+        if handles := getattr(self, "_handles", None):
+            handles.visible = visible and self.selected()
+        self._render()
+
+    def _handle_under(self, pos: Sequence[float]) -> int | None:
+        """Returns an int in [0, 3], or None.
+
+        If an int i, means that the handle at self._positions[i] is at pos.
+        If None, there is no handle at pos.
+        """
         # FIXME: Ideally, Renderer.get_pick_info would do this for us. But it
         # seems broken.
         for i, p in enumerate(self._positions[:-1]):
-            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= self._point_rad**2:
+            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= self._handle_rad**2:
                 return i
         return None
 
     def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
-        # Convert canvas -> world
+        # Convert event pos (on canvas) to world pos
         world_pos = self._canvas_to_world(pos)
-        # Step 1: Check if over handle
-        if (idx := self._handle_hover_idx(world_pos)) is not None:
-            if np.array_equal(
-                self._positions[idx], self._positions.min(axis=0)
-            ) or np.array_equal(self._positions[idx], self._positions.max(axis=0)):
+        # Step 1: Handles
+        # Preferred over the rectangle
+        # Can only be moved if ROI is selected
+        if (idx := self._handle_under(world_pos)) is not None and self.selected():
+            # Idx 0 is top left, 2 is bottom right
+            if idx % 2 == 0:
                 return CursorType.FDIAG_ARROW
+            # Idx 1 is bottom left, 3 is top right
             return CursorType.BDIAG_ARROW
-
-        # Step 2: Check if over ROI
+        # Step 2: Entire ROI
         if self._outline:
             roi_bb = self._outline.geometry.get_bounding_box()
             if _is_inside(roi_bb, world_pos):
                 return CursorType.ALL_ARROW
         return None
+
+    def remove(self) -> None:
+        if (par := self._container.parent) is not None:
+            par.remove(self._container)
 
 
 def get_canvas_class() -> WgpuCanvas:
@@ -660,7 +387,9 @@ def get_canvas_class() -> WgpuCanvas:
 class GfxArrayCanvas(ArrayCanvas):
     """pygfx-based canvas wrapper."""
 
-    def __init__(self) -> None:
+    def __init__(self, viewer_model: ViewerModel) -> None:
+        self._viewer = viewer_model
+
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
@@ -689,8 +418,8 @@ class GfxArrayCanvas(ArrayCanvas):
 
         self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
         self._selection: CanvasElement | None = None
-        # FIXME: Remove
-        self._initializing_roi: PyGFXRoiHandle | None = None
+        # TODO: Weak Reference?
+        self._last_roi_created: PyGFXBoundingBox | None = None
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -772,37 +501,12 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def add_bounding_box(self) -> PyGFXBoundingBox:
         """Add a new Rectangular ROI node to the scene."""
-        roi = PyGFXBoundingBox(
-            render=self.refresh, canvas_to_world=self.canvas_to_world
+        self._last_roi_created = PyGFXBoundingBox(
+            render=self.refresh,
+            canvas_to_world=self.canvas_to_world,
+            parent=self._scene,
         )
-        # FIXME: Parameter to roi
-        self._scene.add(roi._container)
-        self._selection = roi
-        return roi
-
-    # def add_roi(
-    #     self,
-    #     vertices: Sequence[tuple[float, float]] | None = None,
-    #     color: _cmap.Color | None = None,
-    #     border_color: _cmap.Color | None = None,
-    #     visible: bool = False,
-    # ) -> PyGFXRoiHandle:
-    #     """Add a new Rectangular ROI node to the scene."""
-    #     roi = PyGFXBoundingBox(self.refresh, self.canvas_to_world)
-    #     self._scene.add(roi._container)
-    #     handle = RectangularROIHandle(self.refresh, self.canvas_to_world)
-    #     self._scene.add(handle)
-    #     if vertices:
-    #         handle.vertices = vertices
-    #     else:
-    #         # FIXME: Ugly
-    #         self._initializing_roi = handle
-    #     handle.set_color(color)
-    #     handle.set_border_color(border_color)
-    #     handle.set_visible(visible)
-
-    #     self._elements[handle] = handle
-    #     return handle
+        return self._last_roi_created
 
     def set_range(
         self,
@@ -891,37 +595,22 @@ class GfxArrayCanvas(ArrayCanvas):
         self._canvas.visible = visible
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
-        # if roi := self._initializing_roi:
-        #     self._initializing_roi = None
-        #     pos = self.canvas_to_world((event.x, event.y))
-        #     roi.move(pos)
-        #     roi.set_visible(True)
-
-        # ev_pos = (event.x, event.y)
-        # pos = self.canvas_to_world(ev_pos)
-        # # TODO why does the canvas need this point untransformed??
-        # elements = self.elements_at(ev_pos)
-        # # Deselect prior selection before editing new selection
-        # if self._selection:
-        #     self._selection.set_selected(False)
-        # for e in elements:
-        #     if e.can_select():
-        #         e.start_move(pos)
-        #         # Select new selection
-        #         self._selection = e
-        #         self._selection.set_selected(True)
-        #         return False
-        # return False
-
-        # TODO: Make work
-        # if roi := self._initializing_roi:
-        #     self._initializing_roi = None
-        #     pos = self.canvas_to_world((event.x, event.y))
-        #     roi.move(pos)
-        #     roi.set_visible(True)
         if self._selection:
             self._selection.set_selected(False)
             self._selection = None
+        ev_pos = (event.x, event.y)
+        if self._viewer.mode == CanvasMode.CREATE_ROI:
+            if self._last_roi_created is None:
+                raise ValueError("No ROI to create!")
+            self._selection = self._last_roi_created
+            # HACK: Provide a non-zero starting size so that if the user clicks
+            # and immediately releases, it's visible and can be selected again
+            _min = self.canvas_to_world(ev_pos)[:2]
+            _max = (_min[0] + 1, _min[1] + 1)
+            self._selection.set_bounding_box(_min, _max)
+            self._selection.set_visible(True)
+            self._selection.set_selected(True)
+            self._viewer.mode = CanvasMode.PAN_ZOOM
 
         # Find all visuals at the point
         ev_pos = (event.x, event.y)
@@ -929,47 +618,29 @@ class GfxArrayCanvas(ArrayCanvas):
             # If any belong to a bounding box, direct output there
             if bbox := PyGFXBoundingBox.owner_of.get(vis, None):
                 self._selection = bbox
-                self.canvas_to_world(ev_pos)
-                # FIXME: Use the same event?
-                self._selection.set_selected(True)
-                self._selection.on_mouse_press(
-                    MousePressEvent(ev_pos[0], ev_pos[1], event.btn)
-                )
+                self._selection.on_mouse_press(event)
                 # self._camera.interactive = False
                 return False
 
         return False
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
-        # ev_pos = (event.x, event.y)
-        # if event.btn == MouseButton.LEFT:
-        #     if self._selection and self._selection.selected():
-        #         ev_pos = (event.x, event.y)
-        #         pos = self.canvas_to_world(ev_pos)
-        #         self._selection.move(pos)
-        #         # If we are moving the object, we don't want to move the camera
-        #         return True
-        # return False
-        ev_pos = (event.x, event.y)
-        # for vis in self._canvas.visuals_at(ev_pos):
-        #     if bbox := VispyBoundingBox.owner_of.get(vis, None):
-        #         bbox._set_hover(vis)
-        #         break
         if event.btn == MouseButton.LEFT:
             if self._selection and self._selection.selected():
-                ev_pos = (event.x, event.y)
-                pos = self.canvas_to_world(ev_pos)
-                # FIXME: Use the same event?
-                self._selection.on_mouse_move(MouseMoveEvent(pos[0], pos[1], event.btn))
+                self._selection.on_mouse_move(event)
                 # If we are moving the object, we don't want to move the camera
                 return True
         return False
 
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        if self._selection:
+            self._selection.on_mouse_release(event)
+        if self._viewer.mode == CanvasMode.CREATE_ROI:
+            self._viewer.mode = CanvasMode.PAN_ZOOM
         return False
 
     def get_cursor(self, pos: tuple[float, float]) -> CursorType:
-        if self._initializing_roi:
+        if self._viewer.mode == CanvasMode.CREATE_ROI:
             return CursorType.CROSS
         for vis in self.elements_at(pos):
             if bbox := PyGFXBoundingBox.owner_of.get(vis, None):

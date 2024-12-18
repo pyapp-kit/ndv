@@ -27,6 +27,7 @@ from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
+from ndv.models._viewer_model import CanvasMode, ViewerModel
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -35,7 +36,8 @@ if TYPE_CHECKING:
     import cmap
     from qtpy.QtGui import QIcon
 
-    from ndv._types import AxisKey, MouseReleaseEvent
+    from ndv._types import AxisKey
+    from ndv.views.bases.graphics._canvas import ArrayCanvas
     from ndv.views.protocols import CanvasElement, PRoiHandle
 
 SLIDER_STYLE = """
@@ -338,10 +340,13 @@ class _QArrayViewer(QWidget):
 
 
 class QtArrayView(ArrayView):
-    def __init__(self, canvas_widget: QWidget) -> None:
-        self._qwidget = qwdg = _QArrayViewer(canvas_widget)
+    def __init__(self, canvas: ArrayCanvas, viewer_model: ViewerModel) -> None:
+        self._model = viewer_model
+        self._canvas = canvas
+        self._qwidget = qwdg = _QArrayViewer(canvas.frontend_widget())
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
+        self._model.events.mode.connect(self._on_model_mode_changed)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -365,6 +370,10 @@ class QtArrayView(ArrayView):
                 splitter.setSizes([sum(sizes), 0])
         else:
             self.histogramRequested.emit()
+
+    def _on_model_mode_changed(self, new: CanvasMode) -> None:
+        if new != CanvasMode.CREATE_ROI:
+            self._qwidget.add_roi_btn.setChecked(False)
 
     def add_histogram(self, widget: QWidget) -> None:
         if hasattr(self, "_hist"):
@@ -414,9 +423,4 @@ class QtArrayView(ArrayView):
         return self._qwidget
 
     def _on_add_roi_clicked(self, checked: bool) -> None:
-        if checked:
-            # Add new roi
-            self.roiRequested.emit()
-
-    def mouse_release(self, event: MouseReleaseEvent) -> None:
-        self._qwidget.add_roi_btn.setChecked(False)
+        self._model.mode = CanvasMode.CREATE_ROI if checked else CanvasMode.PAN_ZOOM

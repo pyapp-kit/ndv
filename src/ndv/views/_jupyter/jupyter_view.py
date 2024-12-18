@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, MouseReleaseEvent
+    from ndv.views.bases.graphics._canvas import ArrayCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -106,11 +107,9 @@ class JupyterLutView(LutView):
 
 
 class JupyterArrayView(ArrayView):
-    def __init__(
-        self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
-    ) -> None:
+    def __init__(self, canvas: ArrayCanvas, **kwargs: Any) -> None:
         # WIDGETS
-        self._canvas_widget = canvas_widget
+        self._canvas_widget: _jupyter_rfb.CanvasBackend = canvas.frontend_widget()
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([])

@@ -13,6 +13,7 @@ from ._mouseable import Mouseable
 if TYPE_CHECKING:
     import numpy as np
 
+    from ndv.models._viewer_model import ViewerModel
     from ndv.views.bases.graphics._canvas_elements import (
         BoundingBox,
         CanvasElement,
@@ -42,6 +43,8 @@ class GraphicsCanvas(Viewable, Mouseable):
 
 
 class ArrayCanvas(GraphicsCanvas):
+    @abstractmethod
+    def __init__(self, viewer_model: ViewerModel | None = ...) -> None: ...
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod

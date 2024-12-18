@@ -10,10 +10,8 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-class BoundingBoxModel(NDVModel):
-    """Representation of how to display a region of interest (ROI).
-    For now,
-    # TODO: Consider additional parameters for non-rectangle ROIs.
+class RectangularROIModel(NDVModel):
+    """Representation of how to display an axis-aligned rectangular Region of Interest (ROI).
 
     Parameters
     ----------
@@ -25,7 +23,7 @@ class BoundingBoxModel(NDVModel):
     """
 
     visible: bool = True
-    bounding_box: tuple[tuple[float, float], tuple[float, float]] = ([0, 0], [0, 0])
+    bounding_box: tuple[tuple[float, float], tuple[float, float]] = ((0, 0), (0, 0))
 
     @field_validator("bounding_box")
     @classmethod
@@ -39,17 +37,3 @@ class BoundingBoxModel(NDVModel):
         x2 = max(bb[0][0], bb[1][0])
         y2 = max(bb[0][1], bb[1][1])
         return ((x1, y1), (x2, y2))
-
-    # @model_validator(mode="after")
-    # def _validate_model(self) -> Self:
-    #     mi, ma = self.bounding_box
-    #     if len(mi) != len(ma):
-    #         raise ValueError(
-    #             "Minimum and maximum do not share the same number of dimensions"
-    #         )
-    #     for i in range(len(mi)):
-    #         if mi[i] > ma[i]:
-    #             # TODO: Could we switch min and max?
-    #             raise ValueError(f"Minimum is greater than maximum at index {i}")
-
-    #     return self
