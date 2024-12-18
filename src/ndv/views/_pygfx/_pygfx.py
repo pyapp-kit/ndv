@@ -17,7 +17,7 @@ from ndv._types import (
     MousePressEvent,
     MouseReleaseEvent,
 )
-from ndv.models._viewer_model import CanvasMode, ViewerModel
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
 from ndv.views.bases.graphics._canvas_elements import RectangularROI, ROIMoveMode
 
@@ -381,7 +381,7 @@ def get_canvas_class() -> WgpuCanvas:
 class GfxArrayCanvas(ArrayCanvas):
     """pygfx-based canvas wrapper."""
 
-    def __init__(self, viewer_model: ViewerModel) -> None:
+    def __init__(self, viewer_model: ArrayViewerModel) -> None:
         self._viewer = viewer_model
 
         self._current_shape: tuple[int, ...] = ()
@@ -597,7 +597,7 @@ class GfxArrayCanvas(ArrayCanvas):
         world_pos = self.canvas_to_world(canvas_pos)[:2]
 
         # If in CREATE_ROI mode, the new ROI should "start" here.
-        if self._viewer.mode == CanvasMode.CREATE_ROI:
+        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             if self._last_roi_created is None:
                 raise ValueError("No ROI to create!")
             new_roi = self._last_roi_created
@@ -614,7 +614,7 @@ class GfxArrayCanvas(ArrayCanvas):
             new_roi.set_selected(True)
 
             # All done - exit the mode
-            self._viewer.mode = CanvasMode.PAN_ZOOM
+            self._viewer.interaction_mode = InteractionMode.PAN_ZOOM
 
         # Find all visuals at the point
         for vis in self.elements_at(canvas_pos):
@@ -639,7 +639,7 @@ class GfxArrayCanvas(ArrayCanvas):
         return False
 
     def get_cursor(self, pos: tuple[float, float]) -> CursorType:
-        if self._viewer.mode == CanvasMode.CREATE_ROI:
+        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             return CursorType.CROSS
         for vis in self.elements_at(pos):
             self.canvas_to_world(pos)[:2]

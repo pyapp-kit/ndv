@@ -3,18 +3,25 @@ from enum import Enum, auto
 from ndv.models._base_model import NDVModel
 
 
-class CanvasMode(Enum):
-    PAN_ZOOM = auto()
-    CREATE_ROI = auto()
+class InteractionMode(Enum):
+    """An enum defining graphical interaction mechanisms with an array Viewer."""
+
+    PAN_ZOOM = auto()  # Mode allowing the user to pan and zoom
+    CREATE_ROI = auto()  # Mode where user clicks create ROIs
 
 
-class ViewerModel(NDVModel):
-    """Representation of a data viewer.
+class ArrayViewerModel(NDVModel):
+    """Representation of an array viewer.
+
+    TODO: This will likely contain other fields including:
+        * Dimensionality
+        * Camera position
+        * Camera frustum
 
     Parameters
     ----------
-    mode : CanvasMode
-        TODO: Description
+    interaction_mode : InteractionMode
+        Describes the current interaction mode of the Viewer.
     """
 
-    mode: CanvasMode = CanvasMode.PAN_ZOOM
+    interaction_mode: InteractionMode = InteractionMode.PAN_ZOOM

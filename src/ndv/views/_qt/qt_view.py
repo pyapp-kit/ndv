@@ -27,7 +27,7 @@ from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._viewer_model import CanvasMode, ViewerModel
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -340,7 +340,7 @@ class _QArrayViewer(QWidget):
 
 
 class QtArrayView(ArrayView):
-    def __init__(self, canvas: ArrayCanvas, viewer_model: ViewerModel) -> None:
+    def __init__(self, canvas: ArrayCanvas, viewer_model: ArrayViewerModel) -> None:
         self._model = viewer_model
         self._canvas = canvas
         self._qwidget = qwdg = _QArrayViewer(canvas.frontend_widget())
@@ -371,9 +371,11 @@ class QtArrayView(ArrayView):
         else:
             self.histogramRequested.emit()
 
-    def _on_model_mode_changed(self, new: CanvasMode, old: CanvasMode) -> None:
+    def _on_model_mode_changed(
+        self, new: InteractionMode, old: InteractionMode
+    ) -> None:
         # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-        if old == CanvasMode.CREATE_ROI:
+        if old == InteractionMode.CREATE_ROI:
             self._qwidget.add_roi_btn.setChecked(False)
 
     def add_histogram(self, widget: QWidget) -> None:
@@ -424,4 +426,6 @@ class QtArrayView(ArrayView):
         return self._qwidget
 
     def _on_add_roi_clicked(self, checked: bool) -> None:
-        self._model.mode = CanvasMode.CREATE_ROI if checked else CanvasMode.PAN_ZOOM
+        self._model.interaction_mode = (
+            InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
+        )

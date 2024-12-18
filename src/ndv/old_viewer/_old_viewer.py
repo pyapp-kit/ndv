@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from ndv.views.bases.graphics._canvas_elements import (
         CanvasElement,
         ImageHandle,
-        RoiHandle,
+        RectangularROI,
     )
 
     DimKey = int
@@ -160,7 +160,7 @@ class NDViewer(QWidget):
         # Canvas selection
         self._selection: CanvasElement | None = None
         # ROI
-        self._roi: RoiHandle | None = None
+        self._roi: RectangularROI | None = None
 
         # WIDGETS ----------------------------------------------------
 
@@ -343,14 +343,30 @@ class NDViewer(QWidget):
         border_color : str, tuple, list, array, Color, or int
             The border color.  Can be any "ColorLike".
         """
-        # Remove the old ROI
+        roi = self._canvas.add_bounding_box()
+        if color:
+            roi.set_fill(color)
+        if border_color:
+            roi.set_border(border_color)
+        if vertices:
+            roi.set_bounding_box(vertices[0], vertices[2])
+
+        # Assert vertices represent axis-aligned rectangle
+        if vertices is not None:
+            if len(vertices) != 4:
+                raise ValueError("Only rectangles are currently supported")
+            if (
+                vertices[0][0] != vertices[1][0]
+                or vertices[1][1] != vertices[2][1]
+                or vertices[2][0] != vertices[3][0]
+                or vertices[3][1] != vertices[0][1]
+            ):
+                raise ValueError("Only axis-aligned rectangles are currently supported")
+
+        # Remove the old ROI and add the new one
         if self._roi:
             self._roi.remove()
-        color = cmap.Color(color) if color is not None else None
-        border_color = cmap.Color(border_color) if border_color is not None else None
-        self._roi = self._canvas.add_roi(
-            vertices=vertices, color=color, border_color=border_color
-        )
+        self._roi = roi
 
     def set_visualized_dims(self, dims: Iterable[DimKey]) -> None:
         """Set the dimensions that will be visualized.

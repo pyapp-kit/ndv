@@ -21,7 +21,7 @@ from ndv._types import (
     MousePressEvent,
     MouseReleaseEvent,
 )
-from ndv.models._viewer_model import CanvasMode, ViewerModel
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayCanvas, filter_mouse_events
 from ndv.views.bases.graphics._canvas_elements import (
     CanvasElement,
@@ -283,7 +283,7 @@ class VispyViewerCanvas(ArrayCanvas):
     could be swapped in if needed as long as they implement the same interface).
     """
 
-    def __init__(self, viewer_model: ViewerModel) -> None:
+    def __init__(self, viewer_model: ArrayViewerModel) -> None:
         self._viewer = viewer_model
 
         self._canvas = scene.SceneCanvas(size=(600, 600))
@@ -438,7 +438,7 @@ class VispyViewerCanvas(ArrayCanvas):
         world_pos = self.canvas_to_world(canvas_pos)[:2]
 
         # If in CREATE_ROI mode, the new ROI should "start" here.
-        if self._viewer.mode == CanvasMode.CREATE_ROI:
+        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             if self._last_roi_created is None:
                 raise ValueError("No ROI to create!")
             new_roi = self._last_roi_created
@@ -455,7 +455,7 @@ class VispyViewerCanvas(ArrayCanvas):
             new_roi.set_selected(True)
 
             # All done - exit the mode
-            self._viewer.mode = CanvasMode.PAN_ZOOM
+            self._viewer.interaction_mode = InteractionMode.PAN_ZOOM
 
         # Find all visuals at the point
         for vis in self.elements_at(canvas_pos):
@@ -483,7 +483,7 @@ class VispyViewerCanvas(ArrayCanvas):
         return False
 
     def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType:
-        if self._viewer.mode == CanvasMode.CREATE_ROI:
+        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             return CursorType.CROSS
         for vis in self.elements_at(canvas_pos):
             if cursor := vis.get_cursor(canvas_pos):
