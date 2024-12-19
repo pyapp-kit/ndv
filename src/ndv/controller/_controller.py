@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ndv.controller._channel_controller import ChannelController
-from ndv.models import DataDisplayModel
+from ndv.models import DataDisplayModel, RectangularROIModel
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import LUTModel
+from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views import _app
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModel
     from ndv.views.bases import ArrayView, HistogramCanvas
+    from ndv.views.bases.graphics._canvas_elements import RectangularROI
 
     LutKey: TypeAlias = int | None
 
@@ -31,30 +33,43 @@ class ViewerController:
     This is the primary public interface for the viewer.
     """
 
-    def __init__(self, data: DataDisplayModel | None = None) -> None:
+    def __init__(
+        self,
+        data: DataDisplayModel | None = None,
+        viewer: ArrayViewerModel | None = None,
+    ) -> None:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
 
+        self._array_viewer_model = viewer or ArrayViewerModel()
+
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_view_frontend_class()
         canvas_cls = _app.get_canvas_class()
-        self._canvas = canvas_cls()
+        self._canvas = canvas_cls(self._array_viewer_model)
         self._canvas.set_ndim(2)
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.frontend_widget())
-
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._array_viewer_model
+        )
         # TODO: _dd_model is perhaps a temporary concept, and definitely name
         self._dd_model = data or DataDisplayModel()
+        # TODO: Create a dedicated object for wrangling (multiple) ROIs
+        self._roi: RectangularROIModel | None = None
+        self._bb: RectangularROI = self._canvas.add_bounding_box()
 
         self._set_model_connected(self._dd_model.display)
+
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self.add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+
+        self._bb.boundingBoxChanged.connect(self._on_view_bounding_box_changed)
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
@@ -88,6 +103,13 @@ class ViewerController:
         self._dd_model.data = data
         self._fully_synchronize_view()
         self._update_hist_domain_for_dtype(data.dtype)
+
+    @property
+    def roi(self) -> RectangularROIModel:
+        if self._roi is None:
+            self._roi = RectangularROIModel(visible=True)
+            self._set_roi_connected(self._roi, True)
+        return self._roi
 
     # -----------------------------------------------------------------------------
 
@@ -136,6 +158,25 @@ class ViewerController:
         ]:
             getattr(obj, _connect)(callback)
 
+    # FIXME
+    def _set_roi_connected(
+        self, model: RectangularROIModel, connect: bool = True
+    ) -> None:
+        """Connect or disconnect the model to/from the viewer.
+
+        We do this in a single method so that we are sure to connect and disconnect
+        the same events in the same order.  (but it's kinda ugly)
+        """
+        _connect = "connect" if connect else "disconnect"
+
+        for obj, callback in [
+            (model.events.bounding_box, self._on_roi_bounding_box_changed),
+            (model.events.visible, self._on_roi_visibility_changed),
+        ]:
+            getattr(obj, _connect)(callback)
+            if _connect == "connect":
+                callback()
+
     # ------------------ Model callbacks ------------------
 
     def _fully_synchronize_view(self) -> None:
@@ -180,6 +221,13 @@ class ViewerController:
                 lut_ctrl.handles.pop().remove()
         # do we need to cleanup the lut views themselves?
 
+    def _on_roi_bounding_box_changed(self) -> None:
+        box_min, box_max = self.roi.bounding_box
+        self._bb.set_bounding_box(box_min, box_max)
+
+    def _on_roi_visibility_changed(self) -> None:
+        self._bb.set_visible(self.roi.visible)
+
     # ------------------ View callbacks ------------------
 
     def _on_view_current_index_changed(self) -> None:
@@ -207,6 +255,11 @@ class ViewerController:
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self.model.channel_mode = mode
+
+    def _on_view_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
+        self.roi.bounding_box = bb
 
     # ------------------ Helper methods ------------------
 

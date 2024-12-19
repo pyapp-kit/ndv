@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from ndv.controller._channel_controller import ChannelController
 
 
-def _get_mock_canvas() -> ArrayCanvas:
+def _get_mock_canvas(*args: Any, **kwargs: Any) -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
     handle = MagicMock(spec=ImageHandle)
     handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
