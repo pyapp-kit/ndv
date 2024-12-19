@@ -38,9 +38,12 @@ jobs:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
             gui: pyside
-          # wxpython does not build wheels for ubuntu
+          # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
+          - os: macos-latest
+            gui: wxpython
+            python-version: "3.10"
         include:
           # test a couple more python variants, without
           # full os/gui/canvas matrix coverage
@@ -57,6 +60,14 @@ jobs:
             python-version: "3.9"
             gui: pyqt
             canvas: vispy
+          - os: macos-13
+            gui: wxpython
+            python-version: "3.9"
+            canvas: vispy
+          - os: windows-latest
+            gui: jup
+            python-version: "3.9"
+            canvas: pygfx
 
     steps:
       - uses: actions/checkout@v4

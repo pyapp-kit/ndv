@@ -5,7 +5,9 @@ Gabriel Pasa
 gabrieldp
 """
 
-from typing import Any, no_type_check
+from __future__ import annotations
+
+from typing import Any
 
 import wx
 
@@ -19,7 +21,7 @@ def value_to_fraction(value: float, min_value: float, max_value: float) -> float
 
 
 class SliderThumb:
-    def __init__(self, parent: "RangeSlider", value: int):
+    def __init__(self, parent: RangeSlider, value: int):
         self.parent = parent
         self.dragged = False
         self.mouse_over = False
@@ -108,7 +110,7 @@ class SliderThumb:
             in_hitbox = in_hitbox and (boundary_low <= mouse_coord <= boundary_high)
         return in_hitbox
 
-    def GetOtherThumb(self) -> tuple[str, "SliderThumb"]:
+    def GetOtherThumb(self) -> tuple[str, SliderThumb]:
         if self.parent.thumbs["low"] != self:
             return "low", self.parent.thumbs["low"]
         else:
@@ -364,81 +366,3 @@ class RangeSlider(wx.Panel):
             self.thumbs["low"].SetValue(minValue)
         self.min_value = minValue
         self.Refresh()
-
-
-if __name__ == "__main__":
-
-    @no_type_check
-    class TestFrame(wx.Frame):
-        @no_type_check
-        def __init__(self):
-            wx.Frame.__init__(self, None, -1, "Range Slider Demo", size=(300, 100))
-            panel = wx.Panel(self)
-            b = 6
-            vbox = wx.BoxSizer(orient=wx.VERTICAL)
-            vbox.Add(
-                wx.StaticText(parent=panel, label="Custom Range Slider:"),
-                flag=wx.ALIGN_LEFT | wx.ALL,
-                border=b,
-            )
-            self.rangeslider = RangeSlider(
-                parent=panel,
-                lowValue=20,
-                highValue=80,
-                minValue=0,
-                maxValue=100,
-                size=(300, 26),
-            )
-            self.rangeslider.Bind(wx.EVT_SLIDER, self.rangeslider_changed)
-            vbox.Add(self.rangeslider, proportion=1, flag=wx.EXPAND | wx.ALL, border=b)
-            self.rangeslider_static = wx.StaticText(panel)
-            vbox.Add(self.rangeslider_static, flag=wx.ALIGN_LEFT | wx.ALL, border=b)
-            vbox.Add(
-                wx.StaticText(
-                    parent=panel, label="Regular Slider with wx.SL_SELRANGE style:"
-                ),
-                flag=wx.ALIGN_LEFT | wx.ALL,
-                border=b,
-            )
-            self.slider = wx.Slider(parent=panel, style=wx.SL_SELRANGE)
-            self.slider.SetSelection(20, 40)
-            self.slider.Bind(wx.EVT_SLIDER, self.slider_changed)
-            vbox.Add(self.slider, proportion=1, flag=wx.EXPAND | wx.ALL, border=b)
-            self.slider_static = wx.StaticText(panel)
-            vbox.Add(self.slider_static, flag=wx.ALIGN_LEFT | wx.ALL, border=b)
-            self.button_toggle = wx.Button(parent=panel, label="Disable")
-            self.button_toggle.Bind(wx.EVT_BUTTON, self.toggle_slider_enable)
-            vbox.Add(self.button_toggle, flag=wx.ALIGN_CENTER | wx.ALL, border=b)
-            panel.SetSizerAndFit(vbox)
-            box = wx.BoxSizer()
-            box.Add(panel, proportion=1, flag=wx.EXPAND)
-            self.SetSizerAndFit(box)
-
-        @no_type_check
-        def slider_changed(self, evt: wx.Event) -> None:
-            obj = evt.GetEventObject()
-            val = obj.GetValue()
-            self.slider_static.SetLabel(f"Value: {val}")
-
-        @no_type_check
-        def rangeslider_changed(self, evt: wx.Event) -> None:
-            obj = evt.GetEventObject()
-            lv, hv = obj.GetValues()
-            self.rangeslider_static.SetLabel(
-                f"Low value: {lv:.0f}, High value: {hv:.0f}"
-            )
-
-        @no_type_check
-        def toggle_slider_enable(self, evt: wx.Event) -> None:
-            if self.button_toggle.GetLabel() == "Disable":
-                self.slider.Enable(False)
-                self.rangeslider.Enable(False)
-                self.button_toggle.SetLabel("Enable")
-            else:
-                self.slider.Enable(True)
-                self.rangeslider.Enable(True)
-                self.button_toggle.SetLabel("Disable")
-
-    app = wx.App()
-    TestFrame().Show()
-    app.MainLoop()
