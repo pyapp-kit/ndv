@@ -1,6 +1,6 @@
 """Test controller without canavs or gui frontend"""
 
-from typing import TYPE_CHECKING, Any, cast, no_type_check
+from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -38,9 +38,15 @@ def _get_mock_view(*_: Any) -> ArrayView:
     return mock
 
 
+def _patch_views(f: Callable) -> Callable:
+    f = patch.object(_app, "get_array_canvas_class", lambda: _get_mock_canvas)(f)
+    f = patch.object(_app, "get_array_view_class", lambda: _get_mock_view)(f)
+    f = patch.object(_app, "get_histogram_canvas_class", lambda: _get_mock_hist_canvas)(f)  # fmt: skip # noqa
+    return f
+
+
 @no_type_check
-@patch.object(_app, "get_canvas_class", lambda: _get_mock_canvas)
-@patch.object(_app, "get_view_frontend_class", lambda: _get_mock_view)
+@_patch_views
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
@@ -101,8 +107,7 @@ def test_controller() -> None:
 
 
 @no_type_check
-@patch.object(_app, "get_canvas_class", lambda: _get_mock_canvas)
-@patch.object(_app, "get_view_frontend_class", lambda: _get_mock_view)
+@_patch_views
 def test_canvas() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
@@ -124,9 +129,7 @@ def test_canvas() -> None:
 
 
 @no_type_check
-@patch.object(_app, "get_canvas_class", lambda: _get_mock_canvas)
-@patch.object(_app, "get_view_frontend_class", lambda: _get_mock_view)
-@patch.object(_app, "get_histogram_canvas_class", lambda: _get_mock_hist_canvas)
+@_patch_views
 def test_histogram_controller() -> None:
     ctrl = ViewerController()
     mock_view = ctrl.view

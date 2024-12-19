@@ -11,7 +11,8 @@ import pygfx
 import pylinalg as la
 
 from ndv._types import CursorType
-from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
+from ndv.views._app import filter_mouse_events
+from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
