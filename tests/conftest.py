@@ -12,16 +12,19 @@ from unittest.mock import patch
 import pytest
 
 from ndv.views import gui_frontend
+from ndv.views._app import GuiFrontend
 
 if TYPE_CHECKING:
+    from asyncio import AbstractEventLoop
     from collections.abc import Iterator
 
+    import wx
     from pytest import FixtureRequest
     from qtpy.QtWidgets import QApplication
 
 
 @pytest.fixture
-def asyncio_app() -> Any:
+def asyncio_app() -> Iterator[AbstractEventLoop]:
     import asyncio
 
     loop = asyncio.new_event_loop()
@@ -31,23 +34,42 @@ def asyncio_app() -> Any:
 
 
 @pytest.fixture
+def wxapp() -> Iterator[wx.App]:
+    import wx
+
+    app = wx.App()
+    yield app
+    # app.ExitMainLoop()
+
+
+@pytest.fixture
 def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     # this fixture will use the appropriate application depending on the env var
     # NDV_GUI_FRONTEND='qt' pytest
     # NDV_GUI_FRONTEND='jupyter' pytest
+    try:
+        frontend = gui_frontend()
+    except RuntimeError:
+        # if we don't find any frontend, and jupyter is available, use that
+        # since it requires very little setup
+        if importlib.util.find_spec("jupyter"):
+            os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+            gui_frontend.cache_clear()
 
-    if not importlib.util.find_spec("pytestqt"):
-        # pytestqt isn't available ... this can't be a qt test
-        os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+        frontend = gui_frontend()
 
-    if gui_frontend() == "qt":
+    if frontend == GuiFrontend.QT:
         app = request.getfixturevalue("qapp")
         qtbot = request.getfixturevalue("qtbot")
         with patch.object(app, "exec", lambda *_: None):
             with _catch_qt_leaks(request, app):
                 yield app, qtbot
-    elif gui_frontend() == "jupyter":
+    elif frontend == GuiFrontend.JUPYTER:
         yield request.getfixturevalue("asyncio_app")
+    elif frontend == GuiFrontend.WX:
+        yield request.getfixturevalue("wxapp")
+    else:
+        raise RuntimeError("No GUI frontend found")
 
 
 @contextmanager

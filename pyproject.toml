@@ -47,6 +47,7 @@ dependencies = [
 jup = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
 pyqt = ["pyqt6"]
 pyside = ["pyside6<6.8"]
+wxpython = ["wxpython"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl"]
@@ -55,10 +56,12 @@ pygfx = ["pygfx>=0.6.0"]
 # ready to go bundles with vispy
 qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
 jupyter = ["ndv[jup,vispy]", "imageio[tifffile]"]
+wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
 
 test = ["imageio[tifffile]", "pytest-cov", "pytest"]
 dev = [
     "ndv[test,vispy,pygfx,pyqt,jupyter]",
+    "pytest-qt",
     "ipython",
     "mypy",
     "pdbpp",

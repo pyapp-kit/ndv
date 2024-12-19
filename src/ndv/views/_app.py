@@ -23,6 +23,7 @@ _APP_INSTANCE: Any | None = None  # pointer to the global app instsance.
 class GuiFrontend(str, Enum):
     QT = "qt"
     JUPYTER = "jupyter"
+    WX = "wx"
 
 
 class CanvasBackend(str, Enum):
@@ -44,6 +45,11 @@ def get_view_frontend_class() -> type[ArrayView]:
 
         return JupyterArrayView
 
+    if frontend == GuiFrontend.WX:
+        from ._wx.wx_view import WxArrayView
+
+        return WxArrayView
+
     raise RuntimeError("No GUI frontend found")
 
 
@@ -54,8 +60,11 @@ def get_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
 
         from ndv.views._vispy._vispy import VispyViewerCanvas
 
-        if gui_frontend() == GuiFrontend.JUPYTER:
+        _frontend = gui_frontend()
+        if _frontend == GuiFrontend.JUPYTER:
             use_app("jupyter_rfb")
+        elif _frontend == GuiFrontend.WX:
+            use_app("wx")
 
         return VispyViewerCanvas
 
@@ -91,6 +100,12 @@ def _is_running_in_qapp() -> bool:
     return False
 
 
+def _is_running_in_wxapp() -> bool:
+    if wx := sys.modules.get("wx"):
+        return wx.App.Get() is not None
+    return False
+
+
 def _try_start_qapp() -> bool:
     global _APP_INSTANCE
     try:
@@ -103,6 +118,22 @@ def _try_start_qapp() -> bool:
 
         _install_excepthook()
         _APP_INSTANCE = qapp
+        return True
+    except Exception:
+        return False
+
+
+def _try_start_wxapp() -> bool:
+    global _APP_INSTANCE
+    try:
+        import wx
+
+        wxapp: wx.App | None
+        if (wxapp := wx.App.Get()) is None:
+            wxapp = wx.App()
+
+        _install_excepthook()
+        _APP_INSTANCE = wxapp
         return True
     except Exception:
         return False
@@ -190,8 +221,12 @@ def gui_frontend() -> GuiFrontend:
         return GuiFrontend.JUPYTER
     if _is_running_in_qapp():
         return GuiFrontend.QT
+    if _is_running_in_wxapp():
+        return GuiFrontend.WX
     if _try_start_qapp():
         return GuiFrontend.QT
+    if _try_start_wxapp():
+        return GuiFrontend.WX
     raise RuntimeError(f"Could not find an appropriate GUI frontend: {valid!r}")
 
 
@@ -230,5 +265,14 @@ def run_app() -> None:
                 f"Got unexpected application type: {type(_APP_INSTANCE)}"
             )
         _APP_INSTANCE.exec()
+    elif frontend == GuiFrontend.WX:
+        import wx
+
+        _try_start_wxapp()
+        if not isinstance(_APP_INSTANCE, wx.App):
+            raise RuntimeError(
+                f"Got unexpected application type: {type(_APP_INSTANCE)}"
+            )
+        _APP_INSTANCE.MainLoop()
     elif frontend == GuiFrontend.JUPYTER:
         pass  # nothing to do here
