@@ -37,8 +37,8 @@ class ViewerController:
         self._lut_controllers: dict[LutKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
-        frontend_cls = _app.get_view_frontend_class()
-        canvas_cls = _app.get_canvas_class()
+        frontend_cls = _app.get_array_view_class()
+        canvas_cls = _app.get_array_canvas_class()
         self._canvas = canvas_cls()
         self._canvas.set_ndim(2)
 
