@@ -64,7 +64,7 @@ class MouseMoveEvent(NamedTuple):
 
     x: float
     y: float
-    btn: MouseButton
+    btn: MouseButton = MouseButton.NONE
 
 
 class MousePressEvent(NamedTuple):

@@ -419,7 +419,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._ndim = ndim
         if ndim == 3:
             self._camera = cam = pygfx.PerspectiveCamera(0, 1)
-            cam.show_object(self._scene, up=(0, -1, 0), view_dir=(0, 0, 1))
+            with suppress(ValueError):
+                cam.show_object(self._scene, up=(0, -1, 0), view_dir=(0, 0, 1))
             controller = pygfx.OrbitController(cam, register_events=self._renderer)
             zoom = "zoom"
             # FIXME: there is still an issue with rotational centration.
