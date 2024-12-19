@@ -264,10 +264,11 @@ class JupyterProvider(GuiProvider):
 
     @staticmethod
     def create_app() -> Any:
-        if not JupyterProvider.is_running():  # pragma: no cover
+        if not JupyterProvider.is_running() and not os.getenv("PYTEST_CURRENT_TEST"):
             # if we got here, it probably means that someone used
             # NDV_GUI_FRONTEND=jupyter without actually being in a juptyer notebook
-            raise RuntimeError(
+            # we allow it in tests, but not in normal usage.
+            raise RuntimeError(  # pragma: no cover
                 "Jupyter is not running a notebook shell.  Cannot create app."
             )
         return None
