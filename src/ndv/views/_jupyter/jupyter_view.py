@@ -7,6 +7,7 @@ import cmap
 import ipywidgets as widgets
 
 from ndv.models._array_display_model import ChannelMode
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -107,8 +108,13 @@ class JupyterLutView(LutView):
 
 class JupyterArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
+        self,
+        canvas_widget: _jupyter_rfb.CanvasBackend,
+        viewer_model: ArrayViewerModel,
+        **kwargs: Any,
     ) -> None:
+        self._viewer_model = viewer_model
+        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
         # WIDGETS
         self._canvas_widget = canvas_widget
 
@@ -124,6 +130,16 @@ class JupyterArrayView(ArrayView):
 
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
+        self._add_roi_btn = widgets.ToggleButton(
+            value=False,
+            description="New ROI",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="Adds a new Rectangular ROI.",
+            icon="square",
+        )
+
+        self._add_roi_btn.observe(self._on_add_roi_button_toggle, names="value")
+
         # LAYOUT
 
         self.layout = widgets.VBox(
@@ -132,7 +148,7 @@ class JupyterArrayView(ArrayView):
                 self._canvas_widget,
                 self._hover_info_label,
                 self._slider_box,
-                self._channel_mode_combo,
+                widgets.HBox([self._channel_mode_combo, self._add_roi_btn]),
             ]
         )
 
@@ -227,6 +243,19 @@ class JupyterArrayView(ArrayView):
     def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
+
+    def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
+        """Emit signal when the channel mode changes."""
+        self._viewer_model.interaction_mode = (
+            InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
+        )
+
+    def _on_model_mode_changed(
+        self, new: InteractionMode, old: InteractionMode
+    ) -> None:
+        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+        if old == InteractionMode.CREATE_ROI:
+            self._add_roi_btn.value = False
 
     def add_histogram(self, widget: Any) -> None:
         """Add a histogram widget to the viewer."""

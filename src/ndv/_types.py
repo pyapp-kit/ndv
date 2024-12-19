@@ -56,6 +56,7 @@ class MouseButton(IntFlag):
     LEFT = auto()
     MIDDLE = auto()
     RIGHT = auto()
+    NONE = auto()
 
 
 class MouseMoveEvent(NamedTuple):
@@ -63,6 +64,7 @@ class MouseMoveEvent(NamedTuple):
 
     x: float
     y: float
+    btn: MouseButton = MouseButton.NONE
 
 
 class MousePressEvent(NamedTuple):
@@ -70,7 +72,7 @@ class MousePressEvent(NamedTuple):
 
     x: float
     y: float
-    btn: MouseButton = MouseButton.LEFT
+    btn: MouseButton
 
 
 class MouseReleaseEvent(NamedTuple):
@@ -78,11 +80,12 @@ class MouseReleaseEvent(NamedTuple):
 
     x: float
     y: float
-    btn: MouseButton = MouseButton.LEFT
+    btn: MouseButton
 
 
 class CursorType(Enum):
     DEFAULT = "default"
+    CROSS = "cross"
     V_ARROW = "v_arrow"
     H_ARROW = "h_arrow"
     ALL_ARROW = "all_arrow"
@@ -101,9 +104,22 @@ class CursorType(Enum):
 
         return {
             CursorType.DEFAULT: Qt.CursorShape.ArrowCursor,
+            CursorType.CROSS: Qt.CursorShape.CrossCursor,
             CursorType.V_ARROW: Qt.CursorShape.SizeVerCursor,
             CursorType.H_ARROW: Qt.CursorShape.SizeHorCursor,
             CursorType.ALL_ARROW: Qt.CursorShape.SizeAllCursor,
             CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
             CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
+        }[self]
+
+    def to_jupyter(self) -> str:
+        """Converts CursorType to jupyter cursor strings."""
+        return {
+            CursorType.DEFAULT: "default",
+            CursorType.CROSS: "crosshair",
+            CursorType.V_ARROW: "ns-resize",
+            CursorType.H_ARROW: "ew-resize",
+            CursorType.ALL_ARROW: "move",
+            CursorType.BDIAG_ARROW: "nesw-resize",
+            CursorType.FDIAG_ARROW: "nwse-resize",
         }[self]
