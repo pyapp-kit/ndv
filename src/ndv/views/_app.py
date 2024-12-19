@@ -272,8 +272,9 @@ def gui_frontend() -> GuiFrontend:
     or available.
     """
     requested = os.getenv(GUI_ENV_VAR, "").lower()
+    valid = {x.value for x in GuiFrontend}
     if requested:
-        if requested not in (valid := {x.value for x in GuiFrontend}):
+        if requested not in valid:
             raise ValueError(
                 f"Invalid GUI frontend: {requested!r}. Valid options: {valid}"
             )
@@ -311,8 +312,9 @@ def canvas_backend(requested: str | None) -> CanvasBackend:
     """
     backend = requested or os.getenv(CANVAS_ENV_VAR, "").lower()
 
+    valid = {x.value for x in CanvasBackend}
     if backend:
-        if backend not in (valid := {x.value for x in CanvasBackend}):
+        if backend not in valid:
             raise ValueError(
                 f"Invalid canvas backend: {backend!r}. Valid options: {valid}"
             )
