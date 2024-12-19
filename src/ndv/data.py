@@ -67,8 +67,8 @@ def cells3d() -> np.ndarray:
 
     # this data has been stretched to 16 bit, and lacks certain intensity values
     # add a small random integer to each pixel ... so the histogram is not silly
-    data = (data + np.random.randint(-24, 24, data.shape)).astype(np.uint16)
-    return data
+    data = (data + np.random.randint(-24, 24, data.shape)).clip(0, 65535)
+    return data.astype(np.uint16)
 
 
 def cat() -> np.ndarray:
