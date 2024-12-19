@@ -105,11 +105,6 @@ class WxLutView(LutView):
 
 # mostly copied from _qt.qt_view._QDimsSliders
 class _WxDimsSliders(wx.Panel):
-    # note to self... I first started with a wxSignal, but found that it was not
-    # being emitted as "soon" on initialization as psygnal.Signal.  This can be
-    # looked into ... or we can just use psygnal here.  It's also possible, if we
-    # end up passing the model into the views, that views won't need these sorts
-    # of signals at all.  Open GH issue to discuss if you are here :)
     currentIndexChanged = Signal()
 
     def __init__(self, parent: wx.Window) -> None:
