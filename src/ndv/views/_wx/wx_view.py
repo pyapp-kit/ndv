@@ -172,6 +172,8 @@ class _WxArrayViewer(wx.Frame):
         super().__init__(parent)
 
         # FIXME: pygfx backend needs this to be canvas_widget._subwidget
+        if hasattr(canvas_widget, '_subwidget'):
+            canvas_widget = canvas_widget._subwidget
 
         if (parent := canvas_widget.GetParent()) and parent is not self:
             canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
