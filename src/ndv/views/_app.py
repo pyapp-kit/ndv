@@ -7,14 +7,19 @@ import traceback
 from contextlib import suppress
 from enum import Enum
 from functools import cache
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
+from types import MethodType
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Protocol, cast
+
+from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
 if TYPE_CHECKING:
+    from collections.abc import Container
     from types import TracebackType
 
     from IPython.core.interactiveshell import InteractiveShell
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
+    from ndv.views.bases.graphics._mouseable import Mouseable
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
@@ -53,6 +58,8 @@ class GuiProvider(Protocol):
     def array_view_class() -> type[ArrayView]: ...
     @staticmethod
     def exec() -> None: ...
+    @staticmethod
+    def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]: ...
 
 
 class CanvasProvider(Protocol):
@@ -122,6 +129,55 @@ class QtProvider(GuiProvider):
 
         return QtArrayView
 
+    @staticmethod
+    def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
+        from qtpy.QtCore import QEvent, QObject
+        from qtpy.QtGui import QMouseEvent
+
+        if not isinstance(canvas, QObject):
+            raise TypeError(f"Expected canvas to be QObject, got {type(canvas)}")
+
+        class Filter(QObject):
+            def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
+                """Event filter installed on the canvas to handle mouse events.
+
+                here is where we get a chance to intercept mouse events before allowing
+                the canvas to respond to them. Return `True` to prevent the event from
+                being passed to the canvas.
+                """
+                if qevent is None:
+                    return False  # pragma: no cover
+
+                try:
+                    # use children in case backend has a subwidget stealing events.
+                    children: Container = canvas.children()
+                except RuntimeError:
+                    # native is likely dead
+                    return False
+
+                intercept = False
+                if obj is canvas or obj in children:
+                    if isinstance(qevent, QMouseEvent):
+                        pos = qevent.pos()
+                        etype = qevent.type()
+                        if etype == QEvent.Type.MouseMove:
+                            mme = MouseMoveEvent(x=pos.x(), y=pos.y())
+                            intercept |= receiver.on_mouse_move(mme)
+                            receiver.mouseMoved.emit(mme)
+                        elif etype == QEvent.Type.MouseButtonPress:
+                            mpe = MousePressEvent(x=pos.x(), y=pos.y())
+                            intercept |= receiver.on_mouse_press(mpe)
+                            receiver.mousePressed.emit(mpe)
+                        elif etype == QEvent.Type.MouseButtonRelease:
+                            mre = MouseReleaseEvent(x=pos.x(), y=pos.y())
+                            intercept |= receiver.on_mouse_release(mre)
+                            receiver.mouseReleased.emit(mre)
+                return intercept
+
+        f = Filter()
+        canvas.installEventFilter(f)
+        return lambda: canvas.removeEventFilter(f)
+
 
 class WxProvider(GuiProvider):
     """Provider for wxPython."""
@@ -156,6 +212,46 @@ class WxProvider(GuiProvider):
 
         return WxArrayView
 
+    @staticmethod
+    def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
+        from wx import EVT_LEFT_DOWN, EVT_LEFT_UP, EVT_MOTION, EvtHandler, MouseEvent
+
+        if not isinstance(canvas, EvtHandler):
+            raise TypeError(
+                f"Expected vispy canvas to be wx EvtHandler, got {type(canvas)}"
+            )
+
+        # TIP: event.Skip() allows the event to propagate to other handlers.
+
+        def on_mouse_move(event: MouseEvent) -> None:
+            mme = MouseMoveEvent(x=event.GetX(), y=event.GetY())
+            if not receiver.on_mouse_move(mme):
+                receiver.mouseMoved.emit(mme)
+                event.Skip()
+
+        def on_mouse_press(event: MouseEvent) -> None:
+            mpe = MousePressEvent(x=event.GetX(), y=event.GetY())
+            if not receiver.on_mouse_press(mpe):
+                receiver.mousePressed.emit(mpe)
+                event.Skip()
+
+        def on_mouse_release(event: MouseEvent) -> None:
+            mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY())
+            if not receiver.on_mouse_release(mre):
+                receiver.mouseReleased.emit(mre)
+                event.Skip()
+
+        canvas.Bind(EVT_MOTION, on_mouse_move)
+        canvas.Bind(EVT_LEFT_DOWN, on_mouse_press)
+        canvas.Bind(EVT_LEFT_UP, on_mouse_release)
+
+        def _unbind() -> None:
+            canvas.Unbind(EVT_MOTION, on_mouse_move)
+            canvas.Unbind(EVT_LEFT_DOWN, on_mouse_press)
+            canvas.Unbind(EVT_LEFT_UP, on_mouse_release)
+
+        return _unbind
+
 
 class JupyterProvider(GuiProvider):
     """Provider for Jupyter notebooks/lab (NOT ipython)."""
@@ -185,6 +281,38 @@ class JupyterProvider(GuiProvider):
         from ._jupyter.jupyter_view import JupyterArrayView
 
         return JupyterArrayView
+
+    @staticmethod
+    def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
+        from jupyter_rfb import RemoteFrameBuffer
+
+        if not isinstance(canvas, RemoteFrameBuffer):
+            raise TypeError(
+                f"Expected canvas to be RemoteFrameBuffer, got {type(canvas)}"
+            )
+
+        # patch the handle_event from _jupyter_rfb.CanvasBackend
+        # to intercept various mouse events.
+        super_handle_event = canvas.handle_event
+
+        def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
+            etype = ev["event_type"]
+            if etype == "pointer_move":
+                mme = MouseMoveEvent(x=ev["x"], y=ev["y"])
+                receiver.on_mouse_move(mme)
+                receiver.mouseMoved.emit(mme)
+            elif etype == "pointer_down":
+                mpe = MousePressEvent(x=ev["x"], y=ev["y"])
+                receiver.on_mouse_press(mpe)
+                receiver.mousePressed.emit(mpe)
+            elif etype == "pointer_up":
+                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"])
+                receiver.on_mouse_release(mre)
+                receiver.mouseReleased.emit(mre)
+            super_handle_event(ev)
+
+        canvas.handle_event = MethodType(handle_event, canvas)
+        return lambda: setattr(canvas, "handle_event", super_handle_event)
 
 
 class VispyProvider(CanvasProvider):
@@ -357,6 +485,24 @@ def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanv
     if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")
     return CANVAS_PROVIDERS[_backend].histogram_canvas_class()
+
+
+def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
+    """Intercept mouse events on `scene_canvas` and forward them to `receiver`.
+
+    Parameters
+    ----------
+    canvas : Any
+        The front-end canvas widget to intercept mouse events from.
+    receiver : Mouseable
+        The object to forward mouse events to.
+
+    Returns
+    -------
+    Callable[[], None]
+        A function that can be called to remove the event filter.
+    """
+    return GUI_PROVIDERS[gui_frontend()].filter_mouse_events(canvas, receiver)
 
 
 def run_app() -> None:

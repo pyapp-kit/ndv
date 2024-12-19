@@ -7,7 +7,8 @@ import numpy as np
 from vispy import scene
 
 from ndv._types import CursorType
-from ndv.views.bases import HistogramCanvas, filter_mouse_events
+from ndv.views._app import filter_mouse_events
+from ndv.views.bases import HistogramCanvas
 
 from ._plot_widget import PlotWidget
 
