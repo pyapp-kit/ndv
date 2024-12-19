@@ -59,7 +59,8 @@ class ArrayView(Viewable):
     @abstractmethod
     def remove_lut_view(self, view: LutView) -> None: ...
 
-    @abstractmethod
-    def add_histogram(self, widget: Any) -> None: ...
-    @abstractmethod
-    def remove_histogram(self, widget: Any) -> None: ...
+    def add_histogram(self, widget: Any) -> None:
+        raise NotImplementedError
+
+    def remove_histogram(self, widget: Any) -> None:
+        raise NotImplementedError
