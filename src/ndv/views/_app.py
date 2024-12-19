@@ -338,21 +338,21 @@ def canvas_backend(requested: str | None) -> CanvasBackend:
 # TODO: add a way to set the frontend via an environment variable
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
 def get_array_view_class() -> type[ArrayView]:
-    if (frontend := gui_frontend()) not in GUI_PROVIDERS:
+    if (frontend := gui_frontend()) not in GUI_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No GUI frontend found for {frontend}")
     return GUI_PROVIDERS[frontend].array_view_class()
 
 
 def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
     _backend = canvas_backend(backend)
-    if _backend not in CANVAS_PROVIDERS:
+    if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")
     return CANVAS_PROVIDERS[_backend].array_canvas_class()
 
 
 def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanvas]:
     _backend = canvas_backend(backend)
-    if _backend not in CANVAS_PROVIDERS:
+    if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")
     return CANVAS_PROVIDERS[_backend].histogram_canvas_class()
 
