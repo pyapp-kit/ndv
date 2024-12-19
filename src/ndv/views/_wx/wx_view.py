@@ -280,3 +280,9 @@ class WxArrayView(ArrayView):
             self._wxwidget.Show()
         else:
             self._wxwidget.Hide()
+
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
+        pass
+
+    def visible_axes(self) -> Sequence[AxisKey]:
+        return []
