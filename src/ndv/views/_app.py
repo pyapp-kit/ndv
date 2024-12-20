@@ -73,6 +73,10 @@ def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanv
         from ndv.views._vispy._histogram import VispyHistogramCanvas
 
         return VispyHistogramCanvas
+    if _backend == CanvasBackend.PYGFX:
+        from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
+
+        return PyGFXHistogramCanvas
     raise RuntimeError(f"Histogram not supported for backend: {_backend}")
 
 
