@@ -16,6 +16,7 @@ from vispy.util.quaternion import Quaternion
 
 from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
+from ndv.views._vispy._utils import supports_float_textures
 from ndv.views.bases import ArrayCanvas
 from ndv.views.bases.graphics._canvas_elements import (
     CanvasElement,
@@ -440,6 +441,7 @@ class VispyViewerCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
+        self._txt_fmt = "auto" if supports_float_textures() else None
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -476,7 +478,9 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
         """Add a new Image node to the scene."""
-        img = scene.visuals.Image(data, parent=self._view.scene)
+        img = scene.visuals.Image(
+            data, parent=self._view.scene, texture_format=self._txt_fmt
+        )
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
         handle = VispyImageHandle(img)
@@ -487,7 +491,10 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
         vol = scene.visuals.Volume(
-            data, parent=self._view.scene, interpolation="nearest"
+            data,
+            parent=self._view.scene,
+            interpolation="nearest",
+            texture_format=self._txt_fmt,
         )
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
