@@ -11,7 +11,8 @@ import pygfx
 import pylinalg as la
 
 from ndv._types import CursorType
-from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle, filter_mouse_events
+from ndv.views._app import filter_mouse_events
+from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -409,6 +410,10 @@ def get_canvas_class() -> WgpuCanvas:
         from wgpu.gui.jupyter import JupyterWgpuCanvas
 
         return JupyterWgpuCanvas
+    if frontend == GuiFrontend.WX:
+        from wgpu.gui.wx import WxWgpuCanvas
+
+        return WxWgpuCanvas
 
 
 class GfxArrayCanvas(ArrayCanvas):
@@ -457,7 +462,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._ndim = ndim
         if ndim == 3:
             self._camera = cam = pygfx.PerspectiveCamera(0, 1)
-            cam.show_object(self._scene, up=(0, -1, 0), view_dir=(0, 0, 1))
+            with suppress(ValueError):
+                cam.show_object(self._scene, up=(0, -1, 0), view_dir=(0, 0, 1))
             controller = pygfx.OrbitController(cam, register_events=self._renderer)
             zoom = "zoom"
             # FIXME: there is still an issue with rotational centration.

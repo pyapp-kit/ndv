@@ -12,7 +12,7 @@ from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidge
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
 
-from ndv.views import get_canvas_class
+from ndv.views import get_array_canvas_class
 
 from ._old_data_wrapper import DataWrapper
 from ._qt._components import (
@@ -187,7 +187,7 @@ class NDViewer(QWidget):
         # place to display arbitrary text
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
-        self._canvas: ArrayCanvas = get_canvas_class()()
+        self._canvas: ArrayCanvas = get_array_canvas_class()()
         self._canvas.set_ndim(self._ndims)
         self._qcanvas = self._canvas.frontend_widget()
 
