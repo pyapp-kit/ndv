@@ -1,23 +1,28 @@
 from __future__ import annotations
 
+import warnings
+from contextlib import suppress
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pygfx
-from fastplotlib import Figure
-from fastplotlib.graphics import LineGraphic
-from fastplotlib.graphics._base import Graphic
-from fastplotlib.graphics.selectors import LinearRegionSelector
-from pygfx.controllers import PanZoomController
+import pylinalg as la
 
+from ndv._types import CursorType, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 from ndv.views.bases import HistogramCanvas
+from ndv.views._app import filter_mouse_events
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import TypeAlias
 
     import cmap
     import numpy.typing as npt
+    from wgpu.gui.jupyter import JupyterWgpuCanvas
+    from wgpu.gui.qt import QWgpuCanvas
+
+    WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas
 
 
 class Grabbable(Enum):
@@ -27,113 +32,26 @@ class Grabbable(Enum):
     GAMMA = auto()
 
 
-class PanZoom1DController(PanZoomController):
-    """A PanZoomController that locks one axis."""
+def get_canvas_class() -> WgpuCanvas:
+    from ndv.views._app import GuiFrontend, gui_frontend
 
-    _zeros = np.zeros(3)
+    frontend = gui_frontend()
+    if frontend == GuiFrontend.QT:
+        from qtpy.QtCore import QSize
+        from wgpu.gui import qt
 
-    def _update_pan(self, delta: tuple, *, vecx: Any, vecy: Any) -> None:
-        super()._update_pan(delta, vecx=vecx, vecy=self._zeros)
+        class QWgpuCanvas(qt.QWgpuCanvas):
+            def installEventFilter(self, filter: Any) -> None:
+                self._subwidget.installEventFilter(filter)
 
-    def _update_zoom(self, delta: tuple, *, vecx: Any, vecy: Any) -> None:
-        super()._update_zoom(delta, vecx=vecx, vecy=self._zeros)
+            def sizeHint(self) -> QSize:
+                return QSize(self.width(), self.height())
 
+        return QWgpuCanvas
+    if frontend == GuiFrontend.JUPYTER:
+        from wgpu.gui.jupyter import JupyterWgpuCanvas
 
-class HistogramGraphic(Graphic):
-    def __init__(
-        self,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(**kwargs)
-        self._group = pygfx.Group()
-        self._set_world_object(self._group)
-        self._vmin = -10
-        self._vmax = 10
-        # FIXME: Avoid hardcoded data
-        # TODO: Can you change the size of a line?
-        self._line = LineGraphic(np.zeros((131074, 3)))
-        self._group.add(self._line.world_object)
-        self._clims = LinearRegionSelector(
-            selection=[-5, 5],
-            limits=[0, 65536],
-            center=0,
-            size=0,
-            axis="x",
-            edge_thickness=8,
-            resizable=True,
-            parent=self,
-        )
-        # there will be a small difference with the histogram edges so this makes
-        # them both line up exactly
-        self._clims.selection = (
-            self._vmin,
-            self._vmax,
-        )
-        self._group.add(self._clims.world_object)
-
-    def _create_line(self, n: int) -> None:
-        if self._line:
-            self._group.remove(self._line.world_object)
-
-    def _fpl_add_plot_area_hook(self, plot_area) -> None:
-        self._plot_area = plot_area
-        self._clims._fpl_add_plot_area_hook(plot_area)
-        self._line._fpl_add_plot_area_hook(plot_area)
-        self._plot_area.auto_scale()
-        self._plot_area.controller.enabled = True
-
-    @property
-    def vmin(self) -> float:
-        return self._vmin
-
-    @vmin.setter
-    def vmin(self, value: float) -> None:
-        # with pause_events(self.image_graphic, self._clims):
-        # must use world coordinate values directly from selection()
-        # otherwise the linear region bounds jump to the closest bin edges
-        self._clims.selection = (
-            value * self._scale_factor,
-            self._clims.selection[1],
-        )
-        self.image_graphic.vmin = value
-        self._vmin = value
-        if self._colorbar is not None:
-            self._colorbar.vmin = value
-        vmin_str, vmax_str = self._get_vmin_vmax_str()
-        self._text_vmin.offset = (-120, self._clims.selection[0], 0)
-        self._text_vmin.text = vmin_str
-
-    @property
-    def vmax(self) -> float:
-        return self._vmax
-
-    @vmax.setter
-    def vmax(self, value: float) -> None:
-        # with pause_events(self.image_graphic, self._clims):
-        # must use world coordinate values directly from selection()
-        # otherwise the linear region bounds jump to the closest bin edges
-        self._clims.selection = (
-            self._clims.selection[0],
-            value * self._scale_factor,
-        )
-        self.image_graphic.vmax = value
-        self._vmax = value
-        if self._colorbar is not None:
-            self._colorbar.vmax = value
-        vmin_str, vmax_str = self._get_vmin_vmax_str()
-        self._text_vmax.offset = (-120, self._clims.selection[1], 0)
-        self._text_vmax.text = vmax_str
-
-    def set_data(self, values: np.ndarray, bin_edges: np.ndarray) -> None:
-        self._line.data[:, 0] = np.repeat(bin_edges, 2)  # xs
-        self._line.data[0, 1] = self._line.data[21, 1] = 0
-        self._line.data[1:-1, 1] = np.repeat(values, 2)  # xs
-        self._clims.limits = [bin_edges[0], bin_edges[-1]]
-        height = values.max() * 0.98
-        self._clims.fill.geometry = pygfx.box_geometry(1, height, 1)
-        self._clims.edges[0].geometry.positions.data[:, 1] = [height / 2, -height / 2]
-        self._clims.edges[1].geometry.positions.data[:, 1] = [height / 2, -height / 2]
-        self._clims.offset = [0, height / 2, 0]
+        return JupyterWgpuCanvas
 
 
 class PyGFXHistogramCanvas(HistogramCanvas):
@@ -157,28 +75,153 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._domain: tuple[float, float] | None = None
         # The values of the bottom and top edges on the canvas (respectively)
         self._range: tuple[float, float] | None = None
+        # Canvas Margins, in pixels (around the data)
+        # TODO: Computation might better support different displays
+        self.margin_left = 50  # Provide room for y-axis ticks
+        self.margin_bottom = 20  # Provide room for x-axis ticks
+        self.margin_right = 10
+        self.margin_top = 15
 
         # ------------ VisPy Canvas ------------ #
+        cls = get_canvas_class()
+        self._canvas = cls(size=(600, 600))
 
-        self._figure = Figure()
-        self._figure[0, 0].camera.maintain_aspect = False
-        self._figure[0, 0].controller = PanZoom1DController()
-        self._figure[0, 0].toolbar = False
+        # this filter needs to remain in scope for the lifetime of the canvas
+        # or mouse events will not be intercepted
+        # the returned function can be called to remove the filter, (and it also
+        # closes on the event filter and keeps it in scope).
+        self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
-        # self._disconnect_mouse_events = filter_mouse_events(self._canvas.native, self)
+        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas, show_fps=True)
 
-        ## -- Visuals -- ##
+        try:
+            # requires https://github.com/pygfx/pygfx/pull/752
+            self._renderer.blend_mode = "additive"
+        except ValueError:
+            warnings.warn(
+                "This version of pygfx does not yet support additive blending.",
+                stacklevel=3,
+            )
+            self._renderer.blend_mode = "weighted_depth"
 
-        self._graphic = HistogramGraphic()
-        self._figure[0, 0].add_graphic(self._graphic)
+        self._scene = pygfx.Scene()
+        self._viewport = pygfx.Viewport(self._renderer)
+        self._camera: pygfx.OrthographicCamera = pygfx.OrthographicCamera()
+        self._camera.maintain_aspect = False
 
-        self._graphic._clims.add_event_handler(self._on_view_clims_changed, "selection")
+        self._histogram = pygfx.Mesh(
+            geometry=pygfx.Geometry(
+                # NB placeholder arrays
+                positions=np.zeros((1, 3), dtype=np.float32),
+                indices=np.zeros((1, 3), dtype=np.uint16),
+            ),
+            material=pygfx.MeshBasicMaterial(color=(1, 1, 1, 1)),
+        )
+        self._scene.add(self._histogram)
+
+        clim_npoints = 256
+        self._clim_handles = pygfx.Line(
+            geometry=pygfx.Geometry(
+                positions=self._generate_clim_positions(clim_npoints),
+                colors=self._generate_clim_colors(clim_npoints),
+            ),
+            material=pygfx.LineMaterial(
+                color=(1.0, 0.0, 0.0),
+                color_mode="vertex",
+            ),
+        )
+        # TODO: Refactor method
+        # self._update_lut_lines()
+        self._scene.add(self._clim_handles)
+
+        self._x = pygfx.Ruler(
+            start_pos=(0, 0, 0),
+            end_pos=(1, 0, 0),
+            start_value=0,
+            tick_format="",  # Avoid scientific notation
+            tick_side="right",
+        )
+        self._y = pygfx.Ruler(
+            start_pos=(0, 0, 0),
+            end_pos=(0, 1, 0),
+            start_value=0,
+            tick_side="left",
+            ticks_at_end_points=True,
+        )
+        self._scene.add(self._x, self._y)
+
+        self.refresh()
 
     def refresh(self) -> None:
-        # with suppress(AttributeError):
-        #     self._canvas.update()
-        # self._canvas.request_draw(self._animate)
-        pass
+        with suppress(AttributeError):
+            self._canvas.update()
+        self._canvas.request_draw(self._animate)
+
+    def _resize(self) -> None:
+        # Construct the bounding box
+        bb = np.zeros([2, 2])
+        # Priority is given to user range specifications
+        # If the user does not specify the data display range,
+        # display the extent of the data if it exists
+        if self._domain:
+            # User-specified
+            bb[:, 0] = self._domain
+        elif self._bin_edges is not None:
+            # Data-specified
+            bb[:, 0] = (self._bin_edges[0], self._bin_edges[-1])
+        else:
+            # Default
+            bb[:, 0] = (0, 1)
+        if self._range:
+            # User-specified
+            bb[:, 1] = self._range
+        else:
+            # Data-specified/default
+            bb[:, 1] = (0, self._clim_handles.local.scale_y)
+
+        # Update camera
+        # NB this is tricky because the axis tick sizes are specified in pixels.
+        px_width, px_height = self._viewport.logical_size
+        world_width, world_height = np.ptp(bb, axis=0)
+        # 2D Plot layout:
+        #
+        #         c0                c1               c2
+        #     +-------------+-----------------+---------------+
+        #  r0 |             | margin_top      |               |
+        #     |-------------+-----------------+---------------+
+        #  r1 | margin_left | data            | margin_right  |
+        #     |-------------+-----------------+---------------+
+        #  r2 |             | margin_bottom   |               |
+        #     |-------------+-----------------+---------------+
+        #
+        width_frac = px_width / (px_width - self.margin_left - self.margin_right)
+        self._camera.width = world_width * width_frac
+
+        height_frac = px_height / (px_height - self.margin_top - self.margin_bottom)
+        self._camera.height = world_height * height_frac
+
+        self._camera.local.position = [
+            world_width * (1 - (px_width / 2 / (px_width - self.margin_left))),
+            world_height * (1 - (px_height / 2 / (px_height - self.margin_bottom))),
+            0,
+        ]
+
+        # Update rulers
+        self._x.start_pos = [bb[0, 0], bb[0, 1], 0]
+        self._x.end_pos = [bb[1, 0], bb[0, 1], 0]
+
+        self._y.start_pos = [bb[0, 0], bb[0, 1], 0]
+        self._y.end_pos = [bb[0, 0], bb[1, 1], 0]
+        # TODO For short canvases, pygfx has a tough time assigning ticks.
+        # For lack of a more thorough dive/fix, just mark the maximum of the histogram
+        self._y.min_tick_distance = bb[1, 1]
+
+    def _animate(self) -> None:
+        self._x.update(self._camera, self._viewport.logical_size)
+        self._y.update(self._camera, self._viewport.logical_size)
+
+        # Update viewport
+        self._viewport.render(self._scene, self._camera, flush=True)
 
     def set_visible(self, visible: bool) -> None: ...
 
@@ -190,29 +233,33 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         pass
 
     def set_channel_visible(self, visible: bool) -> None:
-        # TODO
-        pass
-        # self._lut_line.visible = visible
-        # self._gamma_handle.visible = visible
+        self._clim_handles.visible = visible
+        self.refresh()
 
     def set_colormap(self, lut: cmap.Colormap) -> None:
-        # TODO
-        return
-        if self._hist_mesh is not None:
-            self._hist_mesh.color = lut.color_stops[-1].color.hex
+        self._histogram.material.color = lut.color_stops[-1].color.hex
+        self.refresh()
 
     def set_gamma(self, gamma: float) -> None:
-        # TODO
-        return
-        if gamma < 0:
-            raise ValueError("gamma must be non-negative!")
-        self._gamma = gamma
-        self._update_lut_lines()
+        # TODO: Support gamma
+        if gamma != self._gamma:
+            return
+        raise NotImplementedError("Setting gamma in PyGFX not yet supported")
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        # TODO
-        self._graphic._clims.selection = clims
-        return
+        self._clims = clims
+        # Move clims line via translate/scale
+        # NB relies on position data lying within [0, 1]
+        # Translate by minimum
+        _, off_y, off_z = self._clim_handles.local.position
+        self._clim_handles.local.position = clims[0], off_y, off_z
+        # Scale by (maximum - minimum)
+        diff = clims[1] - clims[0]
+        diff = diff if abs(diff) > 1e-6 else 1e-6
+        self._clim_handles.local.scale_x = diff
+
+        # Redraw
+        self.refresh()
 
     def set_auto_scale(self, autoscale: bool) -> None:
         # Nothing to do (yet)
@@ -225,9 +272,30 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         These inputs follow the same format as the return value of numpy.histogram.
         """
+        # Convert values/bins to vertices/faces
         self._values, self._bin_edges = values, bin_edges
-        self._graphic.set_data(values, bin_edges)
-        self._figure[0, 0].auto_scale()
+        verts, faces = _hist_counts_to_mesh(
+            self._values, self._bin_edges, self._vertical
+        )
+
+        # Number of bins unchanged - reuse existing geometry for performance
+        if (
+            verts.shape == self._histogram.geometry.positions.data.shape
+            and faces.shape == self._histogram.geometry.indices.data.shape
+        ):
+            self._histogram.geometry.positions.data[:, :] = verts
+            self._histogram.geometry.positions.update_range()
+
+            self._histogram.geometry.indices.data[:, :] = faces
+            self._histogram.geometry.indices.update_range()
+        # Number of bins changed - must create new geometry
+        else:
+            self._histogram.geometry = pygfx.Geometry(positions=verts, indices=faces)
+
+        self._clim_handles.local.scale_y = values.max() / 0.98
+
+        self._resize()
+        self.refresh()
 
     def set_range(
         self,
@@ -236,220 +304,207 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         z: tuple[float, float] | None = None,
         margin: float = 0,
     ) -> None:
-        # TODO:
-        return
-        if x:
-            if x[0] > x[1]:
-                x = (x[1], x[0])
-        elif self._bin_edges is not None:
-            x = self._bin_edges[0], self._bin_edges[-1]
-        if y:
-            if y[0] > y[1]:
-                y = (y[1], y[0])
-        elif self._values is not None:
-            y = (0, np.max(self._values))
-        self._range = y
+        """Update the range of the PanZoomCamera.
+
+        When called with no arguments, the range is set to the full extent of the data.
+        """
+        if not self._scene.children or self._camera is None:
+            return
         self._domain = x
+        self._range = y
+        if margin != 0:
+            raise NotImplementedError("Nonzero margins not currently implemented")
+
         self._resize()
+        self.refresh()
+        return
 
     def set_vertical(self, vertical: bool) -> None:
         # TODO:
-        return
-        self._vertical = vertical
-        self._update_histogram()
-        self.plot.lock_axis("x" if vertical else "y")
-        # When vertical, smaller values should appear at the top of the canvas
-        self.plot.camera.flip = [False, vertical, False]
-        self._update_lut_lines()
-        self._resize()
+        raise NotImplementedError()
 
     def set_log_base(self, base: float | None) -> None:
         # TODO:
-        return
-        if base != self._log_base:
-            self._log_base = base
-            self._update_histogram()
-            self._update_lut_lines()
-            self._resize()
+        raise NotImplementedError()
 
     def frontend_widget(self) -> Any:
-        return self._figure.show()
+        return self._canvas
+
+    def elements_at(self, pos_xy: tuple[float, float]) -> list:
+        raise NotImplementedError()
+
+    # ------------- Private methods ------------- #
+
+    def _generate_clim_positions(self, npoints: int = 256) -> np.ndarray:
+        clims = [0, 1]
+
+        # 2 additional points for each of the two vertical clims lines
+        X = np.empty(npoints + 4)
+        Y = np.empty(npoints + 4)
+        Z = np.zeros(npoints + 4)
+        if self._vertical:
+            # clims lines
+            X[0:2], Y[0:2] = (1, 0.5), clims[0]
+            X[-2:], Y[-2:] = (0.5, 0), clims[1]
+            # gamma line
+            X[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
+            Y[2:-2] = np.linspace(clims[0], clims[1], npoints)
+            np.array([(2**-self._gamma, np.mean(clims))])
+        else:
+            # clims lines
+            X[0:2], Y[0:2] = clims[0], (1, 0.5)
+            X[-2:], Y[-2:] = clims[1], (0.5, 0)
+            # gamma line
+            X[2:-2] = np.linspace(clims[0], clims[1], npoints)
+            Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
+            np.array([(np.mean(clims), 2**-self._gamma)])
+
+        return np.vstack((X, Y, Z), dtype=np.float32).transpose()
+
+    def _generate_clim_colors(self, npoints: int) -> np.ndarray:
+        # Gamma curve intensity between 0.2 and 0.8
+        color = (
+            np.linspace(0.2, 0.8, npoints + 4, dtype=np.float32)
+            .repeat(4)
+            .reshape(-1, 4)
+        )
+        # The entire line should be opaque
+        color[:, 3] = 1
+        # Clims intensity between 0.4 and 0.7
+        c1, c2 = [0.4] * 3, [0.7] * 3
+        color[0:3, :3] = [c1, c2, c1]
+        color[-3:, :3] = [c1, c2, c1]
+
+        return color
+
+    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+        nearby = self._find_nearby_node(pos)
+
+        if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
+            return CursorType.V_ARROW if self._vertical else CursorType.H_ARROW
+        elif nearby is Grabbable.GAMMA:
+            return CursorType.H_ARROW if self._vertical else CursorType.V_ARROW
+        else:
+            x, y = pos
+            x_max, y_max = self._viewport.logical_size
+            if (0 < x <= x_max) and (0 <= y <= y_max):
+                return CursorType.ALL_ARROW
+            else:
+                return CursorType.DEFAULT
+
+    def on_mouse_press(self, event: MousePressEvent) -> bool:
+        pos = event.x, event.y
+        # check whether the user grabbed a node
+        self._grabbed = self._find_nearby_node(pos)
+        return False
+
+    def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
+        self._grabbed = Grabbable.NONE
+        return False
+
+    def on_mouse_move(self, event: MouseMoveEvent) -> bool:
+        """Called whenever mouse moves over canvas."""
+        pos = event.x, event.y
+        if self._clims is None:
+            return False  # pragma: no cover
+
+        if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
+            c = self.canvas_to_world(pos)[1 if self._vertical else 0]
+            if self._grabbed is Grabbable.LEFT_CLIM:
+                # The left clim must stay to the left of the right clim
+                new_left = min(c, self._clims[1])
+                # ...and no less than the minimum value
+                if self._bin_edges is not None:
+                    new_left = max(new_left, self._bin_edges[0])
+                newlims = (new_left, self._clims[1])
+            elif self._grabbed is Grabbable.RIGHT_CLIM:
+                # The right clim must stay to the right of the left clim
+                new_right = max(self._clims[0], c)
+                # ...and no more than the minimum value
+                if self._bin_edges is not None:
+                    new_right = min(new_right, self._bin_edges[-1])
+                newlims = (self._clims[0], new_right)
+            self.climsChanged.emit(newlims)
+            return False
+
+        self.get_cursor(pos).apply_to(self)
+        return False
+
+    def _find_nearby_node(
+        self, pos: tuple[float, float], tolerance: int = 5
+    ) -> Grabbable:
+        """Describes whether the event is near a clim."""
+        click_x, click_y = pos
+
+        # NB Computations are performed in canvas-space
+        # for easier tolerance computation.
+        plot_to_canvas = self.world_to_canvas
+        # gamma_to_plot = self._handle_transform.map
+
+        if self._clims is not None:
+            if self._vertical:
+                click = click_y
+                right = plot_to_canvas((0, self._clims[1], 0))[1]
+                left = plot_to_canvas((0, self._clims[0], 0))[1]
+            else:
+                click = click_x
+                right = plot_to_canvas((self._clims[1], 0, 0))[0]
+                left = plot_to_canvas((self._clims[0], 0, 0))[0]
+
+            # Right bound always selected on overlap
+            if bool(abs(right - click) < tolerance):
+                return Grabbable.RIGHT_CLIM
+            if bool(abs(left - click) < tolerance):
+                return Grabbable.LEFT_CLIM
+
+        return Grabbable.NONE
+
+    def world_to_canvas(
+        self, pos_xyz: tuple[float, float, float]
+    ) -> tuple[float, float]:
+        """Map XYZ coordinate in world space to XY canvas position (pixels)."""
+        # Code adapted from:
+        # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR420
+        screen_space = pygfx.utils.transform.AffineTransform()
+        screen_space.position = (-1, 1, 0)
+        x_d, y_d = self._viewport.logical_size
+        screen_space.scale = (2 / x_d, -2 / y_d, 1)
+        ndc_to_screen = screen_space.inverse_matrix
+        canvas_pos = la.vec_transform(
+            pos_xyz, ndc_to_screen @ self._camera.camera_matrix
+        )
+        return (canvas_pos[0], canvas_pos[1])
 
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
-        raise NotImplementedError
+        # Code adapted from:
+        # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR395
+        # Get position relative to viewport
+        pos_rel = (
+            pos_xy[0] - self._viewport.rect[0],
+            pos_xy[1] - self._viewport.rect[1],
+        )
 
-    def elements_at(self, pos_xy: tuple[float, float]) -> list:
-        raise NotImplementedError
+        vs = self._viewport.logical_size
 
-    # ------------- Private methods ------------- #
+        # Convert position to NDC
+        x = pos_rel[0] / vs[0] * 2 - 1
+        y = -(pos_rel[1] / vs[1] * 2 - 1)
+        pos_ndc = (x, y, 0)
 
-    def _on_view_clims_changed(self, ev) -> None:
-        selection = self._graphic._clims.selection
-        self.climsChanged.emit(selection)
+        if self._camera:
+            pos_ndc += la.vec_transform(
+                self._camera.world.position, self._camera.camera_matrix
+            )
+            pos_world = la.vec_unproject(pos_ndc[:2], self._camera.camera_matrix)
 
-    # def _update_lut_lines(self, npoints: int = 256) -> None:
-    #     if self._clims is None or self._gamma is None:
-    #         return  # pragma: no cover
-
-    #     # 2 additional points for each of the two vertical clims lines
-    #     X = np.empty(npoints + 4)
-    #     Y = np.empty(npoints + 4)
-    #     if self._vertical:
-    #         # clims lines
-    #         X[0:2], Y[0:2] = (1, 0.5), self._clims[0]
-    #         X[-2:], Y[-2:] = (0.5, 0), self._clims[1]
-    #         # gamma line
-    #         X[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
-    #         Y[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
-    #         midpoint = np.array([(2**-self._gamma, np.mean(self._clims))])
-    #     else:
-    #         # clims lines
-    #         X[0:2], Y[0:2] = self._clims[0], (1, 0.5)
-    #         X[-2:], Y[-2:] = self._clims[1], (0.5, 0)
-    #         # gamma line
-    #         X[2:-2] = np.linspace(self._clims[0], self._clims[1], npoints)
-    #         Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
-    #         midpoint = np.array([(np.mean(self._clims), 2**-self._gamma)])
-
-    #     # TODO: Move to self.edit_cmap
-    #     color = np.linspace(0.2, 0.8, npoints + 4).repeat(4).reshape(-1, 4)
-    #     c1, c2 = [0.4] * 4, [0.7] * 4
-    #     color[0:3] = [c1, c2, c1]
-    #     color[-3:] = [c1, c2, c1]
-
-    #     self._lut_line.set_data((X, Y), marker_size=0, color=color)
-
-    #     self._gamma_handle_pos[:] = midpoint[0]
-    #     self._gamma_handle.set_data(pos=self._gamma_handle_pos)
-
-    #     # FIXME: These should be called internally upon set_data, right?
-    #     # Looks like https://github.com/vispy/vispy/issues/1899
-    #     self._lut_line._bounds_changed()
-    #     for v in self._lut_line._subvisuals:
-    #         v._bounds_changed()
-    #     self._gamma_handle._bounds_changed()
-
-    # def get_cursor(self, pos: tuple[float, float]) -> CursorType:
-    #     nearby = self._find_nearby_node(pos)
-
-    #     if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
-    #         return CursorType.V_ARROW if self._vertical else CursorType.H_ARROW
-    #     elif nearby is Grabbable.GAMMA:
-    #         return CursorType.H_ARROW if self._vertical else CursorType.V_ARROW
-    #     else:
-    #         x, y = self._to_plot_coords(pos)
-    #         x1, x2 = self.plot.xaxis.axis.domain
-    #         y1, y2 = self.plot.yaxis.axis.domain
-    #         if (x1 < x <= x2) and (y1 <= y <= y2):
-    #             return CursorType.ALL_ARROW
-    #         else:
-    #             return CursorType.DEFAULT
-
-    # def on_mouse_press(self, event: MousePressEvent) -> bool:
-    #     pos = event.x, event.y
-    #     # check whether the user grabbed a node
-    #     self._grabbed = self._find_nearby_node(pos)
-    #     if self._grabbed != Grabbable.NONE:
-    #         # disconnect the pan/zoom mouse events until handle is dropped
-    #         self.plot.camera.interactive = False
-    #     return False
-
-    # def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
-    #     self._grabbed = Grabbable.NONE
-    #     self.plot.camera.interactive = True
-    #     return False
-
-    # def on_mouse_move(self, event: MouseMoveEvent) -> bool:
-    #     """Called whenever mouse moves over canvas."""
-    #     pos = event.x, event.y
-    #     if self._clims is None:
-    #         return False  # pragma: no cover
-
-    #     if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
-    #         if self._vertical:
-    #             c = self._to_plot_coords(pos)[1]
-    #         else:
-    #             c = self._to_plot_coords(pos)[0]
-    #         if self._grabbed is Grabbable.LEFT_CLIM:
-    #             newlims = (min(self._clims[1], c), self._clims[1])
-    #         elif self._grabbed is Grabbable.RIGHT_CLIM:
-    #             newlims = (self._clims[0], max(self._clims[0], c))
-    #         self.climsChanged.emit(newlims)
-    #         return False
-
-    #     if self._grabbed is Grabbable.GAMMA:
-    #         y0, y1 = (
-    #             self.plot.xaxis.axis.domain
-    #             if self._vertical
-    #             else self.plot.yaxis.axis.domain
-    #         )
-    #         y = self._to_plot_coords(pos)[0 if self._vertical else 1]
-    #         if y < np.maximum(y0, 0) or y > y1:
-    #             return False
-    #         self.gammaChanged.emit(-np.log2(y / y1))
-    #         return False
-
-    #     self.get_cursor(pos).apply_to(self)
-    #     return False
-
-    # def _find_nearby_node(
-    #     self, pos: tuple[float, float], tolerance: int = 5
-    # ) -> Grabbable:
-    #     """Describes whether the event is near a clim."""
-    #     click_x, click_y = pos
-
-    #     # NB Computations are performed in canvas-space
-    #     # for easier tolerance computation.
-    #     plot_to_canvas = self.node_tform.imap
-    #     gamma_to_plot = self._handle_transform.map
-
-    #     if self._clims is not None:
-    #         if self._vertical:
-    #             click = click_y
-    #             right = plot_to_canvas([0, self._clims[1]])[1]
-    #             left = plot_to_canvas([0, self._clims[0]])[1]
-    #         else:
-    #             click = click_x
-    #             right = plot_to_canvas([self._clims[1], 0])[0]
-    #             left = plot_to_canvas([self._clims[0], 0])[0]
-
-    #         # Right bound always selected on overlap
-    #         if bool(abs(right - click) < tolerance):
-    #             return Grabbable.RIGHT_CLIM
-    #         if bool(abs(left - click) < tolerance):
-    #             return Grabbable.LEFT_CLIM
-
-    #     if self._gamma_handle_pos is not None:
-    #         gx, gy = plot_to_canvas(gamma_to_plot(self._gamma_handle_pos[0]))[:2]
-    #         if bool(abs(gx - click_x) < tolerance and abs(gy - click_y) < tolerance):
-    #             return Grabbable.GAMMA
-
-    #     return Grabbable.NONE
-
-    # def _to_plot_coords(self, pos: Sequence[float]) -> tuple[float, float]:
-    #     """Return the plot coordinates of the given position."""
-    #     x, y = self.node_tform.map(pos)[:2]
-    #     return x, y
-
-    # def _resize(self) -> None:
-    #     self.plot.camera.set_range(
-    #         x=self._range if self._vertical else self._domain,
-    #         y=self._domain if self._vertical else self._range,
-    #         # FIXME: Bitten by https://github.com/vispy/vispy/issues/1483
-    #         # It's pretty visible in logarithmic mode
-    #         margin=1e-30,
-    #     )
-    #     if self._vertical:
-    #         scale = 0.98 * self.plot.xaxis.axis.domain[1]
-    #         self._handle_transform.scale = (scale, 1)
-    #     else:
-    #         scale = 0.98 * self.plot.yaxis.axis.domain[1]
-    #         self._handle_transform.scale = (1, scale)
-
-    # def setVisible(self, visible: bool) -> None: ...
+            # NB In vispy, (0.5,0.5) is a center of an image pixel, while in pygfx
+            # (0,0) is the center. We conform to vispy's standard.
+            return (pos_world[0] + 0.5, pos_world[1] + 0.5, pos_world[2] + 0.5)
+        else:
+            return (-1, -1, -1)
 
 
 def _hist_counts_to_mesh(
