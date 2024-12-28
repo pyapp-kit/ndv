@@ -1,9 +1,14 @@
 """Example usage of new mvc pattern."""
 
+import os
+
 import numpy as np
 
 from ndv import data, run_app
 from ndv.controller import ViewerController
+
+# os.environ["NDV_CANVAS_BACKEND"] = "vispy"
+os.environ["NDV_CANVAS_BACKEND"] = "pygfx"
 
 viewer = ViewerController()
 
