@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def _opengl_context() -> Iterator[None]:
     """Assure we are running with a valid OpenGL context.
 
-    Only create a Canvas is one doesn't exist. Creating and closing a
+    Only create a Canvas if one doesn't exist. Creating and closing a
     Canvas causes vispy to process Qt events which can cause problems.
     Ideally call opengl_context() on start after creating your first
     Canvas. However it will work either way.
