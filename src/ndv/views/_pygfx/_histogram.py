@@ -130,8 +130,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 color_mode="vertex",
             ),
         )
-        # TODO: Refactor method
-        # self._update_lut_lines()
         self._scene.add(self._clim_handles)
 
         self._x = pygfx.Ruler(
@@ -148,6 +146,16 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             tick_side="left",
         )
         self._scene.add(self._x, self._y)
+
+        # TODO: Re-implement pan/zoom?
+        controller = pygfx.PanZoomController(register_events=self._viewport)
+        controller.add_camera(
+            self._camera,
+            include_state={"x", "width"},
+        )
+        self._controller = controller
+        # increase zoom wheel gain
+        self._controller.controls.update({"wheel": ("zoom_to_point", "push", -0.005)})
 
         self.refresh()
 
@@ -399,10 +407,14 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         pos = event.x, event.y
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(pos)
+        if self._grabbed != Grabbable.NONE:
+            # disconnect pan/zoom events until handle is dropped
+            self._controller.enabled = False
         return False
 
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
+        self._controller.enabled = True
         return False
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
