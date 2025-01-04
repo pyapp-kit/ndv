@@ -60,7 +60,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
     def __init__(self, *, vertical: bool = False) -> None:
         # ------------ data and state ------------ #
 
-        self._values: Sequence[float] | np.ndarray | None = None
+        self._values: np.ndarray | None = None
         self._bin_edges: Sequence[float] | np.ndarray | None = None
         self._clims: tuple[float, float] | None = None
         self._gamma: float = 1
@@ -146,7 +146,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             end_pos=(0, 1, 0),
             start_value=0,
             tick_side="left",
-            ticks_at_end_points=True,
         )
         self._scene.add(self._x, self._y)
 
@@ -214,7 +213,11 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._y.end_pos = [bb[0, 0], bb[1, 1], 0]
         # TODO For short canvases, pygfx has a tough time assigning ticks.
         # For lack of a more thorough dive/fix, just mark the maximum of the histogram
-        self._y.min_tick_distance = bb[1, 1]
+        if self._values is not None:
+            self._y.ticks = [int(self._values.max())]
+        else:
+            self._y.ticks = bb[1, 1]
+        self._y.min_tick_distance = bb[1, 1]  # Prevents any other ticks
 
     def _animate(self) -> None:
         self._x.update(self._camera, self._viewport.logical_size)
