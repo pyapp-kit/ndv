@@ -480,6 +480,7 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
         """Add a new Image node to the scene."""
+        data = _downcast(data)
         img = scene.visuals.Image(data, parent=self._view.scene)
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
@@ -490,6 +491,7 @@ class VispyViewerCanvas(ArrayCanvas):
         return handle
 
     def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
+        data = _downcast(data)
         vol = scene.visuals.Volume(
             data, parent=self._view.scene, interpolation="nearest"
         )
@@ -580,3 +582,12 @@ class VispyViewerCanvas(ArrayCanvas):
             if (handle := self._elements.get(vis)) is not None:
                 elements.append(handle)
         return elements
+
+
+def _downcast(data: np.ndarray | None) -> np.ndarray | None:
+    """Downcast >32bit data to 32bit."""
+    # downcast to 32bit, preserving int/float
+    if data is not None and data.dtype.itemsize > 4:
+        d32b = np.int32 if np.issubdtype(data.dtype, np.integer) else np.float32
+        data = data.astype(d32b)
+    return data

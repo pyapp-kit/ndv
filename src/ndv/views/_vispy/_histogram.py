@@ -111,6 +111,10 @@ class VispyHistogramCanvas(HistogramCanvas):
 
     def set_visible(self, visible: bool) -> None: ...
 
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()
+
     # ------------- LutView Protocol methods ------------- #
 
     def set_channel_name(self, name: str) -> None:

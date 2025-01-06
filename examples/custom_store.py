@@ -4,34 +4,48 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+import ndv.models
 import ndv.v1
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping
+    from collections.abc import Hashable, Mapping, Sequence
 
 
 class MyArrayThing:
+    """Some custom data type that we want to visualize."""
+
     def __init__(self, shape: tuple[int, ...]) -> None:
         self.shape = shape
-        self._data = np.random.randint(0, 256, shape)
+        self._data = np.random.randint(0, 256, shape).astype(np.uint16)
 
     def __getitem__(self, item: Any) -> np.ndarray:
         return self._data[item]  # type: ignore [no-any-return]
 
 
-class MyWrapper(ndv.v1.DataWrapper[MyArrayThing]):
+class MyWrapper(ndv.models.DataWrapper[MyArrayThing]):
     @classmethod
     def supports(cls, data: Any) -> bool:
+        """Return True if the data is supported by this wrapper"""
         if isinstance(data, MyArrayThing):
             return True
         return False
 
-    def sizes(self) -> dict[Hashable, int]:
-        """Return a mapping of {dim: size} for the data"""
-        return {f"dim_{k}": v for k, v in enumerate(self.data.shape)}
+    @property
+    def dims(self) -> tuple[Hashable, ...]:
+        """Return the dimensions of the data"""
+        return tuple(f"dim_{k}" for k in range(len(self.data.shape)))
+
+    @property
+    def coords(self) -> dict[Hashable, Sequence]:
+        """Return a mapping of {dim: coords} for the data"""
+        return {f"dim_{k}": range(v) for k, v in enumerate(self.data.shape)}
 
     def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
-        """Convert mapping of {dim: index} to conventional indexing"""
+        """Select a subset of the data.
+
+        `indexers` is a mapping of {dim: index} where index is either an integer or a
+        slice.
+        """
         idx = tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
         return self.data[idx]
 
