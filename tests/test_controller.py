@@ -49,11 +49,12 @@ def _patch_views(f: Callable) -> Callable:
 @_patch_views
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
-    data = np.empty(SHAPE)
     ctrl = ViewerController()
     model = ctrl.display_model
     mock_view = ctrl.view
+    mock_view.create_sliders.assert_not_called()
 
+    data = np.empty(SHAPE)
     ctrl.data = data
     wrapper = ctrl._model.data_wrapper
 

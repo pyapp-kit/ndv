@@ -19,11 +19,6 @@ if TYPE_CHECKING:
     LutKey: TypeAlias = int | None
 
 
-# (probably rename to something like just Viewer...
-# or compose all three of the model/view/controller into a single class
-# that exposes the public interface)
-
-
 class ViewerController:
     """The controller mostly manages the connection between the model and the view.
 
@@ -57,7 +52,8 @@ class ViewerController:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
-        self._fully_synchronize_view()
+        if self._model.data_wrapper is not None:
+            self._fully_synchronize_view()
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
