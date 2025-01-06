@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 from qtpy.QtCore import Qt, Signal
 from qtpy.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -14,13 +15,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from superqt import (
-    QCollapsible,
-    QElidingLabel,
-    QEnumComboBox,
-    QLabeledRangeSlider,
-    QLabeledSlider,
-)
+from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
@@ -277,7 +272,11 @@ class _QArrayViewer(QWidget):
         self.hover_info_label = QElidingLabel("", self)
 
         # the button that controls the display mode of the channels
-        self.channel_mode_combo = QEnumComboBox(self, ChannelMode)
+        # not using QEnumComboBox because we want to exclude some values for now
+        self.channel_mode_combo = QComboBox(self)
+        self.channel_mode_combo.addItems(
+            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+        )
 
         # button to reset the zoom of the canvas
         # TODO: unify icons across all the view frontends in a new file
@@ -339,7 +338,9 @@ class QtArrayView(ArrayView):
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
-        qwdg.channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged.emit)
+        qwdg.channel_mode_combo.currentTextChanged.connect(
+            self._on_channel_mode_changed
+        )
         qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit)
 
     def add_lut_view(self) -> QLutView:
@@ -349,6 +350,9 @@ class QtArrayView(ArrayView):
 
     def remove_lut_view(self, view: LutView) -> None:
         self._qwidget.luts.removeWidget(cast("QLutView", view).frontend_widget())
+
+    def _on_channel_mode_changed(self, text: str) -> None:
+        self.channelModeChanged.emit(ChannelMode(text))
 
     def _on_add_histogram_clicked(self) -> None:
         splitter = self._qwidget.splitter
@@ -399,7 +403,7 @@ class QtArrayView(ArrayView):
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
         """Set the channel mode button text."""
-        self._qwidget.channel_mode_combo.setCurrentEnum(mode)
+        self._qwidget.channel_mode_combo.setCurrentText(mode.value)
 
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
