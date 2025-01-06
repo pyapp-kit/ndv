@@ -8,6 +8,7 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping, Sequence
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
 
 import numpy as np
@@ -168,6 +169,35 @@ class DataWrapper(Generic[ArrayT], ABC):
         if nbytes := getattr(self._data, "nbytes", 0) / 1e6:
             info += f", {nbytes:.2f}MB"
         return info
+
+    # TODO: this needs to be cleared when data.dims changes
+    @cached_property
+    def axis_map(self) -> Mapping[Hashable, int]:
+        """Mapping of ALL valid axis keys to normalized, positive integer keys."""
+        axis_index: dict[Hashable, int] = {}
+        ndims = len(self.dims)
+        for i, dim in enumerate(self.dims):
+            axis_index[dim] = i  # map dimension label to positive index
+            axis_index[i] = i  # map positive integer index to itself
+            axis_index[-(ndims - i)] = i  # map negative integer index to positive index
+        return axis_index
+
+    def normalized_axis_key(self, axis: Hashable) -> int:
+        """Return positive index for `axis` (which can be +/- int or str label)."""
+        try:
+            return self.axis_map[axis]
+        except KeyError as e:
+            ndims = len(self.dims)
+            if isinstance(axis, int):
+                raise IndexError(
+                    f"Axis index {axis} out of bounds for data with {ndims} dimensions"
+                ) from e
+            raise IndexError(f"Axis label {axis} not found in data dimensions") from e
+
+    def clear_cache(self) -> None:
+        """Clear any cached properties."""
+        if hasattr(self, "axis_map"):
+            del self.axis_map
 
 
 ##########################

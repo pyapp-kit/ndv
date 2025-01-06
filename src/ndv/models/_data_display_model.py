@@ -1,8 +1,7 @@
 from collections.abc import Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass
-from functools import cached_property
-from typing import Any, Optional, Protocol, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Union, cast
 
 import numpy as np
 from pydantic import Field, model_validator
@@ -12,6 +11,11 @@ from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._base_model import NDVModel
 
 from .data_wrappers import DataWrapper
+
+if TYPE_CHECKING:
+    from ndv._types import AxisKey
+    from ndv.models._array_display_model import IndexMap, LutMap, TwoOrThreeAxisTuple
+    from ndv.models._lut_model import LUTModel
 
 
 class DataWrapperP(Protocol):
@@ -44,12 +48,13 @@ class DataRequest:
     channel_axis: Optional[int]
 
 
-class DataDisplayModel(NDVModel):
+class ArrayDataDisplayModel(NDVModel):
     """Combination of data and display models.
 
     Mostly this class exists to resolve AxisKeys in the display model
     (which can be axis labels, or positive/negative integers) to real/existing
-    positive indices in the data.
+    positive indices in the data.  But it also makes it easier for multiple data display
+    models to share the same underlying display model (e.g. for linked views).
     """
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
@@ -86,74 +91,108 @@ class DataDisplayModel(NDVModel):
         else:
             self.data_wrapper = DataWrapper.create(data)
 
-    def _canonicalize_axis_key(self, axis: Hashable) -> int:
-        """Return positive index for AxisKey (which can be +/- int or label)."""
+    def _ensure_wrapper(self) -> DataWrapper:
         if self.data_wrapper is None:
-            raise ValueError("Data not set")
-
-        try:
-            return self.canonicalized_axis_map[axis]
-        except KeyError as e:
-            ndims = len(self.data_wrapper.dims)
-            if isinstance(axis, int):
-                raise IndexError(
-                    f"Axis index {axis} out of bounds for data with {ndims} dimensions"
-                ) from e
-            raise IndexError(f"Axis label {axis} not found in data dimensions") from e
+            raise ValueError("Cannot normalize axes.  No data is set.")
+        return self.data_wrapper
 
     @property
-    def canonical_data_coords(self) -> Mapping[int, Sequence]:
-        """Return the coordinates of the data in canonical form."""
-        if self.data_wrapper is None:
+    def data_coords(self) -> Mapping[int, Sequence]:
+        """Return the coordinates of the data as positive integers."""
+        if (wrapper := self.data_wrapper) is None:
             return {}
-        return {
-            self._canonicalize_axis_key(d): self.data_wrapper.coords[d]
-            for d in self.data_wrapper.dims
-        }
+        return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
+
+    # ArrayDisplayModel properties, passed through: --------------------------------
 
     @property
-    def canonical_visible_axes(self) -> tuple[int, ...]:
-        """Return the visible axes in canonical form."""
-        return tuple(
-            self._canonicalize_axis_key(ax) for ax in self.display.visible_axes
+    def visible_axes(self) -> tuple[int, int, int] | tuple[int, int]:
+        """Return the visible axes as positive integers."""
+        wrapper = self._ensure_wrapper()
+        return tuple(  # type: ignore [return-value]
+            wrapper.normalized_axis_key(ax) for ax in self.display.visible_axes
         )
 
-    @property
-    def canonical_channel_axis(self) -> Optional[int]:
-        """Return the channel axis in canonical form."""
-        if self.display.channel_axis is None:
-            return None
-        return self._canonicalize_axis_key(self.display.channel_axis)
+    @visible_axes.setter
+    def visible_axes(self, axes: "TwoOrThreeAxisTuple") -> None:
+        self.display.visible_axes = axes
 
     @property
-    def canonical_current_index(self) -> Mapping[int, Union[int, slice]]:
-        """Return the current index in canonical form."""
+    def current_index(self) -> Mapping[int, Union[int, slice]]:
+        """Return the current index with positive integer axis keys."""
+        wrapper = self._ensure_wrapper()
         return {
-            self._canonicalize_axis_key(ax): v
+            wrapper.normalized_axis_key(ax): v
             for ax, v in self.display.current_index.items()
         }
+
+    @current_index.setter
+    def current_index(self, index: "IndexMap") -> None:
+        self.display.current_index.assign(index)
+
+    @property
+    def channel_mode(self) -> ChannelMode:
+        """Return the channel mode."""
+        return self.display.channel_mode
+
+    @channel_mode.setter
+    def channel_mode(self, mode: ChannelMode) -> None:
+        self.display.channel_mode = mode
+
+    @property
+    def channel_axis(self) -> Optional[int]:
+        """Return the channel axis as positive integers."""
+        if self.display.channel_axis is None:
+            return None
+        wrapper = self._ensure_wrapper()
+        return wrapper.normalized_axis_key(self.display.channel_axis)
+
+    @channel_axis.setter
+    def channel_axis(self, axis: "AxisKey | None") -> None:
+        self.display.channel_axis = axis
+
+    @property
+    def luts(self) -> "LutMap":
+        """Return the lookup tables."""
+        return self.display.luts
+
+    @luts.setter
+    def luts(self, luts: "LutMap") -> None:
+        self.display.luts.assign(luts)
+
+    @property
+    def default_lut(self) -> "LUTModel":
+        """Return the default lookup table."""
+        return self.display.default_lut
+
+    @property
+    def current_slices(self) -> dict[int, Union[int, slice]]:
+        """Return the current index, ensuring all visible axes are slices."""
+        # first ensure that all visible axes (those that will be displayed in the view)
+        # are slices and present in the request.
+        requested = dict(self.current_index)
+        for ax in self.visible_axes:
+            if not isinstance(requested.get(ax), slice):
+                requested[ax] = slice(None)
+        return requested
 
     def current_slice_requests(self) -> list[DataRequest]:
         """Return the current index request for the data.
 
         This reconciles the `current_index` and `visible_axes` attributes of the display
         with the available dimensions of the data to return a valid index request.
-        In the returned mapping, the keys are the canonicalized (non-negative integer)
+        In the returned mapping, the keys are the normalized (non-negative integer)
         axis indices and the values are either integers or slices (where axes present
         in `visible_axes` are guaranteed to be slices rather than integers).
         """
         if self.data_wrapper is None:
             return []
-        # first ensure that all visible axes (those that will be displayed in the view)
-        # are slices and present in the request.
-        requested_slice = dict(self.canonical_current_index)
-        for ax in self.canonical_visible_axes:
-            if not isinstance(requested_slice.get(ax), slice):
-                requested_slice[ax] = slice(None)
+
+        requested_slice = self.current_slices
 
         # if we need to request multiple channels (composite mode or RGB),
         # ensure that the channel axis is also sliced
-        if c_ax := self.canonical_channel_axis:
+        if c_ax := self.channel_axis:
             if self.display.channel_mode.is_multichannel():
                 if not isinstance(requested_slice.get(c_ax), slice):
                     requested_slice[c_ax] = slice(None)
@@ -175,7 +214,7 @@ class DataDisplayModel(NDVModel):
             DataRequest(
                 wrapper=self.data_wrapper,
                 index=requested_slice,
-                visible_axes=self.canonical_visible_axes,
+                visible_axes=self.visible_axes,
                 channel_axis=c_ax,
             )
         ]
@@ -218,23 +257,3 @@ class DataDisplayModel(NDVModel):
                 futures.append(future)
 
         return futures
-
-    # TODO: this needs to be cleared when data.dims changes
-    @cached_property
-    def canonicalized_axis_map(self) -> Mapping[Hashable, int]:
-        """Create a mapping of ALL valid axis keys to canonicalized keys.
-
-        This can be used later to quickly map any valid axis key
-        (axis label, positive int, or negative int) to a positive integer index.
-        """
-        if not self.data_wrapper:
-            raise ValueError("Data not set")
-
-        axis_index: dict[Hashable, int] = {}
-        dims = self.data_wrapper.dims
-        ndims = len(dims)
-        for i, dim in enumerate(dims):
-            axis_index[dim] = i  # map dimension label to positive index
-            axis_index[i] = i  # map positive integer index to itself
-            axis_index[-(ndims - i)] = i  # map negative integer index to positive index
-        return axis_index

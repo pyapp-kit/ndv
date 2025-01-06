@@ -51,11 +51,11 @@ def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
     ctrl = ViewerController()
-    model = ctrl.model
+    model = ctrl.display_model
     mock_view = ctrl.view
 
     ctrl.data = data
-    wrapper = ctrl._dd_model.data_wrapper
+    wrapper = ctrl._model.data_wrapper
 
     # showing the controller shows the view
     ctrl.show()
@@ -101,7 +101,7 @@ def test_controller() -> None:
     # setting a new ArrayDisplay model updates the appropriate view widgets
     ch_ctrl = cast("ChannelController", ctrl._lut_controllers[None])
     ch_ctrl.lut_views[0].set_colormap_without_signal.reset_mock()
-    ctrl.model = ArrayDisplayModel(default_lut=LUTModel(cmap="green"))
+    ctrl.display_model = ArrayDisplayModel(default_lut=LUTModel(cmap="green"))
     # fails
     # ch_ctrl.lut_views[0].set_colormap_without_signal.assert_called_once()
 
@@ -144,10 +144,10 @@ def test_histogram_controller() -> None:
 
     # changing the index updates the histogram
     mock_histogram.set_data.reset_mock()
-    ctrl.model.current_index.assign({0: 1, 1: 2, 3: 3})
+    ctrl.display_model.current_index.assign({0: 1, 1: 2, 3: 3})
     mock_histogram.set_data.assert_called_once()
 
     # switching to composite mode puts the histogram view in the
     # lut controller for all channels (this may change)
-    ctrl.model.channel_mode = ChannelMode.COMPOSITE
+    ctrl.display_model.channel_mode = ChannelMode.COMPOSITE
     assert mock_histogram in ctrl._lut_controllers[0].lut_views

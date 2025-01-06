@@ -21,13 +21,13 @@ def test_mvc_viewer() -> None:
 
     # test changing current index via the view
     index_mock = Mock()
-    viewer.model.current_index.value_changed.connect(index_mock)
+    viewer.display_model.current_index.value_changed.connect(index_mock)
     index = {0: 4, 1: 1, 2: 2}
     # setting the index should trigger the signal, only once
     viewer._view.set_current_index(index)
     index_mock.assert_called_once()
     for k, v in index.items():
-        assert viewer.model.current_index[k] == v
+        assert viewer.display_model.current_index[k] == v
     # setting again should not trigger the signal
     index_mock.reset_mock()
     viewer._view.set_current_index(index)
