@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Union, cast
 
 import numpy as np
-from pydantic import Field, model_validator
-from typing_extensions import Self
+from pydantic import Field
 
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._base_model import NDVModel
@@ -58,19 +57,24 @@ class ArrayDataDisplayModel(NDVModel):
     """
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
-    # TODO: add validator
     data_wrapper: Optional[DataWrapper] = None
 
-    @model_validator(mode="after")
-    def _validate_model(self) -> Self:
+    def model_post_init(self, __context: Any) -> None:
         self.display.events.channel_mode.connect(self._on_channel_mode_change)
-        return self
+        # set current_index to 0 for all axes if it is not set
+        if (
+            not self.display.current_index
+            and (wrapper := self.data_wrapper) is not None
+        ):
+            self.current_index = {
+                wrapper.normalized_axis_key(d): 0 for d in wrapper.dims
+            }
 
-    def _on_channel_mode_change(self, mode: ChannelMode) -> None:
+    def _on_channel_mode_change(self) -> None:
         # if the mode is not grayscale, and the channel axis is not set,
         # we let the data wrapper guess the channel axis
         if (
-            mode != ChannelMode.GRAYSCALE
+            self.display.channel_mode != ChannelMode.GRAYSCALE
             and self.display.channel_axis is None
             and self.data_wrapper is not None
         ):
@@ -103,7 +107,9 @@ class ArrayDataDisplayModel(NDVModel):
             return {}
         return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
 
-    # ArrayDisplayModel properties, passed through: --------------------------------
+    # ArrayDisplayModel, with axes normalized to positive integers
+    # setters set the underlying display model with the "raw" command value.
+    # one can always access self.display.attr to get the non-normalized value
 
     @property
     def visible_axes(self) -> tuple[int, int, int] | tuple[int, int]:

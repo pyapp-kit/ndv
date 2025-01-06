@@ -63,5 +63,6 @@ def imshow(
 
     viewer = ViewerController(data_model)
     viewer.show()
+
     run_app()
     return viewer
