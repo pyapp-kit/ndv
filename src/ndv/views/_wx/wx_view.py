@@ -102,6 +102,9 @@ class WxLutView(LutView):
         else:
             self._wxwidget.Hide()
 
+    def close(self) -> None:
+        self._wxwidget.Close()
+
 
 # mostly copied from _qt.qt_view._QDimsSliders
 class _WxDimsSliders(wx.Panel):
@@ -280,3 +283,6 @@ class WxArrayView(ArrayView):
             self._wxwidget.Show()
         else:
             self._wxwidget.Hide()
+
+    def close(self) -> None:
+        self._wxwidget.Close()

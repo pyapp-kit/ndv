@@ -155,6 +155,9 @@ class QLutView(LutView):
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
 
+    def close(self) -> None:
+        self._qwidget.close()
+
 
 class _QDimsSliders(QWidget):
     currentIndexChanged = Signal()
@@ -407,6 +410,9 @@ class QtArrayView(ArrayView):
 
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
+
+    def close(self) -> None:
+        self._qwidget.close()
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget

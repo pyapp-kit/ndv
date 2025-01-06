@@ -471,6 +471,10 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def set_visible(self, visible: bool) -> None: ...
 
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()
+
     def refresh(self) -> None:
         self._canvas.update()
 

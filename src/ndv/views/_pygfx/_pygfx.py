@@ -630,3 +630,7 @@ class GfxArrayCanvas(ArrayCanvas):
     def set_visible(self, visible: bool) -> None:
         """Set the visibility of the canvas."""
         self._canvas.visible = visible
+
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()

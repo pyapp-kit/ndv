@@ -101,6 +101,9 @@ class JupyterLutView(LutView):
         # show or hide the actual widget itself
         self.layout.layout.display = "flex" if visible else "none"
 
+    def close(self) -> None:
+        self.layout.close()
+
     def frontend_widget(self) -> Any:
         return self.layout
 
@@ -246,3 +249,6 @@ class JupyterArrayView(ArrayView):
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
             display.clear_output()  # type: ignore [no-untyped-call]
+
+    def close(self) -> None:
+        self.layout.close()
