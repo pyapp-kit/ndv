@@ -4,8 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-import ndv.models
-import ndv.v1
+from ndv import DataWrapper
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Mapping, Sequence
@@ -22,7 +21,7 @@ class MyArrayThing:
         return self._data[item]  # type: ignore [no-any-return]
 
 
-class MyWrapper(ndv.models.DataWrapper[MyArrayThing]):
+class MyWrapper(DataWrapper[MyArrayThing]):
     @classmethod
     def supports(cls, data: Any) -> bool:
         """Return True if the data is supported by this wrapper"""

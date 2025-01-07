@@ -45,7 +45,6 @@ def test_ndviewer(any_app: Any) -> None:
     v = NDViewer(dask_arr)
     # qtbot.addWidget(v)
     v.show()
-    # temporary workaround for qtbot access ... review when dropping v1
     if isinstance(any_app, tuple) and len(any_app) == 2:
         qtbot = any_app[1]
         qtbot.waitUntil(v._is_idle, timeout=1000)
@@ -69,7 +68,6 @@ def test_hover_info(any_app: Any) -> None:
     data = np.ones((4, 3, 32, 32), dtype=np.float32)
     viewer = NDViewer(data)
     viewer.show()
-    # temporary workaround for qtbot access ... review when dropping v1
     if isinstance(any_app, tuple) and len(any_app) == 2:
         qtbot = any_app[1]
         qtbot.waitUntil(viewer._is_idle, timeout=1000)

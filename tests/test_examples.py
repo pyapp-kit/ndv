@@ -6,11 +6,7 @@ from pathlib import Path
 import pytest
 
 try:
-    import pytestqt
-
-    if pytestqt.qt_compat.qt_api.pytest_qt_api.startswith("pyside"):
-        pytest.skip("V1 viewer segfaults with pyside", allow_module_level=True)
-
+    import pytestqt  # noqa
 except ImportError:
     pytest.skip("This module requires qt frontend", allow_module_level=True)
 
