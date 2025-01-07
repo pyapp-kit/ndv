@@ -213,7 +213,10 @@ class ArrayViewer:
         self._view.set_channel_mode(display_model.channel_mode)
         if self.data is not None:
             self._update_visible_sliders()
-            self._view.set_current_index(display_model.current_index)
+            if cur_index := display_model.current_index:
+                self._view.set_current_index(cur_index)
+            # reconcile view sliders with model
+            self._on_view_current_index_changed()
             if wrapper := self._model.data_wrapper:
                 self._view.set_data_info(wrapper.summary_info())
 
