@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, overload
 
-from ndv.viewers import ArrayViewer
+from ndv.controller import ArrayViewer
 from ndv.views._app import run_app
 
 if TYPE_CHECKING:
@@ -16,12 +16,15 @@ if TYPE_CHECKING:
     from .models.data_wrappers import DataWrapper
 
 
+# either provide a fully formed display model
 @overload
 def imshow(model: ArrayDataDisplayModel, /) -> ArrayViewer: ...
+# or data with a display model
 @overload
 def imshow(
     data: Any | DataWrapper, display_model: ArrayDisplayModel, /
 ) -> ArrayViewer: ...
+# or data with optional kwargs to create a display model
 @overload
 def imshow(
     data: Any | DataWrapper, /, **kwargs: Unpack[ArrayDisplayModelKwargs]
@@ -48,7 +51,7 @@ def imshow(
     ViewerController
         The viewer window.
     """
-    viewer = ArrayViewer(data, display_model, **kwargs)  # type: ignore [arg-type]
+    viewer = ArrayViewer(data, display_model, **kwargs)
     viewer.show()
 
     run_app()

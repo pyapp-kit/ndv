@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 
 from ndv._types import MouseMoveEvent
-from ndv.controller import ViewerController
+from ndv.controller import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import _app
@@ -49,7 +49,7 @@ def _patch_views(f: Callable) -> Callable:
 @_patch_views
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
-    ctrl = ViewerController()
+    ctrl = ArrayViewer()
     model = ctrl.display_model
     mock_view = ctrl.view
     mock_view.create_sliders.assert_not_called()
@@ -112,7 +112,7 @@ def test_controller() -> None:
 def test_canvas() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
-    ctrl = ViewerController()
+    ctrl = ArrayViewer()
     mock_canvas = ctrl._canvas
 
     mock_view = ctrl.view
@@ -132,7 +132,7 @@ def test_canvas() -> None:
 @no_type_check
 @_patch_views
 def test_histogram_controller() -> None:
-    ctrl = ViewerController()
+    ctrl = ArrayViewer()
     mock_view = ctrl.view
 
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)

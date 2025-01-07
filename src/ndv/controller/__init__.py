@@ -1,3 +1,3 @@
-from ._controller import ViewerController
+from ._controller import ArrayViewer
 
-__all__ = ["ViewerController"]
+__all__ = ["ArrayViewer"]

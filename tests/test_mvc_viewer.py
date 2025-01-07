@@ -5,14 +5,14 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from ndv.controller import ViewerController
+from ndv.controller import ArrayViewer
 from ndv.views import gui_frontend
 
 
 @pytest.mark.usefixtures("any_app")
 def test_mvc_viewer() -> None:
     """Example usage of new mvc pattern."""
-    viewer = ViewerController()
+    viewer = ArrayViewer()
     assert gui_frontend() in type(viewer._view).__name__.lower()
     viewer.show()
 
