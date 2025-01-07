@@ -40,6 +40,11 @@ class MyWrapper(ndv.models.DataWrapper[MyArrayThing]):
         """Return a mapping of {dim: coords} for the data"""
         return {f"dim_{k}": range(v) for k, v in enumerate(self.data.shape)}
 
+    @property
+    def dtype(self) -> np.dtype:
+        """Return the dtype of the data"""
+        return self.data._data.dtype
+
     def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
         """Select a subset of the data.
 

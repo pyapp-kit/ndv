@@ -46,7 +46,7 @@ class ArrayViewer:
 
     def __init__(
         self,
-        data_or_model: Any | DataWrapper | ArrayDataDisplayModel,
+        data_or_model: Any | DataWrapper | ArrayDataDisplayModel = None,
         /,
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
@@ -160,15 +160,21 @@ class ArrayViewer:
                 self._histogram.set_data(counts, edges)
 
         if self.data is not None:
-            self._update_hist_domain_for_dtype(self.data.dtype)
+            self._update_hist_domain_for_dtype()
 
     # --------------------- PRIVATE ------------------------------------------
 
-    def _update_hist_domain_for_dtype(self, dtype: np.typing.DTypeLike) -> None:
+    def _update_hist_domain_for_dtype(
+        self, dtype: np.typing.DTypeLike | None = None
+    ) -> None:
         if self._histogram is None:
             return
-
-        dtype = np.dtype(dtype)
+        if dtype is None:
+            if (wrapper := self.model.data_wrapper) is None:
+                return
+            dtype = wrapper.dtype
+        else:
+            dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
             self._histogram.set_range(x=(iinfo.min, iinfo.max))
@@ -202,7 +208,7 @@ class ArrayViewer:
         with self.view.currentIndexChanged.blocked():
             self._view.create_sliders(self._model.normed_data_coords)
         self._view.set_channel_mode(display_model.channel_mode)
-        if (data := self.data) is not None:
+        if self.data is not None:
             self._update_visible_sliders()
             self._view.set_current_index(display_model.current_index)
             if wrapper := self._model.data_wrapper:
@@ -212,7 +218,7 @@ class ArrayViewer:
             self._update_canvas()
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr._update_view_from_model()
-            self._update_hist_domain_for_dtype(data.dtype)
+            self._update_hist_domain_for_dtype()
 
     def _on_model_visible_axes_changed(self) -> None:
         self._update_visible_sliders()

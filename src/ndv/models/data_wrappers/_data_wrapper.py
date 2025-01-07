@@ -105,6 +105,17 @@ class DataWrapper(Generic[ArrayT], ABC):
     def save_as_zarr(self, path: str) -> None:
         raise NotImplementedError("Saving as zarr is not supported for this data type")
 
+    @property
+    def dtype(self) -> np.dtype:
+        """Return the dtype for the data."""
+        try:
+            return np.dtype(self._data.dtype)  # type: ignore
+        except AttributeError as e:
+            raise NotImplementedError(
+                "`dtype` property not properly implemented for DataWrapper of type: "
+                f"{type(self)}"
+            ) from e
+
     # -----------------------------
 
     @classmethod
