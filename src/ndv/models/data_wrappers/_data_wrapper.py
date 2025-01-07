@@ -167,10 +167,10 @@ class DataWrapper(Generic[ArrayT], ABC):
         for dimkey, val in sizes.items():
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
-                    return dimkey
+                    return self.normalized_axis_key(dimkey)
 
         # otherwise use the smallest dimension as the channel axis
-        return min(sizes, key=sizes.get)  # type: ignore
+        return min(sizes, key=sizes.get)  # type: ignore [arg-type]
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""

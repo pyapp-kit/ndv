@@ -1,6 +1,6 @@
 from collections.abc import Hashable, Iterable, Mapping, Sequence
 from concurrent.futures import Future
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Union, cast
 
 import numpy as np
@@ -33,8 +33,9 @@ class DataWrapperP(Protocol):
 class DataResponse:
     """Response object for data requests."""
 
-    data: np.ndarray
+    data: np.ndarray = field(repr=False)
     channel_key: Optional[int]
+    request: Optional["DataRequest"] = None
 
 
 @dataclass
@@ -80,7 +81,10 @@ class ArrayDataDisplayModel(NDVModel):
             and self.display.channel_axis is None
             and self.data_wrapper is not None
         ):
-            self.display.channel_axis = self.data_wrapper.guess_channel_axis()
+            # only use the guess if it's not already in the visible axes
+            guess = self.data_wrapper.guess_channel_axis()
+            if guess not in self.normed_visible_axes:
+                self.channel_axis = guess
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
@@ -271,6 +275,7 @@ class ArrayDataDisplayModel(NDVModel):
                     DataResponse(
                         data=ch_data.transpose(*t_dims).squeeze(),
                         channel_key=i,
+                        request=req,
                     )
                 )
                 futures.append(future)
