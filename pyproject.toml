@@ -79,6 +79,7 @@ third_party_arrays = [
     "jax[cpu]",
     "pooch",                                   # for xarray example
     "pyopencl[pocl]; sys_platform == 'linux'",
+    "pyopencl; sys_platform == 'darwin'",
     "sparse",
     "tensorstore",
     "numpy<2.0",                               # for tensorstore (at least)

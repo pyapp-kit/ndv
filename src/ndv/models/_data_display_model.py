@@ -1,7 +1,7 @@
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import numpy as np
 from pydantic import Field
@@ -17,27 +17,6 @@ if TYPE_CHECKING:
     from ndv.models._lut_model import LUTModel
 
 
-class DataWrapperP(Protocol):
-    """Unused protocol, just marking what we need from DataWrapper here."""
-
-    @property
-    def data(self) -> Any: ...
-    @property
-    def dims(self) -> tuple[Hashable, ...]: ...
-    @property
-    def coords(self) -> Mapping[Hashable, Sequence]: ...
-    def isel(self, index: Mapping[int, Union[int, slice]]) -> np.ndarray: ...
-
-
-@dataclass
-class DataResponse:
-    """Response object for data requests."""
-
-    data: np.ndarray = field(repr=False)
-    channel_key: Optional[int]
-    request: Optional["DataRequest"] = None
-
-
 @dataclass
 class DataRequest:
     """Request object for data slicing."""
@@ -48,13 +27,36 @@ class DataRequest:
     channel_axis: Optional[int]
 
 
-class ArrayDataDisplayModel(NDVModel):
-    """Combination of data and display models.
+@dataclass
+class DataResponse:
+    """Response object for data requests."""
 
-    Mostly this class exists to resolve AxisKeys in the display model
-    (which can be axis labels, or positive/negative integers) to real/existing
-    positive indices in the data.  But it also makes it easier for multiple data display
-    models to share the same underlying display model (e.g. for linked views).
+    data: np.ndarray = field(repr=False)
+    channel_key: Optional[int]
+    request: Optional[DataRequest] = None
+
+
+class ArrayDataDisplayModel(NDVModel):
+    """Full model combining ArrayDisplayModel model with a DataWrapper.
+
+    The `ArrayDisplayModel` can be thought of as an "instruction" for how to display
+    some data, while the `DataWrapper` is the actual data.  This class combines the two
+    and provides a way to access the data in a normalized way (i.e. be converting
+    AxisKeys in the display model to positive integers, based on the available
+    dimensions of the DataWrapper).  This makes it easier to index into the data, even
+    with named axes, which this class also helps manage with the `request_sliced_data`
+    method.
+
+    Having this class composed of the two other models (rather than inheriting from
+    `ArrayDisplayModel`) allows for multiple models to share the same underlying
+    display model (e.g. for linked views).
+
+    Attributes
+    ----------
+    display : ArrayDisplayModel
+        The display model. Provides instructions for how to display the data.
+    data_wrapper : Optional[DataWrapper]
+        The data wrapper. Provides the actual data to be displayed
     """
 
     display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
@@ -63,15 +65,6 @@ class ArrayDataDisplayModel(NDVModel):
     def model_post_init(self, __context: Any) -> None:
         # connect the channel mode change signal to the channel axis guessing method
         self.display.events.channel_mode.connect(self._on_channel_mode_change)
-
-        # set current_index to 0 for all axes if it is not set
-        if (
-            not self.display.current_index
-            and (wrapper := self.data_wrapper) is not None
-        ):
-            self.display.current_index.update(
-                {wrapper.normalized_axis_key(d): 0 for d in wrapper.dims}
-            )
 
     def _on_channel_mode_change(self) -> None:
         # if the mode is not grayscale, and the channel axis is not set,
@@ -126,7 +119,7 @@ class ArrayDataDisplayModel(NDVModel):
         wrapper = self._ensure_wrapper()
         return wrapper.normalized_axis_key(self.display.channel_axis)
 
-    # Proxy Methods for DataWrapper and ArrayDisplayModel ----------------------------
+    # Proxy Methods for DataWrapper       ----------------------------
 
     @property
     def data(self) -> Any:
@@ -142,6 +135,8 @@ class ArrayDataDisplayModel(NDVModel):
             self.data_wrapper = None
         else:
             self.data_wrapper = DataWrapper.create(data)
+
+    # Proxy Methods for ArrayDisplayModel ----------------------------
 
     @property
     def visible_axes(self) -> "TwoOrThreeAxisTuple":
@@ -159,6 +154,7 @@ class ArrayDataDisplayModel(NDVModel):
     @current_index.setter
     def current_index(self, index: "IndexMap") -> None:
         """Set the current index."""
+        # use `assign` because current_index is immutable
         self.display.current_index.assign(index)
 
     @property
@@ -187,6 +183,8 @@ class ArrayDataDisplayModel(NDVModel):
 
     @luts.setter
     def luts(self, luts: "LutMap") -> None:
+        """Set the lookup tables."""
+        # use `assign` because luts is immutable
         self.display.luts.assign(luts)
 
     @property
