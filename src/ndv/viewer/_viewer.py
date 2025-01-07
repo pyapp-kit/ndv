@@ -153,6 +153,9 @@ class NDViewer(QWidget):
         # ROI
         self._roi: PRoiHandle | None = None
 
+        # closest data point under the mouse
+        self._data_coords: tuple[int, int] = (0, 0)
+
         # WIDGETS ----------------------------------------------------
 
         # the button that controls the display mode of the channels
@@ -731,6 +734,7 @@ class NDViewer(QWidget):
 
         x = int(x)
         y = int(y)
+        self._data_coords = (x, y)
         text = f"[{y}, {x}]"
         # TODO: Can we use self._canvas.elements_at?
         for n, handles in enumerate(self._img_handles.values()):
@@ -765,6 +769,10 @@ class NDViewer(QWidget):
         if a0.key() == Qt.Key.Key_Delete and self._selection is not None:
             self._selection.remove()
             self._selection = None
+        elif a0.key() in [Qt.Key.Key_Plus, Qt.Key.Key_Equal]:
+            self._canvas.zoom(factor=0.667, center=self._data_coords)
+        elif a0.key() in [Qt.Key.Key_Minus, Qt.Key.Key_Underscore]:
+            self._canvas.zoom(factor=1.5, center=self._data_coords)
 
     def _update_roi_button(self, event: QMouseEvent) -> bool:
         if self._add_roi_btn.isChecked():
