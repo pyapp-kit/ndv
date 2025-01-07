@@ -11,8 +11,6 @@ from ndv.models import ArrayDataDisplayModel
 if TYPE_CHECKING:
     from typing import Any, Unpack
 
-    from numpy.typing import ArrayLike  # noqa: F401
-
     from ndv.models._array_display_model import (
         ArrayDisplayModel,
         ArrayDisplayModelKwargs,
@@ -29,10 +27,10 @@ class ArrayViewer:
 
     Parameters
     ----------
-    data_or_model : ArrayDataDisplayModel | DataWrapper | ArrayLike
-        Data to be displayed. If a model is provided, it will be used directly.
-        If an array or `DataWrapper` is provided, a default display model will be
-        created.
+    data_or_model : ArrayDataDisplayModel | DataWrapper | Any
+        Data to be displayed. If a full `ArrayDataDisplayModel` is provided, it will be
+        used directly. If an array or `DataWrapper` is provided, a default display model
+        will be created.
     display_model : ArrayDisplayModel, optional
         Just the display model to use. If provided, `data_or_model` must be an array
         or `DataWrapper`... and kwargs will be ignored.

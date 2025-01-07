@@ -140,7 +140,7 @@ class ViewerController:
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
         with self.view.currentIndexChanged.blocked():
-            self._view.create_sliders(self._model.data_coords)
+            self._view.create_sliders(self._model.normed_data_coords)
         self._view.set_channel_mode(self.display_model.channel_mode)
         if self.data is not None:
             self._update_visible_sliders()
@@ -215,9 +215,9 @@ class ViewerController:
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
-        hidden_sliders: tuple[int, ...] = self._model.visible_axes
+        hidden_sliders: tuple[int, ...] = self._model.normed_visible_axes
         if self.display_model.channel_mode.is_multichannel():
-            if ch := self._model.channel_axis:
+            if ch := self._model.normed_channel_axis:
                 hidden_sliders += (ch,)
 
         self._view.hide_sliders(hidden_sliders, show_remainder=True)

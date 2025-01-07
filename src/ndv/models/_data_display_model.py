@@ -60,15 +60,17 @@ class ArrayDataDisplayModel(NDVModel):
     data_wrapper: Optional[DataWrapper] = None
 
     def model_post_init(self, __context: Any) -> None:
+        # connect the channel mode change signal to the channel axis guessing method
         self.display.events.channel_mode.connect(self._on_channel_mode_change)
+
         # set current_index to 0 for all axes if it is not set
         if (
             not self.display.current_index
             and (wrapper := self.data_wrapper) is not None
         ):
-            self.current_index = {
-                wrapper.normalized_axis_key(d): 0 for d in wrapper.dims
-            }
+            self.display.current_index.update(
+                {wrapper.normalized_axis_key(d): 0 for d in wrapper.dims}
+            )
 
     def _on_channel_mode_change(self) -> None:
         # if the mode is not grayscale, and the channel axis is not set,
@@ -79,6 +81,48 @@ class ArrayDataDisplayModel(NDVModel):
             and self.data_wrapper is not None
         ):
             self.display.channel_axis = self.data_wrapper.guess_channel_axis()
+
+    # Properties for normalized data access -----------------------------------------
+    # these all use positive integers as axis keys
+
+    def _ensure_wrapper(self) -> DataWrapper:
+        if self.data_wrapper is None:
+            raise ValueError("Cannot normalize axes.  No data is set.")
+        return self.data_wrapper
+
+    @property
+    def normed_data_coords(self) -> Mapping[int, Sequence]:
+        """Return the coordinates of the data as positive integers."""
+        if (wrapper := self.data_wrapper) is None:
+            return {}
+        return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
+
+    @property
+    def normed_visible_axes(self) -> tuple[int, int, int] | tuple[int, int]:
+        """Return the visible axes as positive integers."""
+        wrapper = self._ensure_wrapper()
+        return tuple(  # type: ignore [return-value]
+            wrapper.normalized_axis_key(ax) for ax in self.display.visible_axes
+        )
+
+    @property
+    def normed_current_index(self) -> Mapping[int, Union[int, slice]]:
+        """Return the current index with positive integer axis keys."""
+        wrapper = self._ensure_wrapper()
+        return {
+            wrapper.normalized_axis_key(ax): v
+            for ax, v in self.display.current_index.items()
+        }
+
+    @property
+    def normed_channel_axis(self) -> "int | None":
+        """Return the channel axis as positive integers."""
+        if self.display.channel_axis is None:
+            return None
+        wrapper = self._ensure_wrapper()
+        return wrapper.normalized_axis_key(self.display.channel_axis)
+
+    # Proxy Methods for DataWrapper and ArrayDisplayModel ----------------------------
 
     @property
     def data(self) -> Any:
@@ -95,45 +139,22 @@ class ArrayDataDisplayModel(NDVModel):
         else:
             self.data_wrapper = DataWrapper.create(data)
 
-    def _ensure_wrapper(self) -> DataWrapper:
-        if self.data_wrapper is None:
-            raise ValueError("Cannot normalize axes.  No data is set.")
-        return self.data_wrapper
-
     @property
-    def data_coords(self) -> Mapping[int, Sequence]:
-        """Return the coordinates of the data as positive integers."""
-        if (wrapper := self.data_wrapper) is None:
-            return {}
-        return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
-
-    # ArrayDisplayModel, with axes normalized to positive integers
-    # setters set the underlying display model with the "raw" command value.
-    # one can always access self.display.attr to get the non-normalized value
-
-    @property
-    def visible_axes(self) -> tuple[int, int, int] | tuple[int, int]:
-        """Return the visible axes as positive integers."""
-        wrapper = self._ensure_wrapper()
-        return tuple(  # type: ignore [return-value]
-            wrapper.normalized_axis_key(ax) for ax in self.display.visible_axes
-        )
+    def visible_axes(self) -> "TwoOrThreeAxisTuple":
+        return self.display.visible_axes
 
     @visible_axes.setter
     def visible_axes(self, axes: "TwoOrThreeAxisTuple") -> None:
         self.display.visible_axes = axes
 
     @property
-    def current_index(self) -> Mapping[int, Union[int, slice]]:
-        """Return the current index with positive integer axis keys."""
-        wrapper = self._ensure_wrapper()
-        return {
-            wrapper.normalized_axis_key(ax): v
-            for ax, v in self.display.current_index.items()
-        }
+    def current_index(self) -> "IndexMap":
+        """Return the current index."""
+        return self.display.current_index
 
     @current_index.setter
     def current_index(self, index: "IndexMap") -> None:
+        """Set the current index."""
         self.display.current_index.assign(index)
 
     @property
@@ -143,15 +164,13 @@ class ArrayDataDisplayModel(NDVModel):
 
     @channel_mode.setter
     def channel_mode(self, mode: ChannelMode) -> None:
+        """Set the channel mode."""
         self.display.channel_mode = mode
 
     @property
-    def channel_axis(self) -> Optional[int]:
-        """Return the channel axis as positive integers."""
-        if self.display.channel_axis is None:
-            return None
-        wrapper = self._ensure_wrapper()
-        return wrapper.normalized_axis_key(self.display.channel_axis)
+    def channel_axis(self) -> "AxisKey | None":
+        """Return the channel axis."""
+        return self.display.channel_axis
 
     @channel_axis.setter
     def channel_axis(self, axis: "AxisKey | None") -> None:
@@ -171,16 +190,7 @@ class ArrayDataDisplayModel(NDVModel):
         """Return the default lookup table."""
         return self.display.default_lut
 
-    @property
-    def current_slices(self) -> dict[int, Union[int, slice]]:
-        """Return the current index, ensuring all visible axes are slices."""
-        # first ensure that all visible axes (those that will be displayed in the view)
-        # are slices and present in the request.
-        requested = dict(self.current_index)
-        for ax in self.visible_axes:
-            if not isinstance(requested.get(ax), slice):
-                requested[ax] = slice(None)
-        return requested
+    # Indexing and Data Slicing -----------------------------------------------------
 
     def current_slice_requests(self) -> list[DataRequest]:
         """Return the current index request for the data.
@@ -194,11 +204,14 @@ class ArrayDataDisplayModel(NDVModel):
         if self.data_wrapper is None:
             return []
 
-        requested_slice = self.current_slices
+        requested_slice = dict(self.normed_current_index)
+        for ax in self.normed_visible_axes:
+            if not isinstance(requested_slice.get(ax), slice):
+                requested_slice[ax] = slice(None)
 
         # if we need to request multiple channels (composite mode or RGB),
         # ensure that the channel axis is also sliced
-        if c_ax := self.channel_axis:
+        if c_ax := self.normed_channel_axis:
             if self.display.channel_mode.is_multichannel():
                 if not isinstance(requested_slice.get(c_ax), slice):
                     requested_slice[c_ax] = slice(None)
@@ -220,7 +233,7 @@ class ArrayDataDisplayModel(NDVModel):
             DataRequest(
                 wrapper=self.data_wrapper,
                 index=requested_slice,
-                visible_axes=self.visible_axes,
+                visible_axes=self.normed_visible_axes,
                 channel_axis=c_ax,
             )
         ]
