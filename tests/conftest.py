@@ -5,7 +5,7 @@ import importlib
 import importlib.util
 import os
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
@@ -96,7 +96,7 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
         from vispy.app.backends._qt import CanvasBackendDesktop
 
         allow: tuple[type, ...] = (CanvasBackendDesktop,)
-    except ImportError:
+    except (ImportError, RuntimeError):
         allow = ()
 
     # This is a known widget that is not cleaned up properly
