@@ -9,18 +9,29 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping, Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Protocol,
+    TypeVar,
+)
 
 import numpy as np
 import numpy.typing as npt
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
+    from typing import Any, TypeAlias, TypeGuard
 
+    import dask.array.core as da
+    import numpy.typing as npt
     import pydantic_core
+    import pyopencl.array as cl_array
+    import sparse
     import tensorstore as ts
     from pydantic import GetCoreSchemaHandler
-    from typing_extensions import TypeAlias, TypeGuard
 
     Index: TypeAlias = int | slice
 
@@ -282,7 +293,7 @@ class ArrayLikeWrapper(DataWrapper[NPArrayLike]):
 
     def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
         idx = tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
-        return np.asarray(self.data[idx])
+        return self._asarray(self.data[idx])
 
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[SupportsIndexing]:
@@ -298,3 +309,53 @@ class ArrayLikeWrapper(DataWrapper[NPArrayLike]):
         ):
             return True
         return False
+
+    def _asarray(self, data: npt.ArrayLike) -> np.ndarray:
+        """Convert data to a numpy array."""
+        return np.asarray(data)
+
+
+class SparseArrayWrapper(ArrayLikeWrapper["sparse.Array"]):
+    PRIORITY = 50
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[sparse.COO]:
+        if (sparse := sys.modules.get("sparse")) and isinstance(obj, sparse.COO):
+            return True
+        return False
+
+    def _asarray(self, data: sparse.COO) -> np.ndarray:
+        return np.asarray(data.todense())
+
+
+class CLArrayWrapper(ArrayLikeWrapper["cl_array.Array"]):
+    """Wrapper for pyopencl array objects."""
+
+    PRIORITY = 50
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[cl_array.Array]:
+        if (cl_array := sys.modules.get("pyopencl.array")) and isinstance(
+            obj, cl_array.Array
+        ):
+            return True
+        return False
+
+    def _asarray(self, data: cl_array.Array) -> np.ndarray:
+        return np.asarray(data.get())
+
+
+class DaskWrapper(ArrayLikeWrapper["da.Array"]):
+    """Wrapper for dask array objects."""
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[da.Array]:
+        if (da := sys.modules.get("dask.array")) and isinstance(obj, da.Array):
+            return True
+        return False
+
+    def _asarray(self, data: da.Array) -> np.ndarray:
+        return np.asarray(data.compute())
+
+    def save_as_zarr(self, path: str) -> None:
+        self._data.to_zarr(url=path)
