@@ -102,7 +102,7 @@ class ArrayDataDisplayModel(NDVModel):
         return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
 
     @property
-    def normed_visible_axes(self) -> tuple[int, int, int] | tuple[int, int]:
+    def normed_visible_axes(self) -> "tuple[int, int, int] | tuple[int, int]":
         """Return the visible axes as positive integers."""
         wrapper = self._ensure_wrapper()
         return tuple(  # type: ignore [return-value]
