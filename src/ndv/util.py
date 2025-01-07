@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from qtpy.QtWidgets import QApplication
 
@@ -12,14 +12,16 @@ from .viewer._viewer import NDViewer
 if TYPE_CHECKING:
     from qtpy.QtCore import QCoreApplication
 
+    from .viewer._components import ChannelMode
     from .viewer._data_wrapper import DataWrapper
+    from .viewer._viewer import ChannelModeStr
 
 
 def imshow(
     data: Any | DataWrapper,
     cmap: Any | None = None,
     *,
-    channel_mode: Literal["mono", "composite", "auto"] = "auto",
+    channel_mode: ChannelModeStr | ChannelMode = "auto",
 ) -> NDViewer:
     """Display an array or DataWrapper in a new NDViewer window.
 
@@ -29,7 +31,7 @@ def imshow(
         The data to be displayed. If not a DataWrapper, it will be wrapped in one.
     cmap : Any | None, optional
         The colormap(s) to use for displaying the data.
-    channel_mode : Literal['mono', 'composite'], optional
+    channel_mode : Literal['mono', 'composite', 'rgb', 'rgba', 'auto'], optional
         The initial mode for displaying the channels. By default "mono" will be
         used unless a cmap is provided, in which case "composite" will be used.
 
@@ -39,12 +41,8 @@ def imshow(
         The viewer window.
     """
     app, should_exec = _get_app()
-    if cmap is not None:
-        channel_mode = "composite"
-        if not isinstance(cmap, (list, tuple)):
-            cmap = [cmap]
-    elif channel_mode == "auto":
-        channel_mode = "mono"
+    if cmap is not None and not isinstance(cmap, (list, tuple)):
+        cmap = [cmap]
     viewer = NDViewer(data, colormaps=cmap, channel_mode=channel_mode)
     viewer.show()
     viewer.raise_()
