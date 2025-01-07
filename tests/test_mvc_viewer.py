@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from ndv.controller import ArrayViewer
+from ndv.controllers import ArrayViewer
 from ndv.views import gui_frontend
 
 

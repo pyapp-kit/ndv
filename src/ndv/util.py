@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, overload
 
-from ndv.controller import ArrayViewer
+from ndv.controllers import ArrayViewer
 from ndv.views._app import run_app
 
 if TYPE_CHECKING:

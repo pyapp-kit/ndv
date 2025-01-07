@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ndv.controller._channel_controller import ChannelController
+from ndv.controllers._channel_controller import ChannelController
 from ndv.models import ArrayDataDisplayModel
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from ndv.views.bases import ArrayView, HistogramCanvas
 
     LutKey: TypeAlias = int | None
+
+
+# primary "Controller" (and public API) for viewing an array
 
 
 class ArrayViewer:

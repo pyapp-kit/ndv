@@ -8,7 +8,7 @@ except PackageNotFoundError:
     __version__ = "uninstalled"
 
 from . import data
-from .controller import ArrayViewer
+from .controllers import ArrayViewer
 from .models import DataWrapper
 from .util import imshow
 from .views import run_app

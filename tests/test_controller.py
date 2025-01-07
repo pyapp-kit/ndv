@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 
 from ndv._types import MouseMoveEvent
-from ndv.controller import ArrayViewer
+from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import _app
@@ -16,7 +16,7 @@ from ndv.views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases.graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
-    from ndv.controller._channel_controller import ChannelController
+    from ndv.controllers._channel_controller import ChannelController
 
 
 def _get_mock_canvas() -> ArrayCanvas:
