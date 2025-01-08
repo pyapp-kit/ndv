@@ -1,15 +1,18 @@
 """Test controller without canavs or gui frontend"""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
+import pytest
 
 from ndv._types import MouseMoveEvent
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
-from ndv.views import _app
+from ndv.views import _app, gui_frontend
 from ndv.views.bases._array_view import ArrayView
 from ndv.views.bases._lut_view import LutView
 from ndv.views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
@@ -152,3 +155,28 @@ def test_histogram_controller() -> None:
     # lut controller for all channels (this may change)
     ctrl.model.display.channel_mode = ChannelMode.COMPOSITE
     assert mock_histogram in ctrl._lut_controllers[0].lut_views
+
+
+@pytest.mark.usefixtures("any_app")
+def test_array_viewer_with_app() -> None:
+    """Example usage of new mvc pattern."""
+    viewer = ArrayViewer()
+    assert gui_frontend() in type(viewer._view).__name__.lower()
+    viewer.show()
+
+    data = np.random.randint(0, 255, size=(10, 10, 10, 10, 10), dtype="uint8")
+    viewer.data = data
+
+    # test changing current index via the view
+    index_mock = Mock()
+    viewer.model.display.current_index.value_changed.connect(index_mock)
+    index = {0: 4, 1: 1, 2: 2}
+    # setting the index should trigger the signal, only once
+    viewer._view.set_current_index(index)
+    index_mock.assert_called_once()
+    for k, v in index.items():
+        assert viewer.model.display.current_index[k] == v
+    # setting again should not trigger the signal
+    index_mock.reset_mock()
+    viewer._view.set_current_index(index)
+    index_mock.assert_not_called()
