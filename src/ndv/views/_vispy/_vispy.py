@@ -479,9 +479,14 @@ class VispyViewerCanvas(ArrayCanvas):
     def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         data = _downcast(data)
-        img = scene.visuals.Image(
-            data, parent=self._view.scene, texture_format=self._txt_fmt
-        )
+        try:
+            img = scene.visuals.Image(
+                data, parent=self._view.scene, texture_format=self._txt_fmt
+            )
+        except ValueError as e:
+            warnings.warn(f'{e}. Falling back to CPUScaledTexture', stacklevel=2)
+            img = scene.visuals.Image(data, parent=self._view.scene)
+
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
         handle = VispyImageHandle(img)
@@ -592,7 +597,7 @@ def _downcast(data: np.ndarray | None) -> np.ndarray | None:
     # downcast to 32bit, preserving int/float
     if data is not None:
         if np.issubdtype(data.dtype, np.integer) and data.dtype.itemsize > 2:
-            warnings.warn("Downcasting integer data to uint16.")
+            warnings.warn("Downcasting integer data to uint16.", stacklevel=2)
             data = data.astype(np.uint16)
         elif np.issubdtype(data.dtype, np.floating) and data.dtype.itemsize > 4:
             data = data.astype(np.float32)
