@@ -484,7 +484,7 @@ class VispyViewerCanvas(ArrayCanvas):
                 data, parent=self._view.scene, texture_format=self._txt_fmt
             )
         except ValueError as e:
-            warnings.warn(f'{e}. Falling back to CPUScaledTexture', stacklevel=2)
+            warnings.warn(f"{e}. Falling back to CPUScaledTexture", stacklevel=2)
             img = scene.visuals.Image(data, parent=self._view.scene)
 
         img.set_gl_state("additive", depth_test=False)
