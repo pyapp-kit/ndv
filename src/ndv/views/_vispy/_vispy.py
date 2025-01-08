@@ -16,6 +16,7 @@ from vispy.util.quaternion import Quaternion
 
 from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
+from ndv.views._vispy._utils import supports_float_textures
 from ndv.views.bases import ArrayCanvas
 from ndv.views.bases.graphics._canvas_elements import (
     CanvasElement,
@@ -440,6 +441,7 @@ class VispyViewerCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
+        self._txt_fmt = "auto" if supports_float_textures() else None
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -481,7 +483,14 @@ class VispyViewerCanvas(ArrayCanvas):
     def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         data = _downcast(data)
-        img = scene.visuals.Image(data, parent=self._view.scene)
+        try:
+            img = scene.visuals.Image(
+                data, parent=self._view.scene, texture_format=self._txt_fmt
+            )
+        except ValueError as e:
+            warnings.warn(f"{e}. Falling back to CPUScaledTexture", stacklevel=2)
+            img = scene.visuals.Image(data, parent=self._view.scene)
+
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
         handle = VispyImageHandle(img)
@@ -492,9 +501,19 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
         data = _downcast(data)
-        vol = scene.visuals.Volume(
-            data, parent=self._view.scene, interpolation="nearest"
-        )
+        try:
+            vol = scene.visuals.Volume(
+                data,
+                parent=self._view.scene,
+                interpolation="nearest",
+                texture_format=self._txt_fmt,
+            )
+        except ValueError as e:
+            warnings.warn(f"{e}. Falling back to CPUScaledTexture", stacklevel=2)
+            vol = scene.visuals.Volume(
+                data, parent=self._view.scene, interpolation="nearest"
+            )
+
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
         handle = VispyImageHandle(vol)
@@ -587,7 +606,10 @@ class VispyViewerCanvas(ArrayCanvas):
 def _downcast(data: np.ndarray | None) -> np.ndarray | None:
     """Downcast >32bit data to 32bit."""
     # downcast to 32bit, preserving int/float
-    if data is not None and data.dtype.itemsize > 4:
-        d32b = np.int32 if np.issubdtype(data.dtype, np.integer) else np.float32
-        data = data.astype(d32b)
+    if data is not None:
+        if np.issubdtype(data.dtype, np.integer) and data.dtype.itemsize > 2:
+            warnings.warn("Downcasting integer data to uint16.", stacklevel=2)
+            data = data.astype(np.uint16)
+        elif np.issubdtype(data.dtype, np.floating) and data.dtype.itemsize > 4:
+            data = data.astype(np.float32)
     return data
