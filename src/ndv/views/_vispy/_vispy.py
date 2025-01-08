@@ -586,6 +586,7 @@ class VispyViewerCanvas(ArrayCanvas):
                 elements.append(handle)
         return elements
 
+
 def _downcast(data: np.ndarray | None) -> np.ndarray | None:
     """Downcast >32bit data to 32bit."""
     # downcast to 32bit, preserving int/float
