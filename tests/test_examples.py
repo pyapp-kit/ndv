@@ -22,6 +22,7 @@ EXAMPLES_PY = list(EXAMPLES.glob("*.py"))
 @pytest.mark.allow_leaks
 @pytest.mark.usefixtures("any_app")
 @pytest.mark.parametrize("example", EXAMPLES_PY, ids=lambda x: x.name)
+@pytest.mark.filterwarnings("ignore:Downcasting integer data")
 def test_example(example: Path) -> None:
     try:
         runpy.run_path(str(example))
