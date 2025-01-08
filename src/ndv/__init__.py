@@ -13,4 +13,4 @@ from .models import DataWrapper
 from .util import imshow
 from .views import run_app
 
-__all__ = ["ArrayViewer", "DataWrapper", "NDViewer", "data", "imshow", "run_app"]
+__all__ = ["ArrayViewer", "DataWrapper", "data", "imshow", "run_app"]
