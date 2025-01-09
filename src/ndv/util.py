@@ -10,29 +10,22 @@ from ndv.views._app import run_app
 if TYPE_CHECKING:
     from typing import Any, Unpack
 
-    from ndv.models import ArrayDataDisplayModel
-
     from .models._array_display_model import ArrayDisplayModel, ArrayDisplayModelKwargs
     from .models.data_wrappers import DataWrapper
 
 
-# either provide a fully formed display model
-@overload
-def imshow(model: ArrayDataDisplayModel, /) -> ArrayViewer: ...
-# or data with a display model
 @overload
 def imshow(
-    data: Any | DataWrapper, display_model: ArrayDisplayModel, /
+    data: Any | DataWrapper, /, display_model: ArrayDisplayModel = ...
 ) -> ArrayViewer: ...
-# or data with optional kwargs to create a display model
 @overload
 def imshow(
     data: Any | DataWrapper, /, **kwargs: Unpack[ArrayDisplayModelKwargs]
 ) -> ArrayViewer: ...
 def imshow(
-    data: Any | DataWrapper | ArrayDataDisplayModel,
-    display_model: ArrayDisplayModel | None = None,
+    data: Any | DataWrapper,
     /,
+    display_model: ArrayDisplayModel | None = None,
     **kwargs: Unpack[ArrayDisplayModelKwargs],
 ) -> ArrayViewer:
     """Display an array or DataWrapper in a new NDViewer window.
@@ -40,7 +33,7 @@ def imshow(
     Parameters
     ----------
     data : Any | DataWrapper
-        The data to be displayed. If not a DataWrapper, it will be wrapped in one.
+        The data to be displayed. Any ArrayLike object or an `ndv.DataWrapper`.
     display_model: ArrayDisplayModel, optional
         The display model to use. If not provided, a new one will be created.
     kwargs : Unpack[ArrayDisplayModelKwargs]

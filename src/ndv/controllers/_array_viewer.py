@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
-from ndv.models import ArrayDataDisplayModel
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
+from ndv.models._data_display_model import ArrayDataDisplayModel
 from ndv.models._lut_model import LUTModel
 from ndv.views import _app
 
@@ -35,10 +35,8 @@ class ArrayViewer:
 
     Parameters
     ----------
-    data_or_model : ArrayDataDisplayModel | DataWrapper | Any
-        Data to be displayed. If a full `ArrayDataDisplayModel` is provided, it will be
-        used directly. If an array or `DataWrapper` is provided, a default display model
-        will be created.
+    data_or_model :  DataWrapper | Any
+        Data to be displayed.
     display_model : ArrayDisplayModel, optional
         Just the display model to use. If provided, `data_or_model` must be an array
         or `DataWrapper`... and kwargs will be ignored.
@@ -49,28 +47,15 @@ class ArrayViewer:
 
     def __init__(
         self,
-        data_or_model: Any | DataWrapper | ArrayDataDisplayModel = None,
+        data: Any | DataWrapper = None,
         /,
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
-        if isinstance(data_or_model, ArrayDataDisplayModel):
-            if display_model is not None or kwargs:
-                warnings.warn(
-                    "If an ArrayDataDisplayModel is provided, display_model and kwargs "
-                    "will be ignored.",
-                    stacklevel=2,
-                )
-            model = data_or_model
-        else:
-            if display_model is not None and kwargs:
-                warnings.warn(
-                    "If display_model is provided, kwargs will be ignored.",
-                    stacklevel=2,
-                )
-            display_model = display_model or ArrayDisplayModel(**kwargs)
-            model = ArrayDataDisplayModel(
-                data_wrapper=data_or_model, display=display_model
+        if display_model is not None and kwargs:
+            warnings.warn(
+                "When display_model is provided, kwargs are be ignored.",
+                stacklevel=2,
             )
 
         # mapping of channel keys to their respective controllers
@@ -86,7 +71,8 @@ class ArrayViewer:
         self._histogram: HistogramCanvas | None = None
         self._view = frontend_cls(self._canvas.frontend_widget())
 
-        self._model: ArrayDataDisplayModel = model
+        display_model = display_model or ArrayDisplayModel(**kwargs)
+        self._model = ArrayDataDisplayModel(data_wrapper=data, display=display_model)
         self._set_model_connected(self._model.display)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
@@ -105,24 +91,24 @@ class ArrayViewer:
         return self._view
 
     @property
-    def model(self) -> ArrayDataDisplayModel:
+    def display_model(self) -> ArrayDisplayModel:
         """Return the display model for the viewer."""
-        return self._model
+        return self._model.display
 
-    @model.setter
-    def model(self, model: ArrayDisplayModel | ArrayDataDisplayModel) -> None:
+    @display_model.setter
+    def display_model(self, model: ArrayDisplayModel) -> None:
         """Set the display model for the viewer."""
+        if not isinstance(model, ArrayDisplayModel):
+            raise TypeError("model must be an ArrayDisplayModel")
         self._set_model_connected(self._model.display, False)
-        if isinstance(model, ArrayDisplayModel):
-            self._model.display = model
-        elif isinstance(model, ArrayDataDisplayModel):
-            self._model = model
-        else:
-            raise TypeError(
-                "model must be an ArrayDisplayModel or ArrayDataDisplayModel"
-            )
+        self._model.display = model
         self._set_model_connected(self._model.display)
         self._fully_synchronize_view()
+
+    @property
+    def data_wrapper(self) -> Any:
+        """Return data being displayed."""
+        return self._model.data_wrapper
 
     @property
     def data(self) -> Any:
@@ -173,7 +159,7 @@ class ArrayViewer:
         if self._histogram is None:
             return
         if dtype is None:
-            if (wrapper := self.model.data_wrapper) is None:
+            if (wrapper := self._model.data_wrapper) is None:
                 return
             dtype = wrapper.dtype
         else:

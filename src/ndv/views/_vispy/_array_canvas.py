@@ -418,7 +418,7 @@ class VispyRoiHandle(RoiHandle):
         return self._roi.cursor_at(pos)
 
 
-class VispyViewerCanvas(ArrayCanvas):
+class VispyArrayCanvas(ArrayCanvas):
     """Vispy-based viewer for data.
 
     All vispy-specific code is encapsulated in this class (and non-vispy canvases
