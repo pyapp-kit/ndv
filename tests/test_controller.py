@@ -141,7 +141,7 @@ def test_histogram_controller() -> None:
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)
 
     # adding a histogram tells the view to add a histogram, and updates the data
-    ctrl.add_histogram()
+    ctrl._add_histogram()
     mock_view.add_histogram.assert_called_once()
     mock_histogram = ctrl._histogram
     mock_histogram.set_data.assert_called_once()

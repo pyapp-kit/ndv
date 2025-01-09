@@ -79,7 +79,7 @@ class ArrayViewer:
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
-        self._view.histogramRequested.connect(self.add_histogram)
+        self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
@@ -159,7 +159,9 @@ class ArrayViewer:
             self._data_model.data_wrapper, display_model=self.display_model
         )
 
-    def add_histogram(self) -> None:
+    # --------------------- PRIVATE ------------------------------------------
+
+    def _add_histogram(self) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         self._histogram = histogram_cls()
         self._view.add_histogram(self._histogram.frontend_widget())
@@ -173,8 +175,6 @@ class ArrayViewer:
 
         if self.data is not None:
             self._update_hist_domain_for_dtype()
-
-    # --------------------- PRIVATE ------------------------------------------
 
     def _update_hist_domain_for_dtype(
         self, dtype: np.typing.DTypeLike | None = None
