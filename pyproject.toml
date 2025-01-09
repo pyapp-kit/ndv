@@ -84,7 +84,7 @@ third_party_arrays = [
     "numpy<2.0",                               # for tensorstore (at least)
     "torch",
     "xarray",
-    "zarr",
+    "zarr<3",
     "dask[array]",
 ]
 
