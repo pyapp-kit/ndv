@@ -2,7 +2,7 @@
 
 import warnings
 from enum import Enum
-from typing import Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
 
 from pydantic import Field, computed_field, model_validator
 from typing_extensions import Self, TypeAlias
@@ -13,6 +13,30 @@ from ._base_model import NDVModel
 from ._lut_model import LUTModel
 from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    import cmap
+
+    from ._lut_model import AutoscaleType
+
+    class LutModelKwargs(TypedDict, total=False):
+        visible: bool
+        cmap: cmap.Colormap | cmap._colormap.ColorStopsLike
+        clims: tuple[float, float] | None
+        gamma: float
+        autoscale: AutoscaleType
+
+    class ArrayDisplayModelKwargs(TypedDict, total=False):
+        visible_axes: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
+        current_index: Mapping[AxisKey, Union[int, slice]]
+        channel_mode: "ChannelMode" | Literal["grayscale", "composite", "color", "rgba"]
+        channel_axis: Optional[AxisKey]
+        reducers: Mapping[AxisKey | None, ReducerType]
+        luts: Mapping[int | None, LUTModel | LutModelKwargs]
+        default_lut: LUTModel | LutModelKwargs
+
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
 IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]

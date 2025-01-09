@@ -8,18 +8,30 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
+from functools import cached_property
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Protocol,
+    TypeVar,
+)
 
 import numpy as np
 import numpy.typing as npt
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
+    from typing import Any, TypeAlias, TypeGuard
 
+    import dask.array.core as da
+    import numpy.typing as npt
     import pydantic_core
+    import pyopencl.array as cl_array
+    import sparse
     import tensorstore as ts
     from pydantic import GetCoreSchemaHandler
-    from typing_extensions import TypeAlias, TypeGuard
 
     Index: TypeAlias = int | slice
 
@@ -93,6 +105,17 @@ class DataWrapper(Generic[ArrayT], ABC):
     def save_as_zarr(self, path: str) -> None:
         raise NotImplementedError("Saving as zarr is not supported for this data type")
 
+    @property
+    def dtype(self) -> np.dtype:
+        """Return the dtype for the data."""
+        try:
+            return np.dtype(self._data.dtype)  # type: ignore
+        except AttributeError as e:
+            raise NotImplementedError(
+                "`dtype` property not properly implemented for DataWrapper of type: "
+                f"{type(self)}"
+            ) from e
+
     # -----------------------------
 
     @classmethod
@@ -144,10 +167,10 @@ class DataWrapper(Generic[ArrayT], ABC):
         for dimkey, val in sizes.items():
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
-                    return dimkey
+                    return self.normalized_axis_key(dimkey)
 
         # otherwise use the smallest dimension as the channel axis
-        return min(sizes, key=sizes.get)  # type: ignore
+        return min(sizes, key=sizes.get)  # type: ignore [arg-type]
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""
@@ -168,6 +191,35 @@ class DataWrapper(Generic[ArrayT], ABC):
         if nbytes := getattr(self._data, "nbytes", 0) / 1e6:
             info += f", {nbytes:.2f}MB"
         return info
+
+    # TODO: this needs to be cleared when data.dims changes
+    @cached_property
+    def axis_map(self) -> Mapping[Hashable, int]:
+        """Mapping of ALL valid axis keys to normalized, positive integer keys."""
+        axis_index: dict[Hashable, int] = {}
+        ndims = len(self.dims)
+        for i, dim in enumerate(self.dims):
+            axis_index[dim] = i  # map dimension label to positive index
+            axis_index[i] = i  # map positive integer index to itself
+            axis_index[-(ndims - i)] = i  # map negative integer index to positive index
+        return axis_index
+
+    def normalized_axis_key(self, axis: Hashable) -> int:
+        """Return positive index for `axis` (which can be +/- int or str label)."""
+        try:
+            return self.axis_map[axis]
+        except KeyError as e:
+            ndims = len(self.dims)
+            if isinstance(axis, int):
+                raise IndexError(
+                    f"Axis index {axis} out of bounds for data with {ndims} dimensions"
+                ) from e
+            raise IndexError(f"Axis label {axis} not found in data dimensions") from e
+
+    def clear_cache(self) -> None:
+        """Clear any cached properties."""
+        if hasattr(self, "axis_map"):
+            del self.axis_map
 
 
 ##########################
@@ -252,7 +304,7 @@ class ArrayLikeWrapper(DataWrapper[NPArrayLike]):
 
     def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
         idx = tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
-        return np.asarray(self.data[idx])
+        return self._asarray(self.data[idx])
 
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[SupportsIndexing]:
@@ -268,3 +320,53 @@ class ArrayLikeWrapper(DataWrapper[NPArrayLike]):
         ):
             return True
         return False
+
+    def _asarray(self, data: npt.ArrayLike) -> np.ndarray:
+        """Convert data to a numpy array."""
+        return np.asarray(data)
+
+
+class SparseArrayWrapper(ArrayLikeWrapper["sparse.Array"]):
+    PRIORITY = 50
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[sparse.COO]:
+        if (sparse := sys.modules.get("sparse")) and isinstance(obj, sparse.COO):
+            return True
+        return False
+
+    def _asarray(self, data: sparse.COO) -> np.ndarray:
+        return np.asarray(data.todense())
+
+
+class CLArrayWrapper(ArrayLikeWrapper["cl_array.Array"]):
+    """Wrapper for pyopencl array objects."""
+
+    PRIORITY = 50
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[cl_array.Array]:
+        if (cl_array := sys.modules.get("pyopencl.array")) and isinstance(
+            obj, cl_array.Array
+        ):
+            return True
+        return False
+
+    def _asarray(self, data: cl_array.Array) -> np.ndarray:
+        return np.asarray(data.get())
+
+
+class DaskWrapper(ArrayLikeWrapper["da.Array"]):
+    """Wrapper for dask array objects."""
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[da.Array]:
+        if (da := sys.modules.get("dask.array")) and isinstance(obj, da.Array):
+            return True
+        return False
+
+    def _asarray(self, data: da.Array) -> np.ndarray:
+        return np.asarray(data.compute())
+
+    def save_as_zarr(self, path: str) -> None:
+        self._data.to_zarr(url=path)

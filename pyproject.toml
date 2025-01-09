@@ -21,7 +21,10 @@ description = "simple nd image viewer"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "Talley Lambert", email = "talley.lambert@gmail.com" }]
+authors = [
+    { name = "Talley Lambert", email = "talley.lambert@gmail.com" },
+    { name = "Gabriel Selzer", email = "gjselzer@wisc.edu" },
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
@@ -81,7 +84,7 @@ third_party_arrays = [
     "numpy<2.0",                               # for tensorstore (at least)
     "torch",
     "xarray",
-    "zarr",
+    "zarr<3",
     "dask[array]",
 ]
 
