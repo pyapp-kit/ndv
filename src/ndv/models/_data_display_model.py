@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import Any, Optional, Union, cast
 
 import numpy as np
 from pydantic import Field
@@ -11,10 +11,7 @@ from ndv.models._base_model import NDVModel
 
 from .data_wrappers import DataWrapper
 
-if TYPE_CHECKING:
-    from ndv._types import AxisKey
-    from ndv.models._array_display_model import IndexMap, LutMap, TwoOrThreeAxisTuple
-    from ndv.models._lut_model import LUTModel
+__all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
 
 @dataclass
@@ -36,8 +33,8 @@ class DataResponse:
     request: Optional[DataRequest] = None
 
 
-class ArrayDataDisplayModel(NDVModel):
-    """Full model combining ArrayDisplayModel model with a DataWrapper.
+class _ArrayDataDisplayModel(NDVModel):
+    """Utility class combining ArrayDisplayModel model with a DataWrapper.
 
     The `ArrayDisplayModel` can be thought of as an "instruction" for how to display
     some data, while the `DataWrapper` is the actual data.  This class combines the two
@@ -55,7 +52,7 @@ class ArrayDataDisplayModel(NDVModel):
     ----------
     display : ArrayDisplayModel
         The display model. Provides instructions for how to display the data.
-    data_wrapper : Optional[DataWrapper]
+    data_wrapper : DataWrapper  | None
         The data wrapper. Provides the actual data to be displayed
     """
 
@@ -77,7 +74,7 @@ class ArrayDataDisplayModel(NDVModel):
             # only use the guess if it's not already in the visible axes
             guess = self.data_wrapper.guess_channel_axis()
             if guess not in self.normed_visible_axes:
-                self.channel_axis = guess
+                self.display.channel_axis = guess
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
@@ -118,79 +115,6 @@ class ArrayDataDisplayModel(NDVModel):
             return None
         wrapper = self._ensure_wrapper()
         return wrapper.normalized_axis_key(self.display.channel_axis)
-
-    # Proxy Methods for DataWrapper       ----------------------------
-
-    @property
-    def data(self) -> Any:
-        """Return the data being displayed."""
-        if self.data_wrapper is None:
-            return None
-        return self.data_wrapper.data
-
-    @data.setter
-    def data(self, data: Any) -> None:
-        """Set the data to be displayed."""
-        if data is None:
-            self.data_wrapper = None
-        else:
-            self.data_wrapper = DataWrapper.create(data)
-
-    # Proxy Methods for ArrayDisplayModel ----------------------------
-
-    @property
-    def visible_axes(self) -> "TwoOrThreeAxisTuple":
-        return self.display.visible_axes
-
-    @visible_axes.setter
-    def visible_axes(self, axes: "TwoOrThreeAxisTuple") -> None:
-        self.display.visible_axes = axes
-
-    @property
-    def current_index(self) -> "IndexMap":
-        """Return the current index."""
-        return self.display.current_index
-
-    @current_index.setter
-    def current_index(self, index: "IndexMap") -> None:
-        """Set the current index."""
-        # use `assign` because current_index is immutable
-        self.display.current_index.assign(index)
-
-    @property
-    def channel_mode(self) -> ChannelMode:
-        """Return the channel mode."""
-        return self.display.channel_mode
-
-    @channel_mode.setter
-    def channel_mode(self, mode: ChannelMode) -> None:
-        """Set the channel mode."""
-        self.display.channel_mode = mode
-
-    @property
-    def channel_axis(self) -> "AxisKey | None":
-        """Return the channel axis."""
-        return self.display.channel_axis
-
-    @channel_axis.setter
-    def channel_axis(self, axis: "AxisKey | None") -> None:
-        self.display.channel_axis = axis
-
-    @property
-    def luts(self) -> "LutMap":
-        """Return the lookup tables."""
-        return self.display.luts
-
-    @luts.setter
-    def luts(self, luts: "LutMap") -> None:
-        """Set the lookup tables."""
-        # use `assign` because luts is immutable
-        self.display.luts.assign(luts)
-
-    @property
-    def default_lut(self) -> "LUTModel":
-        """Return the default lookup table."""
-        return self.display.default_lut
 
     # Indexing and Data Slicing -----------------------------------------------------
 

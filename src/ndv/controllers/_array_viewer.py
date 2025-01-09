@@ -7,8 +7,9 @@ import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
-from ndv.models._data_display_model import ArrayDataDisplayModel
+from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._lut_model import LUTModel
+from ndv.models.data_wrappers import DataWrapper
 from ndv.views import _app
 
 if TYPE_CHECKING:
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
-    from ndv.models.data_wrappers import DataWrapper
     from ndv.views.bases import ArrayView, HistogramCanvas
 
     LutKey: TypeAlias = int | None
@@ -72,8 +72,10 @@ class ArrayViewer:
         self._view = frontend_cls(self._canvas.frontend_widget())
 
         display_model = display_model or ArrayDisplayModel(**kwargs)
-        self._model = ArrayDataDisplayModel(data_wrapper=data, display=display_model)
-        self._set_model_connected(self._model.display)
+        self._data_model = _ArrayDataDisplayModel(
+            data_wrapper=data, display=display_model
+        )
+        self._set_model_connected(self._data_model.display)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
@@ -81,47 +83,56 @@ class ArrayViewer:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
-        if self._model.data_wrapper is not None:
+        if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
 
     # -------------- possibly move this logic up to DataDisplayModel --------------
     @property
     def view(self) -> ArrayView:
-        """Return the front-end view object."""
+        """Return the front-end view object.
+
+        To access the actual native widget, use `self.view.frontend_widget()`.
+        If you directly access the frontend widget, you're on your own :) no guarantees
+        can be made about synchronization with the model.  However, it is exposed for
+        experimental and custom use cases.
+        """
         return self._view
 
     @property
     def display_model(self) -> ArrayDisplayModel:
-        """Return the display model for the viewer."""
-        return self._model.display
+        """Return the current ArrayDisplayModel."""
+        return self._data_model.display
 
     @display_model.setter
     def display_model(self, model: ArrayDisplayModel) -> None:
-        """Set the display model for the viewer."""
+        """Set the ArrayDisplayModel."""
         if not isinstance(model, ArrayDisplayModel):
             raise TypeError("model must be an ArrayDisplayModel")
-        self._set_model_connected(self._model.display, False)
-        self._model.display = model
-        self._set_model_connected(self._model.display)
+        self._set_model_connected(self._data_model.display, False)
+        self._data_model.display = model
+        self._set_model_connected(self._data_model.display)
         self._fully_synchronize_view()
 
     @property
     def data_wrapper(self) -> Any:
         """Return data being displayed."""
-        return self._model.data_wrapper
+        return self._data_model.data_wrapper
 
     @property
     def data(self) -> Any:
         """Return data being displayed."""
-        if self._model.data_wrapper is None:
+        if self._data_model.data_wrapper is None:
             return None  # pragma: no cover
         # returning the actual data, not the wrapper
-        return self._model.data_wrapper.data
+        return self._data_model.data_wrapper.data
 
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        self._model.data = data
+        if data is None:
+            self._data_model.data_wrapper = None
+        else:
+            self._data_model.data_wrapper = DataWrapper.create(data)
         self._fully_synchronize_view()
 
     def show(self) -> None:
@@ -159,7 +170,7 @@ class ArrayViewer:
         if self._histogram is None:
             return
         if dtype is None:
-            if (wrapper := self._model.data_wrapper) is None:
+            if (wrapper := self._data_model.data_wrapper) is None:
                 return
             dtype = wrapper.dtype
         else:
@@ -193,9 +204,9 @@ class ArrayViewer:
 
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
-        display_model = self._model.display
+        display_model = self._data_model.display
         with self.view.currentIndexChanged.blocked():
-            self._view.create_sliders(self._model.normed_data_coords)
+            self._view.create_sliders(self._data_model.normed_data_coords)
         self._view.set_channel_mode(display_model.channel_mode)
         if self.data is not None:
             self._update_visible_sliders()
@@ -203,7 +214,7 @@ class ArrayViewer:
                 self._view.set_current_index(cur_index)
             # reconcile view sliders with model
             self._on_view_current_index_changed()
-            if wrapper := self._model.data_wrapper:
+            if wrapper := self._data_model.data_wrapper:
                 self._view.set_data_info(wrapper.summary_info())
 
             self._clear_canvas()
@@ -217,7 +228,7 @@ class ArrayViewer:
         self._update_canvas()
 
     def _on_model_current_index_changed(self) -> None:
-        value = self._model.display.current_index
+        value = self._data_model.display.current_index
         self._view.set_current_index(value)
         self._update_canvas()
 
@@ -246,7 +257,7 @@ class ArrayViewer:
 
     def _on_view_current_index_changed(self) -> None:
         """Update the model when slider value changes."""
-        self._model.display.current_index.update(self._view.current_index())
+        self._data_model.display.current_index.update(self._view.current_index())
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
@@ -268,15 +279,15 @@ class ArrayViewer:
         self._view.set_hover_info(text)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
-        self._model.display.channel_mode = mode
+        self._data_model.display.channel_mode = mode
 
     # ------------------ Helper methods ------------------
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
-        hidden_sliders: tuple[int, ...] = self._model.normed_visible_axes
-        if self._model.display.channel_mode.is_multichannel():
-            if ch := self._model.normed_channel_axis:
+        hidden_sliders: tuple[int, ...] = self._data_model.normed_visible_axes
+        if self._data_model.display.channel_mode.is_multichannel():
+            if ch := self._data_model.normed_channel_axis:
                 hidden_sliders += (ch,)
 
         self._view.hide_sliders(hidden_sliders, show_remainder=True)
@@ -287,12 +298,12 @@ class ArrayViewer:
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
         """
-        if not self._model.data_wrapper:
+        if not self._data_model.data_wrapper:
             return  # pragma: no cover
 
-        display_model = self._model.display
+        display_model = self._data_model.display
         # TODO: make asynchronous
-        for future in self._model.request_sliced_data():
+        for future in self._data_model.request_sliced_data():
             response = future.result()
             key = response.channel_key
             data = response.data
@@ -336,7 +347,7 @@ class ArrayViewer:
         # TODO: handle 3D data
         if (
             x < 0 or y < 0
-        ) or self._model.display.n_visible_axes != 2:  # pragma: no cover
+        ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
             return {}
 
         values: dict[LutKey, float] = {}
