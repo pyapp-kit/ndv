@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 
     from IPython.core.interactiveshell import InteractiveShell
 
-    from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
-    from ndv.views.bases.graphics._mouseable import Mouseable
+    from ndv._views.bases import ArrayCanvas, ArrayView, HistogramCanvas
+    from ndv._views.bases.graphics._mouseable import Mouseable
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
@@ -125,7 +125,7 @@ class QtProvider(GuiProvider):
 
     @staticmethod
     def array_view_class() -> type[ArrayView]:
-        from ._qt.qt_view import QtArrayView
+        from ._qt._array_view import QtArrayView
 
         return QtArrayView
 
@@ -208,7 +208,7 @@ class WxProvider(GuiProvider):
 
     @staticmethod
     def array_view_class() -> type[ArrayView]:
-        from ._wx.wx_view import WxArrayView
+        from ._wx._array_view import WxArrayView
 
         return WxArrayView
 
@@ -279,7 +279,7 @@ class JupyterProvider(GuiProvider):
 
     @staticmethod
     def array_view_class() -> type[ArrayView]:
-        from ._jupyter.jupyter_view import JupyterArrayView
+        from ._jupyter._array_view import JupyterArrayView
 
         return JupyterArrayView
 
@@ -329,7 +329,7 @@ class VispyProvider(CanvasProvider):
     def array_canvas_class() -> type[ArrayCanvas]:
         from vispy.app import use_app
 
-        from ndv.views._vispy._vispy import VispyViewerCanvas
+        from ndv._views._vispy._array_canvas import VispyArrayCanvas
 
         # these may not be necessary, since we likely have already called
         # create_app by this point and vispy will autodetect that.
@@ -342,11 +342,11 @@ class VispyProvider(CanvasProvider):
         # there is no `use_app('qt')`... it's all specific to pyqt/pyside, etc...
         # so we just let vispy autodetect it
 
-        return VispyViewerCanvas
+        return VispyArrayCanvas
 
     @staticmethod
     def histogram_canvas_class() -> type[HistogramCanvas]:
-        from ndv.views._vispy._histogram import VispyHistogramCanvas
+        from ndv._views._vispy._histogram import VispyHistogramCanvas
 
         return VispyHistogramCanvas
 
@@ -362,7 +362,7 @@ class PygfxProvider(CanvasProvider):
 
     @staticmethod
     def array_canvas_class() -> type[ArrayCanvas]:
-        from ndv.views._pygfx._pygfx import GfxArrayCanvas
+        from ndv._views._pygfx._array_canvas import GfxArrayCanvas
 
         return GfxArrayCanvas
 

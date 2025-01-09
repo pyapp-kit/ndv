@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     import cmap
 
-    from ndv.views.bases.graphics._canvas_elements import ImageHandle
+    from ndv._views.bases.graphics._canvas_elements import ImageHandle
 
 
 class CmapCombo(QColormapComboBox):

@@ -1,22 +1,25 @@
 """Test controller without canavs or gui frontend"""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
+import pytest
 
 from ndv._types import MouseMoveEvent
-from ndv.controller import ViewerController
+from ndv._views import _app, gui_frontend
+from ndv._views.bases._array_view import ArrayView
+from ndv._views.bases._lut_view import LutView
+from ndv._views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
+from ndv._views.bases.graphics._canvas_elements import ImageHandle
+from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
-from ndv.views import _app
-from ndv.views.bases._array_view import ArrayView
-from ndv.views.bases._lut_view import LutView
-from ndv.views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
-from ndv.views.bases.graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
-    from ndv.controller._channel_controller import ChannelController
+    from ndv.controllers._channel_controller import ChannelController
 
 
 def _get_mock_canvas() -> ArrayCanvas:
@@ -49,13 +52,14 @@ def _patch_views(f: Callable) -> Callable:
 @_patch_views
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
-    data = np.empty(SHAPE)
-    ctrl = ViewerController()
-    model = ctrl.model
+    ctrl = ArrayViewer()
+    model = ctrl.display_model
     mock_view = ctrl.view
+    mock_view.create_sliders.assert_not_called()
 
+    data = np.empty(SHAPE)
     ctrl.data = data
-    wrapper = ctrl._dd_model.data_wrapper
+    wrapper = ctrl._data_model.data_wrapper
 
     # showing the controller shows the view
     ctrl.show()
@@ -101,7 +105,7 @@ def test_controller() -> None:
     # setting a new ArrayDisplay model updates the appropriate view widgets
     ch_ctrl = cast("ChannelController", ctrl._lut_controllers[None])
     ch_ctrl.lut_views[0].set_colormap_without_signal.reset_mock()
-    ctrl.model = ArrayDisplayModel(default_lut=LUTModel(cmap="green"))
+    ctrl.display_model = ArrayDisplayModel(default_lut=LUTModel(cmap="green"))
     # fails
     # ch_ctrl.lut_views[0].set_colormap_without_signal.assert_called_once()
 
@@ -111,7 +115,7 @@ def test_controller() -> None:
 def test_canvas() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
-    ctrl = ViewerController()
+    ctrl = ArrayViewer()
     mock_canvas = ctrl._canvas
 
     mock_view = ctrl.view
@@ -131,23 +135,48 @@ def test_canvas() -> None:
 @no_type_check
 @_patch_views
 def test_histogram_controller() -> None:
-    ctrl = ViewerController()
+    ctrl = ArrayViewer()
     mock_view = ctrl.view
 
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)
 
     # adding a histogram tells the view to add a histogram, and updates the data
-    ctrl.add_histogram()
+    ctrl._add_histogram()
     mock_view.add_histogram.assert_called_once()
     mock_histogram = ctrl._histogram
     mock_histogram.set_data.assert_called_once()
 
     # changing the index updates the histogram
     mock_histogram.set_data.reset_mock()
-    ctrl.model.current_index.assign({0: 1, 1: 2, 3: 3})
+    ctrl.display_model.current_index.assign({0: 1, 1: 2, 3: 3})
     mock_histogram.set_data.assert_called_once()
 
     # switching to composite mode puts the histogram view in the
     # lut controller for all channels (this may change)
-    ctrl.model.channel_mode = ChannelMode.COMPOSITE
+    ctrl.display_model.channel_mode = ChannelMode.COMPOSITE
     assert mock_histogram in ctrl._lut_controllers[0].lut_views
+
+
+@pytest.mark.usefixtures("any_app")
+def test_array_viewer_with_app() -> None:
+    """Example usage of new mvc pattern."""
+    viewer = ArrayViewer()
+    assert gui_frontend() in type(viewer._view).__name__.lower()
+    viewer.show()
+
+    data = np.random.randint(0, 255, size=(10, 10, 10, 10, 10), dtype="uint8")
+    viewer.data = data
+
+    # test changing current index via the view
+    index_mock = Mock()
+    viewer.display_model.current_index.value_changed.connect(index_mock)
+    index = {0: 4, 1: 1, 2: 2}
+    # setting the index should trigger the signal, only once
+    viewer._view.set_current_index(index)
+    index_mock.assert_called_once()
+    for k, v in index.items():
+        assert viewer.display_model.current_index[k] == v
+    # setting again should not trigger the signal
+    index_mock.reset_mock()
+    viewer._view.set_current_index(index)
+    index_mock.assert_not_called()

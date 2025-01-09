@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, cast
 import cmap
 import ipywidgets as widgets
 
+from ndv._views.bases import ArrayView, LutView
 from ndv.models._array_display_model import ChannelMode
-from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -100,6 +100,9 @@ class JupyterLutView(LutView):
     def set_visible(self, visible: bool) -> None:
         # show or hide the actual widget itself
         self.layout.layout.display = "flex" if visible else "none"
+
+    def close(self) -> None:
+        self.layout.close()
 
     def frontend_widget(self) -> Any:
         return self.layout
@@ -246,3 +249,6 @@ class JupyterArrayView(ArrayView):
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
             display.clear_output()  # type: ignore [no-untyped-call]
+
+    def close(self) -> None:
+        self.layout.close()

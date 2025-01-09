@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 from qtpy.QtCore import Qt, Signal
 from qtpy.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -14,19 +15,13 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from superqt import (
-    QCollapsible,
-    QElidingLabel,
-    QEnumComboBox,
-    QLabeledRangeSlider,
-    QLabeledSlider,
-)
+from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
+from ndv._views.bases import ArrayView, LutView
 from ndv.models._array_display_model import ChannelMode
-from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -74,7 +69,7 @@ QRangeSlider { qproperty-barColor: qlineargradient(
 class _CmapCombo(QColormapComboBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent, allow_user_colormaps=True, add_colormap_text="Add...")
-        self.setMinimumSize(120, 21)
+        self.setMinimumSize(140, 21)
         # self.setStyleSheet("background-color: transparent;")
 
     def showPopup(self) -> None:
@@ -82,6 +77,16 @@ class _CmapCombo(QColormapComboBox):
         popup = self.findChild(QFrame)
         popup.setMinimumWidth(self.width() + 100)
         popup.move(popup.x(), popup.y() - self.height() - popup.height())
+
+    # TODO: upstream me
+    def setCurrentColormap(self, cmap_: cmap.Colormap) -> None:
+        """Adds the color to the QComboBox and selects it."""
+        for idx in range(self.count()):
+            if item := self.itemColormap(idx):
+                if item.name == cmap_.name:
+                    self.setCurrentIndex(idx)
+        else:
+            self.addColormap(cmap_)
 
 
 class _QLUTWidget(QWidget):
@@ -149,6 +154,9 @@ class QLutView(LutView):
 
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
+
+    def close(self) -> None:
+        self._qwidget.close()
 
 
 class _QDimsSliders(QWidget):
@@ -267,7 +275,11 @@ class _QArrayViewer(QWidget):
         self.hover_info_label = QElidingLabel("", self)
 
         # the button that controls the display mode of the channels
-        self.channel_mode_combo = QEnumComboBox(self, ChannelMode)
+        # not using QEnumComboBox because we want to exclude some values for now
+        self.channel_mode_combo = QComboBox(self)
+        self.channel_mode_combo.addItems(
+            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+        )
 
         # button to reset the zoom of the canvas
         # TODO: unify icons across all the view frontends in a new file
@@ -329,7 +341,9 @@ class QtArrayView(ArrayView):
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
-        qwdg.channel_mode_combo.currentEnumChanged.connect(self.channelModeChanged.emit)
+        qwdg.channel_mode_combo.currentTextChanged.connect(
+            self._on_channel_mode_changed
+        )
         qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit)
 
     def add_lut_view(self) -> QLutView:
@@ -339,6 +353,9 @@ class QtArrayView(ArrayView):
 
     def remove_lut_view(self, view: LutView) -> None:
         self._qwidget.luts.removeWidget(cast("QLutView", view).frontend_widget())
+
+    def _on_channel_mode_changed(self, text: str) -> None:
+        self.channelModeChanged.emit(ChannelMode(text))
 
     def _on_add_histogram_clicked(self) -> None:
         splitter = self._qwidget.splitter
@@ -389,10 +406,13 @@ class QtArrayView(ArrayView):
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
         """Set the channel mode button text."""
-        self._qwidget.channel_mode_combo.setCurrentEnum(mode)
+        self._qwidget.channel_mode_combo.setCurrentText(mode.value)
 
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
+
+    def close(self) -> None:
+        self._qwidget.close()
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget

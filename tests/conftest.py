@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from ndv.views import gui_frontend
-from ndv.views._app import GuiFrontend
+from ndv._views import gui_frontend
+from ndv._views._app import GuiFrontend
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -96,7 +96,7 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
         from vispy.app.backends._qt import CanvasBackendDesktop
 
         allow: tuple[type, ...] = (CanvasBackendDesktop,)
-    except ImportError:
+    except (ImportError, RuntimeError):
         allow = ()
 
     # This is a known widget that is not cleaned up properly

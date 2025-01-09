@@ -2,5 +2,6 @@
 
 from ._old_data_wrapper import DataWrapper
 from ._old_viewer import NDViewer
+from .util import imshow
 
-__all__ = ["DataWrapper", "NDViewer"]
+__all__ = ["DataWrapper", "NDViewer", "imshow"]

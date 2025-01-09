@@ -10,5 +10,6 @@ class NDVModel(BaseModel):
     model_config = ConfigDict(
         validate_assignment=True,
         validate_default=True,
+        extra="forbid",
     )
     events: ClassVar[SignalGroupDescriptor] = SignalGroupDescriptor()

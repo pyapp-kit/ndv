@@ -7,8 +7,8 @@ import numpy as np
 from vispy import scene
 
 from ndv._types import CursorType
-from ndv.views._app import filter_mouse_events
-from ndv.views.bases import HistogramCanvas
+from ndv._views._app import filter_mouse_events
+from ndv._views.bases import HistogramCanvas
 
 from ._plot_widget import PlotWidget
 
@@ -110,6 +110,10 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._canvas.update()
 
     def set_visible(self, visible: bool) -> None: ...
+
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()
 
     # ------------- LutView Protocol methods ------------- #
 

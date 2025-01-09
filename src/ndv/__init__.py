@@ -6,11 +6,11 @@ try:
     __version__ = version("ndv")
 except PackageNotFoundError:
     __version__ = "uninstalled"
-__author__ = "Talley Lambert"
-__email__ = "talley.lambert@example.com"
 
 from . import data
+from ._views import run_app
+from .controllers import ArrayViewer
+from .models import DataWrapper
 from .util import imshow
-from .views import run_app
 
-__all__ = ["DataWrapper", "NDViewer", "data", "imshow", "run_app"]
+__all__ = ["ArrayViewer", "DataWrapper", "data", "imshow", "run_app"]

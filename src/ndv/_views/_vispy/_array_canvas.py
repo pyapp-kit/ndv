@@ -15,10 +15,10 @@ from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
 from ndv._types import CursorType
-from ndv.views._app import filter_mouse_events
-from ndv.views._vispy._utils import supports_float_textures
-from ndv.views.bases import ArrayCanvas
-from ndv.views.bases.graphics._canvas_elements import (
+from ndv._views._app import filter_mouse_events
+from ndv._views._vispy._utils import supports_float_textures
+from ndv._views.bases import ArrayCanvas
+from ndv._views.bases.graphics._canvas_elements import (
     CanvasElement,
     ImageHandle,
     RoiHandle,
@@ -418,7 +418,7 @@ class VispyRoiHandle(RoiHandle):
         return self._roi.cursor_at(pos)
 
 
-class VispyViewerCanvas(ArrayCanvas):
+class VispyArrayCanvas(ArrayCanvas):
     """Vispy-based viewer for data.
 
     All vispy-specific code is encapsulated in this class (and non-vispy canvases
@@ -473,6 +473,10 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def set_visible(self, visible: bool) -> None: ...
 
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()
+
     def refresh(self) -> None:
         self._canvas.update()
 
@@ -497,12 +501,19 @@ class VispyViewerCanvas(ArrayCanvas):
 
     def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
         data = _downcast(data)
-        vol = scene.visuals.Volume(
-            data,
-            parent=self._view.scene,
-            interpolation="nearest",
-            texture_format=self._txt_fmt,
-        )
+        try:
+            vol = scene.visuals.Volume(
+                data,
+                parent=self._view.scene,
+                interpolation="nearest",
+                texture_format=self._txt_fmt,
+            )
+        except ValueError as e:
+            warnings.warn(f"{e}. Falling back to CPUScaledTexture", stacklevel=2)
+            vol = scene.visuals.Volume(
+                data, parent=self._view.scene, interpolation="nearest"
+            )
+
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
         handle = VispyImageHandle(vol)

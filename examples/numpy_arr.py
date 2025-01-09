@@ -8,4 +8,4 @@ except Exception as e:
     print(e)
     img = ndv.data.nd_sine_wave((10, 3, 8, 512, 512))
 
-ndv.imshow(img)
+viewer = ndv.imshow(img)

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ndv.views.bases._lut_view import LutView
-from ndv.views.bases._view_base import Viewable
+from ndv._views.bases._lut_view import LutView
+from ndv._views.bases._view_base import Viewable
 
 from ._mouseable import Mouseable
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import cmap
     import numpy as np
 
-    from ndv.views.bases.graphics._canvas_elements import (
+    from ndv._views.bases.graphics._canvas_elements import (
         CanvasElement,
         ImageHandle,
         RoiHandle,

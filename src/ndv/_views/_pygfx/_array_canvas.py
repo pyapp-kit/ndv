@@ -11,8 +11,8 @@ import pygfx
 import pylinalg as la
 
 from ndv._types import CursorType
-from ndv.views._app import filter_mouse_events
-from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
+from ndv._views._app import filter_mouse_events
+from ndv._views.bases import ArrayCanvas, CanvasElement, ImageHandle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -391,7 +391,7 @@ class RectangularROIHandle(PyGFXRoiHandle):
 
 
 def get_canvas_class() -> WgpuCanvas:
-    from ndv.views._app import GuiFrontend, gui_frontend
+    from ndv._views._app import GuiFrontend, gui_frontend
 
     frontend = gui_frontend()
     if frontend == GuiFrontend.QT:
@@ -630,3 +630,7 @@ class GfxArrayCanvas(ArrayCanvas):
     def set_visible(self, visible: bool) -> None:
         """Set the visibility of the canvas."""
         self._canvas.visible = visible
+
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()

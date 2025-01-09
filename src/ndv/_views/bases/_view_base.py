@@ -15,3 +15,7 @@ class Viewable(ABC):
     @abstractmethod
     def set_visible(self, visible: bool) -> None:
         """Sets the visibility of the view/widget itself."""
+
+    @abstractmethod
+    def close(self) -> None:
+        """Close the view/widget."""
