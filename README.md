@@ -60,14 +60,24 @@ See examples for each of these array types in [examples](./examples/)
 
 ## Installation
 
+To just get started using Qt and vispy:
+  
+```python
+pip install ndv[qt]
+```
+
+For Jupyter, without requiring Qt, you can use:
+
+```python
+pip install ndv[jupyter]
+```
+
+If you'd like more control over the backend, you can install the optional dependencies directly.
+
 The only required dependencies are `numpy` and `superqt[cmap,iconify]`.
 You will also need a Qt backend (PyQt or PySide) and one of either
 [vispy](https://github.com/vispy/vispy) or [pygfx](https://github.com/pygfx/pygfx),
 which can be installed through extras `ndv[<pyqt|pyside>,<vispy|pygfx>]`:
-
-```python
-pip install ndv[pyqt,vispy]
-```
 
 > [!TIP]
 > If you have both vispy and pygfx installed, `ndv` will default to using vispy,

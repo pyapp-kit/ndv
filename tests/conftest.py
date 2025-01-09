@@ -1,16 +1,79 @@
+from __future__ import annotations
+
 import gc
+import importlib
+import importlib.util
+import os
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 
+from ndv._views import gui_frontend
+from ndv._views._app import GuiFrontend
+
 if TYPE_CHECKING:
+    from asyncio import AbstractEventLoop
+    from collections.abc import Iterator
+
+    import wx
     from pytest import FixtureRequest
     from qtpy.QtWidgets import QApplication
 
 
-@pytest.fixture(autouse=True)
-def find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None]:
+@pytest.fixture
+def asyncio_app() -> Iterator[AbstractEventLoop]:
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
+
+
+@pytest.fixture
+def wxapp() -> Iterator[wx.App]:
+    import wx
+
+    app = wx.App()
+    yield app
+    # app.ExitMainLoop()
+
+
+@pytest.fixture
+def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
+    # this fixture will use the appropriate application depending on the env var
+    # NDV_GUI_FRONTEND='qt' pytest
+    # NDV_GUI_FRONTEND='jupyter' pytest
+    try:
+        frontend = gui_frontend()
+    except RuntimeError:
+        # if we don't find any frontend, and jupyter is available, use that
+        # since it requires very little setup
+        if importlib.util.find_spec("jupyter"):
+            os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+            gui_frontend.cache_clear()
+
+        frontend = gui_frontend()
+
+    if frontend == GuiFrontend.QT:
+        app = request.getfixturevalue("qapp")
+        qtbot = request.getfixturevalue("qtbot")
+        with patch.object(app, "exec", lambda *_: None):
+            with _catch_qt_leaks(request, app):
+                yield app, qtbot
+    elif frontend == GuiFrontend.JUPYTER:
+        yield request.getfixturevalue("asyncio_app")
+    elif frontend == GuiFrontend.WX:
+        yield request.getfixturevalue("wxapp")
+    else:
+        raise RuntimeError("No GUI frontend found")
+
+
+@contextmanager
+def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[None]:
     """Run after each test to ensure no widgets have been left around.
 
     When this test fails, it means that a widget being tested has an issue closing
@@ -29,7 +92,15 @@ def find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None
     # if the test failed, don't worry about checking widgets
     if request.session.testsfailed - failures_before:
         return
-    remaining = qapp.topLevelWidgets()
+    try:
+        from vispy.app.backends._qt import CanvasBackendDesktop
+
+        allow: tuple[type, ...] = (CanvasBackendDesktop,)
+    except (ImportError, RuntimeError):
+        allow = ()
+
+    # This is a known widget that is not cleaned up properly
+    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, allow)]
     if len(remaining) > nbefore:
         test_node = request.node
 
