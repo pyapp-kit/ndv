@@ -35,7 +35,7 @@ class ArrayViewer:
 
     Parameters
     ----------
-    data_or_model :  DataWrapper | Any
+    data :  DataWrapper | Any
         Data to be displayed.
     display_model : ArrayDisplayModel, optional
         Just the display model to use. If provided, `data_or_model` must be an array
