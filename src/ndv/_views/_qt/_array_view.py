@@ -20,8 +20,8 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
+from ndv._views.bases import ArrayView, LutView
 from ndv.models._array_display_model import ChannelMode
-from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence

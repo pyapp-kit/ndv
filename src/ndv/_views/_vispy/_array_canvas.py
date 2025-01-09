@@ -15,10 +15,10 @@ from vispy.color import Color
 from vispy.util.quaternion import Quaternion
 
 from ndv._types import CursorType
-from ndv.views._app import filter_mouse_events
-from ndv.views._vispy._utils import supports_float_textures
-from ndv.views.bases import ArrayCanvas
-from ndv.views.bases.graphics._canvas_elements import (
+from ndv._views._app import filter_mouse_events
+from ndv._views._vispy._utils import supports_float_textures
+from ndv._views.bases import ArrayCanvas
+from ndv._views.bases.graphics._canvas_elements import (
     CanvasElement,
     ImageHandle,
     RoiHandle,
