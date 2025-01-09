@@ -86,7 +86,8 @@ class ArrayViewer:
         if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
 
-    # -------------- possibly move this logic up to DataDisplayModel --------------
+    # -------------- public attributes and methods -------------------------
+
     @property
     def view(self) -> ArrayView:
         """Return the front-end view object.
@@ -146,6 +147,17 @@ class ArrayViewer:
     def close(self) -> None:
         """Close the viewer."""
         self._view.set_visible(False)
+
+    def clone(self) -> ArrayViewer:
+        """Return a new ArrayViewer instance with the same data and display model.
+
+        Currently, this is a shallow copy.  Modifying one viewer will affect the state
+        of the other.
+        """
+        # TODO: provide deep_copy option
+        return ArrayViewer(
+            self._data_model.data_wrapper, display_model=self.display_model
+        )
 
     def add_histogram(self) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
