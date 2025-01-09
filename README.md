@@ -32,26 +32,26 @@ viewer.show()
 app.exec()
 ```
 
-## `ndv.NDViewer`
+## Features
 
-- very fast import and load time
-- supports arbitrary number of dimensions, with 2D/3D view canvas, and sliders for all non-visible dims
-- sliders support integer as well as slice (range)-based slicing
-- colormaps provided by [cmap](https://github.com/tlambert03/cmap)
-- supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
-- supports any numpy-like duck arrays, including (but not limited to):
-  - `numpy.ndarray`
-  - `cupy.ndarray`
-  - `dask.array.Array`
-  - `jax.Array`
-  - `pyopencl.array.Array`
-  - `sparse.COO`
-  - `tensorstore.TensorStore` (supports named dimensions)
-  - `torch.Tensor` (supports named dimensions)
-  - `xarray.DataArray` (supports named dimensions)
-  - `zarr` (supports named dimensions)
+- ⚡️ fast import and load time
+- 🥞 supports arbitrary number of dimensions, with 2D/3D view canvas
+<!-- - sliders support integer as well as slice (range)-based slicing -->
+- 🎨 colormaps provided by [cmap](https://github.com/tlambert03/cmap)
+- 🌠 supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
+- 🦆 supports any numpy-like duck arrays, including (but not limited to):
+    - `numpy.ndarray`
+    - `cupy.ndarray`
+    - `dask.array.Array`
+    - `jax.Array`
+    - `pyopencl.array.Array`
+    - `sparse.COO`
+    - `tensorstore.TensorStore` (supports named dimensions)
+    - `torch.Tensor` (supports named dimensions)
+    - `xarray.DataArray` (supports named dimensions)
+    - `zarr` (supports named dimensions)
 
-See examples for each of these array types in [examples](./examples/)
+See examples for each of these array types in [examples](https://github.com/pyapp-kit/ndv/tree/main/examples)
 
 > [!NOTE]
 > *You can add support for any custom storage class by subclassing `ndv.DataWrapper`
