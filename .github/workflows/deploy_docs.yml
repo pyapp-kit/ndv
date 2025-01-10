@@ -1,0 +1,43 @@
+name: Publish release documentation
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.repository == 'pyapp-kit/ndv'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+
+      - name: Install mkdocs and mike
+        run: pip install '.[docs]'
+
+      - name: Config git
+        run: |
+          git config user.email "ndv@github.com"
+          git config user.name "Ktlint Release Workflow"
+
+      - name: Deploy release docs
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          VERSION=$(git describe --abbrev=0 --tags)
+          echo "Deploy release docs to version $VERSION"
+          mike deploy --push --update-aliases $VERSION latest
+
+      - name: Deploy dev docs
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          VERSION=$(git describe)
+          echo "Deploy release docs to version $VERSION"
+          mike deploy --push --update-aliases $VERSION dev
+
+      - name: Update default release docs
+        run: mike set-default --push latest
