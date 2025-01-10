@@ -43,10 +43,7 @@ theme:
     - navigation.indexes
     - navigation.footer
     - navigation.sections
-    # - navigation.expand
     - toc.follow
-
-    # - navigation.tabs
 
 extra_css:
   - css/material.css
@@ -82,6 +79,7 @@ plugins:
       backends:
         - codespell:
             dictionaries: [clear]
+  - minify:
   - mkdocstrings:
       handlers:
         python:
@@ -110,7 +108,6 @@ plugins:
             signature_crossrefs: true
             summary: true
             unwrap_annotated: true
-  - minify:
 
 hooks:
   - docs/hooks.py

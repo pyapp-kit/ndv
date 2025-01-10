@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ndv.views.bases._lut_view import LutView
-from ndv.views.bases._view_base import Viewable
+from ndv.views.bases import LutView, Viewable
 
 from ._mouseable import Mouseable
 
