@@ -1,7 +1,13 @@
 site_name: "ndv"
+site_url: https://github.com/pyapp-kit/ndv
 site_description: "minimal n-dimensional python array viewer."
 repo_name: "pyapp-kit/ndv"
+repo_url: https://github.com/pyapp-kit/ndv
 watch: [mkdocs.yml, README.md, src]
+
+extra:
+  version:
+    provider: mike
 
 nav:
   - Home: index.md
@@ -13,6 +19,7 @@ theme:
   name: material
   icon:
     logo: material/cube-scan
+    repo: fontawesome/brands/github
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
@@ -78,7 +85,7 @@ plugins:
       backends:
         - codespell:
             dictionaries: [clear]
-  - minify:
+  - minify
   - mkdocstrings:
       handlers:
         python:
