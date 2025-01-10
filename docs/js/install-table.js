@@ -126,5 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   };
 
-  createTable();
+  if (container) {
+    createTable();
+  }
 });
