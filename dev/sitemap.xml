@@ -1,59 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/install/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/install/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/SUMMARY/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/SUMMARY/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/data/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/data/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/util/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/util/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/controllers/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/controllers/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/models/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/models/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/models/data_wrappers/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/models/data_wrappers/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/v1/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/v1/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/v1/util/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/v1/util/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/views/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/views/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/views/bases/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/views/bases/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
     <url>
-         <loc>https://github.com/pyapp-kit/ndv/dev/reference/ndv/views/bases/graphics/</loc>
+         <loc>https://pyapp-kit.github.io/ndv/dev/reference/ndv/views/bases/graphics/</loc>
          <lastmod>2025-01-10</lastmod>
     </url>
 </urlset>
