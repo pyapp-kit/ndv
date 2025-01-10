@@ -5,11 +5,13 @@ on:
     branches: [main]
     tags: [v*]
 
+permissions:
+  contents: write
+  pages: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     if: github.repository == 'pyapp-kit/ndv'
     steps:
       - uses: actions/checkout@v4
