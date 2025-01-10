@@ -1,4 +1,6 @@
 from ._app import (
+    CanvasBackend,
+    GuiFrontend,
     get_array_canvas_class,
     get_array_view_class,
     get_histogram_canvas_class,
@@ -7,6 +9,8 @@ from ._app import (
 )
 
 __all__ = [
+    "CanvasBackend",
+    "GuiFrontend",
     "get_array_canvas_class",
     "get_array_view_class",
     "get_histogram_canvas_class",

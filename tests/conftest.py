@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from ndv._views import gui_frontend
-from ndv._views._app import GuiFrontend
+from ndv.views import gui_frontend
+from ndv.views._app import GuiFrontend
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop

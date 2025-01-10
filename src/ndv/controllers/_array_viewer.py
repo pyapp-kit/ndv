@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ndv._views import _app
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._lut_model import LUTModel
 from ndv.models.data_wrappers import DataWrapper
+from ndv.views import _app
 
 if TYPE_CHECKING:
     from typing import Any, Unpack
@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
     from ndv._types import MouseMoveEvent
-    from ndv._views.bases import ArrayView, HistogramCanvas
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
+    from ndv.views.bases import ArrayView, HistogramCanvas
 
     LutKey: TypeAlias = int | None
 

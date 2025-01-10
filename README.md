@@ -34,8 +34,9 @@ app.exec()
 
 ## Features
 
-- ⚡️ fast import and load time
-- 🥞 supports arbitrary number of dimensions, with 2D/3D view canvas
+- ⚡️ fast import and time-to-show
+- ♾️ supports arbitrary number of data dimensions
+- 📦 2D/3D view canvas
 <!-- - sliders support integer as well as slice (range)-based slicing -->
 - 🎨 colormaps provided by [cmap](https://github.com/tlambert03/cmap)
 - 🌠 supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends

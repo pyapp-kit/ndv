@@ -4,86 +4,98 @@ repo_name: "pyapp-kit/ndv"
 watch: [mkdocs.yml, README.md, src]
 
 nav:
-# defer to gen-files + literate-nav
-- Home: index.md
-- API reference: reference/
+  # defer to gen-files + literate-nav
+  - Home: index.md
+  - install.md
+  - API reference: reference/
 
 theme:
   name: material
+  icon:
+    logo: material/cube-scan
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.code.copy
 
 extra_css:
-- css/material.css
-- css/mkdocstrings.css
+  - css/material.css
+  - css/ndv.css
+
+extra_javascript:
+  - js/install-table.js
 
 markdown_extensions:
-- admonition
-- pymdownx.emoji:
-    emoji_index: !!python/name:material.extensions.emoji.twemoji
-    emoji_generator: !!python/name:material.extensions.emoji.to_svg
-- pymdownx.snippets:
-    base_path: [!relative $config_dir]
-    check_paths: true
+  - admonition
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      base_path: [!relative $config_dir]
+      check_paths: true
 
 plugins:
-- autorefs
-- search
-- gen-files:
-    scripts:
-    - scripts/gen_ref_nav.py
-- literate-nav:
-    nav_file: SUMMARY.md
-# - coverage
-- mkdocstrings:
-    handlers:
-      python:
-        paths: [src, docs/snippets]
-        import:
-        - https://docs.python.org/3/objects.inv
-        - https://mkdocstrings.github.io/objects.inv
-        - https://mkdocstrings.github.io/autorefs/objects.inv
-        - https://mkdocstrings.github.io/griffe/objects.inv
-        - https://python-markdown.github.io/objects.inv
-        options:
-          docstring_options:
-            ignore_init_summary: true
-          docstring_section_style: list
-          filters: ["!^_"]
-          heading_level: 1
-          inherited_members: true
-          merge_init_into_class: true
-          parameter_headings: true
-          preload_modules: [mkdocstrings]
-          relative_crossrefs: true
-          scoped_crossrefs: true
-          separate_signature: true
-          show_bases: false
-          show_inheritance_diagram: true
-          show_root_heading: true
-          show_root_full_path: false
-          show_signature_annotations: true
-          show_source: false
-          show_symbol_type_heading: true
-          show_symbol_type_toc: true
-          signature_crossrefs: true
-          summary: true
-          unwrap_annotated: true
-- git-revision-date-localized:
-    enabled: !ENV [DEPLOY, false]
-    enable_creation_date: true
-    type: timeago
-- minify:
-    minify_html: !ENV [DEPLOY, false]
-- group:
-    enabled: !ENV [MATERIAL_INSIDERS, false]
-    plugins:
-    - typeset
+  - autorefs
+  - search
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_nav.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  # - coverage
+  - mkdocstrings:
+      handlers:
+        python:
+          import:
+            - https://docs.python.org/3/objects.inv
+          options:
+            docstring_section_style: list
+            docstring_style: "numpy"
+            filters: ["!^_"]
+            heading_level: 1
+            inherited_members: true
+            merge_init_into_class: true
+            parameter_headings: true
+            preload_modules: [ndv]
+            relative_crossrefs: true
+            scoped_crossrefs: true
+            separate_signature: true
+            # show_bases: false
+            show_inheritance_diagram: true
+            show_root_heading: true
+            # show_root_full_path: false
+            show_signature_annotations: true
+            # show_source: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+            summary: true
+            unwrap_annotated: true
+  - minify:
 
 extra:
   social:
-  - icon: fontawesome/brands/github
-    link: https://github.com/pyapp-kit
-  - icon: fontawesome/brands/gitter
-    link: https://gitter.im/mkdocstrings/python
-  - icon: fontawesome/brands/python
-    link: https://pypi.org/project/ndv/
-
+    - icon: fontawesome/brands/github
+      link: https://github.com/pyapp-kit
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/ndv/

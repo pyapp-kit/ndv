@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ndv._views.bases._lut_view import LutView
-from ndv._views.bases._view_base import Viewable
+from ndv.views.bases._lut_view import LutView
+from ndv.views.bases._view_base import Viewable
 
 from ._mouseable import Mouseable
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import cmap
     import numpy as np
 
-    from ndv._views.bases.graphics._canvas_elements import (
+    from ndv.views.bases.graphics._canvas_elements import (
         CanvasElement,
         ImageHandle,
         RoiHandle,
@@ -45,6 +45,8 @@ class GraphicsCanvas(Viewable, Mouseable):
 
 
 class ArrayCanvas(GraphicsCanvas):
+    """ABC for graphics canvas providers."""
+
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod
