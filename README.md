@@ -11,10 +11,7 @@ Simple, fast-loading, asynchronous, n-dimensional array viewer, with minimal dep
 ```python
 import ndv
 
-data = ndv.data.cells3d()
-# or ndv.data.nd_sine_wave()
-# or *any* arraylike object (see support below)
-
+data = ndv.data.cells3d() # or *any* arraylike object
 ndv.imshow(data)
 ```
 

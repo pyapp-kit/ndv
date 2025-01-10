@@ -68,7 +68,8 @@ docs = [
     "mkdocs-material==9.5.49",
     "mkdocs-minify-plugin==0.8.0",
     "mkdocs==1.6.1",
-    "mkdocstrings-python==1.13.0"
+    "mkdocstrings-python==1.13.0",
+    "mkdocs-spellcheck[codespell]==1.1.0",
 ]
 dev = [
     "ndv[test,vispy,pygfx,pyqt,jupyter]",

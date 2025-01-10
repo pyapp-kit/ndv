@@ -491,14 +491,14 @@ def canvas_backend(requested: str | None) -> CanvasBackend:
 # TODO: add a way to set the frontend via an environment variable
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
 def get_array_view_class() -> type[ArrayView]:
-    """Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend."""
+    """Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend."""  # noqa: E501
     if (frontend := gui_frontend()) not in GUI_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No GUI frontend found for {frontend}")
     return GUI_PROVIDERS[frontend].array_view_class()
 
 
 def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
-    """Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend."""
+    """Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend."""  # noqa: E501
     _backend = canvas_backend(backend)
     if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")
@@ -506,7 +506,7 @@ def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
 
 
 def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanvas]:
-    """Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend."""
+    """Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend."""  # noqa: E501
     _backend = canvas_backend(backend)
     if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")

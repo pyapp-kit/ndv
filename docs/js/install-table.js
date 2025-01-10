@@ -5,31 +5,35 @@ document.addEventListener("DOMContentLoaded", () => {
     Frontend: ["PyQt6", "PySide6", "wxPython", "Jupyter"],
   };
 
+  const condaVispy = "vispy pyopengl";
+  const condaJupyter = "jupyter jupyter_rfb glfw ipywidgets";
   const commandMap = {
-    "PyPI,VisPy,PyQt6": "pip install ndv[vispy,pyqt]",
-    "PyPI,VisPy,PySide6": "pip install ndv[vispy,pyside]",
-    "PyPI,VisPy,wxPython": "pip install ndv[vispy,wx]",
-    "PyPI,VisPy,Jupyter": "pip install ndv[vispy,jupyter]",
-    "PyPI,Pygfx,PyQt6": "pip install ndv[pygfx,pyqt]",
-    "PyPI,Pygfx,PySide6": "pip install ndv[pygfx,pyside]",
-    "PyPI,Pygfx,wxPython": "pip install ndv[pygfx,wx]",
-    "PyPI,Pygfx,Jupyter": "pip install ndv[pygfx,jupyter]",
-    "Conda,VisPy,PyQt6": "conda install -c conda-forge ndv vispy pyopengl qt6-main",
-    "Conda,VisPy,PySide6": "conda install -c conda-forge ndv vispy pyopengl 'pyside6<6.8'",
-    "Conda,VisPy,wxPython": "conda install -c conda-forge ndv vispy pyopengl wxpython",
-    "Conda,VisPy,Jupyter": "conda install -c conda-forge ndv vispy pyopengl jupyter jupyter_rfb glfw ipywidgets",
+    "PyPI,VisPy,PyQt6": 'pip install "ndv[vispy,pyqt]"',
+    "PyPI,VisPy,PySide6": 'pip install "ndv[vispy,pyside]"',
+    "PyPI,VisPy,wxPython": 'pip install "ndv[vispy,wxpython]"',
+    "PyPI,VisPy,Jupyter": 'pip install "ndv[vispy,jupyter]"',
+    "PyPI,Pygfx,PyQt6": 'pip install "ndv[pygfx,pyqt]"',
+    "PyPI,Pygfx,PySide6": 'pip install "ndv[pygfx,pyside]"',
+    "PyPI,Pygfx,wxPython": 'pip install "ndv[pygfx,wxpython]"',
+    "PyPI,Pygfx,Jupyter": 'pip install "ndv[pygfx,jupyter]"',
+    "Conda,VisPy,PyQt6": `conda install -c conda-forge ndv ${condaVispy} qt6-main`,
+    "Conda,VisPy,PySide6": `conda install -c conda-forge ndv ${condaVispy} 'pyside6<6.8'`,
+    "Conda,VisPy,wxPython": `conda install -c conda-forge ndv ${condaVispy} wxpython`,
+    "Conda,VisPy,Jupyter": `conda install -c conda-forge ndv ${condaVispy} ${condaJupyter}`,
     "Conda,Pygfx,PyQt6": "conda install -c conda-forge ndv pygfx qt6-main",
     "Conda,Pygfx,PySide6": "conda install -c conda-forge ndv pygfx 'pyside6<6.8'",
     "Conda,Pygfx,wxPython": "conda install -c conda-forge ndv pygfx wxpython",
-    "Conda,Pygfx,Jupyter": "conda install -c conda-forge ndv pygfx jupyter jupyter_rfb glfw ipywidgets",
-    "Github (dev version),VisPy,PyQt6": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,pyqt]",
-    "Github (dev version),VisPy,PySide6": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,pyside]",
-    "Github (dev version),VisPy,wxPython": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,wx]",
-    "Github (dev version),VisPy,Jupyter": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,jupyter]",
-    "Github (dev version),Pygfx,PyQt6": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,pyqt]",
-    "Github (dev version),Pygfx,PySide6": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,pyside]",
-    "Github (dev version),Pygfx,wxPython": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,wx]",
-    "Github (dev version),Pygfx,Jupyter": "pip install git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,jupyter]",
+    "Conda,Pygfx,Jupyter": `conda install -c conda-forge ndv pygfx ${condaJupyter}`,
+    "Github (dev version),VisPy,PyQt6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,pyqt]"',
+    "Github (dev version),VisPy,PySide6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,pyside]"',
+    "Github (dev version),VisPy,wxPython": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,wx]"',
+    "Github (dev version),VisPy,Jupyter":
+      'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,jupyter]"',
+    "Github (dev version),Pygfx,PyQt6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,pyqt]"',
+    "Github (dev version),Pygfx,PySide6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,pyside]"',
+    "Github (dev version),Pygfx,wxPython": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,wx]"',
+    "Github (dev version),Pygfx,Jupyter":
+      'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,jupyter]"',
   };
 
   const container = document.getElementById("install-table");
@@ -41,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
       label.textContent = category;
 
       const buttonsContainer = document.createElement("div");
-      buttonsContainer.classList.add("buttons");
+      buttonsContainer.classList.add("grid-right", "buttons");
 
       tableData[category].forEach((item, index) => {
         const button = document.createElement("button");
@@ -77,12 +81,17 @@ document.addEventListener("DOMContentLoaded", () => {
     label.textContent = "Command:";
 
     const commandDiv = document.createElement("div");
-    commandDiv.classList.add("buttons", "command-section");
+    commandDiv.classList.add("grid-right", "command-section");
     commandDiv.innerHTML = `
     <p id="command-output">Select options to generate command</p>
+    <button class="md-clipboard md-icon" title="Copy to clipboard"></button>
     `;
     container.appendChild(label);
     container.appendChild(commandDiv);
+
+    // Add copy functionality
+    const copyButton = commandDiv.querySelector(".md-clipboard");
+    copyButton.addEventListener("click", copyToClipboard);
 
     // Update the command output initially
     updateCommand();
@@ -99,6 +108,22 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       commandOutput.textContent = commandMap[selectedOptions.join(",")];
     }
+  };
+  const copyToClipboard = () => {
+    const commandOutput = document.getElementById("command-output").textContent;
+    navigator.clipboard
+      .writeText(commandOutput)
+      .then(() => {
+        // give a little animated feedback
+        const commandDiv = document.querySelector(".command-section .md-clipboard");
+        commandDiv.classList.add("copied");
+        setTimeout(() => {
+          commandDiv.classList.remove("copied");
+        }, 500);
+      })
+      .catch((error) => {
+        console.error("Failed to copy to clipboard", error);
+      });
   };
 
   createTable();

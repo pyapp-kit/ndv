@@ -1,14 +1,15 @@
 # Installation
 
-`ndv` brings provides a wrapper around multiple different graphics and GUI
-frameworks, providing a performant multi-dimensional viewer that can be used in
-a variety of contexts.  It work with multiple different graphics libraries,
-including Vispy (for OpenGL) and Pygfx (for WebGPU).  It also supports various
-GUI frameworks, including PyQt5, PySide2, wxPython, and Jupyter notebooks.
+`ndv` can be used in a variety of contexts. It supports various **GUI
+ frameworks**, including [PyQt](https://riverbankcomputing.com/software/pyqt),
+ [PySide](https://wiki.qt.io/Qt_for_Python), [wxPython](https://wxpython.org),
+ and [Jupyter Lab & Notebooks](https://jupyter.org).  It also works with
+ different **graphics libraries**, including [VisPy](https://vispy.org) (for
+ OpenGL) and [Pygfx](https://github.com/pygfx/pygfx) (for WebGPU).
 
-However, each of these libraries has its own dependencies and installation
-requirements.  To make it easier to install `ndv`, we provide a set of
-pre-configured installation extras based on the graphics and GUI libraries you
-want to use:
+These frameworks are *not* included directly with `ndv` and must be installed
+independently. We provide a set of installation extras depending on the graphics
+and GUI libraries you want to use:
 
+<!-- logic for this table in install-table.js -->
 <div id="install-table"></div>

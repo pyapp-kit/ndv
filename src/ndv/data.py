@@ -14,7 +14,7 @@ def nd_sine_wave(
     amplitude: float = 240,
     base_frequency: float = 5,
 ) -> np.ndarray:
-    """5D dataset: (10, 3, 5, 512, 512), float64."""
+    """5D dataset: `(10, 3, 5, 512, 512)`, float64."""
     # Unpack the dimensions
     if not len(shape) == 5:
         raise ValueError("Shape must have 5 dimensions")
@@ -54,7 +54,7 @@ def nd_sine_wave(
 
 
 def cells3d() -> np.ndarray:
-    """Load cells3d from scikit-image (60, 2, 256, 256) uint16."""
+    """Load cells3d from scikit-image `(60, 2, 256, 256)` uint16."""
     try:
         from imageio.v2 import volread
     except ImportError as e:
@@ -72,12 +72,12 @@ def cells3d() -> np.ndarray:
 
 
 def cat() -> np.ndarray:
-    """Load RGB cat data (300, 451, 3), uint8."""
+    """Load RGB cat data `(300, 451, 3)`, uint8."""
     return _imread("imageio:chelsea.png")
 
 
 def astronaut() -> np.ndarray:
-    """Load RGB data (512, 512, 3), uint8."""
+    """Load RGB data `(512, 512, 3)`, uint8."""
     return _imread("imageio:astronaut.png")
 
 
@@ -95,6 +95,22 @@ def cosem_dataset(
     label: str = "er-mem_pred",
     level: int = 4,
 ) -> Any:
+    """Load a dataset from the COSEM/OpenOrganelle project.
+
+    Search for available options at: <https://openorganelle.janelia.org/datasets>
+
+    Parameters
+    ----------
+    uri : str, optional
+        The URI of the dataset to load. If not provided, the default URI is
+        `f"{dataset}/{dataset}.n5/labels/{label}/s{level}/"`.
+    dataset : str, optional
+        The name of the dataset to load. Default is "jrc_hela-3".
+    label : str, optional
+        The label to load. Default is "er-mem_pred".
+    level : int, optional
+        The pyramid level to load. Default is 4.
+    """
     try:
         import tensorstore as ts
     except ImportError:
