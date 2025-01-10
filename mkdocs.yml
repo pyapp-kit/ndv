@@ -86,6 +86,7 @@ plugins:
         - codespell:
             dictionaries: [clear]
   - minify
+  - mike
   - mkdocstrings:
       handlers:
         python:
