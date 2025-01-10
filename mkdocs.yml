@@ -69,7 +69,6 @@ markdown_extensions:
 plugins:
   - autorefs
   - search
-  - gh-admonitions
   - gen-files:
       scripts:
         - scripts/gen_ref_nav.py
