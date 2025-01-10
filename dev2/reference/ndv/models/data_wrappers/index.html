@@ -98,7 +98,7 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../../../.." title="ndv" class="md-header__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -222,13 +222,89 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../install/" class="md-tabs__link">
+        
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+    
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -242,8 +318,10 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../../../.." title="ndv" class="md-nav__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -327,6 +405,9 @@
         
         
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
@@ -386,9 +467,15 @@
     
     
       
+      
+        
+          
+          
+        
+      
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
@@ -408,7 +495,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -486,6 +573,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -755,6 +845,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -839,6 +932,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -895,6 +991,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -1332,7 +1431,7 @@ and it will be automatically detected and used to wrap your data.</p>
                   <details class="quote">
                     <summary>Source code in <code>src/ndv/models/data_wrappers/_data_wrapper.py</code></summary>
                     <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">77</span>
-<span class="normal">78</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-77"><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">78</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-77"><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-78">    <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">data</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
@@ -1487,7 +1586,7 @@ and it will be automatically detected and used to wrap your data.</p>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">219</span>
 <span class="normal">220</span>
 <span class="normal">221</span>
-<span class="normal">222</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-219"><span class="k">def</span> <span class="nf">clear_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">222</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-219"><span class="k">def</span><span class="w"> </span><span class="nf">clear_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-220"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Clear any cached properties.&quot;&quot;&quot;</span>
 </span><span id="__span-0-221">    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;axis_map&quot;</span><span class="p">):</span>
 </span><span id="__span-0-222">        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">axis_map</span>
@@ -1525,7 +1624,7 @@ and it will be automatically detected and used to wrap your data.</p>
 <span class="normal">170</span>
 <span class="normal">171</span>
 <span class="normal">172</span>
-<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-162"><span class="k">def</span> <span class="nf">guess_channel_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Hashable</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-162"><span class="k">def</span><span class="w"> </span><span class="nf">guess_channel_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Hashable</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-163"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the (best guess) axis name for the channel dimension.&quot;&quot;&quot;</span>
 </span><span id="__span-0-164">    <span class="c1"># for arrays with labeled dimensions,</span>
 </span><span id="__span-0-165">    <span class="c1"># see if any of the dimensions are named &quot;channel&quot;</span>
@@ -1567,7 +1666,7 @@ and it will be automatically detected and used to wrap your data.</p>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-101"><span class="nd">@abstractmethod</span>
-</span><span id="__span-0-102"><span class="k">def</span> <span class="nf">isel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">slice</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="__span-0-102"><span class="k">def</span><span class="w"> </span><span class="nf">isel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">slice</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="__span-0-103"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a slice of the data as a numpy array.&quot;&quot;&quot;</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
@@ -1602,7 +1701,7 @@ and it will be automatically detected and used to wrap your data.</p>
 <span class="normal">214</span>
 <span class="normal">215</span>
 <span class="normal">216</span>
-<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-207"><span class="k">def</span> <span class="nf">normalized_axis_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-207"><span class="k">def</span><span class="w"> </span><span class="nf">normalized_axis_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="n">Hashable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 </span><span id="__span-0-208"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return positive index for `axis` (which can be +/- int or str label).&quot;&quot;&quot;</span>
 </span><span id="__span-0-209">    <span class="k">try</span><span class="p">:</span>
 </span><span id="__span-0-210">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">axis_map</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span>
@@ -1611,8 +1710,8 @@ and it will be automatically detected and used to wrap your data.</p>
 </span><span id="__span-0-213">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
 </span><span id="__span-0-214">            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span>
 </span><span id="__span-0-215">                <span class="sa">f</span><span class="s2">&quot;Axis index </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> out of bounds for data with </span><span class="si">{</span><span class="n">ndims</span><span class="si">}</span><span class="s2"> dimensions&quot;</span>
-</span><span id="__span-0-216">            <span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
-</span><span id="__span-0-217">        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Axis label </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> not found in data dimensions&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+</span><span id="__span-0-216">            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+</span><span id="__span-0-217">        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Axis label </span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> not found in data dimensions&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1638,7 +1737,7 @@ and it will be automatically detected and used to wrap your data.</p>
               <summary>Source code in <code>src/ndv/models/data_wrappers/_data_wrapper.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">158</span>
 <span class="normal">159</span>
-<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-158"><span class="k">def</span> <span class="nf">sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Hashable</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-158"><span class="k">def</span><span class="w"> </span><span class="nf">sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Hashable</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
 </span><span id="__span-0-159"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the sizes of the dimensions.&quot;&quot;&quot;</span>
 </span><span id="__span-0-160">    <span class="k">return</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dims</span><span class="p">}</span>
 </span></code></pre></div></td></tr></table></div>
@@ -1682,7 +1781,7 @@ and it will be automatically detected and used to wrap your data.</p>
 <span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-175"><span class="k">def</span> <span class="nf">summary_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-175"><span class="k">def</span><span class="w"> </span><span class="nf">summary_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 </span><span id="__span-0-176"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return info label with information about the data.&quot;&quot;&quot;</span>
 </span><span id="__span-0-177">    <span class="n">package</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">,</span> <span class="s2">&quot;__module__&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 </span><span id="__span-0-178">    <span class="n">info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">package</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">),</span><span class="w"> </span><span class="s1">&#39;__qualname__&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -1740,7 +1839,7 @@ directly import necessary dependencies without a try/except block.</p>
 <span class="normal">88</span>
 <span class="normal">89</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-82"><span class="nd">@classmethod</span>
 </span><span id="__span-0-83"><span class="nd">@abstractmethod</span>
-</span><span id="__span-0-84"><span class="k">def</span> <span class="nf">supports</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-84"><span class="k">def</span><span class="w"> </span><span class="nf">supports</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 </span><span id="__span-0-85"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if this wrapper can handle the given object.</span>
 </span><span id="__span-0-86">
 </span><span id="__span-0-87"><span class="sd">    Any exceptions raised by this method will be suppressed, so it is safe to</span>
@@ -1883,12 +1982,10 @@ directly import necessary dependencies without a try/except block.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../../../assets/javascripts/bundle.88dd0f4e.min.js"></script>
-      
-        <script src="../../../../js/install-table.js"></script>
       
     
   </body>

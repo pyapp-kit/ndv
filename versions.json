@@ -2,14 +2,14 @@
   {
     "version": "dev2",
     "title": "dev2",
-    "aliases": []
+    "aliases": [
+      "latest"
+    ]
   },
   {
     "version": "dev1",
     "title": "dev1",
-    "aliases": [
-      "latest"
-    ]
+    "aliases": []
   },
   {
     "version": "dev",

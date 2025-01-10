@@ -98,7 +98,7 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../../.." title="ndv" class="md-header__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -222,13 +222,89 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../install/" class="md-tabs__link">
+        
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+    
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -242,8 +318,10 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../../.." title="ndv" class="md-nav__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -327,6 +405,9 @@
         
         
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
@@ -386,9 +467,15 @@
     
     
       
+      
+        
+          
+          
+        
+      
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
@@ -408,7 +495,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -484,6 +571,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -592,6 +682,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--nested">
@@ -676,6 +769,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -732,6 +828,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -1304,7 +1403,7 @@ and it will be automatically detected and used to wrap your data.</p>
                   <details class="quote">
                     <summary>Source code in <code>src/ndv/v1/_old_data_wrapper.py</code></summary>
                     <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
-<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-102"><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-102"><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">ArrayT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-103">    <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">data</span>
 </span></code></pre></div></td></tr></table></div>
                   </details>
@@ -1354,7 +1453,7 @@ and it will be automatically detected and used to wrap your data.</p>
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
-<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-135"><span class="k">def</span> <span class="nf">guess_channel_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-135"><span class="k">def</span><span class="w"> </span><span class="nf">guess_channel_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-136"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the (best guess) axis name for the channel dimension.&quot;&quot;&quot;</span>
 </span><span id="__span-0-137">    <span class="c1"># for arrays with labeled dimensions,</span>
 </span><span id="__span-0-138">    <span class="c1"># see if any of the dimensions are named &quot;channel&quot;</span>
@@ -1410,7 +1509,7 @@ method to return a numpy array.</p>
 <span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-119"><span class="nd">@abstractmethod</span>
-</span><span id="__span-0-120"><span class="k">def</span> <span class="nf">isel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indexers</span><span class="p">:</span> <span class="n">Indices</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="__span-0-120"><span class="k">def</span><span class="w"> </span><span class="nf">isel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indexers</span><span class="p">:</span> <span class="n">Indices</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="__span-0-121"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Select a slice from a data store using (possibly) named indices.</span>
 </span><span id="__span-0-122">
 </span><span id="__span-0-123"><span class="sd">    This follows the xarray-style indexing, where indexers is a mapping of</span>
@@ -1447,7 +1546,7 @@ method to return a numpy array.</p>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-129"><span class="k">def</span> <span class="nf">isel_async</span><span class="p">(</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-129"><span class="k">def</span><span class="w"> </span><span class="nf">isel_async</span><span class="p">(</span>
 </span><span id="__span-0-130">    <span class="bp">self</span><span class="p">,</span> <span class="n">indexers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Indices</span><span class="p">]</span>
 </span><span id="__span-0-131"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Future</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Indices</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]]:</span>
 </span><span id="__span-0-132"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Asynchronous version of isel.&quot;&quot;&quot;</span>
@@ -1493,7 +1592,7 @@ are found, the dimensions are just named by their integer index.</p>
 <span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
-<span class="normal">170</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-156"><span class="k">def</span> <span class="nf">sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sizes</span><span class="p">:</span>
+<span class="normal">170</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-156"><span class="k">def</span><span class="w"> </span><span class="nf">sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sizes</span><span class="p">:</span>
 </span><span id="__span-0-157"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a mapping of {dimkey: size} for the data.</span>
 </span><span id="__span-0-158">
 </span><span id="__span-0-159"><span class="sd">    The default implementation uses the shape attribute of the data, and</span>
@@ -1549,7 +1648,7 @@ are found, the dimensions are just named by their integer index.</p>
 <span class="normal">187</span>
 <span class="normal">188</span>
 <span class="normal">189</span>
-<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-172"><span class="k">def</span> <span class="nf">summary_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-172"><span class="k">def</span><span class="w"> </span><span class="nf">summary_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 </span><span id="__span-0-173"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return info label with information about the data.&quot;&quot;&quot;</span>
 </span><span id="__span-0-174">    <span class="n">package</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">,</span> <span class="s2">&quot;__module__&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 </span><span id="__span-0-175">    <span class="n">info</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">package</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">),</span><span class="w"> </span><span class="s1">&#39;__qualname__&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -1608,7 +1707,7 @@ directly import necessary dependencies without a try/except block.</p>
 <span class="normal">116</span>
 <span class="normal">117</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-109"><span class="nd">@classmethod</span>
 </span><span id="__span-0-110"><span class="nd">@abstractmethod</span>
-</span><span id="__span-0-111"><span class="k">def</span> <span class="nf">supports</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-111"><span class="k">def</span><span class="w"> </span><span class="nf">supports</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 </span><span id="__span-0-112"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if this wrapper can handle the given object.</span>
 </span><span id="__span-0-113">
 </span><span id="__span-0-114"><span class="sd">    Any exceptions raised by this method will be suppressed, so it is safe to</span>
@@ -1965,7 +2064,7 @@ set to ChannelMode.MONO.</p>
 <span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
-<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-122"><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-122"><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span id="__span-0-123">    <span class="bp">self</span><span class="p">,</span>
 </span><span id="__span-0-124">    <span class="n">data</span><span class="p">:</span> <span class="n">DataWrapper</span> <span class="o">|</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-125">    <span class="o">*</span><span class="p">,</span>
@@ -2211,7 +2310,7 @@ set to ChannelMode.MONO.</p>
 <span class="normal">662</span>
 <span class="normal">663</span>
 <span class="normal">664</span>
-<span class="normal">665</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-650"><span class="k">def</span> <span class="nf">eventFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">QObject</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">QEvent</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="normal">665</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-650"><span class="k">def</span><span class="w"> </span><span class="nf">eventFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">QObject</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">QEvent</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 </span><span id="__span-0-651"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Event filter installed on the canvas to handle mouse events.&quot;&quot;&quot;</span>
 </span><span id="__span-0-652">    <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-653">        <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># pragma: no cover</span>
@@ -2253,7 +2352,7 @@ set to ChannelMode.MONO.</p>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">420</span>
 <span class="normal">421</span>
 <span class="normal">422</span>
-<span class="normal">423</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-420"><span class="k">def</span> <span class="nf">refresh</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">423</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-420"><span class="k">def</span><span class="w"> </span><span class="nf">refresh</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-421"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Refresh the canvas.&quot;&quot;&quot;</span>
 </span><span id="__span-0-422">    <span class="bp">self</span><span class="o">.</span><span class="n">_clear_images</span><span class="p">()</span>
 </span><span id="__span-0-423">    <span class="bp">self</span><span class="o">.</span><span class="n">_update_data_for_index</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dims_sliders</span><span class="o">.</span><span class="n">value</span><span class="p">())</span>
@@ -2331,7 +2430,7 @@ channel_mode_picker button is used)</p>
 <span class="normal">415</span>
 <span class="normal">416</span>
 <span class="normal">417</span>
-<span class="normal">418</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-388"><span class="k">def</span> <span class="nf">set_channel_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="n">ChannelMode</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">418</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-388"><span class="k">def</span><span class="w"> </span><span class="nf">set_channel_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="n">ChannelMode</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-389"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the mode for displaying the channels.</span>
 </span><span id="__span-0-390">
 </span><span id="__span-0-391"><span class="sd">    In &quot;composite&quot; mode, the channels are displayed as a composite image, using</span>
@@ -2404,7 +2503,7 @@ to redraw the current slice.</p>
 <span class="normal">434</span>
 <span class="normal">435</span>
 <span class="normal">436</span>
-<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-425"><span class="k">def</span> <span class="nf">set_current_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Indices</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-425"><span class="k">def</span><span class="w"> </span><span class="nf">set_current_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Indices</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-426"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the index of the displayed image.</span>
 </span><span id="__span-0-427">
 </span><span id="__span-0-428"><span class="sd">    `index` is a mapping of dimensions to integers or slices that define the slice</span>
@@ -2512,7 +2611,7 @@ initial_index : Indices | None
 <span class="normal">324</span>
 <span class="normal">325</span>
 <span class="normal">326</span>
-<span class="normal">327</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-273"><span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span>
+<span class="normal">327</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-273"><span class="k">def</span><span class="w"> </span><span class="nf">set_data</span><span class="p">(</span>
 </span><span id="__span-0-274">    <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">DataWrapper</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">initial_index</span><span class="p">:</span> <span class="n">Indices</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span id="__span-0-275"><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-276"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the datastore, and, optionally, the sizes of the data.</span>
@@ -2610,7 +2709,7 @@ initial_index : Indices | None
 <span class="normal">383</span>
 <span class="normal">384</span>
 <span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-366"><span class="k">def</span> <span class="nf">set_ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ndim</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-366"><span class="k">def</span><span class="w"> </span><span class="nf">set_ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ndim</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-367"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the number of dimensions to display.&quot;&quot;&quot;</span>
 </span><span id="__span-0-368">    <span class="k">if</span> <span class="n">ndim</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
 </span><span id="__span-0-369">        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;ndim must be 2 or 3&quot;</span><span class="p">)</span>
@@ -2692,7 +2791,7 @@ border_color : str, tuple, list, array, Color, or int
 <span class="normal">350</span>
 <span class="normal">351</span>
 <span class="normal">352</span>
-<span class="normal">353</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-329"><span class="k">def</span> <span class="nf">set_roi</span><span class="p">(</span>
+<span class="normal">353</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-329"><span class="k">def</span><span class="w"> </span><span class="nf">set_roi</span><span class="p">(</span>
 </span><span id="__span-0-330">    <span class="bp">self</span><span class="p">,</span>
 </span><span id="__span-0-331">    <span class="n">vertices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-332">    <span class="n">color</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2750,7 +2849,7 @@ border_color : str, tuple, list, array, Color, or int
 <span class="normal">361</span>
 <span class="normal">362</span>
 <span class="normal">363</span>
-<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-355"><span class="k">def</span> <span class="nf">set_visualized_dims</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dims</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">DimKey</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-355"><span class="k">def</span><span class="w"> </span><span class="nf">set_visualized_dims</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dims</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">DimKey</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-356"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Set the dimensions that will be visualized.</span>
 </span><span id="__span-0-357">
 </span><span id="__span-0-358"><span class="sd">    This dims will NOT have sliders associated with them.</span>
@@ -2882,7 +2981,7 @@ used unless a cmap is provided, in which case "composite" will be used.</p>
 <span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
-<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-15"><span class="k">def</span> <span class="nf">imshow</span><span class="p">(</span>
+<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-15"><span class="k">def</span><span class="w"> </span><span class="nf">imshow</span><span class="p">(</span>
 </span><span id="__span-0-16">    <span class="n">data</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="n">DataWrapper</span><span class="p">,</span>
 </span><span id="__span-0-17">    <span class="n">cmap</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-18">    <span class="o">*</span><span class="p">,</span>
@@ -2905,7 +3004,7 @@ used unless a cmap is provided, in which case "composite" will be used.</p>
 </span><span id="__span-0-35"><span class="sd">    NDViewer</span>
 </span><span id="__span-0-36"><span class="sd">        The viewer window.</span>
 </span><span id="__span-0-37"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-38">    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">NDViewer</span>
+</span><span id="__span-0-38">    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">NDViewer</span>
 </span><span id="__span-0-39">
 </span><span id="__span-0-40">    <span class="n">app</span><span class="p">,</span> <span class="n">should_exec</span> <span class="o">=</span> <span class="n">_get_app</span><span class="p">()</span>
 </span><span id="__span-0-41">    <span class="k">if</span> <span class="n">cmap</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -3048,12 +3147,10 @@ used unless a cmap is provided, in which case "composite" will be used.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../../assets/javascripts/bundle.88dd0f4e.min.js"></script>
-      
-        <script src="../../../js/install-table.js"></script>
       
     
   </body>

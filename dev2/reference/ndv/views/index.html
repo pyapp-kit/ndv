@@ -98,7 +98,7 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../../.." title="ndv" class="md-header__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -222,13 +222,89 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../install/" class="md-tabs__link">
+        
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+    
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -242,8 +318,10 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../../.." title="ndv" class="md-nav__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -327,6 +405,9 @@
         
         
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
@@ -386,9 +467,15 @@
     
     
       
+      
+        
+          
+          
+        
+      
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
@@ -408,7 +495,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -484,6 +571,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -590,6 +680,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -676,6 +769,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--nested">
@@ -732,6 +828,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -1207,7 +1306,7 @@ shows the protocol that GUI &amp; graphics classes should implement.</p>
 <span class="normal">502</span>
 <span class="normal">503</span>
 <span class="normal">504</span>
-<span class="normal">505</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-500"><span class="k">def</span> <span class="nf">get_array_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayCanvas</span><span class="p">]:</span>
+<span class="normal">505</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-500"><span class="k">def</span><span class="w"> </span><span class="nf">get_array_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayCanvas</span><span class="p">]:</span>
 </span><span id="__span-0-501"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
 </span><span id="__span-0-502">    <span class="n">_backend</span> <span class="o">=</span> <span class="n">canvas_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
 </span><span id="__span-0-503">    <span class="k">if</span> <span class="n">_backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
@@ -1240,7 +1339,7 @@ shows the protocol that GUI &amp; graphics classes should implement.</p>
 <span class="normal">494</span>
 <span class="normal">495</span>
 <span class="normal">496</span>
-<span class="normal">497</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-493"><span class="k">def</span> <span class="nf">get_array_view_class</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayView</span><span class="p">]:</span>
+<span class="normal">497</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-493"><span class="k">def</span><span class="w"> </span><span class="nf">get_array_view_class</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayView</span><span class="p">]:</span>
 </span><span id="__span-0-494"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
 </span><span id="__span-0-495">    <span class="k">if</span> <span class="p">(</span><span class="n">frontend</span> <span class="o">:=</span> <span class="n">gui_frontend</span><span class="p">())</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
 </span><span id="__span-0-496">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No GUI frontend found for </span><span class="si">{</span><span class="n">frontend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -1275,7 +1374,7 @@ shows the protocol that GUI &amp; graphics classes should implement.</p>
 <span class="normal">510</span>
 <span class="normal">511</span>
 <span class="normal">512</span>
-<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-508"><span class="k">def</span> <span class="nf">get_histogram_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">HistogramCanvas</span><span class="p">]:</span>
+<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-508"><span class="k">def</span><span class="w"> </span><span class="nf">get_histogram_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">HistogramCanvas</span><span class="p">]:</span>
 </span><span id="__span-0-509"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
 </span><span id="__span-0-510">    <span class="n">_backend</span> <span class="o">=</span> <span class="n">canvas_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
 </span><span id="__span-0-511">    <span class="k">if</span> <span class="n">_backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
@@ -1349,7 +1448,7 @@ running, or available.</p>
 <span class="normal">452</span>
 <span class="normal">453</span>
 <span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-417"><span class="nd">@cache</span>  <span class="c1"># not allowed to change</span>
-</span><span id="__span-0-418"><span class="k">def</span> <span class="nf">gui_frontend</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">GuiFrontend</span><span class="p">:</span>
+</span><span id="__span-0-418"><span class="k">def</span><span class="w"> </span><span class="nf">gui_frontend</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">GuiFrontend</span><span class="p">:</span>
 </span><span id="__span-0-419"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the active [`GuiFrontend`][ndv.views.GuiFrontend].</span>
 </span><span id="__span-0-420">
 </span><span id="__span-0-421"><span class="sd">    This is determined first by the `NDV_GUI_FRONTEND` environment variable, after which</span>
@@ -1411,7 +1510,7 @@ running, or available.</p>
               <summary>Source code in <code>src/ndv/views/_app.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">534</span>
 <span class="normal">535</span>
-<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-534"><span class="k">def</span> <span class="nf">run_app</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-534"><span class="k">def</span><span class="w"> </span><span class="nf">run_app</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="__span-0-535"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Start the GUI application event loop.&quot;&quot;&quot;</span>
 </span><span id="__span-0-536">    <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">gui_frontend</span><span class="p">()]</span><span class="o">.</span><span class="n">exec</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
@@ -1542,12 +1641,10 @@ running, or available.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../../assets/javascripts/bundle.88dd0f4e.min.js"></script>
-      
-        <script src="../../../js/install-table.js"></script>
       
     
   </body>

@@ -98,7 +98,7 @@
 
   
 
-<header class="md-header md-header--shadow" data-md-component="header">
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../../.." title="ndv" class="md-header__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -222,13 +222,89 @@
     
   </nav>
   
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../install/" class="md-tabs__link">
+        
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+    
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
-        
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -242,8 +318,10 @@
                     
 
 
+  
 
-<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../../.." title="ndv" class="md-nav__button md-logo" aria-label="ndv" data-md-component="logo">
       
@@ -327,6 +405,9 @@
         
         
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
@@ -386,9 +467,15 @@
     
     
       
+      
+        
+          
+          
+        
+      
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
@@ -408,7 +495,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -612,6 +699,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -717,6 +807,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -801,6 +894,9 @@
     
     
       
+      
+        
+      
     
     
     <li class="md-nav__item md-nav__item--nested">
@@ -857,6 +953,9 @@
       
     
     
+      
+      
+        
       
     
     
@@ -1172,7 +1271,7 @@
               <summary>Source code in <code>src/ndv/data.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">79</span>
 <span class="normal">80</span>
-<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-79"><span class="k">def</span> <span class="nf">astronaut</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-79"><span class="k">def</span><span class="w"> </span><span class="nf">astronaut</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="__span-0-80"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load RGB data `(512, 512, 3)`, uint8.&quot;&quot;&quot;</span>
 </span><span id="__span-0-81">    <span class="k">return</span> <span class="n">_imread</span><span class="p">(</span><span class="s2">&quot;imageio:astronaut.png&quot;</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
@@ -1200,7 +1299,7 @@
               <summary>Source code in <code>src/ndv/data.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">74</span>
 <span class="normal">75</span>
-<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-74"><span class="k">def</span> <span class="nf">cat</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-74"><span class="k">def</span><span class="w"> </span><span class="nf">cat</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="__span-0-75"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load RGB cat data `(300, 451, 3)`, uint8.&quot;&quot;&quot;</span>
 </span><span id="__span-0-76">    <span class="k">return</span> <span class="n">_imread</span><span class="p">(</span><span class="s2">&quot;imageio:chelsea.png&quot;</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
@@ -1241,14 +1340,14 @@
 <span class="normal">68</span>
 <span class="normal">69</span>
 <span class="normal">70</span>
-<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-56"><span class="k">def</span> <span class="nf">cells3d</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-56"><span class="k">def</span><span class="w"> </span><span class="nf">cells3d</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 </span><span id="__span-0-57"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Load cells3d from scikit-image `(60, 2, 256, 256)` uint16.&quot;&quot;&quot;</span>
 </span><span id="__span-0-58">    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-59">        <span class="kn">from</span> <span class="nn">imageio.v2</span> <span class="kn">import</span> <span class="n">volread</span>
+</span><span id="__span-0-59">        <span class="kn">from</span><span class="w"> </span><span class="nn">imageio.v2</span><span class="w"> </span><span class="kn">import</span> <span class="n">volread</span>
 </span><span id="__span-0-60">    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
 </span><span id="__span-0-61">        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
 </span><span id="__span-0-62">            <span class="s2">&quot;Please `pip install imageio[tifffile]` to load cells3d&quot;</span>
-</span><span id="__span-0-63">        <span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+</span><span id="__span-0-63">        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 </span><span id="__span-0-64">
 </span><span id="__span-0-65">    <span class="n">url</span> <span class="o">=</span> <span class="s2">&quot;https://gitlab.com/scikit-image/data/-/raw/2cdc5ce89b334d28f06a58c9f0ca21aa6992a5ba/cells3d.tif&quot;</span>
 </span><span id="__span-0-66">    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">volread</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
@@ -1373,7 +1472,7 @@
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-92"><span class="k">def</span> <span class="nf">cosem_dataset</span><span class="p">(</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-92"><span class="k">def</span><span class="w"> </span><span class="nf">cosem_dataset</span><span class="p">(</span>
 </span><span id="__span-0-93">    <span class="n">uri</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
 </span><span id="__span-0-94">    <span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jrc_hela-3&quot;</span><span class="p">,</span>
 </span><span id="__span-0-95">    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;er-mem_pred&quot;</span><span class="p">,</span>
@@ -1396,9 +1495,9 @@
 </span><span id="__span-0-112"><span class="sd">        The pyramid level to load. Default is 4.</span>
 </span><span id="__span-0-113"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-114">    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-115">        <span class="kn">import</span> <span class="nn">tensorstore</span> <span class="k">as</span> <span class="nn">ts</span>
+</span><span id="__span-0-115">        <span class="kn">import</span><span class="w"> </span><span class="nn">tensorstore</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ts</span>
 </span><span id="__span-0-116">    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-</span><span id="__span-0-117">        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;Please install tensorstore to fetch cosem data&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+</span><span id="__span-0-117">        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;Please install tensorstore to fetch cosem data&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
 </span><span id="__span-0-118">
 </span><span id="__span-0-119">    <span class="k">if</span> <span class="ow">not</span> <span class="n">uri</span><span class="p">:</span>
 </span><span id="__span-0-120">        <span class="n">uri</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">dataset</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">dataset</span><span class="si">}</span><span class="s2">.n5/labels/</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">/s</span><span class="si">{</span><span class="n">level</span><span class="si">}</span><span class="s2">/&quot;</span>
@@ -1489,7 +1588,7 @@
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-12"><span class="k">def</span> <span class="nf">nd_sine_wave</span><span class="p">(</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-12"><span class="k">def</span><span class="w"> </span><span class="nf">nd_sine_wave</span><span class="p">(</span>
 </span><span id="__span-0-13">    <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
 </span><span id="__span-0-14">    <span class="n">amplitude</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">240</span><span class="p">,</span>
 </span><span id="__span-0-15">    <span class="n">base_frequency</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
@@ -1659,12 +1758,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "navigation.indexes", "navigation.footer", "navigation.sections", "toc.follow", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../../../assets/javascripts/bundle.88dd0f4e.min.js"></script>
-      
-        <script src="../../../js/install-table.js"></script>
       
     
   </body>
