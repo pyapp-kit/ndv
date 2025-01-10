@@ -51,6 +51,8 @@ theme:
     - navigation.footer
     - navigation.sections
     - toc.follow
+    - navigation.tabs
+    - navigation.tabs.sticky
 
 extra_css:
   - css/material.css
