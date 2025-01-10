@@ -17,6 +17,7 @@ nav:
 
 theme:
   name: material
+  custom_dir: docs/_overrides
   icon:
     logo: material/cube-scan
     repo: fontawesome/brands/github
@@ -51,8 +52,6 @@ theme:
     - navigation.footer
     - navigation.sections
     - toc.follow
-    - navigation.tabs
-    - navigation.tabs.sticky
 
 extra_css:
   - css/material.css
@@ -88,7 +87,6 @@ plugins:
         - codespell:
             dictionaries: [clear]
   - minify
-  - mike
   - mkdocstrings:
       handlers:
         python:
