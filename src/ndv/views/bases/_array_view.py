@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
 
-from ndv._views.bases._view_base import Viewable
 from ndv.models._array_display_model import ChannelMode
+from ndv.views.bases._view_base import Viewable
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey
-    from ndv._views.bases._lut_view import LutView
+    from ndv.views.bases import LutView
 
 
 class ArrayView(Viewable):

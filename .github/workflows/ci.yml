@@ -32,7 +32,7 @@ jobs:
         # using 3.12 as main current version, until 3.13 support
         # is ubiquitous in upstream dependencies
         python-version: ["3.10", "3.12"]
-        gui: [pyside, pyqt, jup, wxpython]
+        gui: [pyside, pyqt, jupyter, wxpython]
         canvas: [vispy, pygfx]
         exclude:
           # unsolved intermittent segfaults on this combo
@@ -49,11 +49,11 @@ jobs:
           # full os/gui/canvas matrix coverage
           - os: ubuntu-latest
             python-version: "3.13"
-            gui: jup
+            gui: jupyter
             canvas: vispy
           - os: ubuntu-latest
             python-version: "3.13"
-            gui: jup
+            gui: jupyter
             canvas: pygfx
           # pyside6 is struggling with 3.9
           - os: ubuntu-latest
@@ -65,7 +65,7 @@ jobs:
             python-version: "3.9"
             canvas: vispy
           - os: windows-latest
-            gui: jup
+            gui: jupyter
             python-version: "3.9"
             canvas: pygfx
 
@@ -118,6 +118,23 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.12"]
+  
+  # make sure we can build docs without error
+  test-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[docs]'
+      - name: 📚 Build docs
+        run: mkdocs build --strict
 
   upload_coverage:
     if: always()

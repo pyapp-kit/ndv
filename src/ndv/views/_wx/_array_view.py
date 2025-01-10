@@ -7,10 +7,9 @@ import wx
 import wx.lib.newevent
 from psygnal import Signal
 
-from ndv._views._wx._labeled_slider import WxLabeledSlider
-from ndv._views.bases._array_view import ArrayView
-from ndv._views.bases._lut_view import LutView
 from ndv.models._array_display_model import ChannelMode
+from ndv.views._wx._labeled_slider import WxLabeledSlider
+from ndv.views.bases import ArrayView, LutView
 
 from .range_slider import RangeSlider
 
