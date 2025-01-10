@@ -1,5 +1,5 @@
 site_name: "ndv"
-site_url: http://localhost:8000/
+site_url: https://pyapp-kit.github.io/ndv/
 site_description: "minimal n-dimensional python array viewer."
 repo_name: "pyapp-kit/ndv"
 repo_url: https://github.com/pyapp-kit/ndv
