@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     if: github.repository == 'pyapp-kit/ndv'
     steps:
       - uses: actions/checkout@v4
@@ -22,8 +24,8 @@ jobs:
 
       - name: Config git
         run: |
-          git config user.email "ndv@github.com"
-          git config user.name "Ktlint Release Workflow"
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
 
       - name: Deploy release docs
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
