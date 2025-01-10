@@ -58,8 +58,8 @@ extra_css:
   - css/ndv.css
   - css/install-table.css
 
-# extra_javascript:
-#   - js/install-table.js
+extra_javascript:
+  - js/install-table.js
 
 markdown_extensions:
   - admonition
