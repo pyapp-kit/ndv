@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -346,7 +347,10 @@ class _QArrayViewer(QWidget):
 
 
 class QtArrayView(ArrayView):
-    def __init__(self, canvas_widget: QWidget) -> None:
+    def __init__(
+        self, canvas_widget: QWidget, data_model: _ArrayDataDisplayModel
+    ) -> None:
+        self._data_model = data_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
 
@@ -410,17 +414,22 @@ class QtArrayView(ArrayView):
         """Set the current value of the sliders."""
         self._qwidget.dims_sliders.set_current_index(value)
 
-    def _on_ndims_toggled(self, checked: bool) -> None:
-        was_3d = len(self._visible_axes) > 2
-        is_3d = checked
-        if was_3d and not is_3d:
+    def _on_ndims_toggled(self, is_3d: bool) -> None:
+        if len(self._visible_axes) > 2:
+            if is_3d:  # no change
+                return
             self._visible_axes = self._visible_axes[-2:]
-        elif not was_3d and is_3d:
-            # FIXME
-            # HACCCCCKKK
-            # need a better way to add the next dimension in the GUI
-            new_ax = 0
-            self._visible_axes = (new_ax, *self._visible_axes)
+        else:
+            z_ax = None
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            if z_ax is None:
+                # get the last slider that is not in visible axes
+                sld = reversed(self._qwidget.dims_sliders._sliders)
+                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
+            self._visible_axes = (z_ax, *self._visible_axes)
+        # TODO: a future PR may decide to set this on the model directly...
+        # since we now have access to it.
         self.visibleAxesChanged.emit()
 
     def visible_axes(self) -> Sequence[AxisKey]:

@@ -40,6 +40,8 @@ class DataResponse:
         self.dtype = self.data.dtype
 
 
+# NOTE: nobody particularly likes this class.  It does important stuff, but we're
+# not yet sure where this logic belongs.
 class _ArrayDataDisplayModel(NDVModel):
     """Utility class combining ArrayDisplayModel model with a DataWrapper.
 

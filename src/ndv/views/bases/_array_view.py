@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -13,10 +13,11 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases import LutView
 
 
-class ArrayView(Viewable):
+class ArrayView(Viewable, ABC):
     """ABC for ND Array viewers widget.
 
     Currently, this is the "main" widget that contains the array display and
@@ -30,8 +31,11 @@ class ArrayView(Viewable):
     visibleAxesChanged = Signal()
     channelModeChanged = Signal(ChannelMode)
 
+    # model: _ArrayDataDisplayModel is likely a temporary parameter
     @abstractmethod
-    def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
+    def __init__(
+        self, canvas_widget: Any, model: _ArrayDataDisplayModel, **kwargs: Any
+    ) -> None: ...
     @abstractmethod
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     @abstractmethod

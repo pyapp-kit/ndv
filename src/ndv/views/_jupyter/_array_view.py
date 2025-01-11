@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -110,9 +111,12 @@ class JupyterLutView(LutView):
 
 class JupyterArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
+        self,
+        canvas_widget: _jupyter_rfb.CanvasBackend,
+        data_model: _ArrayDataDisplayModel,
     ) -> None:
         # WIDGETS
+        self._data_model = data_model
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
 
@@ -269,16 +273,22 @@ class JupyterArrayView(ArrayView):
         self._ndims_btn.value = len(axes) == 3
 
     def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
-        was_3d = len(self._visible_axes) > 2
-        is_3d = change["new"]
-        if was_3d and not is_3d:
+        if len(self._visible_axes) > 2:
+            if change["new"]:  # no change
+                return
             self._visible_axes = self._visible_axes[-2:]
-        elif not was_3d and is_3d:
-            # FIXME
-            # HACCCCCKKK
-            # need a better way to add the next dimension in the GUI
-            new_ax = 0
-            self._visible_axes = (new_ax, *self._visible_axes)
+        else:
+            z_ax = None
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            if z_ax is None:
+                # get the last slider that is not in visible axes
+                z_ax = next(
+                    ax for ax in reversed(self._sliders) if ax not in self._visible_axes
+                )
+            self._visible_axes = (z_ax, *self._visible_axes)
+        # TODO: a future PR may decide to set this on the model directly...
+        # since we now have access to it.
         self.visibleAxesChanged.emit()
 
     def close(self) -> None:

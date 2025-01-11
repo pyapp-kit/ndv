@@ -71,6 +71,8 @@ class DataWrapper(Generic[ArrayT], ABC):
     PRIORITY: ClassVar[int] = 50
     # These names will be checked when looking for a channel axis
     COMMON_CHANNEL_NAMES: ClassVar[Container[str]] = ("channel", "ch", "c")
+    COMMON_Z_AXIS_NAMES: ClassVar[Container[str]] = ("z", "depth", "focus")
+
     # Maximum dimension size consider when guessing the channel axis
     MAX_CHANNELS = 16
 
@@ -171,6 +173,22 @@ class DataWrapper(Generic[ArrayT], ABC):
 
         # otherwise use the smallest dimension as the channel axis
         return min(sizes, key=sizes.get)  # type: ignore [arg-type]
+
+    def guess_z_axis(self) -> Hashable | None:
+        """Return the (best guess) axis name for the z (3rd spatial) dimension."""
+        sizes = self.sizes()
+        ch = self.guess_channel_axis()
+        for dimkey in sizes:
+            if str(dimkey).lower() in self.COMMON_Z_AXIS_NAMES:
+                if (normed := self.normalized_axis_key(dimkey)) != ch:
+                    return normed
+
+        # otherwise return the LAST axis that is neither in the last two dimensions
+        # or the channel axis guess
+        return next(
+            (self.normalized_axis_key(x) for x in reversed(self.dims[:-2]) if x != ch),
+            None,
+        )
 
     def summary_info(self) -> str:
         """Return info label with information about the data."""

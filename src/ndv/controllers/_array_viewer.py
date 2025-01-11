@@ -63,6 +63,9 @@ class ArrayViewer:
                 "When display_model is provided, kwargs are be ignored.",
                 stacklevel=2,
             )
+        self._data_model = _ArrayDataDisplayModel(
+            data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
+        )
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -74,15 +77,11 @@ class ArrayViewer:
         self._canvas = canvas_cls()
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.frontend_widget())
+        self._view = frontend_cls(self._canvas.frontend_widget(), self._data_model)
 
-        display_model = display_model or ArrayDisplayModel(**kwargs)
-        self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=data, display=display_model
-        )
         self._set_model_connected(self._data_model.display)
         self._canvas.set_ndim(self.display_model.n_visible_axes)
-        self._view.set_visible_axes(self.display_model.visible_axes)
+        self._view.set_visible_axes(self._data_model.normed_visible_axes)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
@@ -245,7 +244,7 @@ class ArrayViewer:
             self._update_hist_domain_for_dtype()
 
     def _on_model_visible_axes_changed(self) -> None:
-        self._view.set_visible_axes(self.display_model.visible_axes)
+        self._view.set_visible_axes(self._data_model.normed_visible_axes)
         self._update_visible_sliders()
         self._clear_canvas()
         self._update_canvas()
