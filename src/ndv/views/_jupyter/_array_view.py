@@ -274,9 +274,8 @@ class JupyterArrayView(ArrayView):
 
     def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
         if len(self._visible_axes) > 2:
-            if change["new"]:  # no change
-                return
-            self._visible_axes = self._visible_axes[-2:]
+            if not change["new"]:  # is now 2D
+                self._visible_axes = self._visible_axes[-2:]
         else:
             z_ax = None
             if wrapper := self._data_model.data_wrapper:

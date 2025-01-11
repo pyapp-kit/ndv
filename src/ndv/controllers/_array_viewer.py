@@ -114,7 +114,7 @@ class ArrayViewer:
     @display_model.setter
     def display_model(self, model: ArrayDisplayModel) -> None:
         """Set the ArrayDisplayModel."""
-        if not isinstance(model, ArrayDisplayModel):
+        if not isinstance(model, ArrayDisplayModel):  # pragma: no cover
             raise TypeError("model must be an ArrayDisplayModel")
         self._set_model_connected(self._data_model.display, False)
         self._data_model.display = model

@@ -263,9 +263,8 @@ class WxArrayView(ArrayView):
     def _on_ndims_toggled(self, event: wx.CommandEvent) -> None:
         is_3d = self._wxwidget.ndims_btn.GetValue()
         if len(self._visible_axes) > 2:
-            if is_3d:  # no change
-                return
-            self._visible_axes = self._visible_axes[-2:]
+            if not is_3d:  # is now 2D
+                self._visible_axes = self._visible_axes[-2:]
         else:
             z_ax = None
             if wrapper := self._data_model.data_wrapper:
