@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ndv.views.bases import LutView
 
 
-class ArrayView(Viewable, ABC):
+class ArrayView(Viewable):
     """ABC for ND Array viewers widget.
 
     Currently, this is the "main" widget that contains the array display and
