@@ -81,7 +81,6 @@ class ArrayViewer:
 
         self._set_model_connected(self._data_model.display)
         self._canvas.set_ndim(self.display_model.n_visible_axes)
-        self._view.set_visible_axes(self._data_model.normed_visible_axes)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
@@ -229,6 +228,7 @@ class ArrayViewer:
             self._view.create_sliders(self._data_model.normed_data_coords)
         self._view.set_channel_mode(display_model.channel_mode)
         if self.data is not None:
+            self._view.set_visible_axes(self._data_model.normed_visible_axes)
             self._update_visible_sliders()
             if cur_index := display_model.current_index:
                 self._view.set_current_index(cur_index)
