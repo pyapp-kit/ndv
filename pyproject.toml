@@ -47,7 +47,7 @@ dependencies = [
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
-jup = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
+jupyter = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
 pyqt = ["pyqt6"]
 pyside = ["pyside6<6.8"]
 wxpython = ["wxpython"]
@@ -58,10 +58,20 @@ pygfx = ["pygfx>=0.6.0"]
 
 # ready to go bundles with vispy
 qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
-jupyter = ["ndv[jup,vispy]", "imageio[tifffile]"]
+jup = ["ndv[vispy,jupyter]", "imageio[tifffile]"]
 wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
 
 test = ["imageio[tifffile]", "pytest-cov", "pytest"]
+docs = [
+    "mkdocs-gen-files==0.5.0",
+    "mkdocs-literate-nav==0.6.1",
+    "mkdocs-material==9.5.49",
+    "mkdocs-minify-plugin==0.8.0",
+    "mkdocs==1.6.1",
+    "mkdocstrings-python==1.13.0",
+    "mkdocs-spellcheck[codespell]==1.1.0",
+    "mike==2.1.3",
+]
 dev = [
     "ndv[test,vispy,pygfx,pyqt,jupyter]",
     "pytest-qt",

@@ -15,7 +15,7 @@ AutoscaleType: TypeAlias = Union[
 class LUTModel(NDVModel):
     """Representation of how to display a channel of an array.
 
-    Parameters
+    Attributes
     ----------
     visible : bool
         Whether to display this channel.

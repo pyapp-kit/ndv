@@ -42,7 +42,7 @@ class LutView(Viewable):
     def set_channel_visible(self, visible: bool) -> None:
         """Check or uncheck the visibility indicator of the LUT.
 
-        Usually corresponsds to a checkbox.
+        Usually corresponds to a checkbox.
         """
 
     def set_gamma(self, gamma: float) -> None:

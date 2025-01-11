@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 
     from IPython.core.interactiveshell import InteractiveShell
 
-    from ndv._views.bases import ArrayCanvas, ArrayView, HistogramCanvas
-    from ndv._views.bases.graphics._mouseable import Mouseable
+    from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
+    from ndv.views.bases.graphics._mouseable import Mouseable
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
@@ -39,12 +39,34 @@ IPYTHON_GUI_QT = "NDV_IPYTHON_GUI_QT"
 
 
 class GuiFrontend(str, Enum):
+    """Enum of available GUI frontends.
+
+    Attributes
+    ----------
+    QT : str
+        [PyQt5/PySide2/PyQt6/PySide6](https://doc.qt.io)
+    JUPYTER : str
+        [Jupyter notebook/lab](https://jupyter.org)
+    WX : str
+        [wxPython](https://wxpython.org)
+    """
+
     QT = "qt"
     JUPYTER = "jupyter"
     WX = "wx"
 
 
 class CanvasBackend(str, Enum):
+    """Enum of available canvas backends.
+
+    Attributes
+    ----------
+    VISPY : str
+        [Vispy](https://vispy.org)
+    PYGFX : str
+        [Pygfx](https://github.com/pygfx/pygfx)
+    """
+
     VISPY = "vispy"
     PYGFX = "pygfx"
 
@@ -329,7 +351,7 @@ class VispyProvider(CanvasProvider):
     def array_canvas_class() -> type[ArrayCanvas]:
         from vispy.app import use_app
 
-        from ndv._views._vispy._array_canvas import VispyArrayCanvas
+        from ndv.views._vispy._array_canvas import VispyArrayCanvas
 
         # these may not be necessary, since we likely have already called
         # create_app by this point and vispy will autodetect that.
@@ -346,7 +368,7 @@ class VispyProvider(CanvasProvider):
 
     @staticmethod
     def histogram_canvas_class() -> type[HistogramCanvas]:
-        from ndv._views._vispy._histogram import VispyHistogramCanvas
+        from ndv.views._vispy._histogram import VispyHistogramCanvas
 
         return VispyHistogramCanvas
 
@@ -362,7 +384,7 @@ class PygfxProvider(CanvasProvider):
 
     @staticmethod
     def array_canvas_class() -> type[ArrayCanvas]:
-        from ndv._views._pygfx._array_canvas import GfxArrayCanvas
+        from ndv.views._pygfx._array_canvas import GfxArrayCanvas
 
         return GfxArrayCanvas
 
@@ -394,11 +416,11 @@ CANVAS_PROVIDERS: dict[CanvasBackend, CanvasProvider] = {
 
 @cache  # not allowed to change
 def gui_frontend() -> GuiFrontend:
-    """Return the preferred GUI frontend.
+    """Return the active [`GuiFrontend`][ndv.views.GuiFrontend].
 
-    This is determined first by the NDV_GUI_FRONTEND environment variable, after which
-    GUI_PROVIDERS are tried in order until one is found that is either already running,
-    or available.
+    This is determined first by the `NDV_GUI_FRONTEND` environment variable, after which
+    known GUI providers are tried in order until one is found that is either already
+    running, or available.
     """
     requested = os.getenv(GUI_ENV_VAR, "").lower()
     valid = {x.value for x in GuiFrontend}
@@ -469,12 +491,14 @@ def canvas_backend(requested: str | None) -> CanvasBackend:
 # TODO: add a way to set the frontend via an environment variable
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
 def get_array_view_class() -> type[ArrayView]:
+    """Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend."""  # noqa: E501
     if (frontend := gui_frontend()) not in GUI_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No GUI frontend found for {frontend}")
     return GUI_PROVIDERS[frontend].array_view_class()
 
 
 def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
+    """Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend."""  # noqa: E501
     _backend = canvas_backend(backend)
     if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")
@@ -482,6 +506,7 @@ def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
 
 
 def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanvas]:
+    """Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend."""  # noqa: E501
     _backend = canvas_backend(backend)
     if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")

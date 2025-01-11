@@ -1,3 +1,5 @@
+"""Abstract base classes for views and viewable objects."""
+
 from ._array_view import ArrayView
 from ._lut_view import LutView
 from ._view_base import Viewable

@@ -108,7 +108,7 @@ class ArrayDisplayModel(NDVModel):
 
     In the following types, `AxisKey` can be either an integer index or a string label.
 
-    Parameters
+    Attributes
     ----------
     visible_axes : tuple[AxisKey, ...]
         Ordered list of axes to visualize, from slowest to fastest.
