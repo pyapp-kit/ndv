@@ -161,6 +161,9 @@ class DataWrapper(Generic[ArrayT], ABC):
         """Return the sizes of the dimensions."""
         return {dim: len(self.coords[dim]) for dim in self.dims}
 
+    # these guess_x methods may change in the future to become more agnostic to the
+    # dimension name/semantics that they are guessing.
+
     def guess_channel_axis(self) -> Hashable | None:
         """Return the (best guess) axis name for the channel dimension."""
         # for arrays with labeled dimensions,
