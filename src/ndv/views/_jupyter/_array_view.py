@@ -23,10 +23,23 @@ if TYPE_CHECKING:
 class JupyterLutView(LutView):
     def __init__(self) -> None:
         # WIDGETS
-        self._visible = widgets.Checkbox(value=True)
+        self._visible = widgets.Checkbox(value=True, indent=False)
+        self._visible.layout.width = "60px"
         self._cmap = widgets.Dropdown(
-            options=["gray", "green", "magenta", "cubehelix"], value="gray"
+            options=[
+                "gray",
+                "red",
+                "green",
+                "blue",
+                "cyan",
+                "magenta",
+                "yellow",
+                "viridis",
+                "magma",
+            ],
+            value="gray",
         )
+        self._cmap.layout.width = "200px"
         self._clims = widgets.FloatRangeSlider(
             value=[0, 2**16],
             min=0,
@@ -36,6 +49,7 @@ class JupyterLutView(LutView):
             readout=True,
             readout_format=".0f",
         )
+        self._clims.layout.width = "100%"
         self._auto_clim = widgets.ToggleButton(
             value=True,
             description="Auto",
@@ -43,6 +57,7 @@ class JupyterLutView(LutView):
             tooltip="Auto scale",
             icon="check",
         )
+        self._auto_clim.layout.width = "100px"
 
         # LAYOUT
 
@@ -116,27 +131,38 @@ class JupyterArrayView(ArrayView):
         self._canvas_widget = canvas_widget
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
-        self._slider_box = widgets.VBox([])
+        self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
+        self._luts_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
+
         self._data_info_label = widgets.Label()
         self._hover_info_label = widgets.Label()
 
         # the button that controls the display mode of the channels
         self._channel_mode_combo = widgets.Dropdown(
-            options=[x.value for x in ChannelMode], value=str(ChannelMode.GRAYSCALE)
+            options=[ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE],
+            value=str(ChannelMode.GRAYSCALE),
         )
-
+        self._channel_mode_combo.layout.width = "120px"
+        self._channel_mode_combo.layout.align_self = "flex-end"
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
         # LAYOUT
 
+        try:
+            width = getattr(canvas_widget, "css_width", "600px").replace("px", "")
+            width = f"{int(width) + 4}px"
+        except Exception:
+            width = "604px"
         self.layout = widgets.VBox(
             [
                 self._data_info_label,
                 self._canvas_widget,
                 self._hover_info_label,
                 self._slider_box,
+                self._luts_box,
                 self._channel_mode_combo,
-            ]
+            ],
+            layout=widgets.Layout(width=width),
         )
 
         # CONNECTIONS
@@ -160,6 +186,7 @@ class JupyterArrayView(ArrayView):
                 continuous_update=True,
                 orientation="horizontal",
             )
+            sld.layout.width = "99%"
             sld.observe(self._on_slider_change, "value")
             sliders.append(sld)
             self._sliders[axis] = sld
@@ -203,14 +230,16 @@ class JupyterArrayView(ArrayView):
     def add_lut_view(self) -> JupyterLutView:
         """Add a LUT view to the viewer."""
         wdg = JupyterLutView()
-        self.layout.children = (*self.layout.children, wdg.layout)
+        layout = self._luts_box
+        layout.children = (*layout.children, wdg.layout)
         return wdg
 
     def remove_lut_view(self, view: LutView) -> None:
         """Remove a LUT view from the viewer."""
         view = cast("JupyterLutView", view)
-        self.layout.children = tuple(
-            wdg for wdg in self.layout.children if wdg != view.frontend_widget()
+        layout = self._luts_box
+        layout.children = tuple(
+            wdg for wdg in layout.children if wdg != view.frontend_widget()
         )
 
     def set_data_info(self, data_info: str) -> None:
