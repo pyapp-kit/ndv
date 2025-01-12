@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
-from ndv._views.bases._lut_view import LutView
+from ndv.views.bases._lut_view import LutView
 
 from ._mouseable import Mouseable
 

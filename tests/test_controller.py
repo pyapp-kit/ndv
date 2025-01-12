@@ -9,14 +9,14 @@ import numpy as np
 import pytest
 
 from ndv._types import MouseMoveEvent
-from ndv._views import _app, gui_frontend
-from ndv._views.bases._array_view import ArrayView
-from ndv._views.bases._lut_view import LutView
-from ndv._views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
-from ndv._views.bases.graphics._canvas_elements import ImageHandle
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
+from ndv.views import _app, gui_frontend
+from ndv.views.bases._array_view import ArrayView
+from ndv.views.bases._lut_view import LutView
+from ndv.views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
+from ndv.views.bases.graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
     from ndv.controllers._channel_controller import ChannelController

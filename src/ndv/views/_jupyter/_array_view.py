@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import ipywidgets as widgets
 
-from ndv._views.bases import ArrayView, LutView
 from ndv.models._array_display_model import ChannelMode
+from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
