@@ -3,7 +3,6 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any, cast
 
-import cmap
 import ipywidgets as widgets
 
 from ndv._views.bases import ArrayView, LutView
@@ -12,6 +11,7 @@ from ndv.models._array_display_model import ChannelMode
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
+    import cmap
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
@@ -59,16 +59,20 @@ class JupyterLutView(LutView):
     # ------------------ emit changes to the controller ------------------
 
     def _on_clims_changed(self, change: dict[str, Any]) -> None:
-        self.climsChanged.emit(self._clims.value)
+        if self._model:
+            self._model.clims = self._clims.value
 
     def _on_visible_changed(self, change: dict[str, Any]) -> None:
-        self.visibilityChanged.emit(self._visible.value)
+        if self._model:
+            self._model.visible = self._visible.value
 
     def _on_cmap_changed(self, change: dict[str, Any]) -> None:
-        self.cmapChanged.emit(cmap.Colormap(self._cmap.value))
+        if self._model:
+            self._model.cmap = self._cmap.value
 
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
-        self.autoscaleChanged.emit(self._auto_clim.value)
+        if self._model:
+            self._model.autoscale = self._auto_clim.value
 
     # ------------------ receive changes from the controller ---------------
 
@@ -79,20 +83,20 @@ class JupyterLutView(LutView):
     # to avoid loops, unnecessary updates, and unexpected behavior
 
     def set_auto_scale(self, auto: bool) -> None:
-        with self.autoscaleChanged.blocked():
-            self._auto_clim.value = auto
+        # with self.autoscaleChanged.blocked():
+        self._auto_clim.value = auto
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        with self.cmapChanged.blocked():
-            self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
+        # with self.cmapChanged.blocked():
+        self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        with self.climsChanged.blocked():
-            self._clims.value = clims
+        # with self.climsChanged.blocked():
+        self._clims.value = clims
 
     def set_channel_visible(self, visible: bool) -> None:
-        with self.visibilityChanged.blocked():
-            self._visible.value = visible
+        # with self.visibilityChanged.blocked():
+        self._visible.value = visible
 
     def set_gamma(self, gamma: float) -> None:
         pass

@@ -65,16 +65,20 @@ class WxLutView(LutView):
 
     # Event Handlers
     def _on_visible_changed(self, event: wx.CommandEvent) -> None:
-        self.visibilityChanged.emit(self._wxwidget.visible.GetValue())
+        if self._model:
+            self._model.visible = self._wxwidget.visible.GetValue()
 
     def _on_cmap_changed(self, event: wx.CommandEvent) -> None:
-        self.cmapChanged.emit(self._wxwidget.cmap.GetValue())
+        if self._model:
+            self._model.cmap = self._wxwidget.cmap.GetValue()
 
     def _on_clims_changed(self, event: wx.CommandEvent) -> None:
-        self.climsChanged.emit(self._wxwidget.clims.GetValues())
+        if self._model:
+            self._model.clims = self._wxwidget.clims.GetValues()
 
     def _on_autoscale_changed(self, event: wx.CommandEvent) -> None:
-        self.autoscaleChanged.emit(self._wxwidget.auto_clim.GetValue())
+        if self._model:
+            self._model.autoscale = self._wxwidget.auto_clim.GetValue()
 
     # Public Methods
     def frontend_widget(self) -> wx.Window:

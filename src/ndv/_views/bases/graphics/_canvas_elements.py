@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from ndv._views.bases._lut_view import LutView
+
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
@@ -60,7 +62,7 @@ class CanvasElement(Mouseable):
         """Removes the element from the canvas."""
 
 
-class ImageHandle(CanvasElement):
+class ImageHandle(CanvasElement, LutView):
     @abstractmethod
     def data(self) -> np.ndarray: ...
     @abstractmethod
@@ -77,6 +79,30 @@ class ImageHandle(CanvasElement):
     def cmap(self) -> _cmap.Colormap: ...
     @abstractmethod
     def set_cmap(self, cmap: _cmap.Colormap) -> None: ...
+
+    # -- LutView methods -- #
+    def close(self) -> None:
+        pass
+
+    def frontend_widget(self) -> Any:
+        return None
+
+    def set_channel_name(self, name: str) -> None:
+        pass
+
+    def set_auto_scale(self, checked: bool) -> None:
+        # TODO: Make this computation alter the slider...
+        if checked:
+            d = self.data()
+            self.set_clims((d.min(), d.max()))
+
+    def set_colormap(self, cmap: _cmap.Colormap) -> None:
+        self.set_cmap(cmap)
+
+    def set_channel_visible(self, visible: bool) -> None:
+        self.set_visible(visible)
+
+    # set_clims, set_gamma reused above
 
 
 class RoiHandle(CanvasElement):

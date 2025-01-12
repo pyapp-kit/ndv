@@ -1,8 +1,8 @@
 from abc import abstractmethod
-from typing import final
 
 import cmap
-from psygnal import Signal
+
+from ndv.models._lut_model import LUTModel
 
 from ._view_base import Viewable
 
@@ -10,11 +10,10 @@ from ._view_base import Viewable
 class LutView(Viewable):
     """Manages LUT properties (contrast, colormap, etc...) in a view object."""
 
-    visibilityChanged = Signal(bool)
-    autoscaleChanged = Signal(bool)
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
-    gammaChanged = Signal(float)
+    _model: LUTModel | None = None
+
+    def __init__(self, model: LUTModel | None = None) -> None:
+        self.model = model
 
     @abstractmethod
     def set_channel_name(self, name: str) -> None:
@@ -49,29 +48,33 @@ class LutView(Viewable):
         """Set the gamma value of the LUT."""
         return None
 
-    # These methods apply a value to the view without re-emitting the signal.
+    @property
+    def model(self) -> LUTModel | None:
+        return self._model
 
-    @final
-    def set_auto_scale_without_signal(self, auto: bool) -> None:
-        with self.autoscaleChanged.blocked():
-            self.set_auto_scale(auto)
+    @model.setter
+    def model(self, model: LUTModel | None) -> None:
+        if self._model is not None:
+            self._model.events.autoscale.disconnect(self.set_auto_scale)
+            self._model.events.clims.disconnect(self.set_clims)
+            self._model.events.cmap.disconnect(self.set_colormap)
+            self._model.events.gamma.disconnect(self.set_gamma)
+            self._model.events.visible.disconnect(self.set_channel_visible)
+        self._model = model
+        if self._model is not None:
+            self._model.events.autoscale.connect(self.set_auto_scale)
+            self._model.events.clims.connect(self.set_clims)
+            self._model.events.cmap.connect(self.set_colormap)
+            self._model.events.gamma.connect(self.set_gamma)
+            self._model.events.visible.connect(self.set_channel_visible)
 
-    @final
-    def set_colormap_without_signal(self, cmap: cmap.Colormap) -> None:
-        with self.cmapChanged.blocked():
-            self.set_colormap(cmap)
+        self.synchronize()
 
-    @final
-    def set_clims_without_signal(self, clims: tuple[float, float]) -> None:
-        with self.climsChanged.blocked():
-            self.set_clims(clims)
-
-    @final
-    def set_gamma_without_signal(self, gamma: float) -> None:
-        with self.gammaChanged.blocked():
-            self.set_gamma(gamma)
-
-    @final
-    def set_channel_visible_without_signal(self, visible: bool) -> None:
-        with self.visibilityChanged.blocked():
-            self.set_channel_visible(visible)
+    def synchronize(self) -> None:
+        if model := self._model:
+            self.set_auto_scale(bool(model.autoscale))
+            if model.clims:
+                self.set_clims(model.clims)
+            self.set_colormap(model.cmap)
+            self.set_gamma(model.gamma)
+            self.set_channel_visible(model.visible)

@@ -317,7 +317,8 @@ class VispyHistogramCanvas(HistogramCanvas):
                 newlims = (min(self._clims[1], c), self._clims[1])
             elif self._grabbed is Grabbable.RIGHT_CLIM:
                 newlims = (self._clims[0], max(self._clims[0], c))
-            self.climsChanged.emit(newlims)
+            if self.model:
+                self.model.clims = newlims
             return False
 
         if self._grabbed is Grabbable.GAMMA:
@@ -329,7 +330,8 @@ class VispyHistogramCanvas(HistogramCanvas):
             y = self._to_plot_coords(pos)[0 if self._vertical else 1]
             if y < np.maximum(y0, 0) or y > y1:
                 return False
-            self.gammaChanged.emit(-np.log2(y / y1))
+            if self.model:
+                self.model.gamma = -np.log2(y / y1)
             return False
 
         self.get_cursor(pos).apply_to(self)

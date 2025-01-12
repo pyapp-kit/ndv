@@ -126,10 +126,10 @@ class QLutView(LutView):
         super().__init__()
         self._qwidget = _QLUTWidget()
         # TODO: use emit_fast
-        self._qwidget.visible.toggled.connect(self.visibilityChanged.emit)
-        self._qwidget.cmap.currentColormapChanged.connect(self.cmapChanged.emit)
-        self._qwidget.clims.valueChanged.connect(self.climsChanged.emit)
-        self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit)
+        self._qwidget.visible.toggled.connect(self._on_q_visibility_changed)
+        self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
+        self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
+        self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
@@ -157,6 +157,22 @@ class QLutView(LutView):
 
     def close(self) -> None:
         self._qwidget.close()
+
+    def _on_q_visibility_changed(self, visible: bool) -> None:
+        if self._model:
+            self._model.visible = visible
+
+    def _on_q_cmap_changed(self, cmap: cmap.Colormap) -> None:
+        if self._model:
+            self._model.cmap = cmap
+
+    def _on_q_clims_changed(self, clims: tuple[float, float]) -> None:
+        if self._model:
+            self._model.clims = clims
+
+    def _on_q_auto_changed(self, autoscale: bool) -> None:
+        if self._model:
+            self._model.autoscale = autoscale
 
 
 class _QDimsSliders(QWidget):
