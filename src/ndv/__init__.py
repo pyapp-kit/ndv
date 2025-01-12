@@ -1,4 +1,4 @@
-"""simple ndviewer."""
+"""Fast and flexible n-dimensional data viewer."""
 
 from importlib.metadata import PackageNotFoundError, version
 

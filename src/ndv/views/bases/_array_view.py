@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey
-    from ndv.views.bases._lut_view import LutView
+    from ndv.views.bases import LutView
 
 
 class ArrayView(Viewable):

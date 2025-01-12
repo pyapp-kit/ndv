@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ndv.views.bases._lut_view import LutView
-from ndv.views.bases._view_base import Viewable
+from ndv.views.bases import LutView, Viewable
 
 from ._mouseable import Mouseable
 
@@ -24,6 +23,8 @@ if TYPE_CHECKING:
 
 
 class GraphicsCanvas(Viewable, Mouseable):
+    """ABC for graphics canvas providers."""
+
     @abstractmethod
     def refresh(self) -> None: ...
     @abstractmethod
@@ -44,7 +45,12 @@ class GraphicsCanvas(Viewable, Mouseable):
     def elements_at(self, pos_xy: tuple[float, float]) -> list[CanvasElement]: ...
 
 
+# TODO: These classes will probably be merged and refactored in the future.
+
+
 class ArrayCanvas(GraphicsCanvas):
+    """ABC for canvases that show array data."""
+
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod

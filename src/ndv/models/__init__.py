@@ -1,4 +1,4 @@
-"""Models for NDV."""
+"""Models for `ndv`."""
 
 from ._array_display_model import ArrayDisplayModel
 from ._lut_model import LUTModel

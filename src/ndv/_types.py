@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
-    from ndv.views.bases._view_base import Viewable
+    from ndv.views.bases import Viewable
 
 
 def _maybe_int(val: Any) -> Any:

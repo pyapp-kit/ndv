@@ -13,8 +13,7 @@ from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import _app, gui_frontend
-from ndv.views.bases._array_view import ArrayView
-from ndv.views.bases._lut_view import LutView
+from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases.graphics._canvas_elements import ImageHandle
 

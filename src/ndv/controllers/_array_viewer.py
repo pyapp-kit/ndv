@@ -33,6 +33,12 @@ class ArrayViewer:
     This wraps a model, view, and controller into a single object, and defines the
     public API.
 
+    !!! note
+
+        In the future, `ndv` would like to support multiple, layered data sources.
+        We reserve the name `Viewer` for more fully featured viewer. `ArrayViewer`
+        assumes you're viewing a single array.
+
     Parameters
     ----------
     data :  DataWrapper | Any

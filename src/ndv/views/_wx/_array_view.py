@@ -9,8 +9,7 @@ from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
-from ndv.views.bases._array_view import ArrayView
-from ndv.views.bases._lut_view import LutView
+from ndv.views.bases import ArrayView, LutView
 
 from .range_slider import RangeSlider
 
