@@ -8,4 +8,4 @@ try:
     # This seems easier.
     from qtpy.QtCore import Qt  # noqa: F401
 except ImportError:
-    pytest.skip("Skipping Qt tests as Qt is not installed")
+    pytest.skip("Skipping Qt tests as Qt is not installed", allow_module_level=True)
