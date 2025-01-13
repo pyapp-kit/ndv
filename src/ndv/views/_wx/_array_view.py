@@ -225,7 +225,7 @@ class _WxArrayViewer(wx.Frame):
         inner.Add(btns, 0, wx.EXPAND)
 
         outer = wx.BoxSizer(wx.VERTICAL)
-        outer.Add(inner, 1, wx.ALL, 10)
+        outer.Add(inner, 1, wx.EXPAND | wx.ALL, 10)
         self.SetSizer(outer)
         self.SetInitialSize(wx.Size(600, 800))
         self.Layout()
