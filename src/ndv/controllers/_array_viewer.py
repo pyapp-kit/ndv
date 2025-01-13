@@ -27,8 +27,6 @@ if TYPE_CHECKING:
     LutKey: TypeAlias = int | None
 
 
-# primary "Controller" (and public API) for viewing an array
-
 NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
 
 
@@ -72,8 +70,8 @@ class ArrayViewer:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
-        # whether to fetch data asynchronously.  Not public exposed...
-        # but can use env var to set globally
+        # whether to fetch data asynchronously.  Not publicly exposed yet...
+        # but can use 'NDV_SYNCHRONOUS' env var to set globally
         self._async = not NDV_SYNCHRONOUS
 
         self._futures: set[Future[DataResponse]] = set()
