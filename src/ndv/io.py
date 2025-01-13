@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from contextlib import suppress
 from pathlib import Path
 from textwrap import indent, wrap
@@ -14,6 +15,8 @@ if TYPE_CHECKING:
     import xarray as xr
     import zarr
 
+logger = logging.getLogger(__name__)
+
 
 class collect_errors:
     """Store exceptions in `errors` under `key`, rather than raising."""
@@ -22,10 +25,10 @@ class collect_errors:
         self.errors = errors
         self.key = key
 
-    def __enter__(self) -> None:  # noqa: D105
+    def __enter__(self) -> None:
         pass
 
-    def __exit__(  # noqa: D105
+    def __exit__(
         self, exc_type: type[BaseException], exc_value: BaseException, traceback: Any
     ) -> bool:
         if exc_type is not None:
@@ -44,9 +47,6 @@ def imread(path: str | Path) -> Any:
 
     errors: dict[str, Exception] = {}
 
-    with collect_errors(errors, "aicsimageio"):
-        return _read_aicsimageio(path)
-
     if _is_zarr_folder(path):
         with collect_errors(errors, "tensorstore-zarr"):
             return _read_tensorstore(path)
@@ -56,6 +56,9 @@ def imread(path: str | Path) -> Any:
     if _is_n5_folder(path):
         with collect_errors(errors, "tensorstore-n5"):
             return _read_tensorstore(path, driver="n5")
+
+    with collect_errors(errors, "bioio"):
+        return _read_bioio(path)
 
     raise ValueError(_format_error_message(errors))
 
@@ -77,7 +80,7 @@ def _read_tensorstore(path: str | Path, driver: str = "zarr", level: int = 0) ->
 
     sub = _array_path(path, level=level)
     store = ts.open({"driver": driver, "kvstore": str(path) + sub}).result()
-    print("using tensorstore")
+    logger.info("using tensorstore")
     return store
 
 
@@ -91,12 +94,12 @@ def _format_error_message(errors: dict[str, Exception]) -> str:
     return "\n".join(lines)
 
 
-def _read_aicsimageio(path: str | Path) -> xr.DataArray:
-    from aicsimageio import AICSImage
+def _read_bioio(path: str | Path) -> xr.DataArray:
+    from bioio import BioImage
 
-    data = AICSImage(str(path)).xarray_dask_data
-    print("using aicsimageio")
-    return data
+    data = BioImage(str(path))
+    logger.info("using bioio")
+    return data.xarray_dask_data
 
 
 def _read_zarr_python(path: str | Path, level: int = 0) -> zarr.Array:
@@ -104,7 +107,7 @@ def _read_zarr_python(path: str | Path, level: int = 0) -> zarr.Array:
 
     _subpath = _array_path(path, level=level)
     z = zarr.open(str(path) + _subpath, mode="r")
-    print("using zarr python")
+    logger.info("using zarr python")
     return z
 
 

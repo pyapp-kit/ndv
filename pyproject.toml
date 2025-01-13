@@ -65,7 +65,16 @@ jup = ["ndv[vispy,jupyter]", "imageio[tifffile]"]
 wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
 
 # full support for reading files
-io = ["aicsimageio[all]", "bioformats_jar", "readlif", "aicspylibczi"]
+io = [
+    "bioio",
+    "bioio-ome-tiff",
+    "bioio-ome-zarr",
+    "bioio-tifffile",
+    "bioio-lif",
+    "bioio-nd2",
+    "bioio-bioformats",
+    "zarr",
+]
 
 test = ["imageio[tifffile]", "pytest-cov", "pytest"]
 docs = [
