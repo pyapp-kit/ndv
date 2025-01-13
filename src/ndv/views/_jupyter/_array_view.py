@@ -100,25 +100,21 @@ class JupyterLutView(LutView):
     # to avoid loops, unnecessary updates, and unexpected behavior
 
     def set_auto_scale(self, auto: bool) -> None:
-        # with self.autoscaleChanged.blocked():
         self._updating = True
         self._auto_clim.value = auto
         self._updating = False
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        # with self.cmapChanged.blocked():
         self._updating = True
         self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
         self._updating = False
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        # with self.climsChanged.blocked():
         self._updating = True
         self._clims.value = clims
         self._updating = False
 
     def set_channel_visible(self, visible: bool) -> None:
-        # with self.visibilityChanged.blocked():
         self._updating = True
         self._visible.value = visible
         self._updating = False

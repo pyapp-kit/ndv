@@ -38,7 +38,6 @@ class ChannelController:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
-        self.synchronize(view)
 
     def synchronize(self, *views: LutView) -> None:
         """Aligns all views against the backing model."""
