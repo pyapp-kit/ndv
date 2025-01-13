@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from qtpy.QtCore import Qt, Signal
+from qtpy.QtCore import QSize, Qt, Signal
+from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QSplitter,
     QVBoxLayout,
@@ -87,6 +90,20 @@ class _CmapCombo(QColormapComboBox):
                     self.setCurrentIndex(idx)
         else:
             self.addColormap(cmap_)
+
+
+class QSpinner(QLabel):
+    SPIN_GIF = str(Path(__file__).parent / "spin.gif")
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        size = QSize(16, 16)
+        mov = QMovie(self.SPIN_GIF, parent=self)
+        self.setFixedSize(size)
+        mov.setScaledSize(size)
+        mov.setSpeed(150)
+        mov.start()
+        self.setMovie(mov)
 
 
 class _QLUTWidget(QWidget):
@@ -314,11 +331,20 @@ class _QArrayViewer(QWidget):
         info.addWidget(self.data_info_label)
         info_widget.setFixedHeight(16)
 
+        self._progress_spinner = QSpinner(self)
+        self._progress_spinner.hide()
+
+        top = QHBoxLayout()
+        top.setContentsMargins(0, 0, 0, 0)
+        top.addWidget(info_widget)
+        top.addStretch()
+        top.addWidget(self._progress_spinner)
+
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setSpacing(2)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(info_widget)
+        left_layout.addLayout(top)
         left_layout.addWidget(canvas_widget, 1)
         left_layout.addWidget(self.hover_info_label)
         left_layout.addWidget(self.dims_sliders)

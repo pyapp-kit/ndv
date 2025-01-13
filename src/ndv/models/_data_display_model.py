@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Mapping, Sequence
-from concurrent.futures import Future
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union, cast
 
@@ -203,3 +203,42 @@ class _ArrayDataDisplayModel(NDVModel):
                 futures.append(future)
 
         return futures
+
+
+# TODO: move and formalize this
+_EXECUTOR = ThreadPoolExecutor(max_workers=2)
+
+
+def _request_sync(req: DataRequest) -> list[DataResponse]:
+    """Synchronous version of isel."""
+    data = req.wrapper.isel(req.index)
+
+    # for transposing according to the order of visible axes
+    vis_ax = req.visible_axes
+    t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
+
+    if (ch_ax := req.channel_axis) is not None:
+        ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
+    else:
+        ch_indices = (None,)
+
+    responses = []
+    for i in ch_indices:
+        if i is None:
+            ch_data = data
+        else:
+            ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
+            ch_data = data[ch_keepdims]
+            response = DataResponse(
+                data=ch_data.transpose(*t_dims).squeeze(),
+                channel_key=i,
+                request=req,
+            )
+            responses.append(response)
+
+    return responses
+
+
+def _request_async(request: DataRequest) -> Future[list[DataResponse]]:
+    """Asynchronous version of isel."""
+    return _EXECUTOR.submit(_request_sync, request)
