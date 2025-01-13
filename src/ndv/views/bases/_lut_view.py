@@ -1,19 +1,22 @@
+from __future__ import annotations
+
 from abc import abstractmethod
-
-import cmap
-
-from ndv.models._lut_model import LUTModel
+from typing import TYPE_CHECKING
 
 from ._view_base import Viewable
+
+if TYPE_CHECKING:
+    import cmap
+
+    from ndv.models._lut_model import LUTModel
+
+    pass
 
 
 class LutView(Viewable):
     """Manages LUT properties (contrast, colormap, etc...) in a view object."""
 
     _model: LUTModel | None = None
-
-    def __init__(self, model: LUTModel | None = None) -> None:
-        self.model = model
 
     @abstractmethod
     def set_channel_name(self, name: str) -> None:
