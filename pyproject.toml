@@ -21,7 +21,10 @@ description = "simple nd image viewer"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "Talley Lambert", email = "talley.lambert@gmail.com" }]
+authors = [
+    { name = "Talley Lambert", email = "talley.lambert@gmail.com" },
+    { name = "Gabriel Selzer", email = "gjselzer@wisc.edu" },
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
@@ -32,23 +35,61 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
 ]
-dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]"]
+dependencies = [
+    "qtpy",
+    "numpy",
+    "superqt[cmap,iconify]",
+    "pydantic",
+    "psygnal",
+    "typing_extensions",
+]
 
 [project.scripts]
 ndv = "ndv.cli:main"
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
+# Supported GUI frontends
+jupyter = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
 pyqt = ["pyqt6"]
-vispy = ["vispy", "pyopengl"]
-pyside = ["pyside6"]
-pygfx = ["pygfx"]
-io = [
-    "aicsimageio[all]",
-    "bioformats_jar",
-    "readlif",
-    "aicspylibczi",
+pyside = ["pyside6<6.8"]
+wxpython = ["wxpython"]
+
+# Supported Canavs backends
+vispy = ["vispy>=0.14.3", "pyopengl"]
+pygfx = ["pygfx>=0.6.0"]
+
+# ready to go bundles with vispy
+qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
+jup = ["ndv[vispy,jupyter]", "imageio[tifffile]"]
+wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
+
+# full support for reading files
+io = ["aicsimageio[all]", "bioformats_jar", "readlif", "aicspylibczi"]
+
+test = ["imageio[tifffile]", "pytest-cov", "pytest"]
+docs = [
+    "mkdocs-gen-files==0.5.0",
+    "mkdocs-literate-nav==0.6.1",
+    "mkdocs-material==9.5.49",
+    "mkdocs-minify-plugin==0.8.0",
+    "mkdocs==1.6.1",
+    "mkdocstrings-python==1.13.0",
+    "mkdocs-spellcheck[codespell]==1.1.0",
+    "mike==2.1.3",
 ]
+dev = [
+    "ndv[test,vispy,pygfx,pyqt,jupyter]",
+    "pytest-qt",
+    "ipython",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "rich",
+    "ruff",
+    "ipykernel",
+]
+
 third_party_arrays = [
     "aiohttp",                                 # for zarr example
     "jax[cpu]",
@@ -59,17 +100,9 @@ third_party_arrays = [
     "numpy<2.0",                               # for tensorstore (at least)
     "torch",
     "xarray",
-    "zarr",
-]
-test = [
-    "ndv[vispy,pygfx]",
+    "zarr<3",
     "dask[array]",
-    "imageio[tifffile]",
-    "pytest-cov",
-    "pytest-qt",
-    "pytest",
 ]
-dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"
@@ -96,11 +129,12 @@ select = [
     "B",    # flake8-bugbear
     "A001", # flake8-builtins
     "RUF",  # ruff-specific rules
-    "TCH",  # flake8-type-checking
+    "TC",   # flake8-type-checking
     "TID",  # flake8-tidy-imports
 ]
 ignore = [
     "D401", # First line should be in imperative mood
+    "D10",  # Missing docstring...
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -121,6 +155,11 @@ disallow_any_generics = false
 disallow_subclassing_any = false
 show_error_codes = true
 pretty = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
+ignore_missing_imports = true
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]
@@ -132,9 +171,9 @@ filterwarnings = [
     "ignore:Method has been garbage collected::superqt",
     # occasionally happens on linux CI with vispy
     "ignore:Got wrong number of dimensions",
-    # requires pygfx > 0.2.0
-    "ignore:This version of pygfx does not yet support additive blending",
     "ignore:Unable to import recommended hash",
+    # CI-only error on jupyter, vispy, macos
+    "ignore:.*Failed to find a suitable pixel format",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
@@ -161,3 +200,6 @@ ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
 
 [tool.typos.default]
 extend-ignore-identifiers-re = ["(?i)nd2?.*", "(?i)ome", ".*ser_schema"]
+
+[tool.typos.files]
+extend-exclude = ["**/*.ipynb"]

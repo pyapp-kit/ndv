@@ -6,15 +6,12 @@
 [![CI](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml/badge.svg)](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/pyapp-kit/ndv/branch/main/graph/badge.svg)](https://codecov.io/gh/pyapp-kit/ndv)
 
-Simple, fast-loading, asynchronous, n-dimensional array viewer for Qt, with minimal dependencies.
+Simple, fast-loading, asynchronous, n-dimensional array viewer, with minimal dependencies.
 
 ```python
 import ndv
 
-data = ndv.data.cells3d()
-# or ndv.data.nd_sine_wave()
-# or *any* arraylike object (see support below)
-
+data = ndv.data.cells3d() # or *any* arraylike object
 ndv.imshow(data)
 ```
 
@@ -32,26 +29,27 @@ viewer.show()
 app.exec()
 ```
 
-## `ndv.NDViewer`
+## Features
 
-- very fast import and load time
-- supports arbitrary number of dimensions, with 2D/3D view canvas, and sliders for all non-visible dims
-- sliders support integer as well as slice (range)-based slicing
-- colormaps provided by [cmap](https://github.com/tlambert03/cmap)
-- supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
-- supports any numpy-like duck arrays, including (but not limited to):
-  - `numpy.ndarray`
-  - `cupy.ndarray`
-  - `dask.array.Array`
-  - `jax.Array`
-  - `pyopencl.array.Array`
-  - `sparse.COO`
-  - `tensorstore.TensorStore` (supports named dimensions)
-  - `torch.Tensor` (supports named dimensions)
-  - `xarray.DataArray` (supports named dimensions)
-  - `zarr` (supports named dimensions)
+- ⚡️ fast import and time-to-show
+- ♾️ supports arbitrary number of data dimensions
+- 📦 2D/3D view canvas
+<!-- - sliders support integer as well as slice (range)-based slicing -->
+- 🎨 colormaps provided by [cmap](https://github.com/tlambert03/cmap)
+- 🌠 supports [vispy](https://github.com/vispy/vispy) and [pygfx](https://github.com/pygfx/pygfx) backends
+- 🦆 supports any numpy-like duck arrays, including (but not limited to):
+    - `numpy.ndarray`
+    - `cupy.ndarray`
+    - `dask.array.Array`
+    - `jax.Array`
+    - `pyopencl.array.Array`
+    - `sparse.COO`
+    - `tensorstore.TensorStore` (supports named dimensions)
+    - `torch.Tensor` (supports named dimensions)
+    - `xarray.DataArray` (supports named dimensions)
+    - `zarr` (supports named dimensions)
 
-See examples for each of these array types in [examples](./examples/)
+See examples for each of these array types in [examples](https://github.com/pyapp-kit/ndv/tree/main/examples)
 
 > [!NOTE]
 > *You can add support for any custom storage class by subclassing `ndv.DataWrapper`
@@ -60,14 +58,24 @@ See examples for each of these array types in [examples](./examples/)
 
 ## Installation
 
+To just get started using Qt and vispy:
+  
+```python
+pip install ndv[qt]
+```
+
+For Jupyter, without requiring Qt, you can use:
+
+```python
+pip install ndv[jupyter]
+```
+
+If you'd like more control over the backend, you can install the optional dependencies directly.
+
 The only required dependencies are `numpy` and `superqt[cmap,iconify]`.
 You will also need a Qt backend (PyQt or PySide) and one of either
 [vispy](https://github.com/vispy/vispy) or [pygfx](https://github.com/pygfx/pygfx),
 which can be installed through extras `ndv[<pyqt|pyside>,<vispy|pygfx>]`:
-
-```python
-pip install ndv[pyqt,vispy]
-```
 
 > [!TIP]
 > If you have both vispy and pygfx installed, `ndv` will default to using vispy,
