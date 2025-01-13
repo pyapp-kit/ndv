@@ -29,10 +29,13 @@ class DataRequest:
 
 @dataclass(frozen=True, **SLOTS)
 class DataResponse:
-    """Response object for data requests."""
+    """Response object for data requests.
+
+    In the response, the data is broken up according to channel keys.
+    """
 
     # mapping of channel_key -> data
-    data: Mapping[int | None, np.ndarray] = field(repr=False)
+    data: Mapping[Optional[int], np.ndarray] = field(repr=False)
     request: Optional[DataRequest] = None
 
 
