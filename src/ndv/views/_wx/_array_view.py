@@ -96,6 +96,11 @@ class WxLutView(LutView):
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         self._wxwidget.clims.SetValue(*clims)
+        # FIXME: this is a hack.
+        # it's required to make `set_auto_scale_without_signal` work as intended
+        # But it's not a complete solution.  The general pattern of blocking signals
+        # in Wx needs to be re-evaluated.
+        wx.Yield()
 
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
@@ -199,7 +204,9 @@ class _WxArrayViewer(wx.Frame):
 
         # Channel mode combo box
         self.channel_mode_combo = wx.ComboBox(
-            self, choices=[x.value for x in ChannelMode], style=wx.CB_DROPDOWN
+            self,
+            choices=[ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value],
+            style=wx.CB_DROPDOWN,
         )
 
         # Reset zoom button
@@ -209,19 +216,22 @@ class _WxArrayViewer(wx.Frame):
         self.luts = wx.BoxSizer(wx.VERTICAL)
 
         btns = wx.BoxSizer(wx.HORIZONTAL)
-        btns.Add(self.channel_mode_combo, 0, wx.RIGHT, 5)
-        btns.Add(self.reset_zoom_btn, 0, wx.RIGHT, 5)
+        btns.AddStretchSpacer()
+        btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
+        btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
 
         # Layout for the panel
-        main_sizer = wx.BoxSizer(wx.VERTICAL)
-        main_sizer.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 5)
-        main_sizer.Add(self._canvas, 1, wx.EXPAND | wx.ALL, 5)
-        main_sizer.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM, 5)
-        main_sizer.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM, 5)
-        main_sizer.Add(self.luts, 0, wx.EXPAND, 5)
-        main_sizer.Add(btns, 0, wx.EXPAND, 5)
+        inner = wx.BoxSizer(wx.VERTICAL)
+        inner.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 5)
+        inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
+        inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
+        inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
+        inner.Add(self.luts, 0, wx.EXPAND)
+        inner.Add(btns, 0, wx.EXPAND)
 
-        self.SetSizer(main_sizer)
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(inner, 1, wx.EXPAND | wx.ALL, 10)
+        self.SetSizer(outer)
         self.SetInitialSize(wx.Size(600, 800))
         self.Layout()
 
