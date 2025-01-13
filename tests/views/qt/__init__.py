@@ -1,8 +1,11 @@
 """Tests pertaining to Qt components"""
 
-from importlib.util import find_spec
-
 import pytest
 
-if find_spec("qtpy") is None:
+try:
+    # NB: We could use importlib, but we'd have to search for qtpy
+    # AND for one of the many bindings (PyQt5, PyQt6, PySide2)
+    # This seems easier.
+    from qtpy.QtCore import Qt  # noqa: F401
+except ImportError:
     pytest.skip("Skipping Qt tests as Qt is not installed")
