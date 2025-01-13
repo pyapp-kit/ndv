@@ -22,10 +22,10 @@ class collect_errors:
         self.errors = errors
         self.key = key
 
-    def __enter__(self) -> None:  # noqa: D105
+    def __enter__(self) -> None:
         pass
 
-    def __exit__(  # noqa: D105
+    def __exit__(
         self, exc_type: type[BaseException], exc_value: BaseException, traceback: Any
     ) -> bool:
         if exc_type is not None:
