@@ -126,6 +126,10 @@ hooks:
 extra:
   version:
     provider: mike
+  # either of these tags will enable the "viewing pre" announcement banner
+  # see _overrides/main.html
+  pre_release: !ENV ["DOCS_PRERELEASE", false]
+  dev_build: !ENV ["DOCS_DEV", false]
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/pyapp-kit
