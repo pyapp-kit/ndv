@@ -36,8 +36,10 @@ jobs:
           # check if rc or beta release
           if [[ $VERSION == *"rc"* ]] || [[ $VERSION == *"beta"* ]]; then
             export DOCS_PRERELEASE=true
+            echo "Deploying pre-release docs"
             mike deploy --push --update-aliases $VERSION rc
           else
+            echo "Deploying release docs"
             mike deploy --push --update-aliases $VERSION latest
           fi
         env:
