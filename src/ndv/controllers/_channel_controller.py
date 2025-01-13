@@ -41,7 +41,7 @@ class ChannelController:
         self.synchronize(view)
 
     def synchronize(self, *views: LutView) -> None:
-        """Make sure the view matches the model."""
+        """Aligns all views against the backing model."""
         _views: Iterable[LutView] = views or self.lut_views
         name = str(self.key) if self.key is not None else ""
         for view in _views:
@@ -68,13 +68,8 @@ class ChannelController:
 
     def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""
-        handle.model = self.lut_model
         self.handles.append(handle)
         self.add_lut_view(handle)
-
-        if self.lut_model.autoscale:
-            data = handle.data()
-            self.lut_model.clims = (data.min(), data.max())
 
     def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
         """Get the value of the data at the given index."""
