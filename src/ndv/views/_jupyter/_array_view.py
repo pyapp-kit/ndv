@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import cmap
@@ -123,6 +124,9 @@ class JupyterLutView(LutView):
         return self.layout
 
 
+SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
+
+
 class JupyterArrayView(ArrayView):
     def __init__(
         self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
@@ -134,8 +138,14 @@ class JupyterArrayView(ArrayView):
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
         self._luts_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
 
+        # labels for data and hover info
         self._data_info_label = widgets.Label()
         self._hover_info_label = widgets.Label()
+
+        # spinner to indicate progress
+        self._progress_spinner = widgets.Image.from_file(
+            SPIN_GIF, width=18, height=18, layout=widgets.Layout(display="none")
+        )
 
         # the button that controls the display mode of the channels
         self._channel_mode_combo = widgets.Dropdown(
@@ -148,6 +158,15 @@ class JupyterArrayView(ArrayView):
 
         # LAYOUT
 
+        top_row = widgets.HBox(
+            [self._data_info_label, self._progress_spinner],
+            layout=widgets.Layout(
+                display="flex",
+                justify_content="space-between",
+                align_items="center",
+            ),
+        )
+
         try:
             width = getattr(canvas_widget, "css_width", "600px").replace("px", "")
             width = f"{int(width) + 4}px"
@@ -155,7 +174,7 @@ class JupyterArrayView(ArrayView):
             width = "604px"
         self.layout = widgets.VBox(
             [
-                self._data_info_label,
+                top_row,
                 self._canvas_widget,
                 self._hover_info_label,
                 self._slider_box,
@@ -281,3 +300,6 @@ class JupyterArrayView(ArrayView):
 
     def close(self) -> None:
         self.layout.close()
+
+    def set_progress_spinner_visible(self, visible: bool) -> None:
+        self._progress_spinner.layout.display = "flex" if visible else "none"

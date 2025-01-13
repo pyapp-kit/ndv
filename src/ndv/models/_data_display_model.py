@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union, cast
 
@@ -9,6 +9,7 @@ from pydantic import Field
 
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._base_model import NDVModel
+from ndv.views import _app
 
 from .data_wrappers import DataWrapper
 
@@ -183,37 +184,33 @@ class _ArrayDataDisplayModel(NDVModel):
         if not asynchronous:
             for request in requests:
                 future: Future[DataResponse] = Future()
-                future.set_result(_request_sync(request))
+                future.set_result(self.process_request(request))
                 yield future
         else:
             for request in requests:
-                yield _EXECUTOR.submit(_request_sync, request)
+                yield _app.submit_task(self.process_request, request)
 
+    @staticmethod
+    def process_request(req: DataRequest) -> DataResponse:
+        """Process a data request and return the sliced data as a DataResponse."""
+        data = req.wrapper.isel(req.index)
 
-# TODO: move and formalize this
-_EXECUTOR = ThreadPoolExecutor(max_workers=2)
+        # for transposing according to the order of visible axes
+        vis_ax = req.visible_axes
+        t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
 
-
-def _request_sync(req: DataRequest) -> DataResponse:
-    """Synchronous version of isel."""
-    data = req.wrapper.isel(req.index)
-
-    # for transposing according to the order of visible axes
-    vis_ax = req.visible_axes
-    t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
-
-    if (ch_ax := req.channel_axis) is not None:
-        ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
-    else:
-        ch_indices = (None,)
-
-    data_response: dict[int | None, np.ndarray] = {}
-    for i in ch_indices:
-        if i is None:
-            ch_data = data
+        if (ch_ax := req.channel_axis) is not None:
+            ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
         else:
-            ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
-            ch_data = data[ch_keepdims]
-        data_response[i] = ch_data.transpose(*t_dims).squeeze()
+            ch_indices = (None,)
 
-    return DataResponse(data=data_response, request=req)
+        data_response: dict[int | None, np.ndarray] = {}
+        for i in ch_indices:
+            if i is None:
+                ch_data = data
+            else:
+                ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
+                ch_data = data[ch_keepdims]
+            data_response[i] = ch_data.transpose(*t_dims).squeeze()
+
+        return DataResponse(data=data_response, request=req)

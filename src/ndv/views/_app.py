@@ -4,7 +4,7 @@ import importlib.util
 import os
 import sys
 import traceback
-from concurrent.futures import Future
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import suppress
 from enum import Enum
 from functools import cache, wraps
@@ -93,6 +93,15 @@ class GuiProvider(Protocol):
         future: Future[T] = Future()
         future.set_result(func(*args, **kwargs))
         return future
+
+    @staticmethod
+    def get_executor() -> Executor:
+        return _thread_pool_executor()
+
+
+@cache
+def _thread_pool_executor() -> ThreadPoolExecutor:
+    return ThreadPoolExecutor(max_workers=2)
 
 
 class CanvasProvider(Protocol):
@@ -654,10 +663,30 @@ def ndv_excepthook(
 
 
 def ensure_main_thread(func: Callable[P, T]) -> Callable[P, Future[T]]:
-    """Decorator that ensures a function is called in the main thread."""
+    """Decorator that ensures a function is called in the main thread.
+
+    as written... this decorator should *not* be used on class methods because it
+    triggers the creation of an application.
+
+    Instead, use a pattern like this in the `__init__`.
+
+    >>> self._method = MethodType(ensure_main_thread(type(self)._method), self)
+    """
+    # this will trigger creation of the app
+    fn = GUI_PROVIDERS[gui_frontend()].call_in_main_thread
 
     @wraps(func)
     def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Future[T]:
-        return GUI_PROVIDERS[gui_frontend()].call_in_main_thread(func, *args, **kwargs)
+        return fn(func, *args, **kwargs)
 
     return _wrapper
+
+
+def submit_task(func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> Future[T]:
+    """Submit a task to the GUI event loop.
+
+    Returns a `concurrent.futures.Future` or an `asyncio.Future` depending on the
+    GUI frontend.
+    """
+    executor = GUI_PROVIDERS[gui_frontend()].get_executor()
+    return executor.submit(func, *args, **kwargs)

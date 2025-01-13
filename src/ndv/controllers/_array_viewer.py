@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from types import MethodType
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -24,9 +25,6 @@ if TYPE_CHECKING:
     from ndv.views.bases import ArrayView, HistogramCanvas
 
     LutKey: TypeAlias = int | None
-
-
-NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
 
 
 class ArrayViewer:
@@ -66,14 +64,26 @@ class ArrayViewer:
                 stacklevel=2,
             )
 
+        app = _app.gui_frontend()
+
+        # late decoration of _on_data_response_ready, ensuring called in the main thread
+        # this is used as an alternative to decorating the method directly, so as to
+        # not require an application at class definition time
+        self._on_data_response_ready = MethodType(  # type: ignore [method-assign]
+            _app.ensure_main_thread(ArrayViewer._on_data_response_ready), self
+        )
+        # whether to fetch data asynchronously.  Not publicly exposed yet...
+        # but can use 'NDV_SYNCHRONOUS' env var to set globally
+        # jupyter doesn't need async because it's already async (in that the
+        # GUI is already running in JS)
+        NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
+        self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
+        # set of futures for data requests
+        self._futures: set[Future[DataResponse]] = set()
+
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
-        # whether to fetch data asynchronously.  Not publicly exposed yet...
-        # but can use 'NDV_SYNCHRONOUS' env var to set globally
-        self._async = not NDV_SYNCHRONOUS
-
-        self._futures: set[Future[DataResponse]] = set()
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
@@ -335,8 +345,8 @@ class ArrayViewer:
 
         self._cancel_futures()
         for future in self._data_model.request_sliced_data(self._async):
-            future.add_done_callback(self._on_data_response_ready)
             self._futures.add(future)
+            future.add_done_callback(self._on_data_response_ready)
 
         if self._futures:
             self._view.set_progress_spinner_visible(True)
@@ -356,7 +366,6 @@ class ArrayViewer:
         self._futures.clear()
         self._view.set_progress_spinner_visible(False)
 
-    @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
         # NOTE: removing the reference to the last future here is important
         # because the future has a reference to this widget in its _done_callbacks
