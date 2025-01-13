@@ -12,6 +12,7 @@ from qtpy.QtWidgets import (
     QComboBox,
     QFormLayout,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -98,13 +99,17 @@ class QSpinner(QLabel):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        size = QSize(16, 16)
+        size = QSize(18, 18)
         mov = QMovie(self.SPIN_GIF, parent=self)
         self.setFixedSize(size)
-        mov.setScaledSize(size)
         mov.setSpeed(150)
         mov.start()
         self.setMovie(mov)
+
+        # make semi-transparent
+        effect = QGraphicsOpacityEffect(self)
+        effect.setOpacity(0.6)
+        self.setGraphicsEffect(effect)
 
 
 class _QLUTWidget(QWidget):
@@ -358,7 +363,7 @@ class _QArrayViewer(QWidget):
 
     def resizeEvent(self, a0: Any) -> None:
         canv, spinner = self._canvas_widget, self._progress_spinner
-        pad = 10
+        pad = 4
         spinner.move(canv.width() - spinner.width() - pad, pad)
         super().resizeEvent(a0)
 

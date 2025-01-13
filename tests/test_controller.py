@@ -115,6 +115,7 @@ def test_canvas() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
     ctrl = ArrayViewer()
+    ctrl._async = False
     mock_canvas = ctrl._canvas
 
     mock_view = ctrl.view
@@ -135,6 +136,7 @@ def test_canvas() -> None:
 @_patch_views
 def test_histogram_controller() -> None:
     ctrl = ArrayViewer()
+    ctrl._async = False
     mock_view = ctrl.view
 
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)

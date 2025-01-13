@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
 
 
 # primary "Controller" (and public API) for viewing an array
+
+NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
 
 
 class ArrayViewer:
@@ -69,6 +72,9 @@ class ArrayViewer:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
+        # whether to fetch data asynchronously.  Not public exposed...
+        # but can use env var to set globally
+        self._async = not NDV_SYNCHRONOUS
 
         self._futures: set[Future[DataResponse]] = set()
 
@@ -330,14 +336,28 @@ class ArrayViewer:
         if not self._data_model.data_wrapper:
             return  # pragma: no cover
 
-        self._cancel_all_futures()
-
-        for future in self._data_model.request_sliced_data():
+        self._cancel_futures()
+        for future in self._data_model.request_sliced_data(self._async):
             future.add_done_callback(self._on_data_response_ready)
             self._futures.add(future)
 
         if self._futures:
             self._view.set_progress_spinniner_visible(True)
+
+    def _is_idle(self) -> bool:
+        """Return True if no futures are running. Used for testing, and debugging."""
+        return all(f.done() for f in self._futures)
+
+    def _join(self) -> None:
+        """Block until all futures are done. Used for testing, and debugging."""
+        for future in self._futures:
+            future.result()
+
+    def _cancel_futures(self) -> None:
+        while self._futures:
+            self._futures.pop().cancel()
+        self._futures.clear()
+        self._view.set_progress_spinniner_visible(False)
 
     @ensure_main_thread  # type: ignore
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
@@ -393,12 +413,6 @@ class ArrayViewer:
                     self._histogram.set_range()
 
         self._canvas.refresh()
-
-    def _cancel_all_futures(self) -> None:
-        while self._futures:
-            self._futures.pop().cancel()
-        self._futures.clear()
-        self._view.set_progress_spinniner_visible(False)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
         # TODO: handle 3D data

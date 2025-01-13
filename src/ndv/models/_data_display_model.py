@@ -167,8 +167,9 @@ class _ArrayDataDisplayModel(NDVModel):
             )
         ]
 
-    # TODO: make async
-    def request_sliced_data(self) -> Iterator[Future[DataResponse]]:
+    def request_sliced_data(
+        self, asynchronous: bool = True
+    ) -> Iterator[Future[DataResponse]]:
         """Return the slice of data requested by the current index (synchronous)."""
         if self.data_wrapper is None:
             raise ValueError("Data not set")
@@ -176,8 +177,14 @@ class _ArrayDataDisplayModel(NDVModel):
         if not (requests := self.current_slice_requests()):
             return
 
-        for request in requests:
-            yield _EXECUTOR.submit(_request_sync, request)
+        if not asynchronous:
+            for request in requests:
+                future: Future[DataResponse] = Future()
+                future.set_result(_request_sync(request))
+                yield future
+        else:
+            for request in requests:
+                yield _EXECUTOR.submit(_request_sync, request)
 
 
 # TODO: move and formalize this
