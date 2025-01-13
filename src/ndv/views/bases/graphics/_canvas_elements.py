@@ -91,10 +91,9 @@ class ImageHandle(CanvasElement, LutView):
         pass
 
     def set_auto_scale(self, checked: bool) -> None:
-        # TODO: Make this computation alter the slider...
-        if checked:
+        if checked and self.model:
             d = self.data()
-            self.set_clims((d.min(), d.max()))
+            self.model.clims = (d.min(), d.max())
 
     def set_colormap(self, cmap: _cmap.Colormap) -> None:
         self.set_cmap(cmap)

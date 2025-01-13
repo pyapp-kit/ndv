@@ -138,13 +138,16 @@ class QLutView(LutView):
         self._qwidget.visible.setText(name)
 
     def set_auto_scale(self, auto: bool) -> None:
-        self._qwidget.auto_clim.setChecked(auto)
+        with signals_blocked(self._qwidget.auto_clim):
+            self._qwidget.auto_clim.setChecked(auto)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._qwidget.cmap.setCurrentColormap(cmap)
+        with signals_blocked(self._qwidget.cmap):
+            self._qwidget.cmap.setCurrentColormap(cmap)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        self._qwidget.clims.setValue(clims)
+        with signals_blocked(self._qwidget.clims):
+            self._qwidget.clims.setValue(clims)
 
     def set_gamma(self, gamma: float) -> None:
         pass
@@ -169,6 +172,7 @@ class QLutView(LutView):
     def _on_q_clims_changed(self, clims: tuple[float, float]) -> None:
         if self._model:
             self._model.clims = clims
+            self._model.autoscale = False
 
     def _on_q_auto_changed(self, autoscale: bool) -> None:
         if self._model:

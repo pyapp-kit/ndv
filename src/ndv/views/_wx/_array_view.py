@@ -74,6 +74,7 @@ class WxLutView(LutView):
     def _on_clims_changed(self, event: wx.CommandEvent) -> None:
         if self._model:
             self._model.clims = self._wxwidget.clims.GetValues()
+            self._model.autoscale = False
 
     def _on_autoscale_changed(self, event: wx.CommandEvent) -> None:
         if self._model:

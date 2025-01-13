@@ -55,23 +55,25 @@ class JupyterLutView(LutView):
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
+        self._updating: bool = False
 
     # ------------------ emit changes to the controller ------------------
 
     def _on_clims_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
+        if self._model and not self._updating:
             self._model.clims = self._clims.value
+            self._model.autoscale = False
 
     def _on_visible_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
+        if self._model and not self._updating:
             self._model.visible = self._visible.value
 
     def _on_cmap_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
+        if self._model and not self._updating:
             self._model.cmap = self._cmap.value
 
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
+        if self._model and not self._updating:
             self._model.autoscale = self._auto_clim.value
 
     # ------------------ receive changes from the controller ---------------
@@ -84,19 +86,27 @@ class JupyterLutView(LutView):
 
     def set_auto_scale(self, auto: bool) -> None:
         # with self.autoscaleChanged.blocked():
+        self._updating = True
         self._auto_clim.value = auto
+        self._updating = False
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         # with self.cmapChanged.blocked():
+        self._updating = True
         self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
+        self._updating = False
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         # with self.climsChanged.blocked():
+        self._updating = True
         self._clims.value = clims
+        self._updating = False
 
     def set_channel_visible(self, visible: bool) -> None:
         # with self.visibilityChanged.blocked():
+        self._updating = True
         self._visible.value = visible
+        self._updating = False
 
     def set_gamma(self, gamma: float) -> None:
         pass
