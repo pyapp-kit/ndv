@@ -76,13 +76,13 @@ class ImageHandle(CanvasElement, LutView):
     @abstractmethod
     def set_gamma(self, gamma: float) -> None: ...
     @abstractmethod
-    def cmap(self) -> _cmap.Colormap: ...
+    def colormap(self) -> _cmap.Colormap: ...
     @abstractmethod
-    def set_cmap(self, cmap: _cmap.Colormap) -> None: ...
+    def set_colormap(self, cmap: _cmap.Colormap) -> None: ...
 
     # -- LutView methods -- #
     def close(self) -> None:
-        pass
+        self.remove()
 
     def frontend_widget(self) -> Any:
         return None
@@ -95,13 +95,8 @@ class ImageHandle(CanvasElement, LutView):
             d = self.data()
             self.model.clims = (d.min(), d.max())
 
-    def set_colormap(self, cmap: _cmap.Colormap) -> None:
-        self.set_cmap(cmap)
-
     def set_channel_visible(self, visible: bool) -> None:
         self.set_visible(visible)
-
-    # set_clims, set_gamma reused above
 
 
 class RoiHandle(CanvasElement):
