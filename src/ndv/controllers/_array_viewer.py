@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import warnings
-from types import MethodType
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -66,12 +65,6 @@ class ArrayViewer:
 
         app = _app.gui_frontend()
 
-        # late decoration of _on_data_response_ready, ensuring called in the main thread
-        # this is used as an alternative to decorating the method directly, so as to
-        # not require an application at class definition time
-        self._on_data_response_ready = MethodType(  # type: ignore [method-assign]
-            _app.ensure_main_thread(ArrayViewer._on_data_response_ready), self
-        )
         # whether to fetch data asynchronously.  Not publicly exposed yet...
         # but can use 'NDV_SYNCHRONOUS' env var to set globally
         # jupyter doesn't need async because it's already async (in that the
@@ -366,6 +359,7 @@ class ArrayViewer:
         self._futures.clear()
         self._view.set_progress_spinner_visible(False)
 
+    @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
         # NOTE: removing the reference to the last future here is important
         # because the future has a reference to this widget in its _done_callbacks

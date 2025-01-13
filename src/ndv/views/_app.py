@@ -663,20 +663,11 @@ def ndv_excepthook(
 
 
 def ensure_main_thread(func: Callable[P, T]) -> Callable[P, Future[T]]:
-    """Decorator that ensures a function is called in the main thread.
-
-    as written... this decorator should *not* be used on class methods because it
-    triggers the creation of an application.
-
-    Instead, use a pattern like this in the `__init__`.
-
-    >>> self._method = MethodType(ensure_main_thread(type(self)._method), self)
-    """
-    # this will trigger creation of the app
-    fn = GUI_PROVIDERS[gui_frontend()].call_in_main_thread
+    """Decorator that ensures a function is called in the main thread."""
 
     @wraps(func)
     def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Future[T]:
+        fn = GUI_PROVIDERS[gui_frontend()].call_in_main_thread
         return fn(func, *args, **kwargs)
 
     return _wrapper
