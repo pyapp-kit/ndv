@@ -1216,17 +1216,17 @@ shows the protocol that GUI &amp; graphics classes should implement.</p>
 
             <details class="quote">
               <summary>Source code in <code>ndv/views/_app.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span>
-<span class="normal">503</span>
-<span class="normal">504</span>
-<span class="normal">505</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-500"><span class="k">def</span><span class="w"> </span><span class="nf">get_array_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayCanvas</span><span class="p">]:</span>
-</span><span id="__span-0-501"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
-</span><span id="__span-0-502">    <span class="n">_backend</span> <span class="o">=</span> <span class="n">canvas_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
-</span><span id="__span-0-503">    <span class="k">if</span> <span class="n">_backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
-</span><span id="__span-0-504">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No canvas backend found for </span><span class="si">{</span><span class="n">_backend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-505">    <span class="k">return</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">[</span><span class="n">_backend</span><span class="p">]</span><span class="o">.</span><span class="n">array_canvas_class</span><span class="p">()</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-511"><span class="k">def</span><span class="w"> </span><span class="nf">get_array_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayCanvas</span><span class="p">]:</span>
+</span><span id="__span-0-512"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
+</span><span id="__span-0-513">    <span class="n">_backend</span> <span class="o">=</span> <span class="n">canvas_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+</span><span id="__span-0-514">    <span class="k">if</span> <span class="n">_backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+</span><span id="__span-0-515">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No canvas backend found for </span><span class="si">{</span><span class="n">_backend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-516">    <span class="k">return</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">[</span><span class="n">_backend</span><span class="p">]</span><span class="o">.</span><span class="n">array_canvas_class</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1250,15 +1250,15 @@ shows the protocol that GUI &amp; graphics classes should implement.</p>
 
             <details class="quote">
               <summary>Source code in <code>ndv/views/_app.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-493"><span class="k">def</span><span class="w"> </span><span class="nf">get_array_view_class</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayView</span><span class="p">]:</span>
-</span><span id="__span-0-494"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
-</span><span id="__span-0-495">    <span class="k">if</span> <span class="p">(</span><span class="n">frontend</span> <span class="o">:=</span> <span class="n">gui_frontend</span><span class="p">())</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
-</span><span id="__span-0-496">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No GUI frontend found for </span><span class="si">{</span><span class="n">frontend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-497">    <span class="k">return</span> <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">frontend</span><span class="p">]</span><span class="o">.</span><span class="n">array_view_class</span><span class="p">()</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-504"><span class="k">def</span><span class="w"> </span><span class="nf">get_array_view_class</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">ArrayView</span><span class="p">]:</span>
+</span><span id="__span-0-505"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
+</span><span id="__span-0-506">    <span class="k">if</span> <span class="p">(</span><span class="n">frontend</span> <span class="o">:=</span> <span class="n">gui_frontend</span><span class="p">())</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+</span><span id="__span-0-507">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No GUI frontend found for </span><span class="si">{</span><span class="n">frontend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-508">    <span class="k">return</span> <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">frontend</span><span class="p">]</span><span class="o">.</span><span class="n">array_view_class</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1282,17 +1282,17 @@ shows the protocol that GUI &amp; graphics classes should implement.</p>
 
             <details class="quote">
               <summary>Source code in <code>ndv/views/_app.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-508"><span class="k">def</span><span class="w"> </span><span class="nf">get_histogram_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">HistogramCanvas</span><span class="p">]:</span>
-</span><span id="__span-0-509"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
-</span><span id="__span-0-510">    <span class="n">_backend</span> <span class="o">=</span> <span class="n">canvas_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
-</span><span id="__span-0-511">    <span class="k">if</span> <span class="n">_backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
-</span><span id="__span-0-512">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No canvas backend found for </span><span class="si">{</span><span class="n">_backend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-0-513">    <span class="k">return</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">[</span><span class="n">_backend</span><span class="p">]</span><span class="o">.</span><span class="n">histogram_canvas_class</span><span class="p">()</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-519"><span class="k">def</span><span class="w"> </span><span class="nf">get_histogram_canvas_class</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">HistogramCanvas</span><span class="p">]:</span>
+</span><span id="__span-0-520"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend.&quot;&quot;&quot;</span>  <span class="c1"># noqa: E501</span>
+</span><span id="__span-0-521">    <span class="n">_backend</span> <span class="o">=</span> <span class="n">canvas_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+</span><span id="__span-0-522">    <span class="k">if</span> <span class="n">_backend</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+</span><span id="__span-0-523">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No canvas backend found for </span><span class="si">{</span><span class="n">_backend</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-524">    <span class="k">return</span> <span class="n">CANVAS_PROVIDERS</span><span class="p">[</span><span class="n">_backend</span><span class="p">]</span><span class="o">.</span><span class="n">histogram_canvas_class</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1323,18 +1323,7 @@ running, or available.</p>
 
             <details class="quote">
               <summary>Source code in <code>ndv/views/_app.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">428</span>
 <span class="normal">429</span>
 <span class="normal">430</span>
 <span class="normal">431</span>
@@ -1360,44 +1349,55 @@ running, or available.</p>
 <span class="normal">451</span>
 <span class="normal">452</span>
 <span class="normal">453</span>
-<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-417"><span class="nd">@cache</span>  <span class="c1"># not allowed to change</span>
-</span><span id="__span-0-418"><span class="k">def</span><span class="w"> </span><span class="nf">gui_frontend</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">GuiFrontend</span><span class="p">:</span>
-</span><span id="__span-0-419"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the active [`GuiFrontend`][ndv.views.GuiFrontend].</span>
-</span><span id="__span-0-420">
-</span><span id="__span-0-421"><span class="sd">    This is determined first by the `NDV_GUI_FRONTEND` environment variable, after which</span>
-</span><span id="__span-0-422"><span class="sd">    known GUI providers are tried in order until one is found that is either already</span>
-</span><span id="__span-0-423"><span class="sd">    running, or available.</span>
-</span><span id="__span-0-424"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-425">    <span class="n">requested</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">GUI_ENV_VAR</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-</span><span id="__span-0-426">    <span class="n">valid</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">GuiFrontend</span><span class="p">}</span>
-</span><span id="__span-0-427">    <span class="k">if</span> <span class="n">requested</span><span class="p">:</span>
-</span><span id="__span-0-428">        <span class="k">if</span> <span class="n">requested</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid</span><span class="p">:</span>
-</span><span id="__span-0-429">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-</span><span id="__span-0-430">                <span class="sa">f</span><span class="s2">&quot;Invalid GUI frontend: </span><span class="si">{</span><span class="n">requested</span><span class="si">!r}</span><span class="s2">. Valid options: </span><span class="si">{</span><span class="n">valid</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-0-431">            <span class="p">)</span>
-</span><span id="__span-0-432">        <span class="n">key</span> <span class="o">=</span> <span class="n">GuiFrontend</span><span class="p">(</span><span class="n">requested</span><span class="p">)</span>
-</span><span id="__span-0-433">        <span class="c1"># ensure the app is created for explicitly requested frontends</span>
-</span><span id="__span-0-434">        <span class="n">provider</span> <span class="o">=</span> <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
-</span><span id="__span-0-435">        <span class="k">if</span> <span class="ow">not</span> <span class="n">provider</span><span class="o">.</span><span class="n">is_running</span><span class="p">():</span>
-</span><span id="__span-0-436">            <span class="n">provider</span><span class="o">.</span><span class="n">create_app</span><span class="p">()</span>
-</span><span id="__span-0-437">        <span class="k">return</span> <span class="n">key</span>
-</span><span id="__span-0-438">
-</span><span id="__span-0-439">    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">provider</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="__span-0-440">        <span class="k">if</span> <span class="n">provider</span><span class="o">.</span><span class="n">is_running</span><span class="p">():</span>
-</span><span id="__span-0-441">            <span class="k">return</span> <span class="n">key</span>
-</span><span id="__span-0-442">
-</span><span id="__span-0-443">    <span class="n">errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">GuiFrontend</span><span class="p">,</span> <span class="ne">BaseException</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-0-444">    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">provider</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="__span-0-445">        <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-0-446">            <span class="n">provider</span><span class="o">.</span><span class="n">create_app</span><span class="p">()</span>
-</span><span id="__span-0-447">            <span class="k">return</span> <span class="n">key</span>
-</span><span id="__span-0-448">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="__span-0-449">            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">key</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
-</span><span id="__span-0-450">
-</span><span id="__span-0-451">    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>  <span class="c1"># pragma: no cover</span>
-</span><span id="__span-0-452">        <span class="sa">f</span><span class="s2">&quot;Could not find an appropriate GUI frontend: </span><span class="si">{</span><span class="n">valid</span><span class="si">!r}</span><span class="s2">. Tried:</span><span class="se">\n\n</span><span class="s2">&quot;</span>
-</span><span id="__span-0-453">        <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- </span><span class="si">{</span><span class="n">key</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">err</span> <span class="ow">in</span> <span class="n">errors</span><span class="p">)</span>
-</span><span id="__span-0-454">    <span class="p">)</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-428"><span class="nd">@cache</span>  <span class="c1"># not allowed to change</span>
+</span><span id="__span-0-429"><span class="k">def</span><span class="w"> </span><span class="nf">gui_frontend</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">GuiFrontend</span><span class="p">:</span>
+</span><span id="__span-0-430"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the active [`GuiFrontend`][ndv.views.GuiFrontend].</span>
+</span><span id="__span-0-431">
+</span><span id="__span-0-432"><span class="sd">    This is determined first by the `NDV_GUI_FRONTEND` environment variable, after which</span>
+</span><span id="__span-0-433"><span class="sd">    known GUI providers are tried in order until one is found that is either already</span>
+</span><span id="__span-0-434"><span class="sd">    running, or available.</span>
+</span><span id="__span-0-435"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-436">    <span class="n">requested</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="n">GUI_ENV_VAR</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+</span><span id="__span-0-437">    <span class="n">valid</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">GuiFrontend</span><span class="p">}</span>
+</span><span id="__span-0-438">    <span class="k">if</span> <span class="n">requested</span><span class="p">:</span>
+</span><span id="__span-0-439">        <span class="k">if</span> <span class="n">requested</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid</span><span class="p">:</span>
+</span><span id="__span-0-440">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-0-441">                <span class="sa">f</span><span class="s2">&quot;Invalid GUI frontend: </span><span class="si">{</span><span class="n">requested</span><span class="si">!r}</span><span class="s2">. Valid options: </span><span class="si">{</span><span class="n">valid</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span id="__span-0-442">            <span class="p">)</span>
+</span><span id="__span-0-443">        <span class="n">key</span> <span class="o">=</span> <span class="n">GuiFrontend</span><span class="p">(</span><span class="n">requested</span><span class="p">)</span>
+</span><span id="__span-0-444">        <span class="c1"># ensure the app is created for explicitly requested frontends</span>
+</span><span id="__span-0-445">        <span class="n">provider</span> <span class="o">=</span> <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+</span><span id="__span-0-446">        <span class="k">if</span> <span class="ow">not</span> <span class="n">provider</span><span class="o">.</span><span class="n">is_running</span><span class="p">():</span>
+</span><span id="__span-0-447">            <span class="n">provider</span><span class="o">.</span><span class="n">create_app</span><span class="p">()</span>
+</span><span id="__span-0-448">        <span class="k">return</span> <span class="n">key</span>
+</span><span id="__span-0-449">
+</span><span id="__span-0-450">    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">provider</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-0-451">        <span class="k">if</span> <span class="n">provider</span><span class="o">.</span><span class="n">is_running</span><span class="p">():</span>
+</span><span id="__span-0-452">            <span class="k">return</span> <span class="n">key</span>
+</span><span id="__span-0-453">
+</span><span id="__span-0-454">    <span class="n">errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">GuiFrontend</span><span class="p">,</span> <span class="ne">BaseException</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-0-455">    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">provider</span> <span class="ow">in</span> <span class="n">GUI_PROVIDERS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-0-456">        <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-0-457">            <span class="n">provider</span><span class="o">.</span><span class="n">create_app</span><span class="p">()</span>
+</span><span id="__span-0-458">            <span class="k">return</span> <span class="n">key</span>
+</span><span id="__span-0-459">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="__span-0-460">            <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">key</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+</span><span id="__span-0-461">
+</span><span id="__span-0-462">    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>  <span class="c1"># pragma: no cover</span>
+</span><span id="__span-0-463">        <span class="sa">f</span><span class="s2">&quot;Could not find an appropriate GUI frontend: </span><span class="si">{</span><span class="n">valid</span><span class="si">!r}</span><span class="s2">. Tried:</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+</span><span id="__span-0-464">        <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- </span><span class="si">{</span><span class="n">key</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">err</span> <span class="ow">in</span> <span class="n">errors</span><span class="p">)</span>
+</span><span id="__span-0-465">    <span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1421,11 +1421,11 @@ running, or available.</p>
 
             <details class="quote">
               <summary>Source code in <code>ndv/views/_app.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-534"><span class="k">def</span><span class="w"> </span><span class="nf">run_app</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-535"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Start the GUI application event loop.&quot;&quot;&quot;</span>
-</span><span id="__span-0-536">    <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">gui_frontend</span><span class="p">()]</span><span class="o">.</span><span class="n">exec</span><span class="p">()</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-545"><span class="k">def</span><span class="w"> </span><span class="nf">run_app</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-546"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Start the GUI application event loop.&quot;&quot;&quot;</span>
+</span><span id="__span-0-547">    <span class="n">GUI_PROVIDERS</span><span class="p">[</span><span class="n">gui_frontend</span><span class="p">()]</span><span class="o">.</span><span class="n">exec</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
