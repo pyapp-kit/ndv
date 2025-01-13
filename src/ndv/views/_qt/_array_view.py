@@ -86,7 +86,10 @@ class _CmapCombo(QColormapComboBox):
                 if item.name == cmap_.name:
                     self.setCurrentIndex(idx)
         else:
+            # Add the colormap to the end and select it
             self.addColormap(cmap_)
+            # NB: Last item is "Add New...", new cmap is second-to-last
+            self.setCurrentIndex(self.count() - 2)
 
 
 class _QLUTWidget(QWidget):
