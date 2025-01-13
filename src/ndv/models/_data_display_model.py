@@ -1,4 +1,5 @@
-from collections.abc import Iterable, Mapping, Sequence
+import sys
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union, cast
@@ -13,8 +14,10 @@ from .data_wrappers import DataWrapper
 
 __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
+SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
 
-@dataclass
+
+@dataclass(frozen=True, **SLOTS)
 class DataRequest:
     """Request object for data slicing."""
 
@@ -24,12 +27,12 @@ class DataRequest:
     channel_axis: Optional[int]
 
 
-@dataclass
+@dataclass(frozen=True, **SLOTS)
 class DataResponse:
     """Response object for data requests."""
 
-    data: np.ndarray = field(repr=False)
-    channel_key: Optional[int]
+    # mapping of channel_key -> data
+    data: Mapping[int | None, np.ndarray] = field(repr=False)
     request: Optional[DataRequest] = None
 
 
@@ -165,51 +168,23 @@ class _ArrayDataDisplayModel(NDVModel):
         ]
 
     # TODO: make async
-    def request_sliced_data(self) -> list[Future[DataResponse]]:
+    def request_sliced_data(self) -> Iterator[Future[DataResponse]]:
         """Return the slice of data requested by the current index (synchronous)."""
         if self.data_wrapper is None:
             raise ValueError("Data not set")
 
         if not (requests := self.current_slice_requests()):
-            return []
+            return
 
-        futures: list[Future[DataResponse]] = []
-        for req in requests:
-            data = req.wrapper.isel(req.index)
-
-            # for transposing according to the order of visible axes
-            vis_ax = req.visible_axes
-            t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
-
-            if (ch_ax := req.channel_axis) is not None:
-                ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
-            else:
-                ch_indices = (None,)
-
-            for i in ch_indices:
-                if i is None:
-                    ch_data = data
-                else:
-                    ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
-                    ch_data = data[ch_keepdims]
-                future = Future[DataResponse]()
-                future.set_result(
-                    DataResponse(
-                        data=ch_data.transpose(*t_dims).squeeze(),
-                        channel_key=i,
-                        request=req,
-                    )
-                )
-                futures.append(future)
-
-        return futures
+        for request in requests:
+            yield _EXECUTOR.submit(_request_sync, request)
 
 
 # TODO: move and formalize this
 _EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 
-def _request_sync(req: DataRequest) -> list[DataResponse]:
+def _request_sync(req: DataRequest) -> DataResponse:
     """Synchronous version of isel."""
     data = req.wrapper.isel(req.index)
 
@@ -222,23 +197,13 @@ def _request_sync(req: DataRequest) -> list[DataResponse]:
     else:
         ch_indices = (None,)
 
-    responses = []
+    data_response: dict[int | None, np.ndarray] = {}
     for i in ch_indices:
         if i is None:
             ch_data = data
         else:
             ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
             ch_data = data[ch_keepdims]
-            response = DataResponse(
-                data=ch_data.transpose(*t_dims).squeeze(),
-                channel_key=i,
-                request=req,
-            )
-            responses.append(response)
+        data_response[i] = ch_data.transpose(*t_dims).squeeze()
 
-    return responses
-
-
-def _request_async(request: DataRequest) -> Future[list[DataResponse]]:
-    """Asynchronous version of isel."""
-    return _EXECUTOR.submit(_request_sync, request)
+    return DataResponse(data=data_response, request=req)

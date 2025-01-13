@@ -4,6 +4,7 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from superqt import ensure_main_thread
 
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
@@ -69,7 +70,7 @@ class ArrayViewer:
         # where None is the default channel
         self._lut_controllers: dict[LutKey, ChannelController] = {}
 
-        self._futures: set[Future[DataResponse]] = {}
+        self._futures: set[Future[DataResponse]] = set()
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
@@ -239,19 +240,19 @@ class ArrayViewer:
                 self._view.set_data_info(wrapper.summary_info())
 
             self._clear_canvas()
-            self._update_canvas()
+            self._request_data()
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr._update_view_from_model()
             self._update_hist_domain_for_dtype()
 
     def _on_model_visible_axes_changed(self) -> None:
         self._update_visible_sliders()
-        self._update_canvas()
+        self._request_data()
 
     def _on_model_current_index_changed(self) -> None:
         value = self._data_model.display.current_index
         self._view.set_current_index(value)
-        self._update_canvas()
+        self._request_data()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._view.set_channel_mode(mode)
@@ -265,7 +266,7 @@ class ArrayViewer:
                     view.set_visible(show_channel_luts)
         # redraw
         self._clear_canvas()
-        self._update_canvas()
+        self._request_data()
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
@@ -313,10 +314,12 @@ class ArrayViewer:
 
         self._view.hide_sliders(hidden_sliders, show_remainder=True)
 
-    def _cancel_all_futures(self) -> None:
-        while self._futures:
-            self._futures.pop().cancel()
-        self._futures.clear()
+    # The request cycle looks like this:
+    # 1. something changes on the model requiring new data
+    # 2. _request_data is called
+    # 3. _data_model.request_sliced_data returns a list of futures
+    # 4. each future is connected to `_on_data_response_ready` and stored.
+    # 5. when the future resolves, `_on_data_response_ready` draws the response.
 
     def _request_data(self) -> None:
         """Fetch and update the displayed data.
@@ -329,18 +332,21 @@ class ArrayViewer:
 
         self._cancel_all_futures()
 
-        # self._progress_spinner.show()
         for future in self._data_model.request_sliced_data():
             future.add_done_callback(self._on_data_response_ready)
             self._futures.add(future)
 
+        if self._futures:
+            self._view.set_progress_spinniner_visible(True)
+
+    @ensure_main_thread  # type: ignore
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
         # NOTE: removing the reference to the last future here is important
         # because the future has a reference to this widget in its _done_callbacks
         # which will prevent the widget from being garbage collected if the future
         self._futures.discard(future)
-        # if not self._futures:
-        # self._progress_spinner.hide()
+        if not self._futures:
+            self._view.set_progress_spinniner_visible(False)
 
         if future.cancelled():
             return
@@ -352,43 +358,47 @@ class ArrayViewer:
             return
 
         display_model = self._data_model.display
-        key = response.channel_key
-        data = response.data
+        for key, data in response.data.items():
+            if (lut_ctrl := self._lut_controllers.get(key)) is None:
+                if key is None:
+                    model = display_model.default_lut
+                elif key in display_model.luts:
+                    model = display_model.luts[key]
+                else:
+                    # we received a new channel key that has not been set in the model
+                    # so we create a new LUT model for it
+                    model = display_model.luts[key] = LUTModel()
 
-        if (lut_ctrl := self._lut_controllers.get(key)) is None:
-            if key is None:
-                model = display_model.default_lut
-            elif key in display_model.luts:
-                model = display_model.luts[key]
+                lut_views = [self._view.add_lut_view()]
+                if self._histogram is not None:
+                    lut_views.append(self._histogram)
+                self._lut_controllers[key] = lut_ctrl = ChannelController(
+                    key=key,
+                    model=model,
+                    views=lut_views,
+                )
+
+            if not lut_ctrl.handles:
+                # we don't yet have any handles for this channel
+                lut_ctrl.add_handle(self._canvas.add_image(data))
             else:
-                # we received a new channel key that has not been set in the model
-                # so we create a new LUT model for it
-                model = display_model.luts[key] = LUTModel()
-
-            lut_views = [self._view.add_lut_view()]
-            if self._histogram is not None:
-                lut_views.append(self._histogram)
-            self._lut_controllers[key] = lut_ctrl = ChannelController(
-                key=key,
-                model=model,
-                views=lut_views,
-            )
-
-        if not lut_ctrl.handles:
-            # we don't yet have any handles for this channel
-            lut_ctrl.add_handle(self._canvas.add_image(data))
-        else:
-            lut_ctrl.update_texture_data(data)
-            if self._histogram is not None:
-                # TODO: once data comes in in chunks, we'll need a proper stateful
-                # stats object that calculates the histogram incrementally
-                counts, bin_edges = _calc_hist_bins(data)
-                # TODO: currently this is updating the histogram on *any*
-                # channel index... so it doesn't work with composite mode
-                self._histogram.set_data(counts, bin_edges)
-                self._histogram.set_range()
+                lut_ctrl.update_texture_data(data)
+                if self._histogram is not None:
+                    # TODO: once data comes in in chunks, we'll need a proper stateful
+                    # stats object that calculates the histogram incrementally
+                    counts, bin_edges = _calc_hist_bins(data)
+                    # TODO: currently this is updating the histogram on *any*
+                    # channel index... so it doesn't work with composite mode
+                    self._histogram.set_data(counts, bin_edges)
+                    self._histogram.set_range()
 
         self._canvas.refresh()
+
+    def _cancel_all_futures(self) -> None:
+        while self._futures:
+            self._futures.pop().cancel()
+        self._futures.clear()
+        self._view.set_progress_spinniner_visible(False)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
         # TODO: handle 3D data

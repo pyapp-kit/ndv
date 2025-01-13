@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import warnings
+from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from qtpy.QtCore import QSize, Qt, Signal
 from qtpy.QtGui import QMovie
@@ -284,6 +285,7 @@ class _QArrayViewer(QWidget):
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
 
+        self._canvas_widget = canvas_widget
         self.dims_sliders = _QDimsSliders(self)
 
         # place to display dataset summary
@@ -331,20 +333,15 @@ class _QArrayViewer(QWidget):
         info.addWidget(self.data_info_label)
         info_widget.setFixedHeight(16)
 
-        self._progress_spinner = QSpinner(self)
+        self._progress_spinner = QSpinner(canvas_widget)
+        # position at the top right of the canvas_widget:
         self._progress_spinner.hide()
-
-        top = QHBoxLayout()
-        top.setContentsMargins(0, 0, 0, 0)
-        top.addWidget(info_widget)
-        top.addStretch()
-        top.addWidget(self._progress_spinner)
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setSpacing(2)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addLayout(top)
+        left_layout.addWidget(info_widget)
         left_layout.addWidget(canvas_widget, 1)
         left_layout.addWidget(self.hover_info_label)
         left_layout.addWidget(self.dims_sliders)
@@ -358,6 +355,17 @@ class _QArrayViewer(QWidget):
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(self.splitter)
+
+    def resizeEvent(self, a0: Any) -> None:
+        canv, spinner = self._canvas_widget, self._progress_spinner
+        pad = 10
+        spinner.move(canv.width() - spinner.width() - pad, pad)
+        super().resizeEvent(a0)
+
+    def closeEvent(self, a0: Any) -> None:
+        with suppress(AttributeError):
+            del self._canvas_widget
+        super().closeEvent(a0)
 
 
 class QtArrayView(ArrayView):
@@ -442,3 +450,6 @@ class QtArrayView(ArrayView):
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
+
+    def set_progress_spinniner_visible(self, visible: bool) -> None:
+        self._qwidget._progress_spinner.setVisible(visible)
