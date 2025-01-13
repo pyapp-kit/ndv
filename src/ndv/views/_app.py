@@ -4,9 +4,10 @@ import importlib.util
 import os
 import sys
 import traceback
+from concurrent.futures import Future
 from contextlib import suppress
 from enum import Enum
-from functools import cache
+from functools import cache, wraps
 from types import MethodType
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Protocol, cast
 
@@ -17,10 +18,13 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from IPython.core.interactiveshell import InteractiveShell
+    from typing_extensions import ParamSpec, TypeVar
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
     from ndv.views.bases.graphics._mouseable import Mouseable
 
+    T = TypeVar("T")
+    P = ParamSpec("P")
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
 """Preferred GUI frontend. If not set, the first available GUI frontend is used."""
@@ -82,6 +86,13 @@ class GuiProvider(Protocol):
     def exec() -> None: ...
     @staticmethod
     def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]: ...
+    @staticmethod
+    def call_in_main_thread(
+        func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
+    ) -> Future[T]:
+        future: Future[T] = Future()
+        future.set_result(func(*args, **kwargs))
+        return future
 
 
 class CanvasProvider(Protocol):
@@ -93,6 +104,13 @@ class CanvasProvider(Protocol):
     def array_canvas_class() -> type[ArrayCanvas]: ...
     @staticmethod
     def histogram_canvas_class() -> type[HistogramCanvas]: ...
+
+
+# FIXME:
+# the implementation below has a lot of nested imports that will be largely
+# unnecessary after the GUI has been decided.  Consider alternative patterns.
+# primarily, we need to avoid importing any frontends "accidentally".  But beyond
+# that, it can be refactored as needed.
 
 
 class QtProvider(GuiProvider):
@@ -144,6 +162,14 @@ class QtProvider(GuiProvider):
                 return
 
         app.exec()
+
+    @staticmethod
+    def call_in_main_thread(
+        func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
+    ) -> Future[T]:
+        from ._qt._main_thread import call_in_main_thread
+
+        return call_in_main_thread(func, *args, **kwargs)
 
     @staticmethod
     def array_view_class() -> type[ArrayView]:
@@ -224,6 +250,8 @@ class WxProvider(GuiProvider):
             ipy_shell.enable_gui("wx")  # type: ignore [no-untyped-call]
 
         _install_excepthook()
+        from ._wx._main_thread import call_in_main_thread  # noqa: F401
+
         return wxapp
 
     @staticmethod
@@ -238,6 +266,14 @@ class WxProvider(GuiProvider):
                 return
 
         app.MainLoop()
+
+    @staticmethod
+    def call_in_main_thread(
+        func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
+    ) -> Future[T]:
+        from ._wx._main_thread import call_in_main_thread
+
+        return call_in_main_thread(func, *args, **kwargs)
 
     @staticmethod
     def array_view_class() -> type[ArrayView]:
@@ -503,9 +539,7 @@ def canvas_backend(requested: str | None) -> CanvasBackend:
 # (for example, it should be possible to use qt frontend in a jupyter notebook)
 def get_array_view_class() -> type[ArrayView]:
     """Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend."""  # noqa: E501
-    if (frontend := gui_frontend()) not in GUI_PROVIDERS:  # pragma: no cover
-        raise NotImplementedError(f"No GUI frontend found for {frontend}")
-    return GUI_PROVIDERS[frontend].array_view_class()
+    return GUI_PROVIDERS[gui_frontend()].array_view_class()
 
 
 def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
@@ -617,3 +651,13 @@ def ndv_excepthook(
     if os.getenv(EXIT_ON_EXCEPTION):
         print(f"\n{EXIT_ON_EXCEPTION} is set, exiting.")
         sys.exit(1)
+
+
+def ensure_main_thread(func: Callable[P, T]) -> Callable[P, Future[T]]:
+    """Decorator that ensures a function is called in the main thread."""
+
+    @wraps(func)
+    def _wrapper(*args: P.args, **kwargs: P.kwargs) -> Future[T]:
+        return GUI_PROVIDERS[gui_frontend()].call_in_main_thread(func, *args, **kwargs)
+
+    return _wrapper

@@ -5,7 +5,6 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from superqt import ensure_main_thread
 
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
@@ -340,7 +339,7 @@ class ArrayViewer:
             self._futures.add(future)
 
         if self._futures:
-            self._view.set_progress_spinniner_visible(True)
+            self._view.set_progress_spinner_visible(True)
 
     def _is_idle(self) -> bool:
         """Return True if no futures are running. Used for testing, and debugging."""
@@ -355,16 +354,16 @@ class ArrayViewer:
         while self._futures:
             self._futures.pop().cancel()
         self._futures.clear()
-        self._view.set_progress_spinniner_visible(False)
+        self._view.set_progress_spinner_visible(False)
 
-    @ensure_main_thread  # type: ignore
+    @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
         # NOTE: removing the reference to the last future here is important
         # because the future has a reference to this widget in its _done_callbacks
         # which will prevent the widget from being garbage collected if the future
         self._futures.discard(future)
         if not self._futures:
-            self._view.set_progress_spinniner_visible(False)
+            self._view.set_progress_spinner_visible(False)
 
         if future.cancelled():
             return

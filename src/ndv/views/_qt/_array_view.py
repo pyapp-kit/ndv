@@ -94,8 +94,8 @@ class _CmapCombo(QColormapComboBox):
             self.addColormap(cmap_)
 
 
-class QSpinner(QLabel):
-    SPIN_GIF = str(Path(__file__).parent / "spin.gif")
+class _QSpinner(QLabel):
+    SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -298,6 +298,10 @@ class _QArrayViewer(QWidget):
         # place to display arbitrary text
         self.hover_info_label = QElidingLabel("", self)
 
+        # spinner to indicate progress
+        self._progress_spinner = _QSpinner(canvas_widget)
+        self._progress_spinner.hide()
+
         # the button that controls the display mode of the channels
         # not using QEnumComboBox because we want to exclude some values for now
         self.channel_mode_combo = QComboBox(self)
@@ -338,10 +342,6 @@ class _QArrayViewer(QWidget):
         info.addWidget(self.data_info_label)
         info_widget.setFixedHeight(16)
 
-        self._progress_spinner = QSpinner(canvas_widget)
-        # position at the top right of the canvas_widget:
-        self._progress_spinner.hide()
-
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setSpacing(2)
@@ -362,6 +362,7 @@ class _QArrayViewer(QWidget):
         layout.addWidget(self.splitter)
 
     def resizeEvent(self, a0: Any) -> None:
+        # position at spinner the top right of the canvas_widget:
         canv, spinner = self._canvas_widget, self._progress_spinner
         pad = 4
         spinner.move(canv.width() - spinner.width() - pad, pad)
@@ -456,5 +457,5 @@ class QtArrayView(ArrayView):
     def frontend_widget(self) -> QWidget:
         return self._qwidget
 
-    def set_progress_spinniner_visible(self, visible: bool) -> None:
+    def set_progress_spinner_visible(self, visible: bool) -> None:
         self._qwidget._progress_spinner.setVisible(visible)

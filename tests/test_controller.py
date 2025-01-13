@@ -52,6 +52,7 @@ def _patch_views(f: Callable) -> Callable:
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     ctrl = ArrayViewer()
+    ctrl._async = False
     model = ctrl.display_model
     mock_view = ctrl.view
     mock_view.create_sliders.assert_not_called()
