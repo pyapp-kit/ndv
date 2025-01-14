@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
-    from ndv.views.bases.graphics._mouseable import Mouseable
+    from ndv.views.bases._graphics._mouseable import Mouseable
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"

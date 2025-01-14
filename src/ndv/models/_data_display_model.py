@@ -6,10 +6,9 @@ from typing import Any, Optional, Union, cast
 import numpy as np
 from pydantic import Field
 
-from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
-from ndv.models._base_model import NDVModel
-
-from .data_wrappers import DataWrapper
+from ._array_display_model import ArrayDisplayModel, ChannelMode
+from ._base_model import NDVModel
+from ._data_wrapper import DataWrapper
 
 __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
