@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import cmap
 import wx
 from pytest import fixture
@@ -10,18 +8,12 @@ from ndv.models._lut_model import LUTModel
 from ndv.views._app import WxProvider
 from ndv.views._wx._array_view import WxLutView
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
-
-@fixture(autouse=True)
-def app() -> Generator[None, None, None]:
+@fixture(autouse=True, scope="module")
+def app() -> wx.App:
     # Create wx app
     provider = WxProvider()
-    provider.create_app()
-    # NB: Keep app alive during test
-    yield
-    return
+    return provider.create_app()
 
 
 @fixture
@@ -30,7 +22,8 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(model: LUTModel) -> WxLutView:
+def view(app: wx.App, model: LUTModel) -> WxLutView:
+    # NB: wx.App necessary although unused
     frame = wx.Frame(None)
     view = WxLutView(frame)
     assert view.model is None
@@ -61,43 +54,46 @@ def test_WxLutView_update_model(model: LUTModel, view: WxLutView) -> None:
     assert view._wxwidget.auto_clim.GetValue() == new_autoscale
 
 
-def test_WxLutView_update_view(model: LUTModel, view: WxLutView) -> None:
+def test_WxLutView_update_view(app: wx.App, model: LUTModel, view: WxLutView) -> None:
     """Ensures the model updates when the view is changed."""
+
+    def processEvent(evt: wx.PyEventBinder, wdg: wx.Control) -> None:
+        ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
+        wx.PostEvent(wdg.GetEventHandler(), ev)
+        # Borrowed from:
+        # https://github.com/wxWidgets/Phoenix/blob/master/unittests/wtc.py#L41
+        evtLoop = app.GetTraits().CreateEventLoop()
+        wx.EventLoopActivator(evtLoop)
+        evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
 
     new_clims = (5, 6)
     assert model.clims != new_clims
-    view._wxwidget.clims.SetValue(*new_clims)
-    ev = wx.PyCommandEvent(wx.EVT_SLIDER.typeId, view._wxwidget.clims.GetId())
-    wx.PostEvent(view._wxwidget.clims.GetEventHandler(), ev)
-    wx.Yield()
+    clim_wdg = view._wxwidget.clims
+    clim_wdg.SetValue(*new_clims)
+    processEvent(wx.EVT_SLIDER, clim_wdg)
     assert model.clims == new_clims
 
     new_visible = not model.visible
-    view._wxwidget.visible.SetValue(new_visible)
-    ev = wx.PyCommandEvent(wx.EVT_CHECKBOX.typeId, view._wxwidget.visible.GetId())
-    wx.PostEvent(view._wxwidget.visible.GetEventHandler(), ev)
-    wx.Yield()
+    vis_wdg = view._wxwidget.visible
+    vis_wdg.SetValue(new_visible)
+    processEvent(wx.EVT_CHECKBOX, vis_wdg)
     assert model.visible == new_visible
 
     new_cmap = cmap.Colormap("red")
     assert model.cmap != new_cmap
-    view._wxwidget.cmap.SetValue(new_cmap.name)
-    ev = wx.PyCommandEvent(wx.EVT_COMBOBOX.typeId, view._wxwidget.cmap.GetId())
-    wx.PostEvent(view._wxwidget.cmap.GetEventHandler(), ev)
-    wx.Yield()
+    cmap_wdg = view._wxwidget.cmap
+    cmap_wdg.SetValue(new_cmap.name)
+    processEvent(wx.EVT_COMBOBOX, cmap_wdg)
     assert model.cmap == new_cmap
 
     new_autoscale = not model.autoscale
-    view._wxwidget.auto_clim.SetValue(new_autoscale)
-    ev = wx.PyCommandEvent(wx.EVT_TOGGLEBUTTON.typeId, view._wxwidget.auto_clim.GetId())
-    wx.PostEvent(view._wxwidget.auto_clim.GetEventHandler(), ev)
-    wx.Yield()
+    auto_wdg = view._wxwidget.auto_clim
+    auto_wdg.SetValue(new_autoscale)
+    processEvent(wx.EVT_TOGGLEBUTTON, auto_wdg)
     assert model.autoscale == new_autoscale
 
     # When gui clims change, autoscale should be disabled
     model.autoscale = True
-    view._wxwidget.clims.SetValue(0, 1)
-    ev = wx.PyCommandEvent(wx.EVT_SLIDER.typeId, view._wxwidget.clims.GetId())
-    wx.PostEvent(view._wxwidget.clims.GetEventHandler(), ev)
-    wx.Yield()
+    clim_wdg.SetValue(0, 1)
+    processEvent(wx.EVT_SLIDER, clim_wdg)
     assert model.autoscale is False
