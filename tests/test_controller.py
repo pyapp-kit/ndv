@@ -179,3 +179,23 @@ def test_array_viewer_with_app() -> None:
     index_mock.reset_mock()
     viewer._view.set_current_index(index)
     index_mock.assert_not_called()
+
+
+@pytest.mark.usefixtures("any_app")
+def test_channel_autoscale() -> None:
+    data = np.random.randint(0, 255, size=(10, 10, 10, 10, 10), dtype="uint8")
+    viewer = ArrayViewer(data)
+
+    lut_model = viewer._lut_controllers[None].lut_model
+    old_clims = lut_model.clims
+
+    # Adjust the clims with autoscale off
+    lut_model.autoscale = False
+    lut_model.clims = (old_clims[0] + 1, old_clims[1] + 1)
+
+    # Assert turning autoscale back on reverts the clims
+    lut_model.autoscale = True
+    assert lut_model.clims == old_clims
+
+    # NB: The view is (currently) responsible for disabling autoscale when
+    # it moves a clim. Thus that behavior is tested for each backend.
