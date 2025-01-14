@@ -84,12 +84,15 @@ class _CmapCombo(QColormapComboBox):
         for idx in range(self.count()):
             if item := self.itemColormap(idx):
                 if item.name == cmap_.name:
+                    # cmap_ is already here - just select it
                     self.setCurrentIndex(idx)
-        else:
-            # Add the colormap to the end and select it
-            self.addColormap(cmap_)
-            # NB: Last item is "Add New...", new cmap is second-to-last
-            self.setCurrentIndex(self.count() - 2)
+                    return
+
+        # cmap_ not in the combo box - add it!
+        self.addColormap(cmap_)
+        # then, select it!
+        # NB: "Add..." was at idx, now it's at idx+1 and cmap_ is at idx
+        self.setCurrentIndex(idx)
 
 
 class _QLUTWidget(QWidget):
