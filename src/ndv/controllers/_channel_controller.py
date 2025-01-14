@@ -30,6 +30,7 @@ class ChannelController:
         self.key = key
         self.lut_views: list[LutView] = []
         self.lut_model = lut_model
+        self.lut_model.events.autoscale.connect(self._auto_scale)
         self.handles: list[ImageHandle] = []
         for v in views:
             self.add_lut_view(v)
@@ -57,13 +58,14 @@ class ChannelController:
         handles[0].set_data(data)
         # if this image handle is visible and autoscale is on, then we need
         # to update the clim values
-        if self.lut_model.autoscale:
-            self.lut_model.clims = (data.min(), data.max())
-            # lut_view.setClims((data.min(), data.max()))
-            # technically... the LutView may also emit a signal that the
-            # controller listens to, and then updates the image handle
-            # but this next line is more direct
-            # self._handles[None].clim = (data.min(), data.max())
+        self._auto_scale()
+        # if self.lut_model.autoscale:
+        #     self.lut_model.clims = (data.min(), data.max())
+        # lut_view.setClims((data.min(), data.max()))
+        # technically... the LutView may also emit a signal that the
+        # controller listens to, and then updates the image handle
+        # but this next line is more direct
+        # self._handles[None].clim = (data.min(), data.max())
 
     def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""
@@ -86,3 +88,10 @@ class ChannelController:
             # the data source directly.
             return handle.data()[idx]  # type: ignore [no-any-return]
         return None
+
+    def _auto_scale(self) -> None:
+        if self.lut_model.autoscale and len(self.handles):
+            self.lut_model.clims = (
+                min([handle.data().min() for handle in self.handles]),
+                max([handle.data().max() for handle in self.handles]),
+            )
