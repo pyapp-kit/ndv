@@ -15,8 +15,12 @@
 {% endblock %}
 
 {% block outdated %}
-  You're not viewing the latest version.
-  <a href="{{ '../' ~ base_url }}">
-    <strong>Click here to go to latest.</strong>
-  </a>
+    {%- if not prebuild -%} <!-- See the dashes here -->
+    <div style="margin: 0.6rem auto">
+      You're not viewing the latest version.
+      <a href="{{ '../' ~ base_url }}">
+        <strong>Click here to go to latest.</strong>
+      </a>
+    </div>
+    {%- endif -%}
 {% endblock %}

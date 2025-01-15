@@ -29,6 +29,7 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
           git fetch origin gh-pages --depth=1
+          git pull origin gh-pages --ff
 
       - name: Deploy release docs
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
