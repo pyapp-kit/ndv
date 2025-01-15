@@ -37,7 +37,7 @@ class ClimPolicy(BaseModel, ABC):
         return value
 
     @property
-    def cached_clims(self) -> tuple[float, float] | None:
+    def cached_clims(self) -> Optional[tuple[float, float]]:
         """Return the last calculated clims."""
         return self._cached_clims
 
