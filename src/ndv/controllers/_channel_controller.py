@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-from ndv.models._lut_model import ClimType, ManualClims, MinMaxClims
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -53,7 +53,7 @@ class ChannelController:
         view.gammaChanged.connect(self._on_view_lut_gamma_changed)
         self._update_view_from_model(view)
 
-    def _on_model_clims_changed(self, clims: ClimType) -> None:
+    def _on_model_clims_changed(self, clims: ClimsType) -> None:
         """The contrast limits in the model have changed."""
         is_autoscale = not clims.is_manual
         for handle in self.handles:
@@ -111,10 +111,10 @@ class ChannelController:
     ) -> None:
         """The autoscale checkbox in the LUT widget has changed."""
         if autoscale:
-            self.lut_model.clims = MinMaxClims()
+            self.lut_model.clims = ClimsMinMax()
         else:
             mi, ma = self.lut_model.clims.cached_clims
-            self.lut_model.clims = ManualClims(min=mi, max=ma)
+            self.lut_model.clims = ClimsManual(min=mi, max=ma)
 
         for view in self.lut_views:
             view.set_auto_scale_without_signal(autoscale)
@@ -129,7 +129,7 @@ class ChannelController:
 
     def _on_view_lut_clims_changed(self, clims: tuple[float, float]) -> None:
         """The contrast limits slider in the LUT widget has changed."""
-        self.lut_model.clims = ManualClims(min=clims[0], max=clims[1])
+        self.lut_model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_view_lut_gamma_changed(self, gamma: float) -> None:
         """The gamma slider in the LUT widget has changed."""

@@ -23,6 +23,8 @@ AutoscaleType: TypeAlias = Union[
 
 
 class ClimPolicy(BaseModel, ABC):
+    """ABC for contrast limit policies."""
+
     model_config = ConfigDict(frozen=True, extra="forbid")
     _cached_clims: tuple[float, float] = PrivateAttr((0, 1))
 
@@ -40,10 +42,20 @@ class ClimPolicy(BaseModel, ABC):
 
     @property
     def is_manual(self) -> bool:
-        return self.__class__ == ManualClims
+        return self.__class__ == ClimsManual
 
 
-class ManualClims(ClimPolicy):
+class ClimsManual(ClimPolicy):
+    """Manually specified contrast limits.
+
+    Attributes
+    ----------
+    min: float
+        The minimum contrast limit.
+    max: float
+        The maximum contrast limit.
+    """
+
     clim_type: Literal["manual"] = "manual"
     min: float
     max: float
@@ -52,14 +64,26 @@ class ManualClims(ClimPolicy):
         return self.min, self.max
 
 
-class MinMaxClims(ClimPolicy):
+class ClimsMinMax(ClimPolicy):
+    """Autoscale contrast limits based on the minimum and maximum values in the data."""
+
     clim_type: Literal["minmax"] = "minmax"
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return (np.nanmin(data), np.nanmax(data))
 
 
-class PercentileClims(ClimPolicy):
+class ClimsPercentile(ClimPolicy):
+    """Autoscale contrast limits based on percentiles of the data.
+
+    Attributes
+    ----------
+    min_percentile: float
+        The lower percentile for the contrast limits.
+    max_percentile: float
+        The upper percentile for the contrast limits.
+    """
+
     clim_type: Literal["percentile"] = "percentile"
     min_percentile: Annotated[float, Interval(ge=0, le=100)] = 0
     max_percentile: Annotated[float, Interval(ge=0, le=100)] = 100
@@ -68,7 +92,18 @@ class PercentileClims(ClimPolicy):
         return tuple(np.nanpercentile(data, [self.min_percentile, self.max_percentile]))
 
 
-class StdDevClims(ClimPolicy):
+class ClimsStdDev(ClimPolicy):
+    """Automatically set contrast limits based on standard deviations from the mean.
+
+    Attributes
+    ----------
+    n_stdev: float
+        Number of standard deviations to use.
+    center: Optional[float]
+        Center value for the standard deviation calculation. If None, the mean is
+        used.
+    """
+
     clim_type: Literal["stddev"] = "stddev"
     n_stdev: Annotated[float, Gt(0)] = 2  # number of standard deviations
     center: Optional[float] = None  # None means center around the mean
@@ -89,7 +124,7 @@ class StdDevClims(ClimPolicy):
 #         return self.func(data)
 
 
-ClimType = Union[ManualClims, PercentileClims, StdDevClims, MinMaxClims]
+ClimsType = Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
 
 
 class LUTModel(NDVModel):
@@ -101,9 +136,9 @@ class LUTModel(NDVModel):
         Whether to display this channel.
         NOTE: This has implications for data retrieval, as we may not want to request
         channels that are not visible.  See current_index above.
-    cmap : Colormap
+    cmap : cmap.Colormap
         Colormap to use for this channel.
-    clims : tuple[float, float] | None
+    clims : Union[ManualClims, PercentileClims, StdDevClims, MinMaxClims]
         Method for determining the contrast limits for this channel.
     gamma : float
         Gamma correction for this channel. By default, 1.0.
@@ -111,7 +146,7 @@ class LUTModel(NDVModel):
 
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
-    clims: ClimType = Field(discriminator="clim_type", default_factory=MinMaxClims)
+    clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
     gamma: float = 1.0
 
     @model_validator(mode="before")
@@ -123,15 +158,15 @@ class LUTModel(NDVModel):
 
     @field_validator("clims", mode="before")
     @classmethod
-    def _validate_clims(cls, v: ClimType) -> ClimType:
+    def _validate_clims(cls, v: ClimsType) -> ClimsType:
         if v is None or (
             isinstance(v, dict)
             and v.get("min_percentile") == 0
             and v.get("max_percentile") == 100
         ):
-            return MinMaxClims()
+            return ClimsMinMax()
         if isinstance(v, (tuple, list, np.ndarray)):
             if len(v) == 2:
-                return ManualClims(min=v[0], max=v[1])
+                return ClimsManual(min=v[0], max=v[1])
             raise ValueError("Clims sequence must have exactly 2 elements.")
         return v
