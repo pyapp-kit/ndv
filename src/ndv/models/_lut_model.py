@@ -26,7 +26,7 @@ class ClimPolicy(BaseModel, ABC):
     """ABC for contrast limit policies."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    _cached_clims: tuple[float, float] | None = PrivateAttr(None)
+    _cached_clims: Optional[tuple[float, float]] = PrivateAttr(None)
 
     @abstractmethod
     def get_limits(self, image: npt.NDArray) -> tuple[float, float]:
