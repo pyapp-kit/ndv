@@ -101,7 +101,10 @@ class ChannelController:
     def _on_view_lut_visible_changed(self, visible: bool, key: LutKey = None) -> None:
         """The visibility checkbox in the LUT widget has changed."""
         for handle in self.handles:
+            previous = handle.visible()
             handle.set_visible(visible)
+            if previous != visible:
+                self._update_clims(handle)
 
     def _on_view_lut_autoscale_changed(
         self, autoscale: bool, key: LutKey = None
