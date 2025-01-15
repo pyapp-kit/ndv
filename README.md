@@ -82,10 +82,10 @@ To just get started quickly using Qt and vispy:
 pip install ndv[qt]
 ```
 
-For Jupyter support, with no Qt requirement:
+For Jupyter with vispy, (no Qt or wxPython):
 
 ```python
-pip install ndv[jupyter]
+pip install ndv[jup]
 ```
 
 ## Documentation
