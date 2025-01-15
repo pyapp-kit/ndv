@@ -32,7 +32,9 @@ ndv.run_app()
 
 > [!TIP]
 > To embed the viewer in a broader Qt or wxPython application, you can
-> access the viewer's `widget` attribute and add it to your layout.
+> access the viewer's
+> [`widget`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/controllers/#ndv.controllers.ArrayViewer.widget)
+> attribute and add it to your layout.
 
 ## Features
 
