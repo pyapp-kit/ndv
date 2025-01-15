@@ -89,8 +89,8 @@ class ChannelController:
         _views: Iterable[LutView] = views or self.lut_views
         for view in _views:
             view.set_colormap_without_signal(self.lut_model.cmap)
-            if self.lut_model.clims:
-                view.set_clims_without_signal(self.lut_model.clims.cached_clims)
+            if self.lut_model.clims and (clims := self.lut_model.clims.cached_clims):
+                view.set_clims_without_signal(clims)
 
             is_autoscale = not self.lut_model.clims.is_manual
             view.set_auto_scale_without_signal(is_autoscale)
@@ -112,9 +112,8 @@ class ChannelController:
         """The autoscale checkbox in the LUT widget has changed."""
         if autoscale:
             self.lut_model.clims = ClimsMinMax()
-        else:
-            mi, ma = self.lut_model.clims.cached_clims
-            self.lut_model.clims = ClimsManual(min=mi, max=ma)
+        elif cached := self.lut_model.clims.cached_clims:
+            self.lut_model.clims = ClimsManual(min=cached[0], max=cached[1])
 
         for view in self.lut_views:
             view.set_auto_scale_without_signal(autoscale)

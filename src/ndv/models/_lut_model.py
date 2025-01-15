@@ -26,7 +26,7 @@ class ClimPolicy(BaseModel, ABC):
     """ABC for contrast limit policies."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    _cached_clims: tuple[float, float] = PrivateAttr((0, 1))
+    _cached_clims: tuple[float, float] | None = PrivateAttr(None)
 
     @abstractmethod
     def get_limits(self, image: npt.NDArray) -> tuple[float, float]:
@@ -37,7 +37,8 @@ class ClimPolicy(BaseModel, ABC):
         return value
 
     @property
-    def cached_clims(self) -> tuple[float, float]:
+    def cached_clims(self) -> tuple[float, float] | None:
+        """Return the last calculated clims."""
         return self._cached_clims
 
     @property
