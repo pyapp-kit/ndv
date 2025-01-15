@@ -1,8 +1,18 @@
-from typing import Any, Callable, Optional, Union
+from abc import ABC, abstractmethod
+from typing import Annotated, Any, Callable, Literal, Optional, Union
 
+import numpy as np
 import numpy.typing as npt
+from annotated_types import Gt, Interval
 from cmap import Colormap
-from pydantic import Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 from typing_extensions import TypeAlias
 
 from ._base_model import NDVModel
@@ -10,6 +20,76 @@ from ._base_model import NDVModel
 AutoscaleType: TypeAlias = Union[
     Callable[[npt.ArrayLike], tuple[float, float]], tuple[float, float], bool
 ]
+
+
+class ClimPolicy(BaseModel, ABC):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    _cached_clims: tuple[float, float] = PrivateAttr((0, 1))
+
+    @abstractmethod
+    def get_limits(self, image: npt.NDArray) -> tuple[float, float]:
+        """Return the contrast limits for the given image."""
+
+    def calc_clims(self, image: npt.NDArray) -> tuple[float, float]:
+        self._cached_clims = value = self.get_limits(image)
+        return value
+
+    @property
+    def cached_clims(self) -> tuple[float, float]:
+        return self._cached_clims
+
+    @property
+    def is_manual(self) -> bool:
+        return self.__class__ == ManualClims
+
+
+class ManualClims(ClimPolicy):
+    clim_type: Literal["manual"] = "manual"
+    min: float
+    max: float
+
+    def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
+        return self.min, self.max
+
+
+class MinMaxClims(ClimPolicy):
+    clim_type: Literal["minmax"] = "minmax"
+
+    def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
+        return (np.nanmin(data), np.nanmax(data))
+
+
+class PercentileClims(ClimPolicy):
+    clim_type: Literal["percentile"] = "percentile"
+    min_percentile: Annotated[float, Interval(ge=0, le=100)] = 0
+    max_percentile: Annotated[float, Interval(ge=0, le=100)] = 100
+
+    def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
+        return tuple(np.nanpercentile(data, [self.min_percentile, self.max_percentile]))
+
+
+class StdDevClims(ClimPolicy):
+    clim_type: Literal["stddev"] = "stddev"
+    n_stdev: Annotated[float, Gt(0)] = 2  # number of standard deviations
+    center: Optional[float] = None  # None means center around the mean
+
+    def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
+        center = np.nanmean(data) if self.center is None else self.center
+        diff = self.n_stdev * np.nanstd(data)
+        return center - diff, center + diff
+
+
+# we can add this, but it needs to have a proper pydantic serialization method
+# similar to ReducerType
+# class CustomClims(ClimPolicy):
+#     type_: Literal["custom"] = "custom"
+#     func: Callable[[npt.ArrayLike], tuple[float, float]]
+
+#     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
+#         return self.func(data)
+
+
+ClimType = Union[ManualClims, PercentileClims, StdDevClims, MinMaxClims]
 
 
 class LUTModel(NDVModel):
@@ -24,32 +104,34 @@ class LUTModel(NDVModel):
     cmap : Colormap
         Colormap to use for this channel.
     clims : tuple[float, float] | None
-        Contrast limits for this channel.
-        TODO: What does `None` imply?  Autoscale?
+        Method for determining the contrast limits for this channel.
     gamma : float
         Gamma correction for this channel. By default, 1.0.
-    autoscale : bool | tuple[float, float]
-        Whether/how to autoscale the colormap.
-        If `False`, then autoscaling is disabled.
-        If `True` or `(0, 1)` then autoscale using the min/max of the data.
-        If a tuple, then the first element is the lower quantile and the second element
-        is the upper quantile.
-        If a callable, then it should be a function that takes an array and returns a
-        tuple of (min, max) values to use for scaling.
-
-        NaN values should be ignored (n.b. nanmax is slower and should only be used if
-        necessary).
     """
 
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
-    clims: Optional[tuple[float, float]] = None
+    clims: ClimType = Field(discriminator="clim_type", default_factory=MinMaxClims)
     gamma: float = 1.0
-    autoscale: AutoscaleType = Field(default=True, union_mode="left_to_right")
 
     @model_validator(mode="before")
     def _validate_model(cls, v: Any) -> Any:
         # cast bare string/colormap inputs to cmap declaration
         if isinstance(v, (str, Colormap)):
             return {"cmap": v}
+        return v
+
+    @field_validator("clims", mode="before")
+    @classmethod
+    def _validate_clims(cls, v: ClimType) -> ClimType:
+        if v is None or (
+            isinstance(v, dict)
+            and v.get("min_percentile") == 0
+            and v.get("max_percentile") == 100
+        ):
+            return MinMaxClims()
+        if isinstance(v, (tuple, list, np.ndarray)):
+            if len(v) == 2:
+                return ManualClims(min=v[0], max=v[1])
+            raise ValueError("Clims sequence must have exactly 2 elements.")
         return v
