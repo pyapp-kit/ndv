@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from ndv.models._lut_model import LUTModel
     from ndv.views.bases import LutView
-    from ndv.views.bases.graphics._canvas_elements import ImageHandle
+    from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
     LutKey = int | None
 

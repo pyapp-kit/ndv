@@ -18,7 +18,7 @@ from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
 from ndv.views._vispy._utils import supports_float_textures
 from ndv.views.bases import ArrayCanvas
-from ndv.views.bases.graphics._canvas_elements import (
+from ndv.views.bases._graphics._canvas_elements import (
     CanvasElement,
     ImageHandle,
     RoiHandle,
