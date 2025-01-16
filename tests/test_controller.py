@@ -23,9 +23,13 @@ if TYPE_CHECKING:
 
 def _get_mock_canvas() -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
-    handle = MagicMock(spec=ImageHandle)
-    handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
-    mock.add_image.return_value = handle
+    img_handle = MagicMock(spec=ImageHandle)
+    img_handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
+    mock.add_image.return_value = img_handle
+
+    vol_handle = MagicMock(spec=ImageHandle)
+    vol_handle.data.return_value = np.zeros((10, 10, 10)).astype(np.uint8)
+    mock.add_volume.return_value = vol_handle
     return mock
 
 
