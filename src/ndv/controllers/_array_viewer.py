@@ -371,14 +371,15 @@ class ArrayViewer:
 
             else:
                 lut_ctrl.update_texture_data(data)
-                if self._histogram is not None:
-                    # TODO: once data comes in in chunks, we'll need a proper stateful
-                    # stats object that calculates the histogram incrementally
-                    counts, bin_edges = _calc_hist_bins(data)
-                    # TODO: currently this is updating the histogram on *any*
-                    # channel index... so it doesn't work with composite mode
-                    self._histogram.set_data(counts, bin_edges)
-                    self._histogram.set_range()
+
+            if self._histogram is not None:
+                # TODO: once data comes in in chunks, we'll need a proper stateful
+                # stats object that calculates the histogram incrementally
+                counts, bin_edges = _calc_hist_bins(data)
+                # FIXME: currently this is updating the histogram on *any*
+                # channel index... so it doesn't work with composite mode
+                self._histogram.set_data(counts, bin_edges)
+                self._histogram.set_range()
 
         self._canvas.refresh()
 
