@@ -157,6 +157,7 @@ class JupyterArrayView(ArrayView):
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="View in 3D",
             icon="check",
+            layout=widgets.Layout(width="60px"),
         )
         self._ndims_btn.observe(self._on_ndims_toggled, names="value")
 
@@ -167,6 +168,11 @@ class JupyterArrayView(ArrayView):
             width = f"{int(width) + 4}px"
         except Exception:
             width = "604px"
+
+        btns = widgets.HBox(
+            [self._channel_mode_combo, self._ndims_btn],
+            layout=widgets.Layout(justify_content="flex-end"),
+        )
         self.layout = widgets.VBox(
             [
                 self._data_info_label,
@@ -174,8 +180,7 @@ class JupyterArrayView(ArrayView):
                 self._hover_info_label,
                 self._slider_box,
                 self._luts_box,
-                self._channel_mode_combo,
-                self._ndims_btn,
+                btns,
             ],
             layout=widgets.Layout(width=width),
         )
