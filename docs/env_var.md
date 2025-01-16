@@ -1,4 +1,4 @@
-# Environment variables
+# Environment Variables
 
 `ndv` recognizes the following environment variables:
 
