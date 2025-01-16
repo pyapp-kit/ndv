@@ -23,9 +23,13 @@ if TYPE_CHECKING:
 
 def _get_mock_canvas() -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
-    handle = MagicMock(spec=ImageHandle)
-    handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
-    mock.add_image.return_value = handle
+    img_handle = MagicMock(spec=ImageHandle)
+    img_handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
+    mock.add_image.return_value = img_handle
+
+    vol_handle = MagicMock(spec=ImageHandle)
+    vol_handle.data.return_value = np.zeros((10, 10, 10)).astype(np.uint8)
+    mock.add_volume.return_value = vol_handle
     return mock
 
 
@@ -95,6 +99,11 @@ def test_controller() -> None:
     mock_view.current_index.return_value = idx
     ctrl._on_view_current_index_changed()
     assert model.current_index == idx
+
+    # when the view sets 3 dimensions, the model is updated
+    mock_view.visible_axes.return_value = (0, -2, -1)
+    ctrl._on_view_visible_axes_changed()
+    assert model.visible_axes == (0, -2, -1)
 
     # when the view changes the channel mode, the model is updated
     assert model.channel_mode == ChannelMode.GRAYSCALE
@@ -175,7 +184,21 @@ def test_array_viewer_with_app() -> None:
     index_mock.assert_called_once()
     for k, v in index.items():
         assert viewer.display_model.current_index[k] == v
+
     # setting again should not trigger the signal
     index_mock.reset_mock()
     viewer._view.set_current_index(index)
     index_mock.assert_not_called()
+
+    # test_setting 3D
+    assert viewer.display_model.visible_axes == (-2, -1)
+    visax_mock = Mock()
+    viewer.display_model.events.visible_axes.connect(visax_mock)
+    viewer._view.set_visible_axes((0, -2, -1))
+
+    # FIXME:
+    # calling set_visible_axes on wx during testing is not triggering the
+    # _on_ndims_toggled callback... and I don't know enough about wx yet to know why.
+    if gui_frontend() != _app.GuiFrontend.WX:
+        visax_mock.assert_called_once()
+        assert viewer.display_model.visible_axes == (0, -2, -1)

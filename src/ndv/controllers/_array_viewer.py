@@ -63,6 +63,9 @@ class ArrayViewer:
                 "When display_model is provided, kwargs are be ignored.",
                 stacklevel=2,
             )
+        self._data_model = _ArrayDataDisplayModel(
+            data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
+        )
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -72,21 +75,19 @@ class ArrayViewer:
         frontend_cls = _app.get_array_view_class()
         canvas_cls = _app.get_array_canvas_class()
         self._canvas = canvas_cls()
-        self._canvas.set_ndim(2)
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.frontend_widget())
+        self._view = frontend_cls(self._canvas.frontend_widget(), self._data_model)
 
-        display_model = display_model or ArrayDisplayModel(**kwargs)
-        self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=data, display=display_model
-        )
         self._set_model_connected(self._data_model.display)
+        self._canvas.set_ndim(self.display_model.n_visible_axes)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
+        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
+
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
         if self._data_model.data_wrapper is not None:
@@ -119,7 +120,7 @@ class ArrayViewer:
     @display_model.setter
     def display_model(self, model: ArrayDisplayModel) -> None:
         """Set the ArrayDisplayModel."""
-        if not isinstance(model, ArrayDisplayModel):
+        if not isinstance(model, ArrayDisplayModel):  # pragma: no cover
             raise TypeError("model must be an ArrayDisplayModel")
         self._set_model_connected(self._data_model.display, False)
         self._data_model.display = model
@@ -233,6 +234,7 @@ class ArrayViewer:
             self._view.create_sliders(self._data_model.normed_data_coords)
         self._view.set_channel_mode(display_model.channel_mode)
         if self.data is not None:
+            self._view.set_visible_axes(self._data_model.normed_visible_axes)
             self._update_visible_sliders()
             if cur_index := display_model.current_index:
                 self._view.set_current_index(cur_index)
@@ -248,8 +250,11 @@ class ArrayViewer:
             self._update_hist_domain_for_dtype()
 
     def _on_model_visible_axes_changed(self) -> None:
+        self._view.set_visible_axes(self._data_model.normed_visible_axes)
         self._update_visible_sliders()
+        self._clear_canvas()
         self._update_canvas()
+        self._canvas.set_ndim(self.display_model.n_visible_axes)
 
     def _on_model_current_index_changed(self) -> None:
         value = self._data_model.display.current_index
@@ -282,6 +287,10 @@ class ArrayViewer:
     def _on_view_current_index_changed(self) -> None:
         """Update the model when slider value changes."""
         self._data_model.display.current_index.update(self._view.current_index())
+
+    def _on_view_visible_axes_changed(self) -> None:
+        """Update the model when the visible axes change."""
+        self.display_model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
@@ -353,17 +362,24 @@ class ArrayViewer:
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
-                lut_ctrl.add_handle(self._canvas.add_image(data))
+                if response.n_visible_axes == 2:
+                    handle = self._canvas.add_image(data)
+                    lut_ctrl.add_handle(handle)
+                elif response.n_visible_axes == 3:
+                    handle = self._canvas.add_volume(data)
+                    lut_ctrl.add_handle(handle)
+
             else:
                 lut_ctrl.update_texture_data(data)
-                if self._histogram is not None:
-                    # TODO: once data comes in in chunks, we'll need a proper stateful
-                    # stats object that calculates the histogram incrementally
-                    counts, bin_edges = _calc_hist_bins(data)
-                    # TODO: currently this is updating the histogram on *any*
-                    # channel index... so it doesn't work with composite mode
-                    self._histogram.set_data(counts, bin_edges)
-                    self._histogram.set_range()
+
+            if self._histogram is not None:
+                # TODO: once data comes in in chunks, we'll need a proper stateful
+                # stats object that calculates the histogram incrementally
+                counts, bin_edges = _calc_hist_bins(data)
+                # FIXME: currently this is updating the histogram on *any*
+                # channel index... so it doesn't work with composite mode
+                self._histogram.set_data(counts, bin_edges)
+                self._histogram.set_range()
 
         self._canvas.refresh()
 
