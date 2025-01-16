@@ -14,8 +14,8 @@ from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
-from ndv.views.bases.graphics._canvas import ArrayCanvas, HistogramCanvas
-from ndv.views.bases.graphics._canvas_elements import ImageHandle
+from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
+from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
     from ndv.controllers._channel_controller import ChannelController
@@ -54,7 +54,7 @@ def test_controller() -> None:
     ctrl = ArrayViewer()
     ctrl._async = False
     model = ctrl.display_model
-    mock_view = ctrl.view
+    mock_view = ctrl._view
     mock_view.create_sliders.assert_not_called()
 
     data = np.empty(SHAPE)
@@ -119,7 +119,7 @@ def test_canvas() -> None:
     ctrl._async = False
     mock_canvas = ctrl._canvas
 
-    mock_view = ctrl.view
+    mock_view = ctrl._view
     ctrl.data = data
 
     # clicking the reset zoom button calls set_range on the canvas
@@ -138,7 +138,7 @@ def test_canvas() -> None:
 def test_histogram_controller() -> None:
     ctrl = ArrayViewer()
     ctrl._async = False
-    mock_view = ctrl.view
+    mock_view = ctrl._view
 
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)
 

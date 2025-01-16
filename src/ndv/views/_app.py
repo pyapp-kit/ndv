@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
-    from ndv.views.bases.graphics._mouseable import Mouseable
+    from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
     P = ParamSpec("P")

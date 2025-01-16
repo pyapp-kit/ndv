@@ -17,6 +17,7 @@ validation:
 nav:
   - Home: index.md
   - install.md
+  - motivation.md
   # This is populated by scripts/gen_ref_nav.py
   - API reference: reference/
 
@@ -68,6 +69,9 @@ extra_javascript:
 
 markdown_extensions:
   - admonition
+  - pymdownx.details
+  - pymdownx.keys
+  - pymdownx.tilde
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -76,12 +80,21 @@ markdown_extensions:
   - pymdownx.highlight:
       pygments_lang_class: true
       line_spans: __span
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - pymdownx.inlinehilite
   - pymdownx.superfences
+  - toc:
+      permalink: "#"
 
 plugins:
   - autorefs
   - search
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      cache_safe: true
   - gen-files:
       scripts:
         - scripts/gen_ref_nav.py
@@ -96,6 +109,9 @@ plugins:
         python:
           import:
             - https://docs.python.org/3/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+            - https://cmap-docs.readthedocs.io/objects.inv
+            - https://psygnal.readthedocs.io/en/latest/objects.inv
           options:
             docstring_section_style: list
             docstring_style: "numpy"

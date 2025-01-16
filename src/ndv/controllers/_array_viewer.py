@@ -7,10 +7,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
-from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
+from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._data_display_model import DataResponse, _ArrayDataDisplayModel
-from ndv.models._lut_model import LUTModel
-from ndv.models.data_wrappers import DataWrapper
 from ndv.views import _app
 
 if TYPE_CHECKING:
@@ -21,7 +19,7 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
-    from ndv.views.bases import ArrayView, HistogramCanvas
+    from ndv.views.bases import HistogramCanvas
 
     LutKey: TypeAlias = int | None
 
@@ -29,14 +27,19 @@ if TYPE_CHECKING:
 class ArrayViewer:
     """Viewer dedicated to displaying a single n-dimensional array.
 
-    This wraps a model, view, and controller into a single object, and defines the
+    This wraps a model and sview into a single object, and defines the
     public API.
 
-    !!! note
+    !!! tip "See also"
 
-        In the future, `ndv` would like to support multiple, layered data sources.
-        We reserve the name `Viewer` for more fully featured viewer. `ArrayViewer`
-        assumes you're viewing a single array.
+        [**`ndv.imshow`**][ndv.imshow] - a convenience function that constructs and
+        shows an `ArrayViewer`.
+
+    !!! note "Future plans"
+
+        In the future, `ndv` would like to support multiple, layered data sources with
+        coordinate transforms. We reserve the name `Viewer` for a more fully featured
+        viewer. `ArrayViewer` assumes you're viewing a single array.
 
     Parameters
     ----------
@@ -104,16 +107,22 @@ class ArrayViewer:
 
     # -------------- public attributes and methods -------------------------
 
-    @property
-    def view(self) -> ArrayView:
-        """Return the front-end view object.
+    # @property
+    # def view(self) -> ArrayView:
+    #     return self._view
 
-        To access the actual native widget, use `self.view.frontend_widget()`.
-        If you directly access the frontend widget, you're on your own :) no guarantees
-        can be made about synchronization with the model.  However, it is exposed for
-        experimental and custom use cases.
+    def widget(self) -> Any:
+        """Return the native front-end widget.
+
+        !!! Warning
+
+            If you directly manipulate the frontend widget, you're on your own :smile:.
+            No guarantees can be made about synchronization with the model.  It is
+            exposed for embedding in an application, and for experimentation and custom
+            use cases.  Please [open an
+            issue](https://github.com/pyapp-kit/ndv/issues/new) if you have questions.
         """
-        return self._view
+        return self._view.frontend_widget()
 
     @property
     def display_model(self) -> ArrayDisplayModel:
@@ -233,7 +242,7 @@ class ArrayViewer:
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
         display_model = self._data_model.display
-        with self.view.currentIndexChanged.blocked():
+        with self._view.currentIndexChanged.blocked():
             self._view.create_sliders(self._data_model.normed_data_coords)
         self._view.set_channel_mode(display_model.channel_mode)
         if self.data is not None:

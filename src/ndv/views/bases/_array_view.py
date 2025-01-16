@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any
 from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.views.bases._view_base import Viewable
+
+from ._view_base import Viewable
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
