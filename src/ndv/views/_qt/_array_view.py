@@ -144,6 +144,8 @@ class QLutView(LutView):
         self._qwidget.cmap.setCurrentColormap(cmap)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
+        if not isinstance(clims, tuple):
+            breakpoint()
         self._qwidget.clims.setValue(clims)
 
     def set_gamma(self, gamma: float) -> None:

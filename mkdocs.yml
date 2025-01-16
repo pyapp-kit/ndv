@@ -109,6 +109,9 @@ plugins:
         python:
           import:
             - https://docs.python.org/3/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+            - https://cmap-docs.readthedocs.io/objects.inv
+            - https://psygnal.readthedocs.io/en/latest/objects.inv
           options:
             docstring_section_style: list
             docstring_style: "numpy"

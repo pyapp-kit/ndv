@@ -288,7 +288,7 @@ class VispyImageHandle(ImageHandle):
     def set_selected(self, selected: bool) -> None:
         raise NotImplementedError("Images cannot be selected")
 
-    def clim(self) -> Any:
+    def clims(self) -> Any:
         return self._visual.clim
 
     def set_clims(self, clims: tuple[float, float]) -> None:
