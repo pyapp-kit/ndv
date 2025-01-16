@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
-    from ndv.views.bases.graphics._mouseable import Mouseable
+    from ndv.views.bases._graphics._mouseable import Mouseable
 
 
 GUI_ENV_VAR = "NDV_GUI_FRONTEND"
@@ -34,8 +34,8 @@ DEBUG_EXCEPTIONS = "NDV_DEBUG_EXCEPTIONS"
 EXIT_ON_EXCEPTION = "NDV_EXIT_ON_EXCEPTION"
 """Whether to exit the application when an exception is raised. Default False."""
 
-IPYTHON_GUI_QT = "NDV_IPYTHON_GUI_QT"
-"""Whether to use gui_qt magic when running in IPython. Default True."""
+IPYTHON_GUI_MAGIC = "NDV_IPYTHON_GUI_MAGIC"
+"""Whether to use %gui magic when running in IPython. Default True."""
 
 
 class GuiFrontend(str, Enum):
@@ -114,9 +114,9 @@ class QtProvider(GuiProvider):
 
         if (qapp := QApplication.instance()) is None:
             # if we're running in IPython
-            # start the %gui qt magic if NDV_IPYTHON_GUI_QT!=0
+            # start the %gui qt magic if NDV_IPYTHON_GUI_MAGIC!=0
             if (ipy_shell := _ipython_shell()) and (
-                os.getenv(IPYTHON_GUI_QT, "true").lower() not in ("0", "false", "no")
+                os.getenv(IPYTHON_GUI_MAGIC, "true").lower() not in ("0", "false", "no")
             ):
                 ipy_shell.enable_gui("qt")  # type: ignore [no-untyped-call]
             # otherwise create a new QApplication
@@ -216,6 +216,12 @@ class WxProvider(GuiProvider):
 
         if (wxapp := wx.App.Get()) is None:
             wxapp = wx.App()
+        # if we're running in IPython
+        # start the %gui qt magic if NDV_IPYTHON_GUI_MAGIC!=0
+        if (ipy_shell := _ipython_shell()) and (
+            os.getenv(IPYTHON_GUI_MAGIC, "true").lower() not in ("0", "false", "no")
+        ):
+            ipy_shell.enable_gui("wx")  # type: ignore [no-untyped-call]
 
         _install_excepthook()
         return wxapp
@@ -224,9 +230,14 @@ class WxProvider(GuiProvider):
     def exec() -> None:
         import wx
 
-        app = wx.App.Get() or WxProvider.create_app()
+        app = cast("wx.App", wx.App.Get() or WxProvider.create_app())
+
+        if ipy_shell := _ipython_shell():
+            # if we're already in an IPython session with %gui qt, don't block
+            if str(ipy_shell.active_eventloop).startswith("wx"):
+                return
+
         app.MainLoop()
-        _install_excepthook()
 
     @staticmethod
     def array_view_class() -> type[ArrayView]:
