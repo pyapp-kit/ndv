@@ -34,8 +34,8 @@ if TYPE_CHECKING:
     from qtpy.QtCore import QObject
     from qtpy.QtGui import QCloseEvent, QKeyEvent
 
-    from ndv.views.bases.graphics._canvas import ArrayCanvas
-    from ndv.views.bases.graphics._canvas_elements import (
+    from ndv.views.bases._graphics._canvas import ArrayCanvas
+    from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         ImageHandle,
         RoiHandle,

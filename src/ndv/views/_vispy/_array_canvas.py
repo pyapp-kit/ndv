@@ -18,7 +18,7 @@ from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
 from ndv.views._vispy._utils import supports_float_textures
 from ndv.views.bases import ArrayCanvas
-from ndv.views.bases.graphics._canvas_elements import (
+from ndv.views.bases._graphics._canvas_elements import (
     CanvasElement,
     ImageHandle,
     RoiHandle,
@@ -288,7 +288,7 @@ class VispyImageHandle(ImageHandle):
     def set_selected(self, selected: bool) -> None:
         raise NotImplementedError("Images cannot be selected")
 
-    def clim(self) -> Any:
+    def clims(self) -> Any:
         return self._visual.clim
 
     def set_clims(self, clims: tuple[float, float]) -> None:

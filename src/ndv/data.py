@@ -54,7 +54,10 @@ def nd_sine_wave(
 
 
 def cells3d() -> np.ndarray:
-    """Load cells3d from scikit-image `(60, 2, 256, 256)` uint16."""
+    """Load cells3d from scikit-image `(60, 2, 256, 256)` uint16.
+
+    Requires `imageio and tifffile` to be installed.
+    """
     try:
         from imageio.v2 import volread
     except ImportError as e:
@@ -67,17 +70,23 @@ def cells3d() -> np.ndarray:
 
     # this data has been stretched to 16 bit, and lacks certain intensity values
     # add a small random integer to each pixel ... so the histogram is not silly
-    data = (data + np.random.randint(-24, 24, data.shape)).astype(np.uint16)
-    return data
+    data = (data + np.random.randint(-24, 24, data.shape)).clip(0, 65535)
+    return data.astype(np.uint16)
 
 
 def cat() -> np.ndarray:
-    """Load RGB cat data `(300, 451, 3)`, uint8."""
+    """Load RGB cat data `(300, 451, 3)`, uint8.
+
+    Requires [imageio](https://pypi.org/project/imageio/) to be installed.
+    """
     return _imread("imageio:chelsea.png")
 
 
 def astronaut() -> np.ndarray:
-    """Load RGB data `(512, 512, 3)`, uint8."""
+    """Load RGB data `(512, 512, 3)`, uint8.
+
+    Requires [imageio](https://pypi.org/project/imageio/) to be installed.
+    """
     return _imread("imageio:astronaut.png")
 
 
@@ -98,6 +107,8 @@ def cosem_dataset(
     """Load a dataset from the COSEM/OpenOrganelle project.
 
     Search for available options at: <https://openorganelle.janelia.org/datasets>
+
+    Requires [tensorstore](https://pypi.org/project/tensorstore/) to be installed.
 
     Parameters
     ----------

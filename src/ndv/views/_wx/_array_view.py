@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     import cmap
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 
 # mostly copied from _qt.qt_view._QLUTWidget
@@ -207,6 +208,9 @@ class _WxArrayViewer(wx.Frame):
         # Reset zoom button
         self.reset_zoom_btn = wx.Button(self, label="Reset Zoom")
 
+        # Reset zoom button
+        self.ndims_btn = wx.ToggleButton(self, label="3D")
+
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
 
@@ -214,6 +218,7 @@ class _WxArrayViewer(wx.Frame):
         btns.AddStretchSpacer()
         btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
         btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
+        btns.Add(self.ndims_btn, 0, wx.ALL, 5)
 
         # Layout for the panel
         inner = wx.BoxSizer(wx.VERTICAL)
@@ -232,13 +237,21 @@ class _WxArrayViewer(wx.Frame):
 
 
 class WxArrayView(ArrayView):
-    def __init__(self, canvas_widget: wx.Window, parent: wx.Window = None) -> None:
+    def __init__(
+        self,
+        canvas_widget: wx.Window,
+        data_model: _ArrayDataDisplayModel,
+        parent: wx.Window = None,
+    ) -> None:
+        self._data_model = data_model
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
+        self._visible_axes: Sequence[AxisKey] = []
 
         # TODO: use emit_fast
         wdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
         wdg.channel_mode_combo.Bind(wx.EVT_COMBOBOX, self._on_channel_mode_changed)
         wdg.reset_zoom_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
+        wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
@@ -246,6 +259,31 @@ class WxArrayView(ArrayView):
 
     def _on_reset_zoom_clicked(self, event: wx.CommandEvent) -> None:
         self.resetZoomClicked.emit()
+
+    def _on_ndims_toggled(self, event: wx.CommandEvent) -> None:
+        is_3d = self._wxwidget.ndims_btn.GetValue()
+        if len(self._visible_axes) > 2:
+            if not is_3d:  # is now 2D
+                self._visible_axes = self._visible_axes[-2:]
+        else:
+            z_ax = None
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            if z_ax is None:
+                # get the last slider that is not in visible axes
+                sld = reversed(self._wxwidget.dims_sliders._sliders)
+                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
+            self._visible_axes = (z_ax, *self._visible_axes)
+        # TODO: a future PR may decide to set this on the model directly...
+        # since we now have access to it.
+        self.visibleAxesChanged.emit()
+
+    def visible_axes(self) -> Sequence[AxisKey]:
+        return self._visible_axes  # no widget to control this yet
+
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
+        self._visible_axes = tuple(axes)
+        self._wxwidget.ndims_btn.SetValue(len(axes) == 3)
 
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget

@@ -5,7 +5,10 @@ from pydantic import BaseModel, ConfigDict
 
 
 class NDVModel(BaseModel):
-    """Base evented model for NDV models."""
+    """Base evented model for NDV models.
+
+    Uses [pydantic.BaseModel][] and [psygnal.SignalGroupDescriptor][].
+    """
 
     model_config = ConfigDict(
         validate_assignment=True,

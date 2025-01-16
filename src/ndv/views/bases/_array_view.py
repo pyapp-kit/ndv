@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, Any
 from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.views.bases._view_base import Viewable
+
+from ._view_base import Viewable
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases import LutView
 
 
@@ -27,16 +29,26 @@ class ArrayView(Viewable):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     histogramRequested = Signal()
+    visibleAxesChanged = Signal()
     channelModeChanged = Signal(ChannelMode)
 
+    # model: _ArrayDataDisplayModel is likely a temporary parameter
     @abstractmethod
-    def __init__(self, canvas_widget: Any, **kwargs: Any) -> None: ...
+    def __init__(
+        self, canvas_widget: Any, model: _ArrayDataDisplayModel, **kwargs: Any
+    ) -> None: ...
     @abstractmethod
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
     @abstractmethod
     def current_index(self) -> Mapping[AxisKey, int | slice]: ...
     @abstractmethod
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None: ...
+
+    @abstractmethod
+    def visible_axes(self) -> Sequence[AxisKey]: ...
+    @abstractmethod
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None: ...
+
     @abstractmethod
     def set_channel_mode(self, mode: ChannelMode) -> None: ...
     @abstractmethod

@@ -6,10 +6,9 @@ from typing import Any, Optional, Union, cast
 import numpy as np
 from pydantic import Field
 
-from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
-from ndv.models._base_model import NDVModel
-
-from .data_wrappers import DataWrapper
+from ._array_display_model import ArrayDisplayModel, ChannelMode
+from ._base_model import NDVModel
+from ._data_wrapper import DataWrapper
 
 __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
@@ -18,7 +17,7 @@ __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 class DataRequest:
     """Request object for data slicing."""
 
-    wrapper: DataWrapper
+    wrapper: DataWrapper = field(repr=False)
     index: Mapping[int, Union[int, slice]]
     visible_axes: tuple[int, ...]
     channel_axis: Optional[int]
@@ -29,10 +28,19 @@ class DataResponse:
     """Response object for data requests."""
 
     data: np.ndarray = field(repr=False)
+    shape: tuple[int, ...] = field(init=False)
+    dtype: np.dtype = field(init=False)
     channel_key: Optional[int]
+    n_visible_axes: int
     request: Optional[DataRequest] = None
 
+    def __post_init__(self) -> None:
+        self.shape = self.data.shape
+        self.dtype = self.data.dtype
 
+
+# NOTE: nobody particularly likes this class.  It does important stuff, but we're
+# not yet sure where this logic belongs.
 class _ArrayDataDisplayModel(NDVModel):
     """Utility class combining ArrayDisplayModel model with a DataWrapper.
 
@@ -155,14 +163,13 @@ class _ArrayDataDisplayModel(NDVModel):
             if isinstance(val, int):
                 requested_slice[ax] = slice(val, val + 1)
 
-        return [
-            DataRequest(
-                wrapper=self.data_wrapper,
-                index=requested_slice,
-                visible_axes=self.normed_visible_axes,
-                channel_axis=c_ax,
-            )
-        ]
+        request = DataRequest(
+            wrapper=self.data_wrapper,
+            index=requested_slice,
+            visible_axes=self.normed_visible_axes,
+            channel_axis=c_ax,
+        )
+        return [request]
 
     # TODO: make async
     def request_sliced_data(self) -> list[Future[DataResponse]]:
@@ -193,13 +200,13 @@ class _ArrayDataDisplayModel(NDVModel):
                     ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
                     ch_data = data[ch_keepdims]
                 future = Future[DataResponse]()
-                future.set_result(
-                    DataResponse(
-                        data=ch_data.transpose(*t_dims).squeeze(),
-                        channel_key=i,
-                        request=req,
-                    )
+                response = DataResponse(
+                    data=ch_data.transpose(*t_dims).squeeze(),
+                    channel_key=i,
+                    n_visible_axes=len(vis_ax),
+                    request=req,
                 )
+                future.set_result(response)
                 futures.append(future)
 
         return futures

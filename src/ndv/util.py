@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from typing import Any, Unpack
 
     from .models._array_display_model import ArrayDisplayModel, ArrayDisplayModelKwargs
-    from .models.data_wrappers import DataWrapper
+    from .models._data_wrapper import DataWrapper
 
 
 @overload
@@ -41,7 +41,7 @@ def imshow(
 
     Returns
     -------
-    ViewerController
+    ArrayViewer
         The viewer window.
     """
     viewer = ArrayViewer(data, display_model, **kwargs)
