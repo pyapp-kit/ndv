@@ -32,4 +32,4 @@ can be used per session.
     **Graphics:**
 
     If you have both VisPy and pygfx installed, `ndv` will (currently) default
-    to using vispy.
+    to using VisPy.
