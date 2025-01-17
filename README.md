@@ -6,7 +6,10 @@
 [![CI](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml/badge.svg)](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/pyapp-kit/ndv/branch/main/graph/badge.svg)](https://codecov.io/gh/pyapp-kit/ndv)
 
-Simple, fast-loading, asynchronous, n-dimensional array viewer, with minimal dependencies.
+Simple, fast-loading, asynchronous, n-dimensional array viewer, with minimal
+dependencies.
+
+Works in Qt, Jupyter, or wxPython.
 
 ```python
 import ndv
