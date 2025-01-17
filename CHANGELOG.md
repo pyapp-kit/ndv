@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.2.1](https://github.com/pyapp-kit/ndv/tree/v0.2.1) (2025-01-17)
+
+[Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.2.0...v0.2.1)
+
+**Merged pull requests:**
+
+- chore: update dependencies [\#104](https://github.com/pyapp-kit/ndv/pull/104) ([tlambert03](https://github.com/tlambert03))
+
 ## [v0.2.0](https://github.com/pyapp-kit/ndv/tree/v0.2.0) (2025-01-17)
 
 [Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.0.4...v0.2.0)
