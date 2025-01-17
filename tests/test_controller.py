@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
+from typing import Any, Callable, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
@@ -10,15 +10,13 @@ import pytest
 
 from ndv._types import MouseMoveEvent
 from ndv.controllers import ArrayViewer
+from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases._graphics._canvas_elements import ImageHandle
-
-if TYPE_CHECKING:
-    from ndv.controllers._channel_controller import ChannelController
 
 
 def _get_mock_canvas() -> ArrayCanvas:
@@ -206,19 +204,22 @@ def test_array_viewer_with_app() -> None:
 
 @pytest.mark.usefixtures("any_app")
 def test_channel_autoscale() -> None:
+    ctrl = ChannelController(key=None, lut_model=LUTModel(), views=[])
+
     # NB: Use a planar dataset so we can manually compute the min/max
     data = np.random.randint(0, 255, size=(10, 10), dtype="uint8")
     mi, ma = np.nanmin(data), np.nanmax(data)
-    viewer = ArrayViewer(data)
+    handle = MagicMock(spec=ImageHandle)
+    handle.data.return_value = data
+    ctrl.add_handle(handle)
 
     # Test some random LutController
-    lut_ctrl = next(iter(viewer._lut_controllers.values()))
-    lut_model = lut_ctrl.lut_model
+    lut_model = ctrl.lut_model
     lut_model.clims = ClimsManual(min=1, max=2)
 
     # Ensure newly added lut views have the correct clims
     mock_viewer = MagicMock(LutView)
-    lut_ctrl.add_lut_view(mock_viewer)
+    ctrl.add_lut_view(mock_viewer)
     mock_viewer.set_clims.assert_called_once_with((1, 2))
 
     # Ensure autoscaling sets the clims
