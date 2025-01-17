@@ -17,7 +17,7 @@ sources = ["src"]
 [project]
 name = "ndv"
 dynamic = ["version"]
-description = "simple nd image viewer"
+description = "Simple, fast-loading, n-dimensional array viewer, with minimal dependencies."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
@@ -33,23 +33,24 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 dependencies = [
-    "qtpy",
-    "numpy",
-    "superqt[cmap,iconify]",
-    "pydantic",
-    "psygnal",
+    "cmap >=0.3",
+    "numpy >=1.22",
+    "psygnal >=0.10",
+    "pydantic >=2.9",
     "typing_extensions",
 ]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
-jupyter = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
-pyqt = ["pyqt6"]
-pyside = ["pyside6<6.8"]
+jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw"]
+qtextras = ["qtpy >=2", "superqt[iconify]>=0.7.1"]
+pyqt = ["pyqt6", "ndv[qtextras]"]
+pyside = ["pyside6<6.8", "ndv[qtextras]"]
 wxpython = ["wxpython"]
 
 # Supported Canavs backends
@@ -170,7 +171,7 @@ filterwarnings = [
     # CI-only error on jupyter, vispy, macos
     "ignore:.*Failed to find a suitable pixel format",
     # unsolved python 3.10 warning on shutdown, either xarray or dask
-    "ignore:unclosed transport:ResourceWarning", 
+    "ignore:unclosed transport:ResourceWarning",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 

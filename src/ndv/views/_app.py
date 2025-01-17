@@ -349,7 +349,11 @@ class JupyterProvider(GuiProvider):
             raise RuntimeError(  # pragma: no cover
                 "Jupyter is not running a notebook shell.  Cannot create app."
             )
-        return None
+        # No app creation needed...
+        # but make sure we can actually import the stuff we need
+        import ipywidgets  # noqa: F401
+        import jupyter  # noqa: F401
+        import jupyter_rfb  # noqa: F401
 
     @staticmethod
     def exec() -> None:
