@@ -41,6 +41,8 @@ class ChannelController:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
+        # TODO: Could probably reuse cached clims
+        self._auto_scale()
 
     def synchronize(self, *views: LutView) -> None:
         """Aligns all views against the backing model."""
@@ -65,7 +67,6 @@ class ChannelController:
         """Add an image texture handle to the controller."""
         self.handles.append(handle)
         self.add_lut_view(handle)
-        self._auto_scale()
 
     def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
         """Get the value of the data at the given index."""

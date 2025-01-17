@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ndv._types import CursorType
+    from ndv.models._lut_model import ClimPolicy
 
 
 class CanvasElement(Mouseable):
@@ -90,7 +91,7 @@ class ImageHandle(CanvasElement, LutView):
     def set_channel_name(self, name: str) -> None:
         pass
 
-    def set_auto_scale(self, checked: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         pass
 
     #     if checked and self.model:

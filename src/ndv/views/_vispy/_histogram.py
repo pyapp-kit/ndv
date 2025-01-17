@@ -7,7 +7,7 @@ import numpy as np
 from vispy import scene
 
 from ndv._types import CursorType
-from ndv.models._lut_model import ClimsManual
+from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
@@ -143,7 +143,7 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._clims = clims
         self._update_lut_lines()
 
-    def set_auto_scale(self, autoscale: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         # Nothing to do (yet)
         pass
 

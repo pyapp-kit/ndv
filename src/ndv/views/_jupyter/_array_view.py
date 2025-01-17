@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 import ipywidgets as widgets
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -101,9 +101,9 @@ class JupyterLutView(LutView):
     # NOTE: it's important to block signals when setting values from the controller
     # to avoid loops, unnecessary updates, and unexpected behavior
 
-    def set_auto_scale(self, auto: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         self._updating = True
-        self._auto_clim.value = auto
+        self._auto_clim.value = not policy.is_manual
         self._updating = False
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:

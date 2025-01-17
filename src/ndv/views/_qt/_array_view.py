@@ -21,7 +21,7 @@ from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -153,9 +153,9 @@ class QLutView(LutView):
     def set_channel_name(self, name: str) -> None:
         self._qwidget.visible.setText(name)
 
-    def set_auto_scale(self, auto: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         with signals_blocked(self._qwidget.auto_clim):
-            self._qwidget.auto_clim.setChecked(auto)
+            self._qwidget.auto_clim.setChecked(not policy.is_manual)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         with signals_blocked(self._qwidget.cmap):
@@ -193,7 +193,11 @@ class QLutView(LutView):
 
     def _on_q_auto_changed(self, autoscale: bool) -> None:
         if self._model:
-            self._model.clims = ClimsMinMax()
+            if autoscale:
+                self._model.clims = ClimsMinMax()
+            else:
+                clims = self._qwidget.clims.value()
+                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
 
 class _QDimsSliders(QWidget):

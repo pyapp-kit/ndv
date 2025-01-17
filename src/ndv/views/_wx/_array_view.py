@@ -8,7 +8,7 @@ import wx.lib.newevent
 from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
 from ndv.views._wx._labeled_slider import WxLabeledSlider
 from ndv.views.bases import ArrayView, LutView
 
@@ -89,8 +89,8 @@ class WxLutView(LutView):
     def set_channel_name(self, name: str) -> None:
         self._wxwidget.visible.SetLabel(name)
 
-    def set_auto_scale(self, auto: bool) -> None:
-        self._wxwidget.auto_clim.SetValue(auto)
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        self._wxwidget.auto_clim.SetValue(not policy.is_manual)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         name = cmap.name.split(":")[-1]  # FIXME: this is a hack

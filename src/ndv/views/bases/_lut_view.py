@@ -8,7 +8,7 @@ from ._view_base import Viewable
 if TYPE_CHECKING:
     import cmap
 
-    from ndv.models._lut_model import LUTModel
+    from ndv.models._lut_model import ClimPolicy, LUTModel
 
     pass
 
@@ -23,7 +23,7 @@ class LutView(Viewable):
         """Set the name of the channel to `name`."""
 
     @abstractmethod
-    def set_auto_scale(self, checked: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         """Set the autoscale button to checked if `checked` is True."""
 
     @abstractmethod
@@ -59,7 +59,7 @@ class LutView(Viewable):
     def model(self, model: LUTModel | None) -> None:
         # Disconnect old model
         if self._model is not None:
-            self._model.events.clims.disconnect(self.set_clims)
+            self._model.events.clims.disconnect(self.set_clim_policy)
             self._model.events.cmap.disconnect(self.set_colormap)
             self._model.events.gamma.disconnect(self.set_gamma)
             self._model.events.visible.disconnect(self.set_channel_visible)
@@ -67,7 +67,7 @@ class LutView(Viewable):
         # Connect new model
         self._model = model
         if self._model is not None:
-            self._model.events.clims.connect(self.set_clims)
+            self._model.events.clims.connect(self.set_clim_policy)
             self._model.events.cmap.connect(self.set_colormap)
             self._model.events.gamma.connect(self.set_gamma)
             self._model.events.visible.connect(self.set_channel_visible)
@@ -77,7 +77,7 @@ class LutView(Viewable):
     def synchronize(self) -> None:
         """Aligns the view against the backing model."""
         if model := self._model:
-            self.set_auto_scale(not model.clims.is_manual)
+            self.set_clim_policy(model.clims)
             self.set_colormap(model.cmap)
             self.set_gamma(model.gamma)
             self.set_channel_visible(model.visible)
