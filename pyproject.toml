@@ -37,7 +37,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "cmap >=0.4",
+    "cmap >=0.3",
     "numpy >=1.22",
     "psygnal >=0.10",
     "pydantic >=2.9",
