@@ -36,9 +36,10 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "cmap >=0.4",
     "numpy >=1.22",
-    "pydantic >=2.9",
     "psygnal >=0.10",
+    "pydantic >=2.9",
     "typing_extensions",
 ]
 
@@ -46,7 +47,7 @@ dependencies = [
 [project.optional-dependencies]
 # Supported GUI frontends
 jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw"]
-qtextras = ["qtpy >=2", "superqt[cmap,iconify]>=0.7.1"]
+qtextras = ["qtpy >=2", "superqt[iconify]>=0.7.1"]
 pyqt = ["pyqt6", "ndv[qtextras]"]
 pyside = ["pyside6<6.8", "ndv[qtextras]"]
 wxpython = ["wxpython"]
