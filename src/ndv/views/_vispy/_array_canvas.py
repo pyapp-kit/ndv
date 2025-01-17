@@ -16,7 +16,6 @@ from vispy.util.quaternion import Quaternion
 
 from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
-from ndv.views._vispy._utils import supports_float_textures
 from ndv.views.bases import ArrayCanvas
 from ndv.views.bases._graphics._canvas_elements import (
     CanvasElement,
@@ -441,7 +440,6 @@ class VispyArrayCanvas(ArrayCanvas):
         self._ndim: Literal[2, 3] | None = None
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
-        self._txt_fmt = "auto" if supports_float_textures() else None
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -485,7 +483,7 @@ class VispyArrayCanvas(ArrayCanvas):
         data = _downcast(data)
         try:
             img = scene.visuals.Image(
-                data, parent=self._view.scene, texture_format=self._txt_fmt
+                data, parent=self._view.scene, texture_format="auto"
             )
         except ValueError as e:
             warnings.warn(f"{e}. Falling back to CPUScaledTexture", stacklevel=2)
@@ -506,7 +504,7 @@ class VispyArrayCanvas(ArrayCanvas):
                 data,
                 parent=self._view.scene,
                 interpolation="nearest",
-                texture_format=self._txt_fmt,
+                texture_format="auto",
             )
         except ValueError as e:
             warnings.warn(f"{e}. Falling back to CPUScaledTexture", stacklevel=2)
