@@ -56,6 +56,7 @@ def _patch_views(f: Callable) -> Callable:
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     ctrl = ArrayViewer()
+    ctrl._async = False
     model = ctrl.display_model
     mock_view = ctrl._view
     mock_view.create_sliders.assert_not_called()
@@ -124,6 +125,7 @@ def test_canvas() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
     ctrl = ArrayViewer()
+    ctrl._async = False
     mock_canvas = ctrl._canvas
 
     mock_view = ctrl._view
@@ -144,6 +146,7 @@ def test_canvas() -> None:
 @_patch_views
 def test_histogram_controller() -> None:
     ctrl = ArrayViewer()
+    ctrl._async = False
     mock_view = ctrl._view
 
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)

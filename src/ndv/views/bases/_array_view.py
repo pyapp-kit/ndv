@@ -69,3 +69,6 @@ class ArrayView(Viewable):
 
     def remove_histogram(self, widget: Any) -> None:
         raise NotImplementedError
+
+    def set_progress_spinner_visible(self, visible: bool) -> None:
+        return
