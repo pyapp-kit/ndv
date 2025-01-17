@@ -14,25 +14,8 @@ and GUI libraries you want to use:
 <!-- logic for this table in install-table.js -->
 <div id="install-table"></div>
 
-## Framework selection
+!!! tip
 
-If you have multiple GUI or graphics libraries installed, you can control which
-ones `ndv` uses with environment variables. The following variables are
-supported:
-
-- `NDV_CANVAS_BACKEND`: Set to `"vispy"` or `"pygfx"` to choose the graphics library.
-- `NDV_GUI_FRONTEND`: Set to `"qt"`, `"wx"`, or `"jupyter"` to choose the GUI library.
-
-!!! info "Defaults"
-
-    **GUI:**
-
-    `ndv` tries to be aware of the GUI library you are using. So it will use
-    `jupyter` if you are in a Jupyter notebook, `qt` if a `QApplication` is
-    already running, and `wx` if a `wx.App` is already running. Finally, it
-    will check available libraries in the order of `qt`, `wx`, `jupyter`.
-
-    **Graphics:**
-
-    If you have both VisPy and pygfx installed, `ndv` will (currently) default
-    to using vispy.
+    If you have *multiple* supported GUI or graphics libraries installed, you can
+    select which ones `ndv` uses with
+    [environment variables](env_var.md#framework-selection).
