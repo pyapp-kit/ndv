@@ -56,9 +56,8 @@ class JupyterLutView(LutView):
             description="Auto",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
-            icon="check",
+            layout=widgets.Layout(width="65px"),
         )
-        self._auto_clim.layout.width = "100px"
 
         # LAYOUT
 
@@ -151,13 +150,21 @@ class JupyterArrayView(ArrayView):
         self._channel_mode_combo.layout.align_self = "flex-end"
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
+        # Reset zoom button
+        self._reset_zoom_btn = widgets.Button(
+            tooltip="Reset Zoom",
+            icon="expand",
+            layout=widgets.Layout(width="40px"),
+        )
+        self._reset_zoom_btn.on_click(self._on_reset_zoom_clicked)
+
+        # 3d view button
         self._ndims_btn = widgets.ToggleButton(
             value=False,
             description="3D",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="View in 3D",
-            icon="check",
-            layout=widgets.Layout(width="60px"),
+            layout=widgets.Layout(width="40px"),
         )
         self._ndims_btn.observe(self._on_ndims_toggled, names="value")
 
@@ -170,7 +177,7 @@ class JupyterArrayView(ArrayView):
             width = "604px"
 
         btns = widgets.HBox(
-            [self._channel_mode_combo, self._ndims_btn],
+            [self._channel_mode_combo, self._ndims_btn, self._reset_zoom_btn],
             layout=widgets.Layout(justify_content="flex-end"),
         )
         self.layout = widgets.VBox(
@@ -323,6 +330,9 @@ class JupyterArrayView(ArrayView):
         # TODO: a future PR may decide to set this on the model directly...
         # since we now have access to it.
         self.visibleAxesChanged.emit()
+
+    def _on_reset_zoom_clicked(self, change: dict[str, Any]) -> None:
+        self.resetZoomClicked.emit()
 
     def close(self) -> None:
         self.layout.close()
