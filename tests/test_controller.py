@@ -11,7 +11,7 @@ import pytest
 from ndv._types import MouseMoveEvent
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
-from ndv.models._lut_model import LUTModel
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
@@ -204,21 +204,24 @@ def test_array_viewer_with_app() -> None:
         assert viewer.display_model.visible_axes == (0, -2, -1)
 
 
-# @pytest.mark.usefixtures("any_app")
-# def test_channel_autoscale() -> None:
-#     data = np.random.randint(0, 255, size=(10, 10, 10, 10, 10), dtype="uint8")
-#     viewer = ArrayViewer(data)
+@pytest.mark.usefixtures("any_app")
+def test_channel_autoscale() -> None:
+    # NB: Use a planar dataset so we can manually compute the min/max
+    data = np.random.randint(0, 255, size=(10, 10), dtype="uint8")
+    mi, ma = np.nanmin(data), np.nanmax(data)
+    viewer = ArrayViewer(data)
 
-#     lut_model = viewer._lut_controllers[None].lut_model
-#     old_clims = lut_model.clims
+    # Test some random LutController
+    lut_ctrl = next(iter(viewer._lut_controllers.values()))
+    lut_model = lut_ctrl.lut_model
+    lut_model.clims = ClimsManual(min=1, max=2)
 
-#     # Adjust the clims with autoscale off
-#     lut_model.autoscale = False
-#     lut_model.clims = (old_clims[0] + 1, old_clims[1] + 1)
+    # Ensure newly added lut views have the correct clims
+    mock_viewer = MagicMock(LutView)
+    lut_ctrl.add_lut_view(mock_viewer)
+    mock_viewer.set_clims.assert_called_once_with((1, 2))
 
-#     # Assert turning autoscale back on reverts the clims
-#     lut_model.autoscale = True
-#     assert lut_model.clims == old_clims
-
-#     # NB: The view is (currently) responsible for disabling autoscale when
-#     # it moves a clim. Thus that behavior is tested for each backend.
+    # Ensure autoscaling sets the clims
+    mock_viewer.set_clims.reset_mock()
+    lut_model.clims = ClimsMinMax()
+    mock_viewer.set_clims.assert_called_once_with((mi, ma))
