@@ -20,9 +20,9 @@ ndv.imshow(data)
 
 ![Montage](https://github.com/pyapp-kit/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
 
-[`ndv.imshow()`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/#ndv.imshow)
+[`ndv.imshow()`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/#ndv.imshow)
 creates an instance of
-[`ndv.ArrayViewer`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/controllers/#ndv.controllers.ArrayViewer),
+[`ndv.ArrayViewer`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/controllers/#ndv.controllers.ArrayViewer),
 which you can also use directly:
 
 ```python
@@ -36,7 +36,7 @@ ndv.run_app()
 > [!TIP]
 > To embed the viewer in a broader Qt or wxPython application, you can
 > access the viewer's
-> [`widget`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/controllers/#ndv.controllers.ArrayViewer.widget)
+> [`widget`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/controllers/#ndv.controllers.ArrayViewer.widget)
 > attribute and add it to your layout.
 
 ## Features
@@ -78,7 +78,7 @@ See examples for each of these array types in
 Because ndv supports many combinations of GUI and graphics frameworks,
 you must install it along with additional dependencies for your desired backend.
 
-See the [installation guide](https://pyapp-kit.github.io/ndv/dev/install/) for
+See the [installation guide](https://pyapp-kit.github.io/ndv/latest/install/) for
 complete details.
 
 To just get started quickly using Qt and vispy:
