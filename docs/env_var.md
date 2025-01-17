@@ -15,8 +15,9 @@
 
 ## Framework selection
 
-If you have multiple supported GUI or graphics libraries installed, you can
-control which ones `ndv` uses with **`NDV_CANVAS_BACKEND`** and **`NDV_GUI_FRONTEND`**,
+Depending on how you've [installed ndv](./install.md), you may end up with
+multiple supported GUI or graphics libraries installed. You can control which
+ones `ndv` uses with **`NDV_CANVAS_BACKEND`** and **`NDV_GUI_FRONTEND`**,
 respectively, as described above.  Note that currently, only one GUI framework
 can be used per session.
 

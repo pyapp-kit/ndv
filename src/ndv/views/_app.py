@@ -586,7 +586,7 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
 
 
 def run_app() -> None:
-    """Start the GUI application event loop."""
+    """Start the active GUI application event loop."""
     GUI_PROVIDERS[gui_frontend()].exec()
 
 
