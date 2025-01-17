@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import cmap
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views._app import QtProvider
 from ndv.views._qt._array_view import QLutView
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
 
 
 @fixture(autouse=True)
@@ -20,8 +25,9 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(model: LUTModel) -> QLutView:
+def view(model: LUTModel, qtbot: QtBot) -> QLutView:
     view = QLutView()
+    qtbot.add_widget(view.frontend_widget())
     # Set the model
     assert view.model is None
     view.model = model
