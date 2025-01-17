@@ -136,13 +136,17 @@ class LUTModel(NDVModel):
     visible : bool
         Whether to display this channel.
         NOTE: This has implications for data retrieval, as we may not want to request
-        channels that are not visible.  See current_index above.
+        channels that are not visible.
+        See [`ArrayDisplayModel.current_index`][ndv.models.ArrayDisplayModel].
     cmap : cmap.Colormap
-        Colormap to use for this channel.
-    clims : Union[ManualClims, PercentileClims, StdDevClims, MinMaxClims]
-        Method for determining the contrast limits for this channel.
+        [`cmap.Colormap`](https://cmap-docs.readthedocs.io/colormaps/) to use for this
+        channel.  This can be expressed as any channel.  This can be expressed as any
+        ["colormap like" object](https://cmap-docs.readthedocs.io/en/latest/colormaps/#colormaplike-objects)
+    clims : Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
+        Method for determining the contrast limits for this channel.  If a 2-element
+        `tuple` or `list` is provided, it is interpreted as a manual contrast limit.
     gamma : float
-        Gamma correction for this channel. By default, 1.0.
+        Gamma applied to the data before applying the colormap. By default, `1.0`.
     """
 
     visible: bool = True

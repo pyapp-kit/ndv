@@ -22,14 +22,15 @@ display data.
     amount of time. "Reasonable" is of course relative and subjective, but we
     aim for less than 1 second on a modern laptop (currently at <100ms).
 - [x] **Broad GUI Compatibility**: A common feature request for `napari` is to support
-    Jupyter notebooks. `ndv` [can work with](./env_var.md#framework-selection) Qt,
+    Jupyter notebooks. `ndv` [can work with](./install.md) Qt,
     wxPython, *and* Jupyter.
 - [x] **Flexible Graphics Providers**: `ndv` works with VisPy in a classical OpenGL
     context, but has an abstracting layer that allows for other graphics engines.
     We currently also support `pygfx`, a WGPU-based graphics engine.
 - [x] **Model/View architecture**: `ndv` should have a clear separation between the
     data model and the view. The model should be serializable and easily
-    transferable between different views.
+    transferable between different views. (The primary model is currently
+    [`ArrayDisplayModel`][ndv.models.ArrayDisplayModel])
 - [x] **Asynchronous first**: `ndv` should be asynchronous by default: meaning
     that the data request/response process happens in the background, and the
     GUI remains responsive. (Optimization of remote, multi-resolution data is on

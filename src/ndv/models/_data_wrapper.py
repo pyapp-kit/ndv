@@ -56,12 +56,13 @@ def _recurse_subclasses(cls: _T) -> Iterator[_T]:
 class DataWrapper(Generic[ArrayT], ABC):
     """Interface for wrapping different array-like data types.
 
-    `DataWrapper.create` is a factory method that returns a DataWrapper instance
-    for the given data type. If your datastore type is not supported, you may implement
-    a new DataWrapper subclass to handle your data type.  To do this, import and
-    subclass DataWrapper, and (minimally) implement the supports and isel methods.
-    Ensure that your class is imported before the DataWrapper.create method is called,
-    and it will be automatically detected and used to wrap your data.
+    [`DataWrapper.create()`][ndv.DataWrapper.create] is a factory method that returns a
+    `DataWrapper` instance for the given data type. If your datastore type is not
+    supported, you may implement a new `DataWrapper` subclass to handle your data type.
+    To do this, import and subclass `DataWrapper`, and (minimally) implement the
+    supports and isel methods. Ensure that your class is imported before the
+    `DataWrapper.create` method is called, and it will be automatically detected and
+    used to wrap your data.
     """
 
     # Order in which subclasses are checked for support.
@@ -102,7 +103,10 @@ class DataWrapper(Generic[ArrayT], ABC):
 
     @abstractmethod
     def isel(self, index: Mapping[int, int | slice]) -> np.ndarray:
-        """Return a slice of the data as a numpy array."""
+        """Return a slice of the data as a numpy array.
+
+        `index` will look like (e.g.) `{0: slice(0, 10), 1: 5}`.
+        """
 
     def save_as_zarr(self, path: str) -> None:
         raise NotImplementedError("Saving as zarr is not supported for this data type")
@@ -122,6 +126,21 @@ class DataWrapper(Generic[ArrayT], ABC):
 
     @classmethod
     def create(cls, data: ArrayT) -> DataWrapper[ArrayT]:
+        """Create a DataWrapper instance for the given data.
+
+        This method will detect all subclasses of DataWrapper and check them in order of
+        their `PRIORITY` class variable. The first subclass that
+        [`supports`][ndv.DataWrapper.supports] the given data will be used to wrap it.
+
+        !!! tip
+
+            This means that you can subclass DataWrapper to handle new data types.
+            Just make sure that your subclass is imported before calling `create`.
+
+        If no subclasses support the data, a `NotImplementedError` is raised.
+
+        If an instance of `DataWrapper` is passed in, it will be returned as-is.
+        """
         if isinstance(data, DataWrapper):
             return data
 
