@@ -1,5 +1,19 @@
 # Installation
 
+!!! tip "TLDR;"
+
+    === "For a desktop usage"
+ 
+        ```python
+        pip install "ndv[vispy,pyqt]"
+        ```
+
+    === "For Jupyter notebook/lab"
+    
+        ```python
+        pip install "ndv[vispy,jupyter]"
+        ```
+
 `ndv` can be used in a variety of contexts. It supports various **GUI
  frameworks**, including [PyQt](https://riverbankcomputing.com/software/pyqt),
  [PySide](https://wiki.qt.io/Qt_for_Python), [wxPython](https://wxpython.org),
@@ -14,7 +28,7 @@ and GUI libraries you want to use:
 <!-- logic for this table in install-table.js -->
 <div id="install-table"></div>
 
-!!! tip
+!!! note "Framework Selection"
 
     If you have *multiple* supported GUI or graphics libraries installed, you can
     select which ones `ndv` uses with
