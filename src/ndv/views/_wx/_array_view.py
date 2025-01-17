@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import wx
+import wx.adv
 import wx.lib.newevent
 from psygnal import Signal
 
@@ -20,6 +22,31 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+
+
+class _WxSpinner(wx.Panel):
+    SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
+
+    def __init__(self, parent: wx.Window):
+        super().__init__(parent)
+        # Load the animated GIF
+        gif = wx.adv.Animation(self.SPIN_GIF)
+        self.anim_ctrl = wx.adv.AnimationCtrl(self, -1, gif)
+
+        # Set fixed size for the spinner
+        self.SetSize((18, 18))
+        self.anim_ctrl.SetSize((18, 18))
+
+        # Start the animation
+        self.anim_ctrl.Play()
+
+        # Set semi-transparent effect (opacity not directly available in wx)
+        # self.SetTransparent(153)  # 60% opacity (255 * 0.6)
+
+        # Add the animation control to the sizer
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.anim_ctrl, 0, wx.ALIGN_CENTER)
+        self.SetSizer(sizer)
 
 
 # mostly copied from _qt.qt_view._QLUTWidget
@@ -198,6 +225,10 @@ class _WxArrayViewer(wx.Frame):
         self._data_info_label = wx.StaticText(self, label="")
         self._hover_info_label = wx.StaticText(self, label="")
 
+        # spinner to indicate progress
+        self._progress_spinner = _WxSpinner(self)
+        self._progress_spinner.Hide()
+
         # Channel mode combo box
         self.channel_mode_combo = wx.ComboBox(
             self,
@@ -220,9 +251,13 @@ class _WxArrayViewer(wx.Frame):
         btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
         btns.Add(self.ndims_btn, 0, wx.ALL, 5)
 
-        # Layout for the panel
+        self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
+        top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
+        top_info.AddStretchSpacer()
+        top_info.Add(self._progress_spinner, 0, wx.EXPAND | wx.BOTTOM, 0)
+
         inner = wx.BoxSizer(wx.VERTICAL)
-        inner.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 5)
+        inner.Add(top_info, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
@@ -333,3 +368,10 @@ class WxArrayView(ArrayView):
 
     def close(self) -> None:
         self._wxwidget.Close()
+
+    def set_progress_spinner_visible(self, visible: bool) -> None:
+        if visible:
+            self._wxwidget._progress_spinner.Show()
+            self._wxwidget._top_info.Layout()
+        else:
+            self._wxwidget._progress_spinner.Hide()

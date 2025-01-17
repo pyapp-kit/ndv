@@ -169,6 +169,8 @@ filterwarnings = [
     "ignore:Unable to import recommended hash",
     # CI-only error on jupyter, vispy, macos
     "ignore:.*Failed to find a suitable pixel format",
+    # unsolved python 3.10 warning on shutdown, either xarray or dask
+    "ignore:unclosed transport:ResourceWarning", 
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 

@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, cast
+from contextlib import suppress
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
-from qtpy.QtCore import Qt, Signal
+from qtpy.QtCore import QSize, Qt, Signal
+from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QSplitter,
     QVBoxLayout,
@@ -88,6 +93,24 @@ class _CmapCombo(QColormapComboBox):
                     self.setCurrentIndex(idx)
         else:
             self.addColormap(cmap_)
+
+
+class _QSpinner(QLabel):
+    SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        size = QSize(18, 18)
+        mov = QMovie(self.SPIN_GIF, parent=self)
+        self.setFixedSize(size)
+        mov.setSpeed(150)
+        mov.start()
+        self.setMovie(mov)
+
+        # make semi-transparent
+        effect = QGraphicsOpacityEffect(self)
+        effect.setOpacity(0.6)
+        self.setGraphicsEffect(effect)
 
 
 class _DimToggleButton(QPushButton):
@@ -278,12 +301,17 @@ class _QArrayViewer(QWidget):
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
 
+        self._canvas_widget = canvas_widget
         self.dims_sliders = _QDimsSliders(self)
 
         # place to display dataset summary
         self.data_info_label = QElidingLabel("", parent=self)
         # place to display arbitrary text
         self.hover_info_label = QElidingLabel("", self)
+
+        # spinner to indicate progress
+        self._progress_spinner = _QSpinner(canvas_widget)
+        self._progress_spinner.hide()
 
         # the button that controls the display mode of the channels
         # not using QEnumComboBox because we want to exclude some values for now
@@ -346,6 +374,18 @@ class _QArrayViewer(QWidget):
         layout.setSpacing(2)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(self.splitter)
+
+    def resizeEvent(self, a0: Any) -> None:
+        # position at spinner the top right of the canvas_widget:
+        canv, spinner = self._canvas_widget, self._progress_spinner
+        pad = 4
+        spinner.move(canv.width() - spinner.width() - pad, pad)
+        super().resizeEvent(a0)
+
+    def closeEvent(self, a0: Any) -> None:
+        with suppress(AttributeError):
+            del self._canvas_widget
+        super().closeEvent(a0)
 
 
 class QtArrayView(ArrayView):
@@ -460,3 +500,6 @@ class QtArrayView(ArrayView):
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
+
+    def set_progress_spinner_visible(self, visible: bool) -> None:
+        self._qwidget._progress_spinner.setVisible(visible)
