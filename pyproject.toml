@@ -33,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -170,7 +171,7 @@ filterwarnings = [
     # CI-only error on jupyter, vispy, macos
     "ignore:.*Failed to find a suitable pixel format",
     # unsolved python 3.10 warning on shutdown, either xarray or dask
-    "ignore:unclosed transport:ResourceWarning", 
+    "ignore:unclosed transport:ResourceWarning",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
