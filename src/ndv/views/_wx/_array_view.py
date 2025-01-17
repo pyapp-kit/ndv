@@ -239,7 +239,7 @@ class _WxArrayViewer(wx.Frame):
         # Reset zoom button
         self.reset_zoom_btn = wx.Button(self, label="Reset Zoom")
 
-        # Reset zoom button
+        # 3d view button
         self.ndims_btn = wx.ToggleButton(self, label="3D")
 
         # LUT layout (simple vertical grouping for LUT widgets)
