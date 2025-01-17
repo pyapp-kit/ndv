@@ -5,35 +5,36 @@ document.addEventListener("DOMContentLoaded", () => {
     Frontend: ["PyQt6", "PySide6", "wxPython", "Jupyter"],
   };
 
-  const condaVispy = "vispy pyopengl";
-  const condaJupyter = "jupyter jupyter_rfb glfw ipywidgets";
+  const pipCommand = 'pip install'
+  const condaCommand = 'conda install -c conda-forge'
+  const gitCommand = 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg'
+  const condaVispy = 'vispy pyopengl';
+  const condaJupyter = 'jupyter jupyter-rfb pyglfw ipywidgets';
   const commandMap = {
-    "PyPI,VisPy,PyQt6": 'pip install "ndv[vispy,pyqt]"',
-    "PyPI,VisPy,PySide6": 'pip install "ndv[vispy,pyside]"',
-    "PyPI,VisPy,wxPython": 'pip install "ndv[vispy,wxpython]"',
-    "PyPI,VisPy,Jupyter": 'pip install "ndv[vispy,jupyter]"',
-    "PyPI,Pygfx,PyQt6": 'pip install "ndv[pygfx,pyqt]"',
-    "PyPI,Pygfx,PySide6": 'pip install "ndv[pygfx,pyside]"',
-    "PyPI,Pygfx,wxPython": 'pip install "ndv[pygfx,wxpython]"',
-    "PyPI,Pygfx,Jupyter": 'pip install "ndv[pygfx,jupyter]"',
-    "Conda,VisPy,PyQt6": `conda install -c conda-forge ndv ${condaVispy} qt6-main`,
-    "Conda,VisPy,PySide6": `conda install -c conda-forge ndv ${condaVispy} 'pyside6<6.8'`,
-    "Conda,VisPy,wxPython": `conda install -c conda-forge ndv ${condaVispy} wxpython`,
-    "Conda,VisPy,Jupyter": `conda install -c conda-forge ndv ${condaVispy} ${condaJupyter}`,
-    "Conda,Pygfx,PyQt6": "conda install -c conda-forge ndv pygfx qt6-main",
-    "Conda,Pygfx,PySide6": "conda install -c conda-forge ndv pygfx 'pyside6<6.8'",
-    "Conda,Pygfx,wxPython": "conda install -c conda-forge ndv pygfx wxpython",
-    "Conda,Pygfx,Jupyter": `conda install -c conda-forge ndv pygfx ${condaJupyter}`,
-    "Github (dev version),VisPy,PyQt6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,pyqt]"',
-    "Github (dev version),VisPy,PySide6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,pyside]"',
-    "Github (dev version),VisPy,wxPython": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,wx]"',
-    "Github (dev version),VisPy,Jupyter":
-      'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[vispy,jupyter]"',
-    "Github (dev version),Pygfx,PyQt6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,pyqt]"',
-    "Github (dev version),Pygfx,PySide6": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,pyside]"',
-    "Github (dev version),Pygfx,wxPython": 'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,wx]"',
-    "Github (dev version),Pygfx,Jupyter":
-      'pip install "git+https://github.com/pyapp-kit/ndv.git@main#egg=ndv[pygfx,jupyter]"',
+    "PyPI,VisPy,PyQt6": `${pipCommand} "ndv[vispy,pyqt]"`,
+    "PyPI,VisPy,PySide6": `${pipCommand} "ndv[vispy,pyside]"`,
+    "PyPI,VisPy,wxPython": `${pipCommand} "ndv[vispy,wxpython]"`,
+    "PyPI,VisPy,Jupyter": `${pipCommand} "ndv[vispy,jupyter]"`,
+    "PyPI,Pygfx,PyQt6": `${pipCommand} "ndv[pygfx,pyqt]"`,
+    "PyPI,Pygfx,PySide6": `${pipCommand} "ndv[pygfx,pyside]"`,
+    "PyPI,Pygfx,wxPython": `${pipCommand} "ndv[pygfx,wxpython]"`,
+    "PyPI,Pygfx,Jupyter": `${pipCommand} "ndv[pygfx,jupyter]"`,
+    "Conda,VisPy,PyQt6": `${condaCommand} ndv ${condaVispy} qt6-main`,
+    "Conda,VisPy,PySide6": `${condaCommand} ndv ${condaVispy} 'pyside6<6.8'`,
+    "Conda,VisPy,wxPython": `${condaCommand} ndv ${condaVispy} wxpython`,
+    "Conda,VisPy,Jupyter": `${condaCommand} ndv ${condaVispy} ${condaJupyter}`,
+    "Conda,Pygfx,PyQt6": `${condaCommand} ndv pygfx qt6-main`,
+    "Conda,Pygfx,PySide6": `${condaCommand} ndv pygfx 'pyside6<6.8'`,
+    "Conda,Pygfx,wxPython": `${condaCommand} ndv pygfx wxpython`,
+    "Conda,Pygfx,Jupyter": `${condaCommand} ndv pygfx ${condaJupyter}`,
+    "Github (dev version),VisPy,PyQt6": `${gitCommand}=ndv[vispy,pyqt]"`,
+    "Github (dev version),VisPy,PySide6": `${gitCommand}=ndv[vispy,pyside]"`,
+    "Github (dev version),VisPy,wxPython": `${gitCommand}=ndv[vispy,wx]"`,
+    "Github (dev version),VisPy,Jupyter": `${gitCommand}=ndv[vispy,jupyter]"`,
+    "Github (dev version),Pygfx,PyQt6": `${gitCommand}=ndv[pygfx,pyqt]"`,
+    "Github (dev version),Pygfx,PySide6": `${gitCommand}=ndv[pygfx,pyside]"`,
+    "Github (dev version),Pygfx,wxPython": `${gitCommand}=ndv[pygfx,wx]"`,
+    "Github (dev version),Pygfx,Jupyter": `${gitCommand}=ndv[pygfx,jupyter]"`,
   };
 
   const container = document.getElementById("install-table");
