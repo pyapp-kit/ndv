@@ -10,8 +10,8 @@ import pygfx
 import pylinalg as la
 
 from ndv._types import CursorType, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
-from ndv.views.bases import HistogramCanvas
 from ndv.views._app import filter_mouse_events
+from ndv.views.bases import HistogramCanvas
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -82,9 +82,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self.margin_right = 10
         self.margin_top = 15
 
-        # ------------ VisPy Canvas ------------ #
+        # ------------ PyGFX Canvas ------------ #
         cls = get_canvas_class()
-        self._canvas = cls(size=(600, 600))
+        self._size = (600, 600)
+        self._canvas = cls(size=self._size)
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
@@ -164,6 +165,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             self._canvas.update()
         self._canvas.request_draw(self._animate)
 
+    def close(self) -> None:
+        self._disconnect_mouse_events()
+        self._canvas.close()
+
     def _resize(self) -> None:
         # Construct the bounding box
         bb = np.zeros([2, 2])
@@ -228,6 +233,12 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._y.min_tick_distance = bb[1, 1]  # Prevents any other ticks
 
     def _animate(self) -> None:
+        # Dynamically rescale the graph when canvas size changes
+        rect = self._viewport.logical_size
+        if rect != self._size:
+            self._size = rect
+            self._resize()
+
         self._x.update(self._camera, self._viewport.logical_size)
         self._y.update(self._camera, self._viewport.logical_size)
 
