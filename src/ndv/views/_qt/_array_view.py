@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -110,6 +111,14 @@ class _QSpinner(QLabel):
         effect = QGraphicsOpacityEffect(self)
         effect.setOpacity(0.6)
         self.setGraphicsEffect(effect)
+
+
+class _DimToggleButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        icn = QIconifyIcon("f7:view-2d", color="#333333")
+        icn.addKey("f7:view-3d")
+        super().__init__(icn, "", parent)
+        self.setCheckable(True)
 
 
 class _QLUTWidget(QWidget):
@@ -330,8 +339,11 @@ class _QArrayViewer(QWidget):
         self._btn_layout.setParent(None)
         self.luts.expand()
 
+        # button to change number of displayed dimensions
+        self.ndims_btn = _DimToggleButton(self)
+
         self._btn_layout.addWidget(self.channel_mode_combo)
-        # self._btns.addWidget(self._ndims_btn)
+        self._btn_layout.addWidget(self.ndims_btn)
         self._btn_layout.addWidget(self.histogram_btn)
         self._btn_layout.addWidget(self.set_range_btn)
         # self._btns.addWidget(self._add_roi_btn)
@@ -377,7 +389,10 @@ class _QArrayViewer(QWidget):
 
 
 class QtArrayView(ArrayView):
-    def __init__(self, canvas_widget: QWidget) -> None:
+    def __init__(
+        self, canvas_widget: QWidget, data_model: _ArrayDataDisplayModel
+    ) -> None:
+        self._data_model = data_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
 
@@ -387,6 +402,9 @@ class QtArrayView(ArrayView):
             self._on_channel_mode_changed
         )
         qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit)
+        qwdg.ndims_btn.toggled.connect(self._on_ndims_toggled)
+
+        self._visible_axes: Sequence[AxisKey] = []
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()
@@ -437,6 +455,30 @@ class QtArrayView(ArrayView):
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         """Set the current value of the sliders."""
         self._qwidget.dims_sliders.set_current_index(value)
+
+    def _on_ndims_toggled(self, is_3d: bool) -> None:
+        if len(self._visible_axes) > 2:
+            if not is_3d:  # is now 2D
+                self._visible_axes = self._visible_axes[-2:]
+        else:
+            z_ax = None
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            if z_ax is None:
+                # get the last slider that is not in visible axes
+                sld = reversed(self._qwidget.dims_sliders._sliders)
+                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
+            self._visible_axes = (z_ax, *self._visible_axes)
+        # TODO: a future PR may decide to set this on the model directly...
+        # since we now have access to it.
+        self.visibleAxesChanged.emit()
+
+    def visible_axes(self) -> Sequence[AxisKey]:
+        return self._visible_axes  # no widget to control this yet
+
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
+        self._visible_axes = tuple(axes)
+        self._qwidget.ndims_btn.setChecked(len(axes) > 2)
 
     def set_data_info(self, text: str) -> None:
         """Set the data info text, above the canvas."""

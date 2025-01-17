@@ -38,7 +38,7 @@ DEBUG_EXCEPTIONS = "NDV_DEBUG_EXCEPTIONS"
 EXIT_ON_EXCEPTION = "NDV_EXIT_ON_EXCEPTION"
 """Whether to exit the application when an exception is raised. Default False."""
 
-IPYTHON_GUI_MAGIC = "NDV_IPYTHON_GUI_MAGIC"
+IPYTHON_GUI_MAGIC = "NDV_IPYTHON_MAGIC"
 """Whether to use %gui magic when running in IPython. Default True."""
 
 
@@ -141,7 +141,7 @@ class QtProvider(GuiProvider):
 
         if (qapp := QApplication.instance()) is None:
             # if we're running in IPython
-            # start the %gui qt magic if NDV_IPYTHON_GUI_MAGIC!=0
+            # start the %gui qt magic if NDV_IPYTHON_MAGIC!=0
             if (ipy_shell := _ipython_shell()) and (
                 os.getenv(IPYTHON_GUI_MAGIC, "true").lower() not in ("0", "false", "no")
             ):
@@ -252,7 +252,7 @@ class WxProvider(GuiProvider):
         if (wxapp := wx.App.Get()) is None:
             wxapp = wx.App()
         # if we're running in IPython
-        # start the %gui qt magic if NDV_IPYTHON_GUI_MAGIC!=0
+        # start the %gui qt magic if NDV_IPYTHON_MAGIC!=0
         if (ipy_shell := _ipython_shell()) and (
             os.getenv(IPYTHON_GUI_MAGIC, "true").lower() not in ("0", "false", "no")
         ):
@@ -651,13 +651,13 @@ def ndv_excepthook(
                 py_db.stop_on_unhandled_exception(py_db, thread, additional_info, arg)
             finally:
                 additional_info.is_tracing -= 1
-    elif os.getenv(DEBUG_EXCEPTIONS):
+    elif os.getenv(DEBUG_EXCEPTIONS) in ("1", "true", "True"):
         # Default to pdb if no better option is available
         import pdb
 
         pdb.post_mortem(tb)
 
-    if os.getenv(EXIT_ON_EXCEPTION):
+    if os.getenv(EXIT_ON_EXCEPTION) in ("1", "true", "True"):
         print(f"\n{EXIT_ON_EXCEPTION} is set, exiting.")
         sys.exit(1)
 

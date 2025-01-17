@@ -22,7 +22,7 @@ SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
 class DataRequest:
     """Request object for data slicing."""
 
-    wrapper: DataWrapper
+    wrapper: DataWrapper = field(repr=False)
     index: Mapping[int, Union[int, slice]]
     visible_axes: tuple[int, ...]
     channel_axis: Optional[int]
@@ -36,10 +36,13 @@ class DataResponse:
     """
 
     # mapping of channel_key -> data
+    n_visible_axes: int
     data: Mapping[Optional[int], np.ndarray] = field(repr=False)
     request: Optional[DataRequest] = None
 
 
+# NOTE: nobody particularly likes this class.  It does important stuff, but we're
+# not yet sure where this logic belongs.
 class _ArrayDataDisplayModel(NDVModel):
     """Utility class combining ArrayDisplayModel model with a DataWrapper.
 
@@ -162,14 +165,13 @@ class _ArrayDataDisplayModel(NDVModel):
             if isinstance(val, int):
                 requested_slice[ax] = slice(val, val + 1)
 
-        return [
-            DataRequest(
-                wrapper=self.data_wrapper,
-                index=requested_slice,
-                visible_axes=self.normed_visible_axes,
-                channel_axis=c_ax,
-            )
-        ]
+        request = DataRequest(
+            wrapper=self.data_wrapper,
+            index=requested_slice,
+            visible_axes=self.normed_visible_axes,
+            channel_axis=c_ax,
+        )
+        return [request]
 
     def request_sliced_data(
         self, asynchronous: bool = True
@@ -213,4 +215,4 @@ class _ArrayDataDisplayModel(NDVModel):
                 ch_data = data[ch_keepdims]
             data_response[i] = ch_data.transpose(*t_dims).squeeze()
 
-        return DataResponse(data=data_response, request=req)
+        return DataResponse(n_visible_axes=len(vis_ax), data=data_response, request=req)
