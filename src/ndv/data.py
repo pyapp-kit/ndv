@@ -138,6 +138,8 @@ def cosem_dataset(
                 "bucket": "janelia-cosem-datasets",
                 "path": uri,
             },
+            # 1GB cache... but i don't think it's working
+            "cache_pool": {"total_bytes_limit": 1e9},
         },
     ).result()
     ts_array = ts_array[ts.d[:].label["z", "y", "x"]]
