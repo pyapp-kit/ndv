@@ -80,7 +80,11 @@ class WxLutView(LutView):
 
     def _on_autoscale_changed(self, event: wx.CommandEvent) -> None:
         if self._model:
-            self._model.clims = ClimsMinMax()
+            if self._wxwidget.auto_clim.GetValue():
+                self._model.clims = ClimsMinMax()
+            else:  # Manually scale
+                clims = self._wxwidget.clims.GetValues()
+                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     # Public Methods
     def frontend_widget(self) -> wx.Window:

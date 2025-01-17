@@ -91,7 +91,11 @@ class JupyterLutView(LutView):
 
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
         if self._model and not self._updating:
-            self._model.clims = ClimsMinMax()
+            if change["new"]:  # Autoscale
+                self._model.clims = ClimsMinMax()
+            else:  # Manually scale
+                clims = self._clims.value
+                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     # ------------------ receive changes from the controller ---------------
 

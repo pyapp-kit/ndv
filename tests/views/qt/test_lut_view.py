@@ -3,7 +3,7 @@ from __future__ import annotations
 import cmap
 from pytest import fixture
 
-from ndv.models._lut_model import LUTModel
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views._app import QtProvider
 from ndv.views._qt._array_view import QLutView
 
@@ -32,10 +32,10 @@ def view(model: LUTModel) -> QLutView:
 def test_QLutView_update_model(model: LUTModel, view: QLutView) -> None:
     """Ensures the view updates when the model is changed."""
 
-    new_clims = (4, 5)
-    assert view._qwidget.clims.value() != new_clims
-    model.clims = new_clims
-    assert view._qwidget.clims.value() == new_clims
+    auto_scale = not model.clims.is_manual
+    assert view._qwidget.auto_clim.isChecked() == auto_scale
+    model.clims = ClimsManual(min=0, max=1) if auto_scale else ClimsMinMax()
+    assert view._qwidget.auto_clim.isChecked() != auto_scale
 
     new_visible = not model.visible
     model.visible = new_visible
@@ -46,18 +46,9 @@ def test_QLutView_update_model(model: LUTModel, view: QLutView) -> None:
     model.cmap = new_cmap
     assert view._qwidget.cmap.currentColormap() == new_cmap
 
-    new_autoscale = not model.autoscale
-    model.autoscale = new_autoscale
-    assert view._qwidget.auto_clim.isChecked() == new_autoscale
-
 
 def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     """Ensures the model updates when the view is changed."""
-
-    new_clims = (5, 6)
-    assert model.clims != new_clims
-    view._qwidget.clims.setValue(new_clims)
-    assert model.clims == new_clims
 
     new_visible = not model.visible
     view._qwidget.visible.setChecked(new_visible)
@@ -69,11 +60,16 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     view._qwidget.cmap.setCurrentIndex(1)
     assert model.cmap == new_cmap
 
-    new_autoscale = not model.autoscale
-    view._qwidget.auto_clim.setChecked(new_autoscale)
-    assert model.autoscale == new_autoscale
+    mi, ma = view._qwidget.clims.value()
+    new_clims = (
+        ClimsManual(min=mi, max=ma)
+        if view._qwidget.auto_clim.isChecked()
+        else ClimsMinMax()
+    )
+    view._qwidget.auto_clim.setChecked(not new_clims.is_manual)
+    assert model.clims == new_clims
 
     # When gui clims change, autoscale should be disabled
-    model.autoscale = True
+    model.clims = ClimsMinMax()
     view._qwidget.clims.setValue((0, 1))
-    assert model.autoscale is False
+    assert model.clims == ClimsManual(min=0, max=1)  #  type:ignore
