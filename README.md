@@ -94,18 +94,3 @@ pip install ndv[jup]
 
 For more information, and complete API reference, see the
 [documentation](https://pyapp-kit.github.io/ndv/).
-
-## Motivation
-
-This package arose from the need for a way to *quickly* view multi-dimensional
-arrays with zero tolerance for long import times and/or excessive dependency
-lists. I want something that I can use to view any of the many multi-dimensional
-array types, out of the box, with no assumptions about dimensionality. I want it
-to work reasonably well with remote, asynchronously loaded data. I also want it
-to take advantage of things like named dimensions and categorical coordinate
-values when available. For now, it's a Qt-only widget, since that's where the
-need arose, but I can imagine a jupyter widget in the future (likely as a remote
-frame buffer for vispy/pygfx).
-
-I do not intend for this to grow into full-fledged application, or wrap a
-complete scene graph, though point and ROI selection would be welcome additions.
