@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from itertools import cycle
 from typing import TYPE_CHECKING, Literal, cast
@@ -298,9 +299,9 @@ class NDViewer(QWidget):
 
         # store the data
         self._data_wrapper = DataWrapper.create(data)
-
         # set channel axis
-        self._channel_axis = self._data_wrapper.guess_channel_axis()
+        if self._channel_axis is None:
+            self._channel_axis = self._data_wrapper.guess_channel_axis()
 
         # update the dimensions we are visualizing
         sizes = self._data_wrapper.sizes()
@@ -546,6 +547,10 @@ class NDViewer(QWidget):
         self._last_future = None
         self._progress_spinner.hide()
         if future.cancelled():
+            return
+
+        if exc := future.exception():
+            logging.error(f"Error getting data: {exc}")
             return
 
         for idx, datum in future.result():
