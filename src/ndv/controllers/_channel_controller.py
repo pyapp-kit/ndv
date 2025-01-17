@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from ndv.models._lut_model import LUTModel
     from ndv.views.bases import LutView
-    from ndv.views.bases.graphics._canvas_elements import ImageHandle
+    from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
     LutKey = int | None
 
@@ -30,8 +30,10 @@ class ChannelController:
         self.key = key
         self.lut_views: list[LutView] = []
         self.lut_model = lut_model
-        self.lut_model.events.autoscale.connect(self._auto_scale)
+        self.lut_model.events.clims.connect(self._auto_scale)
         self.handles: list[ImageHandle] = []
+        self.clims: tuple[float, float] = (0, 1)
+
         for v in views:
             self.add_lut_view(v)
 
@@ -55,22 +57,15 @@ class ChannelController:
         # for multiple handles, we'll just update the first one
         if not (handles := self.handles):
             return
-        handles[0].set_data(data)
-        # if this image handle is visible and autoscale is on, then we need
-        # to update the clim values
+        handle = handles[0]
+        handle.set_data(data)
         self._auto_scale()
-        # if self.lut_model.autoscale:
-        #     self.lut_model.clims = (data.min(), data.max())
-        # lut_view.setClims((data.min(), data.max()))
-        # technically... the LutView may also emit a signal that the
-        # controller listens to, and then updates the image handle
-        # but this next line is more direct
-        # self._handles[None].clim = (data.min(), data.max())
 
     def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""
         self.handles.append(handle)
         self.add_lut_view(handle)
+        self._auto_scale()
 
     def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
         """Get the value of the data at the given index."""
@@ -90,8 +85,13 @@ class ChannelController:
         return None
 
     def _auto_scale(self) -> None:
-        if self.lut_model.autoscale and len(self.handles):
-            self.lut_model.clims = (
-                min([handle.data().min() for handle in self.handles]),
-                max([handle.data().max() for handle in self.handles]),
-            )
+        if self.lut_model and len(self.handles):
+            policy = self.lut_model.clims
+            handle_clims = [policy.calc_clims(handle.data()) for handle in self.handles]
+            mi, ma = handle_clims[0]
+            for clims in handle_clims[1:]:
+                mi = min(mi, clims[0])
+                ma = max(ma, clims[1])
+
+            for view in self.lut_views:
+                view.set_clims((mi, ma))

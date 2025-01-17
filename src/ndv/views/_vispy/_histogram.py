@@ -7,6 +7,7 @@ import numpy as np
 from vispy import scene
 
 from ndv._types import CursorType
+from ndv.models._lut_model import ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
@@ -318,7 +319,7 @@ class VispyHistogramCanvas(HistogramCanvas):
             elif self._grabbed is Grabbable.RIGHT_CLIM:
                 newlims = (self._clims[0], max(self._clims[0], c))
             if self.model:
-                self.model.clims = newlims
+                self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
         if self._grabbed is Grabbable.GAMMA:

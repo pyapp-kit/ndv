@@ -68,7 +68,7 @@ class ImageHandle(CanvasElement, LutView):
     @abstractmethod
     def set_data(self, data: np.ndarray) -> None: ...
     @abstractmethod
-    def clim(self) -> Any: ...
+    def clims(self) -> tuple[float, float]: ...
     @abstractmethod
     def set_clims(self, clims: tuple[float, float]) -> None: ...
     @abstractmethod
@@ -91,9 +91,11 @@ class ImageHandle(CanvasElement, LutView):
         pass
 
     def set_auto_scale(self, checked: bool) -> None:
-        if checked and self.model:
-            d = self.data()
-            self.model.clims = (d.min(), d.max())
+        pass
+
+    #     if checked and self.model:
+    #         d = self.data()
+    #         self.model.clims = (d.min(), d.max())
 
     def set_channel_visible(self, visible: bool) -> None:
         self.set_visible(visible)

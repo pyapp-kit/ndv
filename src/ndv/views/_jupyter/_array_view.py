@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 import ipywidgets as widgets
 
 from ndv.models._array_display_model import ChannelMode
+from ndv.models._lut_model import ClimsManual, ClimsMinMax
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -76,8 +78,8 @@ class JupyterLutView(LutView):
 
     def _on_clims_changed(self, change: dict[str, Any]) -> None:
         if self._model and not self._updating:
-            self._model.clims = self._clims.value
-            self._model.autoscale = False
+            clims = self._clims.value
+            self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_visible_changed(self, change: dict[str, Any]) -> None:
         if self._model and not self._updating:
@@ -89,7 +91,7 @@ class JupyterLutView(LutView):
 
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
         if self._model and not self._updating:
-            self._model.autoscale = self._auto_clim.value
+            self._model.clims = ClimsMinMax()
 
     # ------------------ receive changes from the controller ---------------
 
@@ -135,10 +137,14 @@ class JupyterLutView(LutView):
 
 class JupyterArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: _jupyter_rfb.CanvasBackend, **kwargs: Any
+        self,
+        canvas_widget: _jupyter_rfb.CanvasBackend,
+        data_model: _ArrayDataDisplayModel,
     ) -> None:
         # WIDGETS
+        self._data_model = data_model
         self._canvas_widget = canvas_widget
+        self._visible_axes: Sequence[AxisKey] = []
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
@@ -156,6 +162,16 @@ class JupyterArrayView(ArrayView):
         self._channel_mode_combo.layout.align_self = "flex-end"
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
+        self._ndims_btn = widgets.ToggleButton(
+            value=False,
+            description="3D",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="View in 3D",
+            icon="check",
+            layout=widgets.Layout(width="60px"),
+        )
+        self._ndims_btn.observe(self._on_ndims_toggled, names="value")
+
         # LAYOUT
 
         try:
@@ -163,6 +179,11 @@ class JupyterArrayView(ArrayView):
             width = f"{int(width) + 4}px"
         except Exception:
             width = "604px"
+
+        btns = widgets.HBox(
+            [self._channel_mode_combo, self._ndims_btn],
+            layout=widgets.Layout(justify_content="flex-end"),
+        )
         self.layout = widgets.VBox(
             [
                 self._data_info_label,
@@ -170,7 +191,7 @@ class JupyterArrayView(ArrayView):
                 self._hover_info_label,
                 self._slider_box,
                 self._luts_box,
-                self._channel_mode_combo,
+                btns,
             ],
             layout=widgets.Layout(width=width),
         )
@@ -288,6 +309,31 @@ class JupyterArrayView(ArrayView):
             display.display(self.layout)  # type: ignore [no-untyped-call]
         else:
             display.clear_output()  # type: ignore [no-untyped-call]
+
+    def visible_axes(self) -> Sequence[AxisKey]:
+        return self._visible_axes
+
+    def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
+        self._visible_axes = tuple(axes)
+        self._ndims_btn.value = len(axes) == 3
+
+    def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
+        if len(self._visible_axes) > 2:
+            if not change["new"]:  # is now 2D
+                self._visible_axes = self._visible_axes[-2:]
+        else:
+            z_ax = None
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            if z_ax is None:
+                # get the last slider that is not in visible axes
+                z_ax = next(
+                    ax for ax in reversed(self._sliders) if ax not in self._visible_axes
+                )
+            self._visible_axes = (z_ax, *self._visible_axes)
+        # TODO: a future PR may decide to set this on the model directly...
+        # since we now have access to it.
+        self.visibleAxesChanged.emit()
 
     def close(self) -> None:
         self.layout.close()

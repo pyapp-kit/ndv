@@ -59,7 +59,6 @@ class LutView(Viewable):
     def model(self, model: LUTModel | None) -> None:
         # Disconnect old model
         if self._model is not None:
-            self._model.events.autoscale.disconnect(self.set_auto_scale)
             self._model.events.clims.disconnect(self.set_clims)
             self._model.events.cmap.disconnect(self.set_colormap)
             self._model.events.gamma.disconnect(self.set_gamma)
@@ -68,7 +67,6 @@ class LutView(Viewable):
         # Connect new model
         self._model = model
         if self._model is not None:
-            self._model.events.autoscale.connect(self.set_auto_scale)
             self._model.events.clims.connect(self.set_clims)
             self._model.events.cmap.connect(self.set_colormap)
             self._model.events.gamma.connect(self.set_gamma)
@@ -79,9 +77,7 @@ class LutView(Viewable):
     def synchronize(self) -> None:
         """Aligns the view against the backing model."""
         if model := self._model:
-            self.set_auto_scale(bool(model.autoscale))
-            if model.clims:
-                self.set_clims(model.clims)
+            self.set_auto_scale(not model.clims.is_manual)
             self.set_colormap(model.cmap)
             self.set_gamma(model.gamma)
             self.set_channel_visible(model.visible)
