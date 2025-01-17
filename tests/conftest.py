@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from ndv.views import gui_frontend
-from ndv.views._app import GuiFrontend
+from ndv.views._app import GUI_ENV_VAR, GuiFrontend
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -53,7 +53,7 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
         # if we don't find any frontend, and jupyter is available, use that
         # since it requires very little setup
         if importlib.util.find_spec("jupyter"):
-            os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+            os.environ[GUI_ENV_VAR] = "jupyter"
             gui_frontend.cache_clear()
 
         frontend = gui_frontend()

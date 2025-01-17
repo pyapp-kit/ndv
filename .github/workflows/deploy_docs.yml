@@ -52,5 +52,5 @@ jobs:
         env:
           DOCS_DEV: true
 
-      - name: Update default release docs
-        run: mike set-default --push latest
+      # - name: Update default release docs
+      #   run: mike set-default --push latest
