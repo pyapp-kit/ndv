@@ -99,7 +99,7 @@ jobs:
 
       - name: ⬇️🧪 Test minimum stated dependencies
         run: |
-          uv pip install '.[${{ matrix.gui }},${{ matrix.canvas }}]' --resolution lowest-direct -U
+          uv pip install '.[${{ matrix.gui }},${{ matrix.canvas }}]' --resolution lowest-direct -U --only-binary numpy
           uv run pytest -v --color yes tests
 
       - uses: codecov/codecov-action@v5
