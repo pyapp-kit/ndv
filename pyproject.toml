@@ -38,7 +38,7 @@ classifiers = [
 ]
 dependencies = [
     "cmap >=0.3",
-    "numpy >=1.22",
+    "numpy >=1.23",
     "psygnal >=0.10",
     "pydantic >=2.9",
     "typing_extensions",
@@ -47,7 +47,7 @@ dependencies = [
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
-jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw"]
+jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw >=2.4"]
 pyqt = ["pyqt6 >=6.4,!=6.6", "qtpy >=2", "superqt[iconify] >=0.7.1"]
 pyside = [
     # defer to superqt's pyside6 restrictions
@@ -60,15 +60,15 @@ pyside = [
 wxpython = ["wxpython"]
 
 # Supported Canavs backends
-vispy = ["vispy>=0.14.3", "pyopengl"]
+vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
 pygfx = ["pygfx>=0.6.0"]
 
 # ready to go bundles with vispy
-qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
-jup = ["ndv[vispy,jupyter]", "imageio[tifffile]"]
-wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
+qt = ["ndv[vispy,pyqt]", "imageio[tifffile] >=2.20"]
+jup = ["ndv[vispy,jupyter]", "imageio[tifffile] >=2.20"]
+wx = ["ndv[vispy,wxpython]", "imageio[tifffile] >=2.20"]
 
-test = ["imageio[tifffile]", "pytest-cov", "pytest"]
+test = ["imageio[tifffile] >=2.20", "pytest-cov >=6", "pytest >=8"]
 docs = [
     "mkdocs-gen-files==0.5.0",
     "mkdocs-literate-nav==0.6.1",
