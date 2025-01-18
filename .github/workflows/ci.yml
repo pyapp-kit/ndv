@@ -70,20 +70,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
+        run: uv pip install '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
 
       - uses: pyvista/setup-headless-display-action@v3
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
+
+      - name: install pytest-qt
+        if: matrix.gui == 'pyside' || matrix.gui == 'pyqt'
+        run: uv pip install pytest-qt
 
       - name: Install llvmpipe and lavapipe for offscreen canvas
         if: matrix.os == 'ubuntu-latest' && matrix.canvas == 'pygfx'
@@ -91,13 +94,13 @@ jobs:
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
-      - name: install pytest-qt
-        if: matrix.gui == 'pyside' || matrix.gui == 'pyqt'
-        run: pip install pytest-qt
-
       - name: 🧪 Test
+        run: pytest --cov --cov-report=xml -v --color yes tests
+
+      - name: ⬇️🧪 Test minimum stated dependencies
         run: |
-          pytest --cov --cov-report=xml -v --color yes tests
+          uv pip install '.[test,${{ matrix.gui }},${{ matrix.canvas }}]' --resolution lowest-direct -U
+          pytest -v --color yes tests
 
       - uses: codecov/codecov-action@v5
         with:
