@@ -78,7 +78,7 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
 
       - name: 📦 Install dependencies
-        run: uv pip install '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
+        run: uv pip install -e '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
 
       - uses: pyvista/setup-headless-display-action@v3
         with:
@@ -97,7 +97,7 @@ jobs:
       - name: 🧪 Test
         run: uv run pytest --cov --cov-report=xml -v --color yes tests
 
-      - name: ⬇️🧪 Test minimum stated dependencies
+      - name: ⬇️🧪 Test with minimum stated dependencies
         run: |
           uv pip install '.[${{ matrix.gui }},${{ matrix.canvas }}]' --resolution lowest-direct -U --only-binary numpy
           uv run pytest -v --color yes tests -W ignore
