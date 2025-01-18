@@ -48,7 +48,12 @@ dependencies = [
 [project.optional-dependencies]
 # Supported GUI frontends
 jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw >=2.4"]
-pyqt = ["pyqt6 >=6.4,!=6.6", "qtpy >=2", "superqt[iconify] >=0.7.1"]
+pyqt = [
+    "pyqt6 >=6.4,!=6.6",
+    "pyqt6 >=6.5.3; python_version >= '3.10'",
+    "qtpy >=2",
+    "superqt[iconify] >=0.7.1",
+]
 pyside = [
     # defer to superqt's pyside6 restrictions
     "superqt[iconify,pyside6] >=0.7.1",
@@ -178,7 +183,7 @@ filterwarnings = [
     "ignore:.*Failed to find a suitable pixel format",
     # unsolved python 3.10 warning on shutdown, either xarray or dask
     "ignore:unclosed transport:ResourceWarning",
-    "ignore:Jupyter is migrating its paths"
+    "ignore:Jupyter is migrating its paths",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
