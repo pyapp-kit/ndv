@@ -95,12 +95,12 @@ jobs:
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
       - name: 🧪 Test
-        run: pytest --cov --cov-report=xml -v --color yes tests
+        run: uv run pytest --cov --cov-report=xml -v --color yes tests
 
       - name: ⬇️🧪 Test minimum stated dependencies
         run: |
           uv pip install '.[test,${{ matrix.gui }},${{ matrix.canvas }}]' --resolution lowest-direct -U
-          pytest -v --color yes tests
+          uv run pytest -v --color yes tests
 
       - uses: codecov/codecov-action@v5
         with:
