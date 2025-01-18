@@ -43,6 +43,7 @@ jobs:
           - os: macos-latest
             gui: wxpython
             python-version: "3.10"
+
         include:
           # test a couple more python variants, without
           # full os/gui/canvas matrix coverage
@@ -59,6 +60,14 @@ jobs:
             python-version: "3.9"
             gui: pyqt
             canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.11"
+            gui: pyqt
+            canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.13"
+            gui: pyqt
+            canvas: pygfx
           - os: macos-13
             gui: wxpython
             python-version: "3.9"
