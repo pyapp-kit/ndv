@@ -60,6 +60,7 @@ pyside = [
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
     "pyside6 >=6.4",
+    "pyside6 >=6.5.3; python_version >= '3.12'",
     "qtpy >=2",
 ]
 wxpython = ["wxpython"]
