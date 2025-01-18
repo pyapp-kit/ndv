@@ -49,9 +49,14 @@ dependencies = [
 # Supported GUI frontends
 jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw"]
 pyqt = ["pyqt6 >=6.4,!=6.6", "qtpy >=2", "superqt[iconify] >=0.7.1"]
-# for pyside, superqt has the most issues, so we defer to
-# superqt's pyside6 restrictions, but minimally require pyside6>6.4
-pyside = ["superqt[pyside6] >=0.7.1", "pyside6 >=6.4", "qtpy >=2"]
+pyside = [
+    # defer to superqt's pyside6 restrictions
+    "superqt[iconify,pyside6] >=0.7.1",
+    # https://github.com/pyapp-kit/ndv/issues/59
+    "pyside6 ==6.6.3; sys_platform == 'win32'",
+    "pyside6 >=6.4",
+    "qtpy >=2",
+]
 wxpython = ["wxpython"]
 
 # Supported Canavs backends
