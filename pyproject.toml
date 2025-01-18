@@ -48,9 +48,10 @@ dependencies = [
 [project.optional-dependencies]
 # Supported GUI frontends
 jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw"]
-qtextras = ["qtpy >=2", "superqt[iconify]>=0.7.1"]
-pyqt = ["pyqt6", "ndv[qtextras]"]
-pyside = ["pyside6<6.8", "ndv[qtextras]"]
+pyqt = ["pyqt6 >=6.4,!=6.6", "qtpy >=2", "superqt[iconify] >=0.7.1"]
+# for pyside, superqt has the most issues, so we defer to
+# superqt's pyside6 restrictions, but minimally require pyside6>6.4
+pyside = ["superqt[pyside6] >=0.7.1", "pyside6 >=6.4", "qtpy >=2"]
 wxpython = ["wxpython"]
 
 # Supported Canavs backends
