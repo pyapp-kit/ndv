@@ -178,6 +178,7 @@ filterwarnings = [
     "ignore:.*Failed to find a suitable pixel format",
     # unsolved python 3.10 warning on shutdown, either xarray or dask
     "ignore:unclosed transport:ResourceWarning",
+    "ignore:Jupyter is migrating its paths"
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
