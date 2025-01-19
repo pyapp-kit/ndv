@@ -99,7 +99,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
-        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas, show_fps=True)
+        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
 
         try:
             # requires https://github.com/pygfx/pygfx/pull/752
