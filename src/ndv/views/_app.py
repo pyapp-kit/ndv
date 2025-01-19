@@ -96,8 +96,10 @@ class VispyProvider(CanvasProvider):
             use_app("jupyter_rfb")
         elif _frontend == GuiFrontend.WX:
             use_app("wx")
-        # there is no `use_app('qt')`... it's all specific to pyqt/pyside, etc...
-        # so we just let vispy autodetect it
+        elif _frontend == GuiFrontend.QT:
+            from qtpy import API_NAME
+
+            use_app(API_NAME.lower())
 
         return VispyArrayCanvas
 
@@ -144,7 +146,8 @@ CANVAS_PROVIDERS: dict[CanvasBackend, CanvasProvider] = {
 }
 
 
-def running_apps() -> Iterator[GuiFrontend]:
+def _running_apps() -> Iterator[GuiFrontend]:
+    """Return an iterator of running GUI applications."""
     for mod_name in ("PyQt5", "PySide2", "PySide6", "PyQt6"):
         if mod := sys.modules.get(f"{mod_name}.QtWidgets"):
             if (
@@ -175,7 +178,7 @@ def ndv_app() -> NDVApp:
     known GUI providers are tried in order until one is found that is either already
     running, or available.
     """
-    running = list(running_apps())
+    running = list(_running_apps())
 
     requested = os.getenv(GUI_ENV_VAR, "").lower()
     valid = {x.value for x in GuiFrontend}

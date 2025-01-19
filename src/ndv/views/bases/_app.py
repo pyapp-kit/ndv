@@ -31,28 +31,33 @@ class NDVApp:
     # must be valid key for %gui <magic> in IPython
     IPY_MAGIC_KEY: ClassVar[Literal["qt", "wx", None]] = None
 
-    def create_app(self) -> bool:
+    def create_app(self) -> Any:
+        """Create the application instance, if not already created."""
         raise NotImplementedError
 
     def array_view_class(self) -> type[ArrayView]:
         raise NotImplementedError
 
     def run(self) -> None:
+        """Run the application."""
         pass
 
     def filter_mouse_events(
         self, canvas: Any, receiver: Mouseable
     ) -> Callable[[], None]:
+        """Install mouse event filter on `canvas`, redirecting events to `receiver`."""
         raise NotImplementedError
 
     def call_in_main_thread(
         self, func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
     ) -> Future[T]:
+        """Call `func` in the main gui thread."""
         future: Future[T] = Future()
         future.set_result(func(*args, **kwargs))
         return future
 
     def get_executor(self) -> Executor:
+        """Return an executor for running tasks in the background."""
         return _thread_pool_executor()
 
     @staticmethod
