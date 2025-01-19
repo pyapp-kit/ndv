@@ -205,3 +205,25 @@ def test_array_viewer_with_app() -> None:
     if gui_frontend() != _app.GuiFrontend.WX:
         visax_mock.assert_called_once()
         assert viewer.display_model.visible_axes == (0, -2, -1)
+
+
+@pytest.mark.usefixtures("any_app")
+def test_array_viewer_histogram() -> None:
+    """Mostly a smoke test for basic functionality of histogram backends."""
+    viewer = ArrayViewer()
+    viewer.show()
+    viewer._add_histogram()
+    assert viewer._histogram is not None
+
+    # change views
+    if "pygfx" not in type(viewer._histogram).__name__.lower():
+        viewer._histogram.set_vertical(True)
+        viewer._histogram.set_log_base(10)
+
+    # update data
+    np.random.seed(0)
+    maxval = 2**16 - 1
+    data = np.random.randint(0, maxval, (1000,), dtype="uint16")
+    counts = np.bincount(data.flatten(), minlength=maxval + 1)
+    bin_edges = np.arange(maxval + 2) - 0.5
+    viewer._histogram.set_data(counts, bin_edges)
