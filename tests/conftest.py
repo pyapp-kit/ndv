@@ -33,12 +33,17 @@ def asyncio_app() -> Iterator[AbstractEventLoop]:
     loop.close()
 
 
+_WX_APP: wx.App | None = None
+
+
 @pytest.fixture
 def wxapp() -> Iterator[wx.App]:
-    import wx
+    global _WX_APP
+    if _WX_APP is None:
+        import wx
 
-    app = wx.App()
-    yield app
+        _WX_APP = wx.App()
+    yield _WX_APP
     # app.ExitMainLoop()
 
 
