@@ -157,7 +157,7 @@ jobs:
           python -m pip install pytest-codspeed
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v2
+        uses: CodSpeedHQ/action@v3
         with:
           run: pytest --codspeed -v --color=yes
 
