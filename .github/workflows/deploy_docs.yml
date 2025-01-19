@@ -1,0 +1,56 @@
+name: Publish release documentation
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.repository == 'pyapp-kit/ndv'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+
+      - name: Install mkdocs and mike
+        run: pip install '.[docs]'
+
+      - name: Config git
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git fetch origin gh-pages --depth=1
+
+      - name: Deploy release docs
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          VERSION=$(git describe --abbrev=0 --tags)
+          # check if rc or beta release
+          if [[ $VERSION == *"rc"* ]] || [[ $VERSION == *"beta"* ]]; then
+            export DOCS_PRERELEASE=true
+            echo "Deploying pre-release docs"
+            mike deploy --push --update-aliases $VERSION rc
+          else
+            echo "Deploying release docs"
+            mike deploy --push --update-aliases $VERSION latest
+          fi
+        env:
+          DOCS_DEV: false
+
+      - name: Deploy dev docs
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: mike deploy --push --update-aliases dev
+        env:
+          DOCS_DEV: true
+
+      # - name: Update default release docs
+      #   run: mike set-default --push latest

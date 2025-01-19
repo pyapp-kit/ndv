@@ -1,0 +1,157 @@
+site_name: "ndv"
+site_url: https://pyapp-kit.github.io/ndv/
+site_description: "minimal n-dimensional python array viewer."
+repo_name: "pyapp-kit/ndv"
+repo_url: https://github.com/pyapp-kit/ndv
+watch: [mkdocs.yml, README.md, src]
+
+# maximum strictness
+# https://www.mkdocs.org/user-guide/configuration/#validation
+strict: true
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - install.md
+  - motivation.md
+  - env_var.md
+  # This is populated by scripts/gen_ref_nav.py
+  - API reference: reference/
+
+theme:
+  name: material
+  custom_dir: docs/_overrides
+  icon:
+    logo: material/cube-scan
+    repo: fontawesome/brands/github
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.annotate
+    - navigation.indexes
+    - navigation.footer
+    - navigation.sections
+    - toc.follow
+
+extra_css:
+  - css/material.css
+  - css/ndv.css
+  - css/install-table.css
+
+extra_javascript:
+  - js/install-table.js
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.keys
+  - pymdownx.tilde
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.highlight:
+      pygments_lang_class: true
+      line_spans: __span
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - toc:
+      permalink: "#"
+
+plugins:
+  - autorefs
+  - search
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      cache_safe: true
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_nav.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - spellcheck:
+      backends:
+        - codespell:
+            dictionaries: [clear]
+  - mkdocstrings:
+      handlers:
+        python:
+          import:
+            - https://docs.python.org/3/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
+            - https://docs.pydantic.dev/latest/objects.inv
+            - https://cmap-docs.readthedocs.io/objects.inv
+            - https://psygnal.readthedocs.io/en/latest/objects.inv
+          options:
+            docstring_section_style: list
+            docstring_style: "numpy"
+            filters: ["!^_"]
+            heading_level: 1
+            inherited_members: true
+            merge_init_into_class: true
+            parameter_headings: true
+            preload_modules: [ndv]
+            relative_crossrefs: true
+            scoped_crossrefs: true
+            separate_signature: true
+            # show_bases: false
+            show_inheritance_diagram: true
+            show_root_heading: true
+            # show_root_full_path: false
+            show_signature_annotations: true
+            # show_source: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+            summary: true
+            unwrap_annotated: true
+
+hooks:
+  - docs/hooks.py
+
+extra:
+  version:
+    provider: mike
+  # either of these tags will enable the "viewing pre" announcement banner
+  # see _overrides/main.html
+  pre_release: !ENV ["DOCS_PRERELEASE", false]
+  dev_build: !ENV ["DOCS_DEV", false]
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/pyapp-kit
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/ndv/

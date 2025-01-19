@@ -17,30 +17,81 @@ sources = ["src"]
 [project]
 name = "ndv"
 dynamic = ["version"]
-description = "simple nd image viewer"
+description = "Simple, fast-loading, n-dimensional array viewer, with minimal dependencies."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "Talley Lambert", email = "talley.lambert@gmail.com" }]
+authors = [
+    { name = "Talley Lambert", email = "talley.lambert@gmail.com" },
+    { name = "Gabriel Selzer", email = "gjselzer@wisc.edu" },
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
-dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]"]
+dependencies = [
+    "cmap >=0.3",
+    "numpy >=1.22",
+    "psygnal >=0.10",
+    "pydantic >=2.9",
+    "typing_extensions",
+]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
-pyqt = ["pyqt6"]
-vispy = ["vispy", "pyopengl"]
-pyside = ["pyside6"]
-pygfx = ["pygfx"]
+# Supported GUI frontends
+jupyter = ["ipywidgets >=8", "jupyter", "jupyter_rfb >=0.3.3", "glfw"]
+pyqt = ["pyqt6 >=6.4,!=6.6", "qtpy >=2", "superqt[iconify] >=0.7.1"]
+pyside = [
+    # defer to superqt's pyside6 restrictions
+    "superqt[iconify,pyside6] >=0.7.1",
+    # https://github.com/pyapp-kit/ndv/issues/59
+    "pyside6 ==6.6.3; sys_platform == 'win32'",
+    "pyside6 >=6.4",
+    "qtpy >=2",
+]
+wxpython = ["wxpython"]
+
+# Supported Canavs backends
+vispy = ["vispy>=0.14.3", "pyopengl"]
+pygfx = ["pygfx>=0.6.0"]
+
+# ready to go bundles with vispy
+qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
+jup = ["ndv[vispy,jupyter]", "imageio[tifffile]"]
+wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
+
+test = ["imageio[tifffile]", "pytest-cov", "pytest"]
+docs = [
+    "mkdocs-gen-files==0.5.0",
+    "mkdocs-literate-nav==0.6.1",
+    "mkdocs-material==9.5.49",
+    "mkdocs-minify-plugin==0.8.0",
+    "mkdocs==1.6.1",
+    "mkdocstrings-python==1.13.0",
+    "mkdocs-spellcheck[codespell]==1.1.0",
+    "mike==2.1.3",
+    "ruff",
+]
+dev = [
+    "ndv[test,vispy,pygfx,pyqt,jupyter]",
+    "pytest-qt",
+    "ipython",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "rich",
+    "ruff",
+    "ipykernel",
+]
+
 third_party_arrays = [
     "aiohttp",                                 # for zarr example
     "jax[cpu]",
@@ -48,19 +99,12 @@ third_party_arrays = [
     "pyopencl[pocl]; sys_platform == 'linux'",
     "sparse",
     "tensorstore",
+    "numpy<2.0",                               # for tensorstore (at least)
     "torch",
     "xarray",
-    "zarr",
-]
-test = [
-    "ndv[vispy,pygfx]",
+    "zarr<3",
     "dask[array]",
-    "imageio[tifffile]",
-    "pytest-cov",
-    "pytest-qt",
-    "pytest",
 ]
-dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
 
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"
@@ -69,7 +113,7 @@ repository = "https://github.com/pyapp-kit/ndv"
 # https://docs.astral.sh/ruff
 [tool.ruff]
 line-length = 88
-target-version = "py38"
+target-version = "py39"
 src = ["src"]
 
 # https://docs.astral.sh/ruff/rules
@@ -87,11 +131,12 @@ select = [
     "B",    # flake8-bugbear
     "A001", # flake8-builtins
     "RUF",  # ruff-specific rules
-    "TCH",  # flake8-type-checking
+    "TC",   # flake8-type-checking
     "TID",  # flake8-tidy-imports
 ]
 ignore = [
     "D401", # First line should be in imperative mood
+    "D10",  # Missing docstring...
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -112,6 +157,11 @@ disallow_any_generics = false
 disallow_subclassing_any = false
 show_error_codes = true
 pretty = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
+ignore_missing_imports = true
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]
@@ -121,7 +171,13 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore:Method has been garbage collected::superqt",
-    "ignore:Got wrong number of dimensions",             # occasionally happens on linux CI with vispy
+    # occasionally happens on linux CI with vispy
+    "ignore:Got wrong number of dimensions",
+    "ignore:Unable to import recommended hash",
+    # CI-only error on jupyter, vispy, macos
+    "ignore:.*Failed to find a suitable pixel format",
+    # unsolved python 3.10 warning on shutdown, either xarray or dask
+    "ignore:unclosed transport:ResourceWarning",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
@@ -138,11 +194,16 @@ exclude_lines = [
     "pass",
 ]
 
+
 [tool.coverage.run]
 source = ["ndv"]
+omit = ["src/ndv/viewer/_backends/_protocols.py"]
 
 [tool.check-manifest]
 ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
 
 [tool.typos.default]
 extend-ignore-identifiers-re = ["(?i)nd2?.*", "(?i)ome", ".*ser_schema"]
+
+[tool.typos.files]
+extend-exclude = ["**/*.ipynb"]
