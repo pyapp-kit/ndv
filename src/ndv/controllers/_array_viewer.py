@@ -167,7 +167,7 @@ class ArrayViewer:
         self._view.set_visible(True)
 
     def hide(self) -> None:
-        """Show the viewer."""
+        """Hide the viewer."""
         self._view.set_visible(False)
 
     def close(self) -> None:
