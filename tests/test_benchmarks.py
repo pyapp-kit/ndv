@@ -23,7 +23,7 @@ def _show_viewer(data: np.ndarray) -> None:
 def test_time_to_show(benchmark: BenchmarkFixture, qapp: Any) -> None:
     data = np.random.randint(0, 255, size=(10, 256, 256), dtype=np.uint8)
     for k in list(sys.modules):
-        if k.startswith(("ndv", "superqt")):
+        if k.startswith(("ndv", "superqt", "vispy", "pygfx", "wgpu", "PyQt", "PySide")):
             del sys.modules[k]
     with unittest.mock.patch.object(qapp, "exec"):
         benchmark.pedantic(_show_viewer, (data,), iterations=1, rounds=1)
