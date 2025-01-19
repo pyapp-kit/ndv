@@ -300,10 +300,10 @@ class VispyImageHandle(ImageHandle):
     def set_gamma(self, gamma: float) -> None:
         self._visual.gamma = gamma
 
-    def cmap(self) -> _cmap.Colormap:
+    def colormap(self) -> _cmap.Colormap:
         return self._cmap  # FIXME
 
-    def set_cmap(self, cmap: _cmap.Colormap) -> None:
+    def set_colormap(self, cmap: _cmap.Colormap) -> None:
         self._cmap = cmap
         self._visual.cmap = cmap.to_vispy()
 
@@ -426,6 +426,7 @@ class VispyArrayCanvas(ArrayCanvas):
 
     def __init__(self) -> None:
         self._canvas = scene.SceneCanvas(size=(600, 600))
+        self._canvas.measure_fps()
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted

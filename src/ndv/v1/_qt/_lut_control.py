@@ -52,7 +52,7 @@ class LutControl(QWidget):
         self._cmap = CmapCombo()
         self._cmap.currentColormapChanged.connect(self._on_cmap_changed)
         for handle in self._handles:
-            self._cmap.addColormap(handle.cmap())
+            self._cmap.addColormap(handle.colormap())
         for color in cmaplist:
             self._cmap.addColormap(color)
 
@@ -110,7 +110,7 @@ class LutControl(QWidget):
 
     def _on_cmap_changed(self, cmap: cmap.Colormap) -> None:
         for handle in self._handles:
-            handle.set_cmap(cmap)
+            handle.set_colormap(cmap)
 
     def update_autoscale(self) -> None:
         if (
@@ -139,5 +139,5 @@ class LutControl(QWidget):
 
     def add_handle(self, handle: ImageHandle) -> None:
         self._handles.append(handle)
-        self._cmap.addColormap(handle.cmap())
+        self._cmap.addColormap(handle.colormap())
         self.update_autoscale()
