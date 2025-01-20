@@ -7,6 +7,7 @@ from contextlib import suppress
 from enum import Enum, IntFlag, auto
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
+import numpy as np
 from pydantic import PlainSerializer, PlainValidator
 from typing_extensions import TypeAlias
 
@@ -107,3 +108,27 @@ class CursorType(Enum):
             CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
             CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
         }[self]
+
+
+class CameraType(str, Enum):
+    """Camera type."""
+
+    ARCBALL = "arcball"
+    PANZOOM = "panzoom"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+ArrayLike: TypeAlias = np.typing.NDArray
+
+
+class ImageInterpolation(str, Enum):
+    """Image interpolation options."""
+
+    LINEAR = "linear"
+    NEAREST = "nearest"
+    BICUBIC = "bicubic"
+
+    def __str__(self) -> str:
+        return self.value

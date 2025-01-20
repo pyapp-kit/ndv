@@ -290,6 +290,8 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
 
 def _get_schema(hint: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
     # check if the hint already has a core schema attached to it.
+    # this helps to avoid `Definitions error: definition `___` was never filled`
+    # for recursive types.
     if hasattr(hint, "__pydantic_core_schema__"):
         return cast("core_schema.CoreSchema", hint.__pydantic_core_schema__)
     # otherwise, call the handler to get the core schema.
