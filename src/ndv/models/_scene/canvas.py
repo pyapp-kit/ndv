@@ -36,7 +36,7 @@ class CanvasAdaptorProtocol(SupportsVisibility["Canvas"], Protocol):
     def _vis_add_view(self, view: View) -> None: ...
     def _vis_get_ipython_mimebundle(
         self, *args: Any, **kwargs: Any
-    ) -> dict | tuple[dict, dict]:
+    ) -> dict | tuple[dict, dict] | Any:
         return NotImplemented
 
 
@@ -66,7 +66,7 @@ class Canvas(VisModel[CanvasAdaptorProtocol]):
     )
     visible: bool = Field(default=False, description="Whether the canvas is visible.")
     title: str = Field(default="", description="The title of the canvas.")
-    views: ViewList[View] = Field(default_factory=ViewList, allow_mutation=False)
+    views: ViewList[View] = Field(default_factory=lambda: ViewList(), frozen=True)
 
     @property
     def size(self) -> tuple[float, float]:
@@ -137,7 +137,7 @@ class Canvas(VisModel[CanvasAdaptorProtocol]):
                 adaptor._vis_add_view(view)
         return view
 
-    def _repr_mimebundle_(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    def _repr_mimebundle_(self, *args: Any, **kwargs: Any) -> dict[str, Any] | Any:
         """Return a mimebundle for the canvas.
 
         This defers to the native object's _vis_get_ipython_mimebundle method
@@ -148,7 +148,7 @@ class Canvas(VisModel[CanvasAdaptorProtocol]):
         """
         adaptor = self.backend_adaptor()
         if hasattr(adaptor, "_vis_get_ipython_mimebundle"):
-            return adaptor._vis_get_ipython_mimebundle(*args, **kwargs)  # type: ignore
+            return adaptor._vis_get_ipython_mimebundle(*args, **kwargs)
         return NotImplemented
 
 

@@ -58,7 +58,9 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         repr=False,  # recursion is just confusing
         # TODO: maybe make children the derived field?
     )
-    children: ValidatedEventedList["Node"] = Field(default_factory=list, frozen=True)
+    children: ValidatedEventedList["Node"] = Field(
+        default_factory=lambda: ValidatedEventedList(), frozen=True
+    )
     visible: bool = Field(default=True, description="Whether this node is visible.")
     interactive: bool = Field(
         default=False, description="Whether this node accepts mouse and touch events"
