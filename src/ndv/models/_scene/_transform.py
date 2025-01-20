@@ -99,7 +99,7 @@ class Transform(RootModel):
     def __array__(self, dtype: DTypeLike | None = None) -> np.ndarray:
         return self.root.astype(dtype)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.root).replace("array", "Transform")
 
     def is_null(self) -> bool:

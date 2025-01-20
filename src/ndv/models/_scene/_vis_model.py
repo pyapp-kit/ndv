@@ -55,7 +55,7 @@ class BackendAdaptor(Protocol[F]):
 
     @abstractmethod
     def __init__(self, obj: F, **backend_kwargs: Any) -> None:
-        """All backend adaptor objects recieve the object they are adapting."""
+        """All backend adaptor objects receive the object they are adapting."""
         ...
 
     @abstractmethod
@@ -107,7 +107,7 @@ class VisModel(ModelBase, Generic[AdaptorType]):
     # see `examples/custom_node.py` for an example of how this is used.
     BACKEND_ADAPTORS: ClassVar[dict[str, type[BackendAdaptor]]]
 
-    def model_post_init(self, __context):
+    def model_post_init(self, __context: Any) -> None:
         # if using this in an EventedModel, connect to the events
         if hasattr(self, "events"):
             self.events.connect(self._on_any_event)
