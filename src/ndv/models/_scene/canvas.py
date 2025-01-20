@@ -11,7 +11,7 @@ from .view import View
 
 if TYPE_CHECKING:
     import numpy as np
-    from microvis._types import Color
+    from cmap import Color
 
 
 ViewType = TypeVar("ViewType", bound=View)

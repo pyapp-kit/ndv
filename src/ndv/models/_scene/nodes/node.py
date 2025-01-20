@@ -1,14 +1,31 @@
+from __future__ import annotations
+
 import logging
 from abc import abstractmethod
-from collections.abc import Iterator
 from contextlib import suppress
-from typing import Any, Literal, Optional, Protocol, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    Protocol,
+    TypeVar,
+    Union,
+    cast,
+)
 
-from pydantic import field_validator
+from pydantic import (
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+)
 
 from ndv.models._scene._transform import Transform
 from ndv.models._scene._vis_model import Field, SupportsVisibility, VisModel
 from ndv.models._sequence import ValidatedEventedList
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 NodeTypeCoV = TypeVar("NodeTypeCoV", bound="Node", covariant=True)
@@ -23,11 +40,9 @@ class NodeAdaptorProtocol(SupportsVisibility[NodeTypeCoV], Protocol):
     @abstractmethod
     def _vis_set_name(self, arg: str) -> None: ...
     @abstractmethod
-    def _vis_set_parent(self, arg: Optional["Node"]) -> None: ...
+    def _vis_set_parent(self, arg: Node | None) -> None: ...
     @abstractmethod
-    def _vis_set_children(self, arg: list["Node"]) -> None: ...
-    @abstractmethod
-    def _vis_set_visible(self, arg: bool) -> None: ...
+    def _vis_set_children(self, arg: list[Node]) -> None: ...
     @abstractmethod
     def _vis_set_opacity(self, arg: float) -> None: ...
     @abstractmethod
@@ -37,28 +52,31 @@ class NodeAdaptorProtocol(SupportsVisibility[NodeTypeCoV], Protocol):
     @abstractmethod
     def _vis_set_transform(self, arg: Transform) -> None: ...
     @abstractmethod
-    def _vis_add_node(self, node: "Node") -> None: ...
+    def _vis_add_node(self, node: Node) -> None: ...
 
 
-# TODO: need to make sure to call parent.add()
+# improve me... Read up on: https://docs.pydantic.dev/latest/concepts/unions/
+AnyNode = Annotated[
+    Union["Image", "Scene", "GenericNode"], Field(discriminator="node_type")
+]
 
 
 class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
-    """Base class for all nodes."""
+    """Base class for all nodes.
 
-    node_type: Literal["Node"] = Field(
-        "Node", repr=False, description="Type of the node for discriminated unions."
-    )
+    Do not instantiate this class directly. Use a subclass.  GenericNode may
+    be used in place of Node.
+    """
 
-    name: Optional[str] = Field(default=None, description="Name of the node.")
-    parent: Optional["Node"] = Field(
+    name: str | None = Field(default=None, description="Name of the node.")
+    parent: AnyNode | None = Field(
         default=None,
         description="Parent node. If None, this node is a root node.",
         exclude=True,  # prevents recursion in serialization.
         repr=False,  # recursion is just confusing
         # TODO: maybe make children the derived field?
     )
-    children: ValidatedEventedList["Node"] = Field(
+    children: ValidatedEventedList[AnyNode] = Field(
         default_factory=lambda: ValidatedEventedList(), frozen=True
     )
     visible: bool = Field(default=True, description="Whether this node is visible.")
@@ -78,39 +96,39 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         "frame of the parent.",
     )
 
+    node_type: str  # discriminator field defined in subclasses
+
+    @model_serializer(mode="wrap")
+    def _serialize_with_node_type(self, handler: SerializerFunctionWrapHandler) -> Any:
+        # modified serializer that ensures node_type is included,
+        # (e.g. even if exclude_defaults=True)
+        return {**handler(self), "node_type": self.node_type}
+
+    # prevent direct instantiation, which makes it easier to use NodeUnion without
+    # having to deal with self-reference.
+    def __init__(self, /, **data: Any) -> None:
+        if type(self) is Node:
+            raise TypeError("Node cannot be instantiated directly. Use a subclass.")
+        super().__init__(**data)
+
     def model_post_init(self, __context: Any) -> None:
         with suppress(AttributeError):
             self.children.item_inserted.connect(self._on_child_inserted)
 
-    def _on_child_inserted(self, index: int, obj: "Node") -> None:
+    def _on_child_inserted(self, index: int, obj: Node) -> None:
         # ensure parent is set
         self.add(obj)
 
-    # def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
-    #     args = super().__repr_args__()
-    #     # avoid recursion in repr
-    #     return [a for a in args if a[0] != "parent"]
-
-    # # FIXME: the presence of this `__init__` method breaks the very nice static
-    # # hints provided in VScode. but currently need it in order to add _owner to
-    # # children.  maybe there's a better way?
-    # # One possibility is to make _children a private (immutable) property that
-    # # can only be modified using `add()` method, then modify it as needed only on
-    # # first access.
-    # def __init__(self, *args: Any, **kwargs: Any) -> None:
-    #     super().__init__(*args, **kwargs)
-    #     self.children._owner = self
-    #     logger.debug(f"created {type(self)} node {id(self)}")
-
-    def __contains__(self, item: "Node") -> bool:
+    def __contains__(self, item: Node) -> bool:
         """Return True if this node is an ancestor of item."""
         return item in self.children
 
-    def add(self, node: "Node") -> None:
+    def add(self, node: Node) -> None:
         """Add a child node."""
+        node = cast("AnyNode", node)
         nd = f"{node.__class__.__name__} {id(node)}"
         slf = f"{self.__class__.__name__} {id(self)}"
-        node.parent = self
+        node.parent = cast("AnyNode", self)
         if node not in self.children:
             logger.debug(f"Adding node {nd} to {slf}")
             self.children.append(node)
@@ -124,7 +142,7 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
 
     # below borrowed from vispy.scene.Node
 
-    def transform_to_node(self, other: "Node") -> Transform:
+    def transform_to_node(self, other: Node) -> Transform:
         """Return Transform that maps from coordinate frame of `self` to `other`.
 
         Note that there must be a _single_ path in the scenegraph that connects
@@ -144,7 +162,7 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         tforms = [n.transform for n in a[:-1]] + [n.transform.inv() for n in b]
         return Transform.chain(*tforms[::-1])
 
-    def path_to_node(self, other: "Node") -> tuple[list["Node"], list["Node"]]:
+    def path_to_node(self, other: Node) -> tuple[list[Node], list[Node]]:
         """Return two lists describing the path from this node to another.
 
         Parameters
@@ -188,14 +206,14 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         down = their_parents[: their_parents.index(common_parent)][::-1]
         return (up, down)
 
-    def iter_parents(self) -> Iterator["Node"]:
+    def iter_parents(self) -> Iterator[Node]:
         """Return list of parents starting from this node.
 
         The chain ends at the first node with no parents.
         """
         yield self
 
-        x = self
+        x = cast("AnyNode", self)
         while True:
             try:
                 parent = x.parent
@@ -205,3 +223,16 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
                 break
             yield parent
             x = parent
+
+
+class GenericNode(Node[NodeAdaptorProtocol]):
+    """A generic node that can be placed in a scene."""
+
+    node_type: Literal["node"] = "node"
+
+
+# TODO: gotta be a better pattern to populate AnyNode above...
+from .image import Image  # noqa: E402, TC001
+from .scene import Scene  # noqa: E402, TC001
+
+Node.model_rebuild()

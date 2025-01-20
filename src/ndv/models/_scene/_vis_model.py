@@ -27,20 +27,25 @@ class ModelBase(BaseModel):
         extra="ignore",
         validate_default=True,
         validate_assignment=True,
+        repr_exclude_defaults="new",  # type: ignore [typeddict-unknown-key]
     )
 
     # repr that excludes default values
-    def __repr_args__(self) -> Iterable[tuple[str, Any]]:
+    def __repr_args__(self) -> Iterable[tuple[str | None, Any]]:
+        super_args = super().__repr_args__()
+        if not self.model_config.get("repr_exclude_defaults"):
+            yield from super_args
+            return
+
         fields = self.model_fields
-        for key, val in super().__repr_args__():
-            if key:
-                default = fields[key].get_default(
-                    call_default_factory=True, validated_data={}
-                )
-                with suppress(Exception):
-                    if val == default:
-                        continue
-                yield key, val
+        for key, val in super_args:
+            default = fields[key].get_default(  # type: ignore
+                call_default_factory=True, validated_data={}
+            )
+            with suppress(Exception):
+                if val == default:
+                    continue
+            yield key, val
 
 
 F = TypeVar("F", covariant=True, bound="VisModel")
@@ -109,9 +114,7 @@ class VisModel(ModelBase, Generic[AdaptorType]):
 
     def model_post_init(self, __context: Any) -> None:
         # if using this in an EventedModel, connect to the events
-        if hasattr(self, "events"):
-            self.events.connect(self._on_any_event)
-
+        self.events.connect(self._on_any_event)
         # determine fields that need setter methods in the backend adaptor
         # TODO:
         # this really shouldn't need to be in the init.  `__init_subclass__` would be
@@ -171,6 +174,7 @@ class VisModel(ModelBase, Generic[AdaptorType]):
             adaptor_class = self.BACKEND_ADAPTORS[backend]
             logger.debug(f"Using class-provided adaptor class: {adaptor_class}")
         else:
+            raise NotImplementedError("we haven't gotten here yet :)")
             class_name = class_name or type(self).__name__
             backend_module = import_module(f"microvis.backend.{backend}")
             adaptor_class = getattr(backend_module, class_name)
