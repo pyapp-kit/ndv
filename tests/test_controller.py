@@ -12,6 +12,7 @@ from ndv._types import MouseMoveEvent
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
+from ndv.models._roi_model import RectangularROIModel
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from ndv.controllers._channel_controller import ChannelController
 
 
-def _get_mock_canvas() -> ArrayCanvas:
+def _get_mock_canvas(*_: Any) -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
     img_handle = MagicMock(spec=ImageHandle)
     img_handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
@@ -205,3 +206,18 @@ def test_array_viewer_with_app() -> None:
     if gui_frontend() != _app.GuiFrontend.WX:
         visax_mock.assert_called_once()
         assert viewer.display_model.visible_axes == (0, -2, -1)
+
+
+@no_type_check
+@_patch_views
+def test_roi_controller() -> None:
+    ctrl = ArrayViewer()
+
+    # Until a user interacts with ctrl.roi, there is no ROI model
+    assert ctrl._roi_model is None
+    ctrl.roi = RectangularROIModel()
+    assert ctrl._roi_model is not None
+    ctrl.roi = None
+    assert ctrl._roi_model is None
+
+    # Clicking the ROI button and then clicking the canvas creates a ROI

@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 from ndv.models._array_display_model import ArrayDisplayModel
+from ndv.models._roi_model import RectangularROIModel
 
 
 def test_array_display_model() -> None:
@@ -23,3 +24,28 @@ def test_array_display_model() -> None:
 
     assert ArrayDisplayModel.model_json_schema(mode="validation")
     assert ArrayDisplayModel.model_json_schema(mode="serialization")
+
+
+def test_rectangular_roi_model() -> None:
+    m = RectangularROIModel()
+
+    mock = Mock()
+    m.events.bounding_box.connect(mock)
+    m.events.visible.connect(mock)
+
+    m.bounding_box = ((10, 10), (20, 20))
+    mock.assert_called_once_with(
+        ((10, 10), (20, 20)),  # New bounding box value
+        ((0, 0), (0, 0)),  # Initial bounding box on construction
+    )
+    mock.reset_mock()
+
+    m.visible = False
+    mock.assert_called_once_with(
+        False,  # New visibility
+        True,  # Initial visibility on construction
+    )
+    mock.reset_mock()
+
+    assert RectangularROIModel.model_json_schema(mode="validation")
+    assert RectangularROIModel.model_json_schema(mode="serialization")

@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from jupyter_rfb import RemoteFrameBuffer
 
-from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.views.bases._app import NDVApp
 
 if TYPE_CHECKING:
@@ -41,6 +46,19 @@ class JupyterAppWrap(NDVApp):
 
         return JupyterArrayView
 
+    @staticmethod
+    def mouse_btn(btn: Any) -> MouseButton:
+        if btn == 0:
+            return MouseButton.NONE
+        if btn == 1:
+            return MouseButton.LEFT
+        if btn == 2:
+            return MouseButton.RIGHT
+        if btn == 3:
+            return MouseButton.MIDDLE
+
+        raise Exception(f"Jupyter mouse button {btn} is unknown")
+
     def filter_mouse_events(
         self, canvas: Any, receiver: Mouseable
     ) -> Callable[[], None]:
@@ -52,19 +70,29 @@ class JupyterAppWrap(NDVApp):
         # patch the handle_event from _jupyter_rfb.CanvasBackend
         # to intercept various mouse events.
         super_handle_event = canvas.handle_event
+        active_btn: MouseButton = MouseButton.NONE
 
         def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
+            nonlocal active_btn
+            nonlocal canvas
+
             etype = ev["event_type"]
+            if "button" in ev:
+                btn = JupyterAppWrap.mouse_btn(ev["button"])
             if etype == "pointer_move":
-                mme = MouseMoveEvent(x=ev["x"], y=ev["y"])
+                mme = MouseMoveEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 receiver.on_mouse_move(mme)
+                if cursor := receiver.get_cursor(mme):
+                    canvas.cursor = cursor.to_jupyter()
                 receiver.mouseMoved.emit(mme)
             elif etype == "pointer_down":
-                mpe = MousePressEvent(x=ev["x"], y=ev["y"])
+                active_btn = btn
+                mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
             elif etype == "pointer_up":
-                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"])
+                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=active_btn)
+                active_btn = MouseButton.NONE
                 receiver.on_mouse_release(mre)
                 receiver.mouseReleased.emit(mre)
             super_handle_event(ev)

@@ -272,7 +272,8 @@ class VispyHistogramCanvas(HistogramCanvas):
             v._bounds_changed()
         self._gamma_handle._bounds_changed()
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType:
+        pos = (event.x, event.y)
         nearby = self._find_nearby_node(pos)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
@@ -332,7 +333,7 @@ class VispyHistogramCanvas(HistogramCanvas):
             self.gammaChanged.emit(-np.log2(y / y1))
             return False
 
-        self.get_cursor(pos).apply_to(self)
+        self.get_cursor(event).apply_to(self)
         return False
 
     def _find_nearby_node(
