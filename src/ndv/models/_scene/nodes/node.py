@@ -68,7 +68,7 @@ class NodeAdaptorProtocol(SupportsVisibility[NodeTypeCoV], Protocol):
 
 # improve me... Read up on: https://docs.pydantic.dev/latest/concepts/unions/
 AnyNode = Annotated[
-    Union["Image", "Scene", "GenericNode"], Field(discriminator="node_type")
+    Union["Image", "Scene", "GenericNode", "Points"], Field(discriminator="node_type")
 ]
 
 
@@ -78,6 +78,8 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
     Do not instantiate this class directly. Use a subclass.  GenericNode may
     be used in place of Node.
     """
+
+    node_type: str  # discriminator field defined in subclasses
 
     name: str | None = Field(default=None, description="Name of the node.")
     parent: AnyNode | None = Field(
@@ -107,8 +109,6 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         description="Transform that maps the local coordinate frame to the coordinate "
         "frame of the parent.",
     )
-
-    node_type: str  # discriminator field defined in subclasses
 
     @model_serializer(mode="wrap")
     def _serialize_with_node_type(self, handler: SerializerFunctionWrapHandler) -> Any:
@@ -249,6 +249,7 @@ class GenericNode(Node[NodeAdaptorProtocol]):
 
 # TODO: gotta be a better pattern to populate AnyNode above...
 from .image import Image  # noqa: E402, TC001
+from .points import Points  # noqa: E402, TC001
 from .scene import Scene  # noqa: E402, TC001
 
 Node.model_rebuild()

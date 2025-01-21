@@ -3,7 +3,7 @@ from rich import print
 
 from ndv import run_app
 from ndv.models._scene._transform import Transform
-from ndv.models._scene.nodes import Image, Scene
+from ndv.models._scene.nodes import Image, Points, Scene
 from ndv.models._scene.view import View
 from ndv.views import _app
 
@@ -17,7 +17,15 @@ img2 = Image(
     cmap="viridis",
     transform=Transform().scaled((0.7, 0.7)),
 )
-scene = Scene(children=[img1, img2])
+points = Points(
+    coords=np.random.randint(0, 200, (100, 2)),
+    size=5,
+    face_color="blue",
+    edge_color="yellow",
+    edge_width=0.5,
+    opacity=0.1,
+)
+scene = Scene(children=[points, img1, img2])
 view = View(scene=scene)
 
 
@@ -29,10 +37,10 @@ run_app()
 # sys.exit()
 
 # print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-# json = view.model_dump_json(indent=2, exclude_defaults=True)
-# print(json)
+json = view.model_dump_json(indent=2)
+print(json)
 # print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-# print(View.model_validate_json(json))
+print(View.model_validate_json(json))
 
 
-# assert View.model_json_schema()
+assert View.model_json_schema()

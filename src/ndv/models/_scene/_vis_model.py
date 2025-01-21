@@ -29,7 +29,7 @@ class ModelBase(BaseModel):
         extra="ignore",
         validate_default=True,
         validate_assignment=True,
-        repr_exclude_defaults=False,  # type: ignore [typeddict-unknown-key]
+        repr_exclude_defaults=True,  # type: ignore [typeddict-unknown-key]
     )
 
     # repr that excludes default values

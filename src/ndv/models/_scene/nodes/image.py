@@ -34,7 +34,7 @@ class Image(Node[ImageBackend]):
 
     node_type: Literal["image"] = "image"
 
-    data: Any = Field(default=None, repr=False)
+    data: Any = Field(default=None, repr=False, exclude=True)
     cmap: Colormap = Field(
         default_factory=lambda: Colormap("gray"),
         description="The colormap to use for the image.",
