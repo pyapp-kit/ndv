@@ -63,6 +63,8 @@ class WxAppWrap(NDVApp):
 
         active_button = MouseButton.NONE
 
+        # FIXME These functions don't get called with pygfx.
+        # See https://github.com/pygfx/wgpu-py/pull/665 for the fix.
         def on_mouse_move(event: MouseEvent) -> None:
             nonlocal active_button
             mme = MouseMoveEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
