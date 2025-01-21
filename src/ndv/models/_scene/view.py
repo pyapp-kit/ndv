@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
+from cmap import Color
 from pydantic import ConfigDict, Field
 
 from ._vis_model import ModelBase, SupportsVisibility, VisModel
@@ -10,12 +12,12 @@ from .nodes import Camera, Scene
 from .nodes.node import Node
 
 if TYPE_CHECKING:
-    from cmap import Color
     from psygnal import EmissionInfo
 
     from .canvas import Canvas
 
 NodeType = TypeVar("NodeType", bound=Node)
+logger = logging.getLogger(__name__)
 
 
 class ViewAdaptorProtocol(SupportsVisibility["View"], Protocol):
@@ -39,6 +41,9 @@ class ViewAdaptorProtocol(SupportsVisibility["View"], Protocol):
     def _vis_set_padding(self, arg: int) -> None: ...
     @abstractmethod
     def _vis_set_margin(self, arg: int) -> None: ...
+
+    def _vis_set_layout(self, arg: Layout) -> None:
+        pass
 
 
 class Layout(ModelBase):
@@ -72,15 +77,17 @@ class Layout(ModelBase):
     )
     width: float = Field(default=0, description="The width of the object.")
     height: float = Field(default=0, description="The height of the object.")
-    background_color: str | None = Field(
-        default="#000000",
+    background_color: Color | None = Field(
+        default=Color("black"),
         description="The background color (inside of the border). "
         "None implies transparent.",
     )
     border_width: float = Field(
         default=0, description="The width of the border in pixels."
     )
-    border_color: str = Field(default="#000000", description="The color of the border.")
+    border_color: Color | None = Field(
+        default=Color("black"), description="The color of the border."
+    )
     padding: int = Field(
         default=0,
         description="The amount of padding in the widget "
@@ -93,6 +100,10 @@ class Layout(ModelBase):
     @property
     def position(self) -> tuple[float, float]:
         return self.x, self.y
+
+    @property
+    def size(self) -> tuple[float, float]:
+        return self.width, self.height
 
 
 class View(VisModel[ViewAdaptorProtocol]):
@@ -111,6 +122,7 @@ class View(VisModel[ViewAdaptorProtocol]):
     model_config = ConfigDict(repr_exclude_defaults=False)  # type: ignore
 
     def model_post_init(self, __context: Any) -> None:
+        super().model_post_init(__context)
         self.layout.events.connect(self._on_layout_event)
 
     def _on_layout_event(self, info: EmissionInfo) -> None:
@@ -123,14 +135,15 @@ class View(VisModel[ViewAdaptorProtocol]):
         Convenience method for showing the canvas that the view is on.
         If no canvas exists, a new one is created.
         """
-        from .canvas import Canvas
+        if not hasattr(self, "_canvas"):
+            from .canvas import Canvas
 
-        # TODO: we need to know/check somehow if the view is already on a canvas
-        # This just creates a new canvas every time
-        canvas = Canvas()
-        canvas.add_view(self)
-        canvas.show()
-        return canvas
+            # TODO: we need to know/check somehow if the view is already on a canvas
+            # This just creates a new canvas every time
+            self._canvas = Canvas()
+            self._canvas.add_view(self)
+        self._canvas.show()
+        return self._canvas
 
     def add_node(self, node: NodeType) -> NodeType:
         """Add any node to the scene."""
@@ -140,6 +153,7 @@ class View(VisModel[ViewAdaptorProtocol]):
 
     def _create_adaptor(self, cls: type[ViewAdaptorProtocol]) -> ViewAdaptorProtocol:
         adaptor = super()._create_adaptor(cls)
+        logger.debug("VIEW Setting scene %r and camera %r", self.scene, self.camera)
         adaptor._vis_set_scene(self.scene)
         adaptor._vis_set_camera(self.camera)
         return adaptor

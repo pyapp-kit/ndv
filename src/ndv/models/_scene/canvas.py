@@ -4,6 +4,7 @@ import warnings
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
+from cmap import Color  # noqa: TC002
 from psygnal.containers import EventedList
 
 from ._vis_model import Field, SupportsVisibility, VisModel
@@ -11,7 +12,6 @@ from .view import View
 
 if TYPE_CHECKING:
     import numpy as np
-    from cmap import Color
 
 
 ViewType = TypeVar("ViewType", bound=View)
@@ -38,6 +38,9 @@ class CanvasAdaptorProtocol(SupportsVisibility["Canvas"], Protocol):
         self, *args: Any, **kwargs: Any
     ) -> dict | tuple[dict, dict] | Any:
         return NotImplemented
+
+    def _vis_set_views(self, views: list[View]) -> None:
+        pass
 
 
 class ViewList(EventedList[ViewType]):
@@ -104,11 +107,17 @@ class Canvas(VisModel[CanvasAdaptorProtocol]):
         # If you need to add any additional logic to handle the moment of backend
         # creation in a specific Node subtype, you can override the `_create_backend`
         # method (see, for example, the View._create_backend method)
-        self.backend_adaptor(backend=backend)  # make sure we have a backend adaptor
+
+        # ensure we have a backend adaptor
+        adapter = self.backend_adaptor(backend=backend)
         for view in self.views:
             if not view.has_backend_adaptor():
                 # make sure all of the views have a backend adaptor
                 view.backend_adaptor(backend=backend)
+
+        for view in self.views:
+            adapter._vis_add_view(view)
+
         self.visible = True
 
     def hide(self) -> None:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from contextlib import suppress
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -26,6 +25,7 @@ from ndv.models._sequence import ValidatedEventedList
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from contextlib import AbstractContextManager
 
 logger = logging.getLogger(__name__)
 NodeTypeCoV = TypeVar("NodeTypeCoV", bound="Node", covariant=True)
@@ -54,6 +54,17 @@ class NodeAdaptorProtocol(SupportsVisibility[NodeTypeCoV], Protocol):
     @abstractmethod
     def _vis_add_node(self, node: Node) -> None: ...
 
+    def _vis_set_node_type(self, arg: str) -> None:
+        pass
+
+    @abstractmethod
+    def _vis_updates_blocked(self) -> AbstractContextManager:
+        """Return a context manager that blocks updates to the node."""
+
+    @abstractmethod
+    def _vis_force_update(self) -> None:
+        """Force an update to the node."""
+
 
 # improve me... Read up on: https://docs.pydantic.dev/latest/concepts/unions/
 AnyNode = Annotated[
@@ -76,6 +87,7 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         repr=False,  # recursion is just confusing
         # TODO: maybe make children the derived field?
     )
+
     children: ValidatedEventedList[AnyNode] = Field(
         default_factory=lambda: ValidatedEventedList(), frozen=True
     )
@@ -112,8 +124,10 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
         super().__init__(**data)
 
     def model_post_init(self, __context: Any) -> None:
-        with suppress(AttributeError):
-            self.children.item_inserted.connect(self._on_child_inserted)
+        super().model_post_init(__context)
+        for child in self.children:
+            child.parent = cast("AnyNode", self)
+        self.children.item_inserted.connect(self._on_child_inserted)
 
     def _on_child_inserted(self, index: int, obj: Node) -> None:
         # ensure parent is set
@@ -126,10 +140,12 @@ class Node(VisModel[NodeAdaptorProtocolTypeCoV]):
     def add(self, node: Node) -> None:
         """Add a child node."""
         node = cast("AnyNode", node)
-        nd = f"{node.__class__.__name__} {id(node)}"
-        slf = f"{self.__class__.__name__} {id(self)}"
         node.parent = cast("AnyNode", self)
+        if self.has_backend_adaptor() and not node.has_backend_adaptor():
+            node.backend_adaptor()
         if node not in self.children:
+            nd = f"{node.__class__.__name__} {id(node)}"
+            slf = f"{self.__class__.__name__} {id(self)}"
             logger.debug(f"Adding node {nd} to {slf}")
             self.children.append(node)
             if self.has_backend_adaptor():

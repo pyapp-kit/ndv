@@ -7,7 +7,6 @@ from cmap import Colormap
 from pydantic import Field
 
 from ndv._types import ImageInterpolation
-from ndv.models._lut_model import ClimsMinMax, ClimsType
 
 from .node import Node, NodeAdaptorProtocol
 
@@ -23,7 +22,7 @@ class ImageBackend(NodeAdaptorProtocol["Image"], Protocol):
     @abstractmethod
     def _vis_set_cmap(self, arg: Colormap) -> None: ...
     @abstractmethod
-    def _vis_set_clim(self, arg: tuple[float, float] | None) -> None: ...
+    def _vis_set_clims(self, arg: tuple[float, float] | None) -> None: ...
     @abstractmethod
     def _vis_set_gamma(self, arg: float) -> None: ...
     @abstractmethod
@@ -35,12 +34,15 @@ class Image(Node[ImageBackend]):
 
     node_type: Literal["image"] = "image"
 
-    data: Any = None
+    data: Any = Field(default=None, repr=False)
     cmap: Colormap = Field(
         default_factory=lambda: Colormap("gray"),
         description="The colormap to use for the image.",
     )
-    clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
+    clims: tuple[float, float] | None = Field(
+        default=None,
+        description="The contrast limits to use for the image.",
+    )
     gamma: float = Field(default=1.0, description="The gamma correction to use.")
     interpolation: ImageInterpolation = Field(
         default=ImageInterpolation.NEAREST,

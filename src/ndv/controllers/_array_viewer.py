@@ -67,7 +67,7 @@ class ArrayViewer:
             )
         self._data_model = _ArrayDataDisplayModel(
             data_wrapper=data,
-            display=display_model or ArrayDisplayModel(**kwargs),  # type: ignore
+            display=display_model or ArrayDisplayModel(**kwargs),
         )
 
         app = _app.gui_frontend()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from abc import abstractmethod
 from contextlib import suppress
@@ -8,7 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar, cas
 
 from psygnal import EmissionInfo, SignalGroupDescriptor
 from pydantic import BaseModel, ConfigDict
-from pydantic.fields import Field, PrivateAttr
+from pydantic.fields import Field
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 __all__ = ["Field", "ModelBase", "SupportsVisibility", "VisModel"]
 
 logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.DEBUG)
 SETTER_METHOD = "_vis_set_{name}"
 
 
@@ -27,7 +29,7 @@ class ModelBase(BaseModel):
         extra="ignore",
         validate_default=True,
         validate_assignment=True,
-        repr_exclude_defaults="new",  # type: ignore [typeddict-unknown-key]
+        repr_exclude_defaults=False,  # type: ignore [typeddict-unknown-key]
     )
 
     # repr that excludes default values
@@ -54,7 +56,7 @@ F = TypeVar("F", covariant=True, bound="VisModel")
 class BackendAdaptor(Protocol[F]):
     """Protocol for backend adaptor classes.
 
-    An adaptor class is responsible for converting all of the microvis protocol methods
+    An adaptor class is responsible for converting all of the ndv protocol methods
     into native calls for the given backend.
     """
 
@@ -89,7 +91,7 @@ class VisModel(ModelBase, Generic[AdaptorType]):
 
     A backend adaptor is a class that implements the BackendAdaptor protocol (of type
     `T`... for which this class is a generic). The backend adaptor is an object
-    responsible for converting all of the microvis protocol methods (stuff like
+    responsible for converting all of the ndv protocol methods (stuff like
     "_vis_set_width", "_vis_set_visible", etc...) into the appropriate calls for
     the given backend.
     """
@@ -99,18 +101,15 @@ class VisModel(ModelBase, Generic[AdaptorType]):
     # PEP 526 states that ClassVar cannot include any type variables...
     # but there is discussion that this might be too limiting.
     # dicsussion: https://github.com/python/mypy/issues/5144
-    _backend_adaptors: ClassVar[dict[str, BackendAdaptor]] = PrivateAttr({})
+    # _backend_adaptors: ClassVar[dict[str, BackendAdaptor]] = PrivateAttr({})
+
     # This is the set of all field names that must have setters in the backend adaptor.
     # set during the init
-    _evented_fields: ClassVar[set[str]] = PrivateAttr(set())
+    # _evented_fields: ClassVar[set[str]] = PrivateAttr(set())
+
     # this is a cache of all adaptor classes that have been validated to implement
     # the correct methods (via validate_adaptor_class).
-    _validated_adaptor_classes: ClassVar[set[type]] = PrivateAttr(set())
-
-    # This is an optional class variable that can be set by subclasses to
-    # provide a mapping of backend names to backend adaptor classes.
-    # see `examples/custom_node.py` for an example of how this is used.
-    BACKEND_ADAPTORS: ClassVar[dict[str, type[BackendAdaptor]]]
+    _validated_adaptor_classes: ClassVar[set[type]] = set()
 
     def model_post_init(self, __context: Any) -> None:
         # if using this in an EventedModel, connect to the events
@@ -121,7 +120,8 @@ class VisModel(ModelBase, Generic[AdaptorType]):
         # better, but that unfortunately gets called after EventedModel.__new__.
         # need to look into it
         signal_names = set(self.events)
-        self._evented_fields.update(set(self.model_fields).intersection(signal_names))
+        self._evented_fields = set(self.model_fields).intersection(signal_names)
+        self._backend_adaptors: dict[str, BackendAdaptor] = {}
 
     def has_backend_adaptor(self, backend: str | None = None) -> bool:
         """Return True if the object has a backend adaptor.
@@ -170,14 +170,9 @@ class VisModel(ModelBase, Generic[AdaptorType]):
         class_name: str | None = None,
     ) -> type[AdaptorType]:
         """Retrieve the adaptor class with the same name as the object class."""
-        if hasattr(self, "BACKEND_ADAPTORS") and backend in self.BACKEND_ADAPTORS:
-            adaptor_class = self.BACKEND_ADAPTORS[backend]
-            logger.debug(f"Using class-provided adaptor class: {adaptor_class}")
-        else:
-            raise NotImplementedError("we haven't gotten here yet :)")
-            class_name = class_name or type(self).__name__
-            backend_module = import_module(f"microvis.backend.{backend}")
-            adaptor_class = getattr(backend_module, class_name)
+        class_name = class_name or type(self).__name__
+        backend_module = import_module(f"ndv.views._scene.{backend}")
+        adaptor_class = getattr(backend_module, class_name)
         return self.validate_adaptor_class(adaptor_class)
 
     def _create_adaptor(self, cls: type[AdaptorType]) -> AdaptorType:
@@ -187,7 +182,13 @@ class VisModel(ModelBase, Generic[AdaptorType]):
         creation of the backend object. Or do something before/after.
         """
         logger.debug(f"Attaching {type(self)} to backend {cls}")
-        return cls(self)
+        adaptor = cls(self)
+        sync_adaptor(adaptor, self)
+        return adaptor
+
+    def _sync_adaptors(self) -> None:
+        for adaptor in self.backend_adaptors:
+            sync_adaptor(adaptor, self)
 
     def _on_any_event(self, info: EmissionInfo) -> None:
         signal_name = info.signal.name
@@ -210,9 +211,10 @@ class VisModel(ModelBase, Generic[AdaptorType]):
             logger.debug(f"{event_name}={info.args} emitting to backend")
 
             try:
-                setter(*info.args)
+                setter(info.args[0])
             except Exception as e:
                 logger.exception(e)
+                breakpoint()
 
     # TODO:
     # def detach(self) -> None:
@@ -224,11 +226,11 @@ class VisModel(ModelBase, Generic[AdaptorType]):
         # XXX: this could be a classmethod, but it's turning out to be difficult to
         # set _evented_fields on that class (see note in __init__)
 
-        if adaptor_class in self._validated_adaptor_classes:
+        cls = type(self)
+        if adaptor_class in cls._validated_adaptor_classes:
             return cast("type[AdaptorType]", adaptor_class)
 
-        cls = type(self)
-        logger.debug(f"Validating adaptor class {adaptor_class} for {cls}")
+        # logger.debug(f"Validating adaptor class {adaptor_class} for {cls}")
         if missing := {
             SETTER_METHOD.format(name=field)
             for field in self._evented_fields
@@ -238,16 +240,34 @@ class VisModel(ModelBase, Generic[AdaptorType]):
                 f"{adaptor_class} cannot be used as a backend object for "
                 f"{cls}: it is missing the following methods: {missing}"
             )
-        self._validated_adaptor_classes.add(adaptor_class)
+        cls._validated_adaptor_classes.add(adaptor_class)
         return cast("type[AdaptorType]", adaptor_class)
 
 
 # XXX: the default behavior should be to
-# pick the "right" backend for the current environment.  i.e. microvis
-# should work with no configuration in both jupyter and ipython desktop.)
+# pick the "right" backend for the current environment.
+# i.e. ndv should work with no configuration in both jupyter and ipython desktop.)
 def _get_default_backend() -> str:
     """Stub function for the concept of picking a backend when none is specified.
 
     This will likely be context dependent.
     """
     return "vispy"
+
+
+def sync_adaptor(adaptor: BackendAdaptor, model: VisModel) -> None:
+    """Decorator to validate and cache adaptor classes."""
+    blocker = getattr(adaptor, "_vis_updates_blocked", contextlib.nullcontext)
+    with blocker():
+        for field_name in model.model_fields:
+            method_name = SETTER_METHOD.format(name=field_name)
+            value = getattr(model, field_name)
+            try:
+                vis_set = getattr(adaptor, method_name)
+                vis_set(value)
+            except Exception as e:
+                logger.error(
+                    "Failed to set field %r on adaptor %r: %s", field_name, adaptor, e
+                )
+    force_update = getattr(adaptor, "_vis_force_update", lambda: None)
+    force_update()

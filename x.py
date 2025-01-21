@@ -1,17 +1,38 @@
+import numpy as np
 from rich import print
 
-from ndv.models._scene.nodes.node import Node
+from ndv import run_app
+from ndv.models._scene._transform import Transform
+from ndv.models._scene.nodes import Image, Scene
+from ndv.models._scene.view import View
+from ndv.views import _app
 
-root = Node(name="A")
-root.children.append(Node(name="B"))
+_app.ndv_app()
+img1 = Image(
+    name="Some Image", data=np.random.randint(0, 255, (100, 100)).astype(np.uint8)
+)
+
+img2 = Image(
+    data=np.random.randint(0, 255, (200, 200)).astype(np.uint8),
+    cmap="viridis",
+    transform=Transform().scaled((0.7, 0.7)),
+)
+scene = Scene(children=[img1, img2])
+view = View(scene=scene)
 
 
-print(root)
-print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-json = root.model_dump_json(indent=2)
-print(json)
-print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-print(Node.model_validate_json(json))
+print(view)
+view.show()
+view.camera._set_range(margin=0.05)
+run_app()
+
+# sys.exit()
+
+# print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+# json = view.model_dump_json(indent=2, exclude_defaults=True)
+# print(json)
+# print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+# print(View.model_validate_json(json))
 
 
-# print(Node.model_json_schema())
+# assert View.model_json_schema()
