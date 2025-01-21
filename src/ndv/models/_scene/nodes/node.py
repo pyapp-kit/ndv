@@ -11,21 +11,22 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    runtime_checkable,
 )
 
 from pydantic import (
+    Field,
     SerializerFunctionWrapHandler,
     field_validator,
     model_serializer,
 )
 
 from ndv.models._scene._transform import Transform
-from ndv.models._scene._vis_model import Field, SupportsVisibility, VisModel
+from ndv.models._scene._vis_model import SupportsVisibility, VisModel
 from ndv.models._sequence import ValidatedEventedList
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from contextlib import AbstractContextManager
 
 logger = logging.getLogger(__name__)
 NodeTypeCoV = TypeVar("NodeTypeCoV", bound="Node", covariant=True)
@@ -34,6 +35,7 @@ NodeAdaptorProtocolTypeCoV = TypeVar(
 )
 
 
+@runtime_checkable
 class NodeAdaptorProtocol(SupportsVisibility[NodeTypeCoV], Protocol):
     """Backend interface for a Node."""
 
@@ -58,8 +60,12 @@ class NodeAdaptorProtocol(SupportsVisibility[NodeTypeCoV], Protocol):
         pass
 
     @abstractmethod
-    def _vis_updates_blocked(self) -> AbstractContextManager:
-        """Return a context manager that blocks updates to the node."""
+    def _vis_block_updates(self) -> None:
+        """Block future updates until `unblock_updates` is called."""
+
+    @abstractmethod
+    def _vis_unblock_updates(self) -> None:
+        """Unblock updates after `block_updates` was called."""
 
     @abstractmethod
     def _vis_force_update(self) -> None:

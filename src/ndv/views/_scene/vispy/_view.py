@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# TODO: originally, View did need to be a Node, but not anymore,
+# so this could be refactored
 class View(Node, core.view.ViewAdaptorProtocol):
     """View interface for Vispy Backend."""
 

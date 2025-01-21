@@ -91,7 +91,10 @@ class ValidatedEventedList(MutableSequence[_T]):
         return len(self._list)
 
     def __eq__(self, value: object) -> bool:
-        return self._list == value
+        # TODO: this can cause recursion errors for recursive models
+        if isinstance(value, ValidatedEventedList):
+            return self._list == value._list
+        return NotImplemented
 
     # -----------------------------------------------------
 

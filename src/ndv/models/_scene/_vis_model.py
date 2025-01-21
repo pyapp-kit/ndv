@@ -5,14 +5,22 @@ import logging
 from abc import abstractmethod
 from contextlib import suppress
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Protocol,
+    TypeVar,
+    cast,
+)
 
 from psygnal import EmissionInfo, SignalGroupDescriptor
 from pydantic import BaseModel, ConfigDict
 from pydantic.fields import Field
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
 __all__ = ["Field", "ModelBase", "SupportsVisibility", "VisModel"]
 
@@ -252,13 +260,31 @@ def _get_default_backend() -> str:
 
     This will likely be context dependent.
     """
-    return "vispy"
+    from ndv.views._app import canvas_backend
+
+    return canvas_backend(None).value
+
+
+def _update_blocker(adaptor: BackendAdaptor) -> contextlib.AbstractContextManager:
+    from ndv.models._scene.nodes.node import NodeAdaptorProtocol
+
+    if isinstance(adaptor, NodeAdaptorProtocol):
+
+        @contextlib.contextmanager
+        def blocker() -> Iterator[None]:
+            adaptor._vis_block_updates()
+            try:
+                yield
+            finally:
+                adaptor._vis_unblock_updates()
+
+        return blocker()
+    return contextlib.nullcontext()
 
 
 def sync_adaptor(adaptor: BackendAdaptor, model: VisModel) -> None:
     """Decorator to validate and cache adaptor classes."""
-    blocker = getattr(adaptor, "_vis_updates_blocked", contextlib.nullcontext)
-    with blocker():
+    with _update_blocker(adaptor):
         for field_name in model.model_fields:
             method_name = SETTER_METHOD.format(name=field_name)
             value = getattr(model, field_name)

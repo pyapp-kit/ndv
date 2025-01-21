@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from cmap import Color  # noqa: TC002
 from psygnal.containers import EventedList
+from pydantic import Field
 
-from ._vis_model import Field, SupportsVisibility, VisModel
+from ._vis_model import SupportsVisibility, VisModel
 from .view import View
 
 if TYPE_CHECKING:
@@ -58,10 +59,8 @@ class Canvas(VisModel[CanvasAdaptorProtocol]):
     an orthoviewer might be a single canvas with three views, one for each axis.
     """
 
-    width: float = Field(default=500, description="The width of the canvas in pixels.")
-    height: float = Field(
-        default=500, description="The height of the canvas in pixels."
-    )
+    width: int = Field(default=500, description="The width of the canvas in pixels.")
+    height: int = Field(default=500, description="The height of the canvas in pixels.")
     background_color: Color | None = Field(
         default=None,
         description="The background color. None implies transparent "
@@ -72,7 +71,7 @@ class Canvas(VisModel[CanvasAdaptorProtocol]):
     views: ViewList[View] = Field(default_factory=lambda: ViewList(), frozen=True)
 
     @property
-    def size(self) -> tuple[float, float]:
+    def size(self) -> tuple[int, int]:
         """Return the size of the canvas."""
         return self.width, self.height
 

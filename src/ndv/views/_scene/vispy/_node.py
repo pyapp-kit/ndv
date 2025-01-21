@@ -11,28 +11,20 @@ if TYPE_CHECKING:
     from ndv.models._scene import Transform
 
 
-class VispyUpdateBlocker:
-    def __init__(self, vispy_node: scene.VisualNode):
-        self.vispy_node = vispy_node
-
-    def __enter__(self) -> VispyUpdateBlocker:
-        self._update, self.vispy_node.update = self.vispy_node.update, lambda: None
-        return self
-
-    def __exit__(self, *_: Any) -> None:
-        self.vispy_node.update = self._update
-
-
 class Node(core_node.NodeAdaptorProtocol):
     """Node adaptor for Vispy Backend."""
 
     _vispy_node: scene.VisualNode
+    _update: Any = None
 
     def _vis_force_update(self) -> None:
         self._vispy_node.update()
 
-    def _vis_updates_blocked(self) -> VispyUpdateBlocker:
-        return VispyUpdateBlocker(self._vispy_node)
+    def _vis_block_updates(self) -> None:
+        self._update, self._vispy_node.update = self._vispy_node.update, lambda: None
+
+    def _vis_unblock_updates(self) -> None:
+        self._vispy_node.update, self._update = self._update, None
 
     def _vis_get_native(self) -> Any:
         return self._vispy_node

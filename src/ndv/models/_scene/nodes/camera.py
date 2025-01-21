@@ -3,8 +3,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Literal, Protocol
 
+from pydantic import Field
+
 from ndv._types import CameraType
-from ndv.models._scene._vis_model import Field
 
 from .node import Node, NodeAdaptorProtocol
 

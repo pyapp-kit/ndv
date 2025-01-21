@@ -7,10 +7,8 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, DTypeLike, NDArray
-from pydantic import ConfigDict, RootModel
+from pydantic import ConfigDict, Field, RootModel
 from pydantic_core import core_schema
-
-from ._vis_model import Field
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sized
