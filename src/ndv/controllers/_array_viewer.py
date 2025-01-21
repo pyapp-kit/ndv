@@ -12,7 +12,6 @@ from ndv.models._data_display_model import DataResponse, _ArrayDataDisplayModel
 from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
-from ndv.views.bases._graphics._canvas_elements import RectangularROI
 
 if TYPE_CHECKING:
     from concurrent.futures import Future
@@ -23,6 +22,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
+    from ndv.views.bases._graphics._canvas_elements import RectangularROI
 
     LutKey: TypeAlias = int | None
 
@@ -72,8 +72,10 @@ class ArrayViewer:
             data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
         )
         self._viewer_model = ArrayViewerModel()
-        self._viewer_model.events.interaction_mode.connect(self._on_interaction_mode_changed)
-        self._roi_model: RectangularROIModel | None = None
+        self._viewer_model.events.interaction_mode.connect(
+            self._on_interaction_mode_changed
+        )
+        self._roi_model: RectangularROIModel | None = RectangularROIModel(visible=False)
 
         app = _app.gui_frontend()
 
@@ -96,11 +98,14 @@ class ArrayViewer:
         self._canvas = canvas_cls(self._viewer_model)
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.frontend_widget(), self._data_model, self._viewer_model)
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._data_model, self._viewer_model
+        )
 
         self._roi_view: RectangularROI | None = None
 
         self._set_model_connected(self._data_model.display)
+        self._set_roi_model_connected(self._roi_model)
         self._canvas.set_ndim(self.display_model.n_visible_axes)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
@@ -169,7 +174,7 @@ class ArrayViewer:
         else:
             self._data_model.data_wrapper = DataWrapper.create(data)
         self._fully_synchronize_view()
-    
+
     @property
     def roi(self) -> RectangularROIModel | None:
         return self._roi_model
@@ -327,13 +332,17 @@ class ArrayViewer:
         # redraw
         self._clear_canvas()
         self._request_data()
-    
-    def _on_roi_model_bounding_box_changed(self, bb: tuple[tuple[float, float], tuple[float, float]]) -> None:
+
+    def _on_roi_model_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
         if self._roi_view is None:
             self._roi_view = self._canvas.add_bounding_box()
             # HACK
             self._roi_view.set_visible(True)
-            self._roi_view.boundingBoxChanged.connect(self._on_roi_view_bounding_box_changed)
+            self._roi_view.boundingBoxChanged.connect(
+                self._on_roi_view_bounding_box_changed
+            )
         self._roi_view.set_bounding_box(*bb)
 
     def _on_roi_model_visible_changed(self, visible: bool) -> None:
@@ -341,9 +350,11 @@ class ArrayViewer:
             self._roi_view = self._canvas.add_bounding_box()
             # HACK
             self._roi_view.set_visible(True)
-            self._roi_view.boundingBoxChanged.connect(self._on_roi_view_bounding_box_changed)
+            self._roi_view.boundingBoxChanged.connect(
+                self._on_roi_view_bounding_box_changed
+            )
         self._roi_view.set_visible(visible)
-    
+
     def _on_interaction_mode_changed(self, mode: InteractionMode) -> None:
         # TODO: Unify with _on_roi_model_bounding_box_changed
         if mode == InteractionMode.CREATE_ROI:
@@ -351,7 +362,9 @@ class ArrayViewer:
                 self._roi_view.remove()
             self._roi_view = self._canvas.add_bounding_box()
             # HACK
-            self._roi_view.boundingBoxChanged.connect(self._on_roi_view_bounding_box_changed)
+            self._roi_view.boundingBoxChanged.connect(
+                self._on_roi_view_bounding_box_changed
+            )
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
@@ -373,8 +386,10 @@ class ArrayViewer:
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
         self._canvas.set_range()
-    
-    def _on_roi_view_bounding_box_changed(self, bb: tuple[tuple[float, float], tuple[float, float]]) -> None:
+
+    def _on_roi_view_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
         if self._roi_model:
             self._roi_model.bounding_box = bb
 
