@@ -13,8 +13,9 @@ from ._mouseable import Mouseable
 if TYPE_CHECKING:
     import numpy as np
 
-    from ._canvas_elements import CanvasElement, ImageHandle, RectangularROI
     from ndv.models._viewer_model import ArrayViewerModel
+
+    from ._canvas_elements import CanvasElement, ImageHandle, RectangularROI
 
 
 class GraphicsCanvas(Viewable, Mouseable):

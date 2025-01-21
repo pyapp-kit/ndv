@@ -211,7 +211,12 @@ class JupyterArrayView(ArrayView):
             width = "604px"
 
         btns = widgets.HBox(
-            [self._channel_mode_combo, self._ndims_btn, self._add_roi_btn, self._reset_zoom_btn],
+            [
+                self._channel_mode_combo,
+                self._ndims_btn,
+                self._add_roi_btn,
+                self._reset_zoom_btn,
+            ],
             layout=widgets.Layout(justify_content="flex-end"),
         )
         self.layout = widgets.VBox(

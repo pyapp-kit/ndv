@@ -29,7 +29,6 @@ from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
-from ndv.views.bases._graphics._canvas_elements import CanvasElement, RectangularROI
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -39,6 +38,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._graphics._canvas_elements import CanvasElement, RectangularROI
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -411,7 +411,10 @@ class _QArrayViewer(QWidget):
 
 class QtArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: QWidget, data_model: _ArrayDataDisplayModel, viewer_model: ArrayViewerModel
+        self,
+        canvas_widget: QWidget,
+        data_model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
     ) -> None:
         self._data_model = data_model
         self._viewer_model = viewer_model

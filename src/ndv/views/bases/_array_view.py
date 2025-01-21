@@ -36,7 +36,11 @@ class ArrayView(Viewable):
     # model: _ArrayDataDisplayModel is likely a temporary parameter
     @abstractmethod
     def __init__(
-        self, canvas_widget: Any, model: _ArrayDataDisplayModel, viewer_model: ArrayViewerModel, **kwargs: Any
+        self,
+        canvas_widget: Any,
+        model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
+        **kwargs: Any,
     ) -> None: ...
     @abstractmethod
     def create_sliders(self, coords: Mapping[int, Sequence]) -> None: ...
