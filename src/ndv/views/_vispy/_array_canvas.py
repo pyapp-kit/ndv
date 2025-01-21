@@ -15,7 +15,13 @@ import vispy.visuals
 from vispy import scene
 from vispy.util.quaternion import Quaternion
 
-from ndv._types import CursorType, MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas
@@ -106,7 +112,7 @@ class VispyImageHandle(ImageHandle):
     def remove(self) -> None:
         self._visual.parent = None
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
+    def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
 
 
@@ -239,7 +245,8 @@ class VispyBoundingBox(RectangularROI):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
-    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType | None:
+    def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
+        canvas_pos = (mme.x, mme.y)
         pos = self._tform.map(canvas_pos)[:2]
         if self._handle_under(pos) is not None:
             center = self._rect.center
@@ -415,7 +422,7 @@ class VispyArrayCanvas(ArrayCanvas):
                 _y[1] = max(_y[1], shape[1])
                 if len(shape) > 2:
                     _z[1] = max(_z[1], shape[2])
-            elif isinstance(handle, VispyRoiHandle):
+            elif isinstance(handle, VispyBoundingBox):
                 for v in handle.vertices:
                     _x[0] = min(_x[0], v[0])
                     _x[1] = max(_x[1], v[0])
@@ -503,11 +510,11 @@ class VispyArrayCanvas(ArrayCanvas):
         self._camera.interactive = True
         return False
 
-    def get_cursor(self, canvas_pos: tuple[float, float]) -> CursorType:
+    def get_cursor(self, mme: MouseMoveEvent) -> CursorType:
         if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             return CursorType.CROSS
-        for vis in self.elements_at(canvas_pos):
-            if cursor := vis.get_cursor(canvas_pos):
+        for vis in self.elements_at((mme.x, mme.y)):
+            if cursor := vis.get_cursor(mme):
                 return cursor
         return CursorType.DEFAULT
 

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import wx
 from wx import EVT_LEFT_DOWN, EVT_LEFT_UP, EVT_MOTION, EvtHandler, MouseEvent
 
-from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 from ndv.views.bases._app import NDVApp
 
 from ._main_thread import call_in_main_thread
@@ -61,20 +61,31 @@ class WxAppWrap(NDVApp):
 
         # TIP: event.Skip() allows the event to propagate to other handlers.
 
+        active_button = MouseButton.NONE
+
         def on_mouse_move(event: MouseEvent) -> None:
-            mme = MouseMoveEvent(x=event.GetX(), y=event.GetY())
+            nonlocal active_button
+            mme = MouseMoveEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
             if not receiver.on_mouse_move(mme):
                 receiver.mouseMoved.emit(mme)
                 event.Skip()
+            # FIXME: get_cursor is VERY slow, unsure why.
+            if cursor := receiver.get_cursor(mme):
+                canvas.SetCursor(cursor.to_wx())
 
         def on_mouse_press(event: MouseEvent) -> None:
-            mpe = MousePressEvent(x=event.GetX(), y=event.GetY())
+            nonlocal active_button
+            # NB This function is bound to the left mouse button press
+            active_button = MouseButton.LEFT
+            mpe = MousePressEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
             if not receiver.on_mouse_press(mpe):
                 receiver.mousePressed.emit(mpe)
                 event.Skip()
 
         def on_mouse_release(event: MouseEvent) -> None:
-            mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY())
+            nonlocal active_button
+            mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
+            active_button = MouseButton.NONE
             if not receiver.on_mouse_release(mre):
                 receiver.mouseReleased.emit(mre)
                 event.Skip()

@@ -10,11 +10,17 @@ import numpy as np
 import pygfx
 import pylinalg as la
 
-from ndv._types import CursorType, MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
-from ndv.views.bases._graphics._canvas_elements import ROIMoveMode, RectangularROI
+from ndv.views.bases._graphics._canvas_elements import RectangularROI, ROIMoveMode
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -100,7 +106,7 @@ class PyGFXImageHandle(ImageHandle):
         if (par := self._image.parent) is not None:
             par.remove(self._image)
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
+    def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
 
 
@@ -317,9 +323,9 @@ class PyGFXBoundingBox(RectangularROI):
                 return i
         return None
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType | None:
+    def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         # Convert event pos (on canvas) to world pos
-        world_pos = self._canvas_to_world(pos)
+        world_pos = self._canvas_to_world((mme.x, mme.y))
         # Step 1: Handles
         # Preferred over the rectangle
         # Can only be moved if ROI is selected
@@ -648,11 +654,10 @@ class GfxArrayCanvas(ArrayCanvas):
             self._selection.on_mouse_release(event)
         return False
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType:
         if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             return CursorType.CROSS
-        for vis in self.elements_at(pos):
-            self.canvas_to_world(pos)[:2]
-            if cursor := vis.get_cursor(pos):
+        for vis in self.elements_at((event.x, event.y)):
+            if cursor := vis.get_cursor(event):
                 return cursor
         return CursorType.DEFAULT

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
+from functools import lru_cache
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from pydantic import PlainSerializer, PlainValidator
@@ -13,6 +14,7 @@ from typing_extensions import TypeAlias
 if TYPE_CHECKING:
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
+    from wx import Cursor
 
     from ndv.views.bases import Viewable
 
@@ -122,4 +124,28 @@ class CursorType(Enum):
             CursorType.ALL_ARROW: "move",
             CursorType.BDIAG_ARROW: "nesw-resize",
             CursorType.FDIAG_ARROW: "nwse-resize",
+        }[self]
+
+    @lru_cache
+    def to_wx(self) -> Cursor:
+        """Converts CursorType to jupyter cursor strings."""
+        from wx import (
+            CURSOR_ARROW,
+            CURSOR_CROSS,
+            CURSOR_SIZENESW,
+            CURSOR_SIZENS,
+            CURSOR_SIZENWSE,
+            CURSOR_SIZEWE,
+            CURSOR_SIZING,
+            Cursor,
+        )
+
+        return {
+            CursorType.DEFAULT: Cursor(CURSOR_ARROW),
+            CursorType.CROSS: Cursor(CURSOR_CROSS),
+            CursorType.V_ARROW: Cursor(CURSOR_SIZENS),
+            CursorType.H_ARROW: Cursor(CURSOR_SIZEWE),
+            CursorType.ALL_ARROW: Cursor(CURSOR_SIZING),
+            CursorType.BDIAG_ARROW: Cursor(CURSOR_SIZENESW),
+            CursorType.FDIAG_ARROW: Cursor(CURSOR_SIZENWSE),
         }[self]

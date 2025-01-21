@@ -5,9 +5,15 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 from qtpy.QtCore import QEvent, QObject
 from qtpy.QtGui import QMouseEvent
-from qtpy.QtWidgets import QApplication
+from qtpy.QtWidgets import QApplication, QWidget
 
-from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.views.bases._app import NDVApp
 
 if TYPE_CHECKING:
@@ -67,8 +73,8 @@ class QtAppWrap(NDVApp):
     def filter_mouse_events(
         self, canvas: Any, receiver: Mouseable
     ) -> Callable[[], None]:
-        if not isinstance(canvas, QObject):
-            raise TypeError(f"Expected canvas to be QObject, got {type(canvas)}")
+        if not isinstance(canvas, QWidget):
+            raise TypeError(f"Expected canvas to be QWidget, got {type(canvas)}")
 
         f = MouseEventFilter(canvas, receiver)
         canvas.installEventFilter(f)
@@ -76,13 +82,13 @@ class QtAppWrap(NDVApp):
 
 
 class MouseEventFilter(QObject):
-    def __init__(self, canvas: QObject, receiver: Mouseable):
+    def __init__(self, canvas: QWidget, receiver: Mouseable):
         super().__init__()
         self.canvas = canvas
         self.receiver = receiver
         self.active_button = MouseButton.NONE
 
-    def mouse_btn(self, btn : Any) -> MouseButton:
+    def mouse_btn(self, btn: Any) -> MouseButton:
         from qtpy.QtCore import Qt
 
         if btn == Qt.MouseButton.LeftButton:
@@ -93,6 +99,9 @@ class MouseEventFilter(QObject):
             return MouseButton.NONE
 
         raise Exception(f"Qt mouse button {btn} is unknown")
+
+    def set_cursor(self, type: CursorType) -> None:
+        self.canvas.setCursor(type.to_qt())
 
     def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
         """Event filter installed on the canvas to handle mouse events.
@@ -121,6 +130,8 @@ class MouseEventFilter(QObject):
                 if etype == QEvent.Type.MouseMove:
                     mme = MouseMoveEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
                     intercept |= receiver.on_mouse_move(mme)
+                    if cursor := receiver.get_cursor(mme):
+                        self.set_cursor(cursor)
                     receiver.mouseMoved.emit(mme)
                 elif etype == QEvent.Type.MouseButtonPress:
                     self.active_button = btn
@@ -128,7 +139,9 @@ class MouseEventFilter(QObject):
                     intercept |= receiver.on_mouse_press(mpe)
                     receiver.mousePressed.emit(mpe)
                 elif etype == QEvent.Type.MouseButtonRelease:
-                    mre = MouseReleaseEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
+                    mre = MouseReleaseEvent(
+                        x=pos.x(), y=pos.y(), btn=self.active_button
+                    )
                     self.active_button = MouseButton.NONE
                     intercept |= receiver.on_mouse_release(mre)
                     receiver.mouseReleased.emit(mre)
