@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
@@ -19,6 +20,11 @@ from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
     from ndv.controllers._channel_controller import ChannelController
+
+try:
+    from qtpy import QT_API
+except ImportError:
+    QT_API = None
 
 
 def _get_mock_canvas() -> ArrayCanvas:
@@ -212,6 +218,9 @@ def test_array_viewer_histogram() -> None:
     """Mostly a smoke test for basic functionality of histogram backends."""
     if _app.gui_frontend() != _app.GuiFrontend.QT:
         pytest.skip("histograms only implemented in Qt.")
+        return
+    if os.name == "nt" and QT_API == "PySide6" and _app.canvas_backend() == "pygfx":
+        pytest.skip("pygfx not supported on Windows with PySide6.")
         return
 
     viewer = ArrayViewer()
