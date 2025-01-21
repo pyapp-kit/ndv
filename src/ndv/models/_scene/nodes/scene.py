@@ -1,9 +1,9 @@
 from typing import Literal
 
-from .node import Node
+from .node import Node, NodeAdaptorProtocol
 
 
-class Scene(Node):
+class Scene(Node[NodeAdaptorProtocol]):
     """A Root node for a scene graph.
 
     This really isn't anything more than a regular Node, but it's an explicit

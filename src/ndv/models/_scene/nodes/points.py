@@ -52,6 +52,7 @@ SymbolName = Literal[
     "star",
     "cross_lines",
 ]
+ScalingMode = Literal[True, False, "fixed", "scene", "visual"]
 
 
 class Points(Node[PointsBackend]):
@@ -72,7 +73,8 @@ class Points(Node[PointsBackend]):
     symbol: SymbolName = Field(
         default="disc", description="The symbol to use for the points."
     )
-    scaling: Literal[True, False, "fixed", "scene", "visual"] = Field(
+    # TODO: these are vispy-specific names.  Determine more general names
+    scaling: ScalingMode = Field(
         default=True, description="Determines how points scale when zooming."
     )
 

@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 import numpy as np
 from rich import print
 
@@ -9,25 +11,28 @@ from ndv.views import _app
 
 _app.ndv_app()
 img1 = Image(
-    name="Some Image", data=np.random.randint(0, 255, (100, 100)).astype(np.uint8)
+    name="Some Image",
+    data=np.random.randint(0, 255, (100, 100)).astype(np.uint8),
+    clims=(0, 255),
 )
 
 img2 = Image(
     data=np.random.randint(0, 255, (200, 200)).astype(np.uint8),
     cmap="viridis",
     transform=Transform().scaled((0.7, 0.5)).translated((-10, 20)),
+    clims=(0, 255),
 )
 
 scene = Scene(children=[img1, img2])
-points = Points(
-    coords=np.random.randint(0, 200, (100, 2)),
-    size=5,
-    face_color="blue",
-    edge_color="yellow",
-    edge_width=0.5,
-    opacity=0.1,
-)
-scene.children.insert(0, points)
+with suppress(Exception):
+    points = Points(
+        coords=np.random.randint(0, 200, (100, 2)).astype(np.uint8),
+        size=5,
+        face_color="coral",
+        edge_color="blue",
+        opacity=0.8,
+    )
+    scene.children.insert(0, points)
 view = View(scene=scene)
 
 

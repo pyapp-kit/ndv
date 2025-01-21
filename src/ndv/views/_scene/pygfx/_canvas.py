@@ -1,84 +1,51 @@
 from __future__ import annotations
 
-from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Union, cast
-
-import pygfx
+from typing import TYPE_CHECKING, Any, cast
 
 from ndv.models import _scene as core
 
 if TYPE_CHECKING:
     import numpy as np
     from cmap import Color
-    from typing_extensions import TypeAlias
-    from wgpu.gui import glfw, jupyter, offscreen, qt
+    from rendercanvas.auto import RenderCanvas
 
     from ._view import View
-
-    # from wgpu.gui.auto import WgpuCanvas
-    # ... will result in one of the following canvas classes
-    TypeWgpuCanvasType: TypeAlias = Union[
-        type[offscreen.WgpuCanvas],  # if WGPU_FORCE_OFFSCREEN=1
-        type[jupyter.WgpuCanvas],  # if is_jupyter()
-        type[glfw.WgpuCanvas],  # if glfw is installed
-        type[qt.WgpuCanvas],  # if any pyqt backend is installed
-    ]
-    # TODO: lol... there's probably a better way to do this :)
-    WgpuCanvasType: TypeAlias = Union[
-        offscreen.WgpuCanvas,  # if WGPU_FORCE_OFFSCREEN=1
-        jupyter.WgpuCanvas,  # if is_jupyter()
-        glfw.WgpuCanvas,  # if glfw is installed
-        qt.WgpuCanvas,  # if any pyqt backend is installed
-    ]
 
 
 class Canvas(core.canvas.CanvasAdaptorProtocol):
     """Canvas interface for pygfx Backend."""
 
     def __init__(self, canvas: core.Canvas, **backend_kwargs: Any) -> None:
-        # wgpu.gui.auto.WgpuCanvas is a "magic" import that itself is context sensitive
-        # see TYPE_CHECKING section above for details
-        from wgpu.gui.auto import WgpuCanvas
+        from rendercanvas.auto import RenderCanvas
 
-        WgpuCanvas = cast("TypeWgpuCanvasType", WgpuCanvas)
-
-        canvas = WgpuCanvas(size=canvas.size, title=canvas.title, **backend_kwargs)
-        self._wgpu_canvas = cast("WgpuCanvasType", canvas)
-        # TODO: background_color
-        # the qt backend, this shows by default...
-        # if we need to prevent it, we could potentially monkeypatch during init.
+        self._wgpu_canvas = RenderCanvas()
+        # Qt RenderCanvas calls show() in its __init__ method, so we need to hide it
         if hasattr(self._wgpu_canvas, "hide"):
             self._wgpu_canvas.hide()
 
-        self._renderer = pygfx.renderers.WgpuRenderer(self._wgpu_canvas)
-        self._viewport: pygfx.Viewport = pygfx.Viewport(self._renderer)
-        self._views: list[View] = []
-        # self._grid: dict[tuple[int, int], View] = {}
+        self._wgpu_canvas.set_logical_size(canvas.width, canvas.height)
+        self._wgpu_canvas.set_title(canvas.title)
+        self._views = canvas.views
 
-    def _vis_get_native(self) -> WgpuCanvasType:
+    def _vis_get_native(self) -> RenderCanvas:
         return self._wgpu_canvas
 
     def _vis_set_visible(self, arg: bool) -> None:
+        # show the qt canvas we patched earlier in __init__
         if hasattr(self._wgpu_canvas, "show"):
             self._wgpu_canvas.show()
-        self._wgpu_canvas.request_draw(self._animate)
+        self._wgpu_canvas.request_draw(self._draw)
 
-    def _animate(self, viewport: pygfx.Viewport | None = None) -> None:
-        vp = viewport or self._viewport
+    def _draw(self) -> None:
         for view in self._views:
-            view._visit(vp)
-        if hasattr(vp.renderer, "flush"):
-            # an attribute error can occur if flush() is called before render()
-            # https://github.com/pygfx/pygfx/issues/946
-            with suppress(AttributeError):
-                vp.renderer.flush()
-        if viewport is None:
-            self._wgpu_canvas.request_draw()
+            adaptor = cast("View", view.backend_adaptor("pygfx"))
+            adaptor._draw()
 
     def _vis_add_view(self, view: core.View) -> None:
-        adaptor = cast("View", view.backend_adaptor())
+        pass
+        # adaptor = cast("View", view.backend_adaptor())
         # adaptor._pygfx_cam.set_viewport(self._viewport)
-        self._views.append(adaptor)
+        # self._views.append(adaptor)
 
     def _vis_set_width(self, arg: int) -> None:
         _, height = self._wgpu_canvas.get_logical_size()
@@ -88,11 +55,12 @@ class Canvas(core.canvas.CanvasAdaptorProtocol):
         width, _ = self._wgpu_canvas.get_logical_size()
         self._wgpu_canvas.set_logical_size(width, arg)
 
-    def _vis_set_background_color(self, arg: Color | None) -> None:
-        raise NotImplementedError()
+    def _vis_set_background_color(self, arg: Color) -> None:
+        # not sure if pygfx has both a canavs and view background color...
+        pass
 
     def _vis_set_title(self, arg: str) -> None:
-        raise NotImplementedError()
+        self._wgpu_canvas.set_title(arg)
 
     def _vis_close(self) -> None:
         """Close canvas."""
@@ -107,11 +75,10 @@ class Canvas(core.canvas.CanvasAdaptorProtocol):
         alpha: bool = True,
     ) -> np.ndarray:
         """Render to screenshot."""
-        from wgpu.gui.offscreen import WgpuCanvas
+        from rendercanvas.offscreen import OffscreenRenderCanvas
 
+        # not sure about this...
         w, h = self._wgpu_canvas.get_logical_size()
-        canvas = WgpuCanvas(width=w, height=h, pixel_ratio=1)
-        renderer = pygfx.renderers.WgpuRenderer(canvas)
-        viewport = pygfx.Viewport(renderer)
-        canvas.request_draw(lambda: self._animate(viewport))
+        canvas = OffscreenRenderCanvas(width=w, height=h, pixel_ratio=1)
+        canvas.request_draw(self._draw)
         return cast("np.ndarray", canvas.draw())

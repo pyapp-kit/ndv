@@ -5,7 +5,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from cmap import Color
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 
 from ._vis_model import ModelBase, SupportsVisibility, VisModel
 from .nodes import Camera, Scene
@@ -121,9 +121,30 @@ class View(VisModel[ViewAdaptorProtocol]):
 
     model_config = ConfigDict(repr_exclude_defaults=False)  # type: ignore
 
+    _canvas: Canvas | None = PrivateAttr(None)
+
     def model_post_init(self, __context: Any) -> None:
         super().model_post_init(__context)
+        self.camera.parent = self.scene
         self.layout.events.connect(self._on_layout_event)
+
+    @computed_field  # type: ignore
+    @property
+    def canvas(self) -> Canvas:
+        """The canvas that the view is on.
+
+        If one hasn't been created/assigned, a new one is created.
+        """
+        if (canvas := self._canvas) is None:
+            from .canvas import Canvas
+
+            self.canvas = canvas = Canvas()
+        return canvas
+
+    @canvas.setter
+    def canvas(self, value: Canvas) -> None:
+        self._canvas = value
+        self._canvas.add_view(self)
 
     def _on_layout_event(self, info: EmissionInfo) -> None:
         _signal_name = info.signal.name
@@ -135,15 +156,9 @@ class View(VisModel[ViewAdaptorProtocol]):
         Convenience method for showing the canvas that the view is on.
         If no canvas exists, a new one is created.
         """
-        if not hasattr(self, "_canvas"):
-            from .canvas import Canvas
-
-            # TODO: we need to know/check somehow if the view is already on a canvas
-            # This just creates a new canvas every time
-            self._canvas = Canvas()
-            self._canvas.add_view(self)
-        self._canvas.show()
-        return self._canvas
+        canvas = self.canvas
+        canvas.show()
+        return self.canvas
 
     def add_node(self, node: NodeType) -> NodeType:
         """Add any node to the scene."""
