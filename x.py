@@ -15,7 +15,7 @@ img1 = Image(
 img2 = Image(
     data=np.random.randint(0, 255, (200, 200)).astype(np.uint8),
     cmap="viridis",
-    transform=Transform().scaled((0.7, 0.7)),
+    transform=Transform().scaled((0.7, 0.7)).translated((-10, 20)),
 )
 points = Points(
     coords=np.random.randint(0, 200, (100, 2)),
