@@ -22,9 +22,13 @@ if TYPE_CHECKING:
     from ndv.controllers._channel_controller import ChannelController
 
 try:
-    from qtpy import QT_API
+    from qtpy import API_NAME
 except ImportError:
-    QT_API = None
+    API_NAME = None
+
+IS_WIN = os.name == "nt"
+IS_PYSIDE6 = API_NAME == "PySide6"
+IS_PYGFX = _app.canvas_backend(None) == "pygfx"
 
 
 def _get_mock_canvas() -> ArrayCanvas:
@@ -213,14 +217,14 @@ def test_array_viewer_with_app() -> None:
         assert viewer.display_model.visible_axes == (0, -2, -1)
 
 
+@pytest.mark.skipif(
+    bool(IS_WIN and IS_PYSIDE6 and IS_PYGFX), reason="combo still segfaulting on CI"
+)
 @pytest.mark.usefixtures("any_app")
 def test_array_viewer_histogram() -> None:
     """Mostly a smoke test for basic functionality of histogram backends."""
     if _app.gui_frontend() != _app.GuiFrontend.QT:
         pytest.skip("histograms only implemented in Qt.")
-        return
-    if os.name == "nt" and QT_API == "PySide6" and _app.canvas_backend() == "pygfx":
-        pytest.skip("pygfx not supported on Windows with PySide6.")
         return
 
     viewer = ArrayViewer()
