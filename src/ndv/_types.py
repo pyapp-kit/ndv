@@ -7,7 +7,7 @@ from contextlib import suppress
 from enum import Enum, IntFlag, auto
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
-import numpy as np
+import numpy.typing as npt
 from pydantic import PlainSerializer, PlainValidator
 from typing_extensions import TypeAlias
 
@@ -120,7 +120,7 @@ class CameraType(str, Enum):
         return self.value
 
 
-ArrayLike: TypeAlias = np.typing.NDArray
+ArrayLike: TypeAlias = npt.NDArray
 
 
 class ImageInterpolation(str, Enum):
