@@ -102,37 +102,23 @@ DEBUG_EXCEPTIONS = "NDV_DEBUG_EXCEPTIONS"
 EXIT_ON_EXCEPTION = "NDV_EXIT_ON_EXCEPTION"
 """Whether to exit the application when an exception is raised. Default False."""
 
-RICH_TRACEBACKS = "NDV_RICH_TRACEBACKS"
-"""Whether to use rich for printing tracebacks. Default True."""
-
-
-def _print_rich_exception(
-    exc_type: type[BaseException],
-    exc_value: BaseException,
-    exc_traceback: TracebackType | None,
-) -> None:
-    import psygnal
-    from rich.console import Console
-    from rich.traceback import Traceback
-
-    tb = Traceback.from_exception(
-        exc_type, exc_value, exc_traceback, suppress=[psygnal], max_frames=10
-    )
-    Console(stderr=True).print(tb)
-
 
 def _print_exception(
     exc_type: type[BaseException],
     exc_value: BaseException,
     exc_traceback: TracebackType | None,
 ) -> None:
-    if os.getenv(RICH_TRACEBACKS, "1") in ("1", "true", "True"):
-        try:
-            _print_rich_exception(exc_type, exc_value, exc_traceback)
-            return
-        except ImportError:
-            pass
-    traceback.print_exception(exc_type, value=exc_value, tb=exc_traceback)
+    try:
+        import psygnal
+        from rich.console import Console
+        from rich.traceback import Traceback
+
+        tb = Traceback.from_exception(
+            exc_type, exc_value, exc_traceback, suppress=[psygnal], max_frames=10
+        )
+        Console(stderr=True).print(tb)
+    except ImportError:
+        traceback.print_exception(exc_type, value=exc_value, tb=exc_traceback)
 
 
 def ndv_excepthook(
