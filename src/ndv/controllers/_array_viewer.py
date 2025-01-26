@@ -244,19 +244,17 @@ class ArrayViewer:
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
         display_model = self._data_model.display
+        self._view.set_channel_mode(display_model.channel_mode)
         if (wrapper := self._data_model.data_wrapper) is not None:
             with self._view.currentIndexChanged.blocked():
                 self._view.create_sliders(wrapper.coords)
-        self._view.set_channel_mode(display_model.channel_mode)
-        if self.data is not None:
             self._view.set_visible_axes(self._data_model.normed_visible_axes)
             self._update_visible_sliders()
             if cur_index := display_model.current_index:
                 self._view.set_current_index(cur_index)
             # reconcile view sliders with model
             self._on_view_current_index_changed()
-            if wrapper:
-                self._view.set_data_info(wrapper.summary_info())
+            self._view.set_data_info(wrapper.summary_info())
 
             self._clear_canvas()
             self._request_data()
