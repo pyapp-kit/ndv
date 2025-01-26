@@ -9,14 +9,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping, Sequence
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Generic,
-    Protocol,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -31,6 +24,8 @@ if TYPE_CHECKING:
     import pyopencl.array as cl_array
     import sparse
     import tensorstore as ts
+    import torch
+    import xarray as xr
     from pydantic import GetCoreSchemaHandler
 
     Index: TypeAlias = int | slice
@@ -265,6 +260,30 @@ class DataWrapper(Generic[ArrayT], ABC):
 ##########################
 
 
+class XarrayWrapper(DataWrapper["xr.DataArray"]):
+    """Wrapper for xarray DataArray objects."""
+
+    @property
+    def dims(self) -> tuple[Hashable, ...]:
+        """Return the dimension labels for the data."""
+        return tuple(self._data.dims)
+
+    @property
+    def coords(self) -> Mapping[Hashable, Sequence]:
+        """Return the coordinates for the data."""
+        return self.data.coords  # type: ignore [no-any-return]
+
+    def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
+        idx = tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
+        return np.asarray(self.data[idx])
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[xr.DataArray]:
+        if (xr := sys.modules.get("xarray")) and isinstance(obj, xr.DataArray):
+            return True
+        return False
+
+
 class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
     """Wrapper for tensorstore.TensorStore objects."""
 
@@ -410,3 +429,31 @@ class DaskWrapper(ArrayLikeWrapper["da.Array"]):
 
     def save_as_zarr(self, path: str) -> None:
         self._data.to_zarr(url=path)
+
+
+class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
+    """Wrapper for torch tensor objects."""
+
+    @property
+    def coords(self) -> Mapping[Hashable, Sequence]:
+        dims = self.dims
+        return {i: range(s) for i, s in zip(dims, self.data.shape)}
+
+    @property
+    def dims(self) -> tuple[Hashable, ...]:
+        # torch does enforce that len(names) == len(shape), and that names are unique
+        # with the exception of None, which is allowed to be repeated
+        if hasattr(self.data, "names"):
+            names = self.data.names
+            return tuple((i if name is None else name) for i, name in enumerate(names))
+        return tuple(range(len(self.data.shape)))
+
+    def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
+        idx = tuple(indexers.get(k, slice(None)) for k in range(len(self.data.shape)))
+        return np.asarray(self.data[idx])
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[torch.Tensor]:
+        if (torch := sys.modules.get("torch")) and isinstance(obj, torch.Tensor):
+            return True
+        return False

@@ -206,7 +206,7 @@ class _QDimsSliders(QWidget):
         layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         layout = cast("QFormLayout", self.layout())
         for axis, _coords in coords.items():
@@ -438,7 +438,7 @@ class QtArrayView(ArrayView):
         widget.setParent(None)
         widget.deleteLater()
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         self._qwidget.dims_sliders.create_sliders(coords)
 
