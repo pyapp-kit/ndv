@@ -84,7 +84,7 @@ def test_controller() -> None:
     mock_view.create_sliders.assert_called_once_with(ranges)
     # visible-axis sliders are hidden
     # (2,3) because model.visible_axes is set to (-2, -1) and ndim is 4
-    mock_view.hide_sliders.assert_called_once_with((2, 3), show_remainder=True)
+    mock_view.hide_sliders.assert_called_once_with({2, 3}, show_remainder=True)
     # channel mode is set to default (which is currently grayscale)
     mock_view.set_channel_mode.assert_called_once_with(model.channel_mode)
     # data info is set
@@ -93,17 +93,17 @@ def test_controller() -> None:
 
     # changing visible axes updates which sliders are visible
     model.visible_axes = (0, 3)
-    mock_view.hide_sliders.assert_called_with((0, 3), show_remainder=True)
+    mock_view.hide_sliders.assert_called_with({0, 3}, show_remainder=True)
 
     # changing the channel mode updates the sliders and updates the view combobox
     mock_view.hide_sliders.reset_mock()
     model.channel_mode = "composite"
     mock_view.set_channel_mode.assert_called_with(ChannelMode.COMPOSITE)
     mock_view.hide_sliders.assert_called_once_with(
-        (0, 3, model.channel_axis), show_remainder=True
+        {0, 3, model.channel_axis}, show_remainder=True
     )
     model.channel_mode = ChannelMode.GRAYSCALE
-    mock_view.hide_sliders.assert_called_with((0, 3), show_remainder=True)
+    mock_view.hide_sliders.assert_called_with({0, 3}, show_remainder=True)
 
     # when the view changes the current index, the model is updated
     idx = {0: 1, 1: 2, 3: 8}

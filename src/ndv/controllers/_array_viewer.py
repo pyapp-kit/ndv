@@ -331,10 +331,15 @@ class ArrayViewer:
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
-        hidden_sliders: tuple[int, ...] = self._data_model.normed_visible_axes
+        hidden_sliders: set[int] = set(self._data_model.normed_visible_axes)
         if self._data_model.display.channel_mode.is_multichannel():
             if ch := self._data_model.normed_channel_axis:
-                hidden_sliders += (ch,)
+                hidden_sliders.add(ch)
+
+        # hide singleton axes
+        for ax, coord in self._data_model.normed_data_coords.items():
+            if len(coord) < 2:
+                hidden_sliders.add(ax)
 
         self._view.hide_sliders(hidden_sliders, show_remainder=True)
 
