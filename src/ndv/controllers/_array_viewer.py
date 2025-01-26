@@ -343,9 +343,11 @@ class ArrayViewer:
             if len(coord) < 2:
                 hidden_indices.add(ax)
 
+        # here we look into the *non*-normalized wrapper.dims names
+        # and add those to the hidden indices as well (so that sliders are hidden
+        # regardless of the form in which they were expressed in the model)
         hidden_sliders: set[Hashable] = set(hidden_indices)
         if wrapper := self._data_model.data_wrapper:
-            # hide axes that are not present in the data
             for hidden in list(hidden_indices):
                 hidden_sliders.add(wrapper.dims[hidden])
 
