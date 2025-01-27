@@ -257,8 +257,8 @@ class DataWrapper(Generic[ArrayT], ABC):
             info += f" {size_str}"
         if dtype := getattr(self._data, "dtype", ""):
             info += f", {dtype}"
-        if nbytes := getattr(self._data, "nbytes", 0) / 1e6:
-            info += f", {nbytes:.2f}MB"
+        if nbytes := getattr(self._data, "nbytes", 0):
+            info += f", {_human_readable_size(nbytes)}"
         return info
 
     # TODO: this needs to be cleared when data.dims changes
@@ -289,6 +289,15 @@ class DataWrapper(Generic[ArrayT], ABC):
         """Clear any cached properties."""
         if hasattr(self, "axis_map"):
             del self.axis_map
+
+
+def _human_readable_size(nbytes: float) -> str:
+    units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+    for unit in units:
+        if nbytes < 1024:
+            return f"{nbytes:.2f}".rstrip("0").rstrip(".") + unit
+        nbytes /= 1024.0
+    return f"{nbytes:.2f}YB"  # In case nbytes is extremely large
 
 
 ##########################
