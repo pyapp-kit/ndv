@@ -215,7 +215,7 @@ class JupyterArrayView(ArrayView):
 
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         sliders = []
         self._sliders.clear()
