@@ -152,7 +152,7 @@ skip-magic-trailing-comma = false # default is false
 
 # https://mypy.readthedocs.io/en/stable/config_file.html
 [tool.mypy]
-files = "src/**/"
+files = "src/**/*.py"
 strict = true
 disallow_any_generics = false
 disallow_subclassing_any = false
