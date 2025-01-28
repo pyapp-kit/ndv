@@ -1,11 +1,10 @@
-"""An example on how to embed the `ArrayViewer` controller in a custom Qt widget.
-
-To run this example install `ndv` with the following:
-
-```bash
-pip install ndv[vispy,pyqt] imageio
-```
-"""
+# /// script
+# dependencies = [
+#   "imageio",
+#   "ndv[vispy,pyqt]",
+# ]
+# ///
+"""An example on how to embed the `ArrayViewer` controller in a custom Qt widget."""
 
 from typing import TYPE_CHECKING
 

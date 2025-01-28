@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#   "openwfs",
+#   "ndv[vispy,pyqt]",
+# ]
+# ///
 """A minimal microscope dashboard.
 
 The `SyntheticManager` acts as an microscope simulator.
