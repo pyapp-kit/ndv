@@ -16,7 +16,7 @@ uv run https://github.com/pyapp-kit/ndv/raw/refs/heads/main/examples/numpy_arr.p
 Replace `numpy_arr.py` with the name of the example file in this directory you
 want to run.
 
-## Notbooks
+## Notebooks
 
 To run any of the `.ipynb` files in this directory, you can use uv with
 [`juv`](https://github.com/manzt/juv)
