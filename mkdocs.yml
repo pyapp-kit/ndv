@@ -19,6 +19,7 @@ nav:
   - install.md
   - motivation.md
   - env_var.md
+  - Cookbook: cookbook/
   # This is populated by scripts/gen_ref_nav.py
   - API reference: reference/
 
