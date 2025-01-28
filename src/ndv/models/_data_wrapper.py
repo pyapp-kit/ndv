@@ -220,7 +220,7 @@ class DataWrapper(Generic[ArrayT], ABC):
         for dimkey, val in sizes.items():
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
-                    return self.normalized_axis_key(dimkey)
+                    return self.normalize_axis_key(dimkey)
 
         # otherwise use the smallest dimension as the channel axis
         return min(sizes, key=sizes.get)  # type: ignore [arg-type]
@@ -231,13 +231,13 @@ class DataWrapper(Generic[ArrayT], ABC):
         ch = self.guess_channel_axis()
         for dimkey in sizes:
             if str(dimkey).lower() in self.COMMON_Z_AXIS_NAMES:
-                if (normed := self.normalized_axis_key(dimkey)) != ch:
+                if (normed := self.normalize_axis_key(dimkey)) != ch:
                     return normed
 
         # otherwise return the LAST axis that is neither in the last two dimensions
         # or the channel axis guess
         return next(
-            (self.normalized_axis_key(x) for x in reversed(self.dims[:-2]) if x != ch),
+            (self.normalize_axis_key(x) for x in reversed(self.dims[:-2]) if x != ch),
             None,
         )
 
@@ -273,7 +273,7 @@ class DataWrapper(Generic[ArrayT], ABC):
             axis_index[-(ndims - i)] = i  # map negative integer index to positive index
         return axis_index
 
-    def normalized_axis_key(self, axis: Hashable) -> int:
+    def normalize_axis_key(self, axis: Hashable) -> int:
         """Return positive index for `axis` (which can be +/- int or str label)."""
         try:
             return self.axis_map[axis]
