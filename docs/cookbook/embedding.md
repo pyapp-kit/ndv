@@ -11,7 +11,7 @@ The following script shows an example on how to dynamically select a data set an
 --8<-- "examples/cookbook/ndv_embedded.py"
 ````
 
-![Screenshot generated from ndv_embedded.py](../screenshots/cookbook/ndv_embedded.png)
+![Screenshot generated from ndv_embedded.py](../screenshots/cookbook/ndv_embedded.png) {: .screenshot }
 
 ## Use multiple `ndv.ArrayViewer` controllers in the same widget
 

@@ -42,13 +42,11 @@ def generate_screenshot(
 
 def snap_viewer(*_: Any, output: Path | BinaryIO) -> None:
     """Mock QApplication.exec that snaps a screenshot and exits without blocking."""
-    from ndv.views._qt._array_view import _QArrayViewer
+    from qtpy.QtWidgets import QFrame
 
     try:
-        qviewer = next(
-            wdg
-            for wdg in QApplication.topLevelWidgets()
-            if isinstance(wdg, _QArrayViewer)
+        main_wdg = next(
+            wdg for wdg in QApplication.topLevelWidgets() if not isinstance(wdg, QFrame)
         )
     except StopIteration:
         return
@@ -63,14 +61,20 @@ def snap_viewer(*_: Any, output: Path | BinaryIO) -> None:
     QApplication.sendPostedEvents()
     QApplication.processEvents()
 
-    qviewer.grab().save(target)
+    pixmap = main_wdg.grab()
+    pixmap.save(target, "png")
     if isinstance(target, QBuffer):
         img_bytes = target.data().data()
-        cast(BinaryIO, output).write(img_bytes)
+        cast(io.BufferedWriter, output).write(img_bytes)
+
+    main_wdg.close()
+    main_wdg.deleteLater()
 
     for wdg in QApplication.topLevelWidgets():
         wdg.close()
         wdg.deleteLater()
+    QApplication.processEvents()
+    QApplication.processEvents()
     QApplication.processEvents()
 
 
@@ -113,7 +117,6 @@ if __name__ == "<run_path>":
             else:
                 relpath = script.relative_to(examples_dir.parent)
                 logger.info(f"Generated screenshot for {relpath} to {fd.name}")
-
 
 elif __name__ == "__main__":
     script = Path(__file__).parent.parent.parent / "examples" / "numpy_arr.py"

@@ -64,7 +64,10 @@ class SyntheticManager(QObject):
             shape=camera_resolution,
         )
 
-        self._timer.timeout.connect(lambda: self.sigNewFrame.emit(self._camera.read()))
+        self._timer.timeout.connect(self.emit_frame)
+
+    def emit_frame(self) -> None:
+        self.sigNewFrame.emit(self._camera.read())
 
     def toggle_simulation(self, start: bool) -> None:
         if start:
@@ -191,6 +194,6 @@ wrapper = DashboardWidget()
 manager.sigNewFrame.connect(wrapper.new_frame)
 wrapper.sigSimStarted.connect(manager.toggle_simulation)
 wrapper.sigMoveStage.connect(manager.move_stage)
-
+manager.emit_frame()
 wrapper.show()
 app.exec()
