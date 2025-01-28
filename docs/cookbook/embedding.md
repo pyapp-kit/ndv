@@ -3,13 +3,15 @@
 `ndv` can be embedded in an existing Qt application and enriched with additional elements in a custom layout.
 The following document shows some examples of such implementation.
 
-## Change the content of `ArrayViewer` via push buttons.
+## Change the content of `ArrayViewer` via push buttons
 
 The following script shows an example on how to dynamically select a data set and load it in the `ArrayViewer`.
 
 ````python title="examples/cookbook/ndv_embedded.py"
 --8<-- "examples/cookbook/ndv_embedded.py"
 ````
+
+![Screenshot generated from ndv_embedded.py](../screenshots/cookbook/ndv_embedded.png)
 
 ## Use multiple `ndv.ArrayViewer` controllers in the same widget
 

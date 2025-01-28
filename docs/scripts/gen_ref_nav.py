@@ -4,6 +4,7 @@ from pathlib import Path
 
 import mkdocs_gen_files
 
+FE = mkdocs_gen_files.editor.FilesEditor.current()
 nav = mkdocs_gen_files.Nav()
 mod_symbol = '<code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>'
 
@@ -27,11 +28,11 @@ for path in sorted(SRC.rglob("*.py")):
     nav_parts = [f"{mod_symbol} {part}" for part in parts]
     nav[tuple(nav_parts)] = doc_path.as_posix()
 
-    with mkdocs_gen_files.open(full_doc_path, "w") as fd:
+    with FE.open(str(full_doc_path), "w") as fd:
         ident = ".".join(parts)
         fd.write(f"---\ntitle: {ident}\n---\n\n::: {ident}")
 
-    mkdocs_gen_files.set_edit_path(full_doc_path, ".." / path.relative_to(ROOT))
+    FE.set_edit_path(str(full_doc_path), str(".." / path.relative_to(ROOT)))
 
-with mkdocs_gen_files.open("reference/SUMMARY.md", "w") as nav_file:
+with FE.open("reference/SUMMARY.md", "w") as nav_file:
     nav_file.writelines(nav.build_literate_nav())
