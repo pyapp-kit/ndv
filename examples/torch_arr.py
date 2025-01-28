@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "torch>=2.5",
+# ]
+# ///
 from __future__ import annotations
 
 try:

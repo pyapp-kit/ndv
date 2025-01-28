@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "xarray",
+#     "scipy",
+#     "pooch",
+# ]
+# ///
 from __future__ import annotations
 
 try:
