@@ -7,7 +7,6 @@ To run this example install `ndv` with the following:
 ```bash
 pip install ndv[vispy,pyqt] imageio
 ```
-
 """
 
 from qtpy import QtWidgets
@@ -17,7 +16,6 @@ from ndv.data import astronaut, cells3d
 
 
 class MultiNDVWrapper(QtWidgets.QWidget):
-
     def __init__(self) -> None:
         super().__init__()
 

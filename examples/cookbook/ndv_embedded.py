@@ -5,7 +5,6 @@ To run this example install `ndv` with the following:
 ```bash
 pip install ndv[vispy,pyqt] imageio
 ```
-
 """
 
 from typing import TYPE_CHECKING
@@ -20,7 +19,6 @@ if TYPE_CHECKING:
 
 
 class EmbeddingWidget(QtWidgets.QWidget):
-
     def __init__(self) -> None:
         super().__init__()
         layout = QtWidgets.QGridLayout()
@@ -51,8 +49,8 @@ class EmbeddingWidget(QtWidgets.QWidget):
         self._viewer.data = None
         self._viewer.data = astronaut()[:, :, 0]
 
+
 app = QtWidgets.QApplication([])
 widget = EmbeddingWidget()
 widget.show()
 run_app()
-

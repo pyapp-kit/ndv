@@ -162,7 +162,6 @@ class DashboardWidget(QtWidgets.QWidget):
             value -= 1
         self.labels[f"pos:{stage}:{axis}"].setText(f"{value:.2f} µm")
 
-
     def start_simulation(self, checked: bool) -> None:
         if checked:
             self._start_button.setText("Stop")
