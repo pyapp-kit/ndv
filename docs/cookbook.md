@@ -127,7 +127,7 @@ run_app()
 ### A minimal microscope dashboard using `openwfs`
 
 You can use `ndv` to take an external image source (i.e. a widefield camera) and show its content in real-time in a custom widget embedding `ArrayViewer`.
-The script below uses `openwfs` to generate synthetic images of a sample and continously update the view, and allows to move the field of view over the X and Y axis.
+The script below uses `openwfs` to generate synthetic images of a sample and continuously update the view, and allows to move the field of view over the X and Y axis.
 
 To run this example install `ndv` and [`openwfs`](https://github.com/IvoVellekoop/openwfs) with the following command:
 
