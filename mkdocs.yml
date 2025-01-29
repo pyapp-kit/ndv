@@ -3,7 +3,7 @@ site_url: https://pyapp-kit.github.io/ndv/
 site_description: "minimal n-dimensional python array viewer."
 repo_name: "pyapp-kit/ndv"
 repo_url: https://github.com/pyapp-kit/ndv
-watch: [mkdocs.yml, README.md, src, examples]
+watch: [mkdocs.yml, README.md, src]
 
 # maximum strictness
 # https://www.mkdocs.org/user-guide/configuration/#validation

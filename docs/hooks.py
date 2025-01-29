@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 LOGGER = get_plugin_logger("ndv_docs")
 # Path to the docs directory
 DOCS = Path(__file__).parent
+ROOT = DOCS.parent
 # pattern to detect {{ screenshot: some/file.py }}
 SCREENSHOT_RE = re.compile(r"{{\s*screenshot:\s*(.+?)\s*}}")
 # a mapping of {hash -> File} for all screenshots we've generated
@@ -49,31 +50,51 @@ SCREENSHOTS: defaultdict[int, set[File]] = defaultdict(set)
 
 
 def on_startup(command: Literal["build", "gh-deploy", "serve"], dirty: bool) -> None:
+    """Runs once at the very beginning of an mkdocs invocation."""
     sys.path.append(str(DOCS))
 
 
 def on_config(config: Config, **__: Any) -> None:
+    """First event called on build, run immediately after user cfg is loaded/validated.
+
+    Any alterations to the config should be made here.
+    """
     config["markdown_extensions"].append("hooks")
 
 
 def on_page_markdown(
     markdown: str, page: Page, config: MkDocsConfig, files: Files
 ) -> str:
-    """Called when processing a markdown page."""
-    # ---------------------------------------------------------------------------
-    # Find all {{ screenshot: some/file.py }},
-    # generate a screenshot for each file and replace the tag with the image link
-    # this generates two links: one for light mode and one for dark mode
+    """Called after the page's markdown is loaded from file.
+
+    Can be used to alter the Markdown source text. The meta- data has been stripped off
+    and is available as page.meta at this point.
+    """
+    # ------------------------- Screenshot Generation ---------------------------------
+    #
 
     def get_screenshot_link(match: re.Match) -> str:
-        """Callback for SCREENSHOT_RE.sub."""
-        script = Path(match.group(1))
-        script_hash = hash(script.read_bytes())
-        if not (ss_files := SCREENSHOTS[script_hash]):
-            LOGGER.info(f"Generating screenshot for {script}")
-            for content, mode in generate_screenshots(script):
-                src_uri = f"screenshots/{script.stem}_{mode}.png"
-                LOGGER.info(f"   >> {mode}: {src_uri}, {hash(content)}")
+        """Callback for SCREENSHOT_RE.sub.
+
+        Return a markdown link to replace `{{ screenshot: some/file.py }}`
+        """
+        script_path = Path(match.group(1))
+        # add the script to the watch list so that mkdocs will rebuild the page
+        # if the script is edited
+        abs_path = str(ROOT / script_path)
+        if abs_path not in config.watch:
+            config.watch.append(abs_path)
+
+        # if we've never seen the content of this script before, generate a screenshot
+        # and store it in the SCREENSHOTS dict
+        if not (ss_files := SCREENSHOTS[hash(script_path.read_bytes())]):
+            LOGGER.info(f"Generating screenshot for {script_path}")
+            for content, mode in generate_screenshots(script_path):
+                src_uri = f"screenshots/{script_path.stem}_{mode}.png"
+                LOGGER.info(f"   >> {mode}: {src_uri}")
+
+                # mkdocs takes care of copying the file to the site_dir
+                # we just have to create a File object for it
                 file = File.generated(
                     config,
                     src_uri=src_uri,
@@ -84,12 +105,18 @@ def on_page_markdown(
 
         link = ""
         for file in ss_files:
+            # build markdown links, with lazy loading and theme awareness
             files.append(file)
             mode = "dark" if "dark" in file.src_uri else "light"
+            alt_txt = f"Screenshot generated with {script_path.stem}"
             uri = f"../{file.src_uri}#only-{mode}"
-            link += f"![{script}]({uri}){{ .auto-screenshot loading=lazy }}\n"
+            # note, the .auto-screenshot class is styled in ndv.css
+            link += f"![{alt_txt}]({uri}){{ .auto-screenshot loading=lazy }}\n"
         return link
 
+    # Find all {{ screenshot: some/file.py }},
+    # generate a screenshot for each file and replace the tag with the image link
+    # this generates two links: one for light mode and one for dark mode
     new_markdown = SCREENSHOT_RE.sub(get_screenshot_link, markdown)
 
     # ---------------------------------------------------------------------------
@@ -163,7 +190,7 @@ def grab_top_widget(
     # the biggest issue at the time is the animated expansion of the luts
     # QcollapsibleWidget.  That should be fixed at superqt to not animate if desired.
     for _i in range(10):
-        time.sleep(0.05)
+        time.sleep(0.1)
         QApplication.processEvents()
 
     def _get_bytes() -> bytes:
@@ -176,7 +203,7 @@ def grab_top_widget(
     yield _get_bytes(), "light"
     if set_dark_mode(True):
         for _i in range(10):
-            time.sleep(0.05)
+            time.sleep(0.1)
             QApplication.processEvents()
         yield _get_bytes(), "dark"
         set_dark_mode(False)
