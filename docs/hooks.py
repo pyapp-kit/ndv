@@ -1,3 +1,16 @@
+"""Custom hooks used in our documentation.
+
+This is registered in the `hooks` section of `mkdocs.yml` file and is used to apply
+all of our customizations to the documentation build process, such as automatically
+generating screenshots from scripts.
+
+Screenshots can be inserted into the documentation by using the following syntax:
+
+```markdown
+{{ screenshot: some/file/relative/to/repo_root.py }}
+```
+"""
+
 from __future__ import annotations
 
 import re
@@ -6,7 +19,7 @@ import sys
 import time
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, no_type_check
+from typing import TYPE_CHECKING, Any, Literal
 from unittest.mock import patch
 
 import markdown
@@ -43,7 +56,13 @@ def on_config(config: Config, **__: Any) -> None:
 def on_page_markdown(
     markdown: str, page: Page, config: MkDocsConfig, files: Files
 ) -> str:
+    """Called when processing a markdown page."""
+    # ---------------------------------------------------------------------------
+    # Find all {{ screenshot: some/file.py }},
+    # generate a screenshot for each file and replace the tag with the image link
+
     def get_screenshot_link(match: re.Match) -> str:
+        """Callback for SCREENSHOT_RE.sub."""
         script = Path(match.group(1))
         script_hash = hash(script.read_bytes())
         if not (file := SCREENSHOTS.get(script_hash)):
@@ -54,12 +73,14 @@ def on_page_markdown(
                 content=generate_screenshot(script),
                 inclusion=InclusionLevel.NOT_IN_NAV,
             )
-
         files.append(file)
         x = f"![{script}](../{file.src_uri}){{ .auto-screenshot }}"
         return x
 
     new_markdown = SCREENSHOT_RE.sub(get_screenshot_link, markdown)
+
+    # ---------------------------------------------------------------------------
+
     return new_markdown
 
 
@@ -74,31 +95,35 @@ def generate_screenshot(script: Path) -> bytes:
     if script.suffix != ".py":
         raise ValueError(f"Invalid file type: {script}")
 
+    # patch any calls to QApplication([]) in scripts, so they don't cause an
+    # error if the Application is already created.
     original_new = QApplication.__new__
 
-    # run
-    @no_type_check
     def _start_app(*_: Any) -> QCoreApplication:
         if (app := QApplication.instance()) is None:
-            QApplication._APP = app = original_new(*_)
-            QApplication.__init__(app, [])
+            QApplication._APP = app = original_new(*_)  # type: ignore
+            QApplication.__init__(app, [])  # type: ignore
         return app
 
+    patch_app = patch.object(QApplication, "__new__", _start_app)
+
+    # patch QApplication.exec to grab the top widget and exit,
+    # rather than entering an event loop.
     buffer = QBuffer()
     buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-
-    patch_app = patch.object(QApplication, "__new__", _start_app)
     patch_exec = patch.object(
         QApplication, "exec", partial(grab_top_widget, buffer=buffer)
     )
     with patch_app, patch_exec:
+        # run the script
         runpy.run_path(str(script), run_name="__main__")
 
+    # return the screenshot grabbed by the grab_top_widget function
     return buffer.data().data()
 
 
 def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
-    """Mock QApplication.exec that snaps a screenshot and exits without blocking."""
+    """Find the top widget and return bytes containing a screenshot."""
     from qtpy.QtWidgets import QFrame
 
     try:
@@ -129,6 +154,9 @@ def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
 
 
 # ---------------------------- Custom Markdown Extension ----------------------------
+
+# this stuff can be removed if we stop using snippets to insert markdown
+# (like README.md) that has github style admonitions.
 
 
 class GhAdmonitionPreprocessor(markdown.preprocessors.Preprocessor):
