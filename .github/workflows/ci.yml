@@ -133,7 +133,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[docs]'
       - name: 📚 Build docs
-        run: mkdocs build --strict
+        run: |
+          osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to true'
+          mkdocs build --strict
       - uses: actions/upload-artifact@v2
         with:
           name: docs
