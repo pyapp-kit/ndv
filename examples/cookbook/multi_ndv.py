@@ -19,15 +19,13 @@ class MultiNDVWrapper(QtWidgets.QWidget):
     def __init__(self) -> None:
         super().__init__()
 
-        layout = QtWidgets.QGridLayout()
-        self._astronaut_viewer = ArrayViewer(astronaut()[:, :, 0])
+        self._astronaut_viewer = ArrayViewer(astronaut().mean(axis=-1))
         self._cells_virewer = ArrayViewer(cells3d(), current_index={0: 30, 1: 1})
 
         # get `ArrayViewer` widget and add it to the layout
-        layout.addWidget(self._astronaut_viewer.widget(), 0, 0, 4, 4)
-        layout.addWidget(self._cells_virewer.widget(), 0, 5, 4, 4)
-
-        self.setLayout(layout)
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.addWidget(self._astronaut_viewer.widget())
+        layout.addWidget(self._cells_virewer.widget())
 
 
 app = QtWidgets.QApplication([])

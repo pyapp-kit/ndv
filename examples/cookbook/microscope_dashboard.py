@@ -14,40 +14,32 @@ The `DashboardWidget` is a simple GUI that displays the images and allows the us
 - move the stage in the x and y directions.
 """
 
-import astropy.units as u  # type: ignore
+from typing import Any, cast
+
+import astropy.units as u
 import numpy as np
-import numpy.typing as npt
-from openwfs.simulation import Camera, Microscope, StaticSource  # type: ignore
-from psygnal import Signal
-from qtpy import QtWidgets
-from qtpy.QtCore import QObject, Qt, QTimer
-from qtpy.QtWidgets import QApplication
+from openwfs.simulation import Camera, Microscope, StaticSource
+from qtpy import QtWidgets as QtW
+from qtpy.QtCore import QObject, Qt, Signal
 
 from ndv import ArrayViewer
 
 
 class SyntheticManager(QObject):
-    sigNewFrame = Signal(np.ndarray)
+    newFrame = Signal(np.ndarray)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
 
-        self._timer = QTimer()
-
-        specimen_resolution = (
-            1024,
-            1024,
-        )  # height x width in pixels of the specimen image
+        specimen_resolution = (1024, 1024)  # (height, width) in pixels of the image
         specimen_pixel_size = 60 * u.nm  # resolution (pixel size) of the specimen image
         magnification = 40  # magnification from object plane to camera.
         numerical_aperture = 0.85  # numerical aperture of the microscope objective
         wavelength = 532.8 * u.nm  # wavelength of the light, for computing diffraction.
         camera_resolution = (256, 256)  # number of pixels on the camera
-        # camera_pixel_size = 6.45 * u.um  # Size of the pixels on the camera
 
-        img = np.maximum(
-            np.random.randint(-10000, 10, specimen_resolution, dtype=np.int16), 0
-        )
+        img = np.random.randint(-10000, 10, specimen_resolution, dtype=np.int16)
+        img = np.maximum(img, 0)
         src = StaticSource(img, pixel_size=specimen_pixel_size)
 
         self._microscope = Microscope(
@@ -64,136 +56,114 @@ class SyntheticManager(QObject):
             shape=camera_resolution,
         )
 
-        self._timer.timeout.connect(self.emit_frame)
-
-    def emit_frame(self) -> None:
-        self.sigNewFrame.emit(self._camera.read())
+    def move_stage(self, axis: str, step: float) -> None:
+        if axis == "x":
+            self._microscope.xy_stage.x += step * u.um
+        if axis == "y":
+            self._microscope.xy_stage.y += step * u.um
 
     def toggle_simulation(self, start: bool) -> None:
         if start:
-            self._timer.start(100)
-        else:
-            self._timer.stop()
+            self._timer_id = self.startTimer(100)
+        elif hasattr(self, "_timer_id"):
+            self.killTimer(self._timer_id)
 
-    def move_stage(self, axis: str, direction: str) -> None:
-        if direction == "+":
-            match axis:
-                case "x":
-                    self._microscope.xy_stage.x += 1 * u.um
-                case "y":
-                    self._microscope.xy_stage.y += 1 * u.um
-        else:
-            match axis:
-                case "x":
-                    self._microscope.xy_stage.x -= 1 * u.um
-                case "y":
-                    self._microscope.xy_stage.y -= 1 * u.um
+    def timerEvent(self, e: Any) -> None:
+        self.emit_frame()
+
+    def emit_frame(self) -> None:
+        self.newFrame.emit(self._camera.read())
 
 
-class DashboardWidget(QtWidgets.QWidget):
-    sigSimStarted = Signal(bool)
-    sigMoveStage = Signal(str, str)
+class StageWidget(QtW.QGroupBox):
+    stageMoved = Signal(str, int)
+
+    def __init__(self, name: str, axes: list[str], parent: QtW.QWidget) -> None:
+        super().__init__(name, parent)
+        self._data_key = "data"
+
+        def _make_button(txt: str, *data: Any) -> QtW.QPushButton:
+            btn = QtW.QPushButton(txt)
+            btn.setAutoRepeat(True)
+            btn.setProperty(self._data_key, data)
+            btn.clicked.connect(self._move_stage)
+            return btn
+
+        layout = QtW.QVBoxLayout(self)
+        for ax in axes:
+            # spinbox showing stage position
+            spin = QtW.QDoubleSpinBox()
+            spin.setMinimumWidth(80)
+            spin.setAlignment(Qt.AlignmentFlag.AlignRight)
+            spin.setSuffix(" µm")
+            spin.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            spin.setButtonSymbols(QtW.QAbstractSpinBox.ButtonSymbols.NoButtons)
+
+            # buttons to move the stage
+            down = _make_button("-", ax, spin)
+            up = _make_button("+", ax, spin)
+
+            row = QtW.QHBoxLayout()
+            row.addWidget(QtW.QLabel(f"<strong>{ax}:</strong>"), 0)
+            row.addWidget(spin, 0, Qt.AlignmentFlag.AlignRight)
+            row.addWidget(down, 1)
+            row.addWidget(up, 1)
+            layout.addLayout(row)
+
+    def _move_stage(self) -> None:
+        button = cast(QtW.QPushButton, self.sender())
+        ax, spin = button.property(self._data_key)
+        step = 1 if button.text() == "+" else -1
+        cast(QtW.QDoubleSpinBox, spin).stepBy(step)
+        self.stageMoved.emit(ax, step)
+
+
+class DashboardWidget(QtW.QWidget):
+    simulationStarted = Signal(bool)
+    stageMoved = Signal(str, int)
 
     def __init__(self) -> None:
         super().__init__()
-        layout = QtWidgets.QGridLayout()
-        self._start_button = QtWidgets.QPushButton("Start")
-        self.labels: dict[str, QtWidgets.QLabel] = {}
-        self.buttons: dict[str, QtWidgets.QPushButton] = {}
-        self._stage_name = "Stage"
-        axis = [
-            "x",
-            "y",
-        ]
 
-        self.group = QtWidgets.QGroupBox(self._stage_name)
-        self.group.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self._stage_widget = StageWidget("Stage", ["x", "y"], self)
+        self._stage_widget.setEnabled(False)
+        self._stage_widget.stageMoved.connect(self.stageMoved)
 
-        group_layout = QtWidgets.QGridLayout()
+        self._viewer = ArrayViewer()
+        self._viewer._async = False  # Disable async rendering for simplicity
 
-        for idx, ax in enumerate(axis):
-            self.labels[f"label:{self._stage_name}:{ax}"] = QtWidgets.QLabel(
-                f"<strong>{ax}</strong>"
-            )
-            self.labels[f"label:{self._stage_name}:{ax}"].setTextFormat(
-                Qt.TextFormat.RichText
-            )
-            self.labels[f"pos:{self._stage_name}:{ax}"] = QtWidgets.QLabel(
-                f"{0:.2f} µm"
-            )
-            self.labels[f"pos:{self._stage_name}:{ax}"].setTextFormat(
-                Qt.TextFormat.RichText
-            )
-            self.buttons[f"up:{self._stage_name}:{ax}"] = QtWidgets.QPushButton("+")
-            self.buttons[f"down:{self._stage_name}:{ax}"] = QtWidgets.QPushButton("-")
-            # signal connection
-            self.buttons[f"up:{self._stage_name}:{ax}"].clicked.connect(
-                lambda *_, axis=ax, dir="+": self._move_stage(
-                    self._stage_name, axis, dir
-                )
-            )
-            self.buttons[f"down:{self._stage_name}:{ax}"].clicked.connect(
-                lambda *_, axis=ax, dir="-": self._move_stage(
-                    self._stage_name, axis, dir
-                )
-            )
-            group_layout.addWidget(
-                self.labels[f"label:{self._stage_name}:{ax}"], idx, 0
-            )
-            group_layout.addWidget(self.labels[f"pos:{self._stage_name}:{ax}"], idx, 1)
-            group_layout.addWidget(self.buttons[f"up:{self._stage_name}:{ax}"], idx, 2)
-            group_layout.addWidget(
-                self.buttons[f"down:{self._stage_name}:{ax}"], idx, 3
-            )
-
-        self.group.setLayout(group_layout)
-
-        for button in self.buttons.values():
-            button.setEnabled(False)
-
-        self._data: npt.NDArray = np.zeros((256, 256), dtype=np.uint8)
-        self._viewer = ArrayViewer(self._data)
-        layout.addWidget(self._viewer.widget(), 0, 0, 1, 5)
-        layout.addWidget(self._start_button, 1, 0, 1, 1)
-        layout.addWidget(self.group, 1, 2, 1, 4)
-
+        self._start_button = QtW.QPushButton("Start")
+        self._start_button.setMinimumWidth(120)
         self._start_button.toggled.connect(self.start_simulation)
         self._start_button.setCheckable(True)
 
-        self.setLayout(layout)
+        bottom = QtW.QHBoxLayout()
+        bottom.setContentsMargins(0, 0, 0, 0)
+        bottom.addWidget(self._start_button)
+        bottom.addSpacing(120)
+        bottom.addWidget(self._stage_widget)
 
-    def _move_stage(self, stage: str, axis: str, direction: str) -> None:
-        self.sigMoveStage.emit(axis, direction)
-        value = float(self.labels[f"pos:{stage}:{axis}"].text().split(" ")[0])
-        if direction == "+":
-            value += 1
-        else:
-            value -= 1
-        self.labels[f"pos:{stage}:{axis}"].setText(f"{value:.2f} µm")
+        layout = QtW.QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.addWidget(self._viewer.widget(), 1)
+        layout.addLayout(bottom)
 
     def start_simulation(self, checked: bool) -> None:
-        if checked:
-            self._start_button.setText("Stop")
-            self.sigSimStarted.emit(True)
-            for button in self.buttons.values():
-                button.setEnabled(True)
-        else:
-            self._start_button.setText("Start")
-            self.sigSimStarted.emit(False)
-            for button in self.buttons.values():
-                button.setEnabled(False)
+        self._stage_widget.setEnabled(checked)
+        self._start_button.setText("Stop" if checked else "Start")
+        self.simulationStarted.emit(checked)
 
-    def new_frame(self, frame: np.ndarray) -> None:
+    def set_data(self, frame: np.ndarray) -> None:
         self._viewer.data = frame
 
 
-app = QApplication([])
+app = QtW.QApplication([])
 manager = SyntheticManager()
 wrapper = DashboardWidget()
 
-manager.sigNewFrame.connect(wrapper.new_frame)
-wrapper.sigSimStarted.connect(manager.toggle_simulation)
-wrapper.sigMoveStage.connect(manager.move_stage)
-manager.emit_frame()
+manager.newFrame.connect(wrapper.set_data)
+wrapper.simulationStarted.connect(manager.toggle_simulation)
+wrapper.stageMoved.connect(manager.move_stage)
+manager.emit_frame()  # just to populate the viewer with an image
 wrapper.show()
 app.exec()
