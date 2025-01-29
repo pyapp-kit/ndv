@@ -200,24 +200,24 @@ def grab_top_widget(
         pixmap.save(buffer, fmt)
         return buffer.data().data()
 
-    yield _get_bytes(), "light"
-    if set_dark_mode(True):
-        for _i in range(10):
+    modes: list[Mode] = ["light", "dark"] if sys.platform == "darwin" else ["light"]
+    for mode in modes:
+        set_dark_mode(mode == "dark")
+        for _i in range(12):
             time.sleep(0.1)
             QApplication.processEvents()
-        yield _get_bytes(), "dark"
-        set_dark_mode(False)
-
-    main_wdg.close()
-    main_wdg.deleteLater()
+        yield _get_bytes(), mode
 
     for wdg in QApplication.topLevelWidgets():
         wdg.close()
         wdg.deleteLater()
     QApplication.processEvents()
+    QApplication.processEvents()
 
 
 def set_dark_mode(bool: bool) -> bool:
+    if not sys.platform == "darwin":
+        return False
     try:
         subprocess.check_call(
             [
