@@ -1,52 +1,44 @@
 # /// script
 # dependencies = [
-#   "imageio",
 #   "ndv[vispy,pyqt]",
+#   "imageio[tifffile]",
 # ]
 # ///
 """An example on how to embed the `ArrayViewer` controller in a custom Qt widget."""
-
-from typing import TYPE_CHECKING
 
 from qtpy import QtWidgets
 
 from ndv import ArrayViewer, run_app
 from ndv.data import astronaut, cat
 
-if TYPE_CHECKING:
-    import numpy.typing as npt
-
 
 class EmbeddingWidget(QtWidgets.QWidget):
     def __init__(self) -> None:
         super().__init__()
-        layout = QtWidgets.QGridLayout()
-        self._data: npt.NDArray = cat()[:, :, 0]
-        self._viewer = ArrayViewer(self._data)
+        self._viewer = ArrayViewer()
 
         self._cat_button = QtWidgets.QPushButton("Load cat image")
-        self._astronaut_button = QtWidgets.QPushButton("Load astronaut image")
-
         self._cat_button.clicked.connect(self._load_cat)
+
+        self._astronaut_button = QtWidgets.QPushButton("Load astronaut image")
         self._astronaut_button.clicked.connect(self._load_astronaut)
 
-        # get `ArrayViewer` widget and add it to the layout;
-        # you can specify the row and column span of the widget
-        layout.addWidget(self._viewer.widget(), 0, 0, 1, 5)
+        btns = QtWidgets.QHBoxLayout()
+        btns.addWidget(self._cat_button)
+        btns.addWidget(self._astronaut_button)
 
-        # add buttons to the layout
-        layout.addWidget(self._cat_button, 1, 0)
-        layout.addWidget(self._astronaut_button, 1, 1)
+        layout = QtWidgets.QVBoxLayout(self)
+        # `ArrayViewer.widget()` returns the native Qt widget
+        layout.addWidget(self._viewer.widget())
+        layout.addLayout(btns)
 
-        self.setLayout(layout)
+        self._load_cat()
 
     def _load_cat(self) -> None:
-        self._viewer.data = None
-        self._viewer.data = cat()[:, :, 0]
+        self._viewer.data = cat().mean(axis=-1)
 
     def _load_astronaut(self) -> None:
-        self._viewer.data = None
-        self._viewer.data = astronaut()[:, :, 0]
+        self._viewer.data = astronaut().mean(axis=-1)
 
 
 app = QtWidgets.QApplication([])
