@@ -81,6 +81,7 @@ docs = [
     "mike==2.1.3",
     "ruff",
     # EXAMPLES
+    "ndv[vispy,pyqt]",
     "openwfs==1.0.0",
     "imageio[tifffile]",
 ]

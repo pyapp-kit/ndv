@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest # cause screenshots are nicer
     if: github.repository == 'pyapp-kit/ndv'
     steps:
       - uses: actions/checkout@v4
