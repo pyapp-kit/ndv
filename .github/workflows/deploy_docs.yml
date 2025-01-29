@@ -11,7 +11,9 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: macos-latest # cause screenshots are nicer
+    runs-on: macos-latest  # nicer screenshots
+    env:
+      QT_SCALE_FACTOR: 2  # simulate retina display for nicer screenshots
     if: github.repository == 'pyapp-kit/ndv'
     steps:
       - uses: actions/checkout@v4
