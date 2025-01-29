@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "tensorstore",
+# ]
+# ///
 from __future__ import annotations
 
 import ndv

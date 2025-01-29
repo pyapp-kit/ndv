@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "zarr",
+#     "fsspec",
+#     "aiohttp",
+# ]
+# ///
 from __future__ import annotations
 
 import ndv
