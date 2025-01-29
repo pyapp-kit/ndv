@@ -11,7 +11,7 @@ The following script shows an example on how to dynamically select a data set an
 --8<-- "examples/cookbook/ndv_embedded.py"
 ````
 
-![Screenshot generated from ndv_embedded.py](../screenshots/cookbook/ndv_embedded.png) {: .screenshot }
+{{ screenshot: examples/cookbook/ndv_embedded.py }}
 
 ## Use multiple `ndv.ArrayViewer` controllers in the same widget
 
@@ -21,6 +21,8 @@ The following script shows an example on how to create multiple instances of the
 --8<-- "examples/cookbook/multi_ndv.py"
 ````
 
+{{ screenshot: examples/cookbook/multi_ndv.py }}
+
 ## A minimal microscope dashboard using `openwfs`
 
 You can use `ndv` to take an external image source (i.e. a widefield camera) and show its content in real-time in a custom widget embedding `ArrayViewer`.
@@ -29,3 +31,5 @@ The script below uses [`openwfs`](https://github.com/IvoVellekoop/openwfs) to ge
 ````python title="examples/cookbook/microscope_dashboard.py"
 --8<-- "examples/cookbook/microscope_dashboard.py"
 ````
+
+{{ screenshot: examples/cookbook/microscope_dashboard.py }}

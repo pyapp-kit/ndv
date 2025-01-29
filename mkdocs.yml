@@ -3,7 +3,7 @@ site_url: https://pyapp-kit.github.io/ndv/
 site_description: "minimal n-dimensional python array viewer."
 repo_name: "pyapp-kit/ndv"
 repo_url: https://github.com/pyapp-kit/ndv
-watch: [mkdocs.yml, README.md, src]
+watch: [mkdocs.yml, README.md, src, examples]
 
 # maximum strictness
 # https://www.mkdocs.org/user-guide/configuration/#validation
@@ -102,8 +102,7 @@ plugins:
       cache_safe: true
   - gen-files:
       scripts:
-        - docs/scripts/gen_ref_nav.py
-        - docs/scripts/gen_screenshots.py
+        - scripts/gen_ref_nav.py
   - literate-nav:
       nav_file: SUMMARY.md
   - spellcheck:
@@ -147,12 +146,6 @@ hooks:
   - docs/hooks.py
 
 extra:
-  screenshots:
-    suffix: .png
-    # list of pathlib-patterns to include/exclude from autogeneration of screenshots
-    # https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language
-    exclude_patterns: ['**/backend_test/**']
-    include_patterns: ['**/cookbook/**']
   version:
     provider: mike
   # either of these tags will enable the "viewing pre" announcement banner

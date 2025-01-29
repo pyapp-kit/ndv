@@ -25,3 +25,7 @@ a.external:hover::after,
 a.autorefs-external:hover::after {
   background-color: var(--md-accent-fg-color);
 }
+
+img.auto-screenshot {
+  border-radius: 6px;
+}
