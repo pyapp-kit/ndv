@@ -121,8 +121,6 @@ jobs:
   # make sure we can build docs without error
   test-docs:
     runs-on: macos-latest  # nicer screenshots
-    env:
-      QT_SCALE_FACTOR: 2  # simulate retina display for nicer screenshots
     steps:
       - uses: actions/checkout@v4
       - name: 🐍 Set up Python

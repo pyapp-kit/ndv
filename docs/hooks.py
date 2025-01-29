@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import re
 import runpy
+import subprocess
 import sys
 import time
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from unittest.mock import patch
@@ -29,6 +29,8 @@ from qtpy.QtCore import QBuffer, QCoreApplication, QIODevice
 from qtpy.QtWidgets import QApplication
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
     from matplotlib.dviread import Page
     from mkdocs.config import Config
     from mkdocs.config.defaults import MkDocsConfig
@@ -67,12 +69,15 @@ def on_page_markdown(
         script_hash = hash(script.read_bytes())
         if not (file := SCREENSHOTS.get(script_hash)):
             LOGGER.info(f"Generating screenshot for {script}")
-            SCREENSHOTS[script_hash] = file = File.generated(
-                config,
-                f"screenshots/{script.stem}.png",
-                content=generate_screenshot(script),
-                inclusion=InclusionLevel.NOT_IN_NAV,
-            )
+            for content, mode in generate_screenshots(script):
+                file = File.generated(
+                    config,
+                    f"screenshots/{script.stem}_{mode}.png",
+                    content=content,
+                    inclusion=InclusionLevel.NOT_IN_NAV,
+                )
+                files.append(file)
+
         files.append(file)
         x = f"![{script}](../{file.src_uri}){{ .auto-screenshot }}"
         return x
@@ -86,8 +91,10 @@ def on_page_markdown(
 
 # ---------------------------- ScreenShot Generation ----------------------------
 
+Mode = Literal["light", "dark"]
 
-def generate_screenshot(script: Path) -> bytes:
+
+def generate_screenshots(script: Path) -> Iterable[tuple[bytes, Mode]]:
     """Generate a screenshot from a script."""
     script = Path(script).resolve()
     if not script.is_file():
@@ -107,22 +114,32 @@ def generate_screenshot(script: Path) -> bytes:
 
     patch_app = patch.object(QApplication, "__new__", _start_app)
 
-    # patch QApplication.exec to grab the top widget and exit,
-    # rather than entering an event loop.
-    buffer = QBuffer()
-    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-    patch_exec = patch.object(
-        QApplication, "exec", partial(grab_top_widget, buffer=buffer)
-    )
+    # We'll collect yields from grab_top_widget into a list,
+    # then yield them after the script has finished.
+    results: list[tuple[bytes, Mode]] = []
+
+    # patch QApplication.exec to grab screenshots instead of running the event loop
+
+    def patched_exec(*args: Any, **kwargs: Any) -> int:
+        # Call the generator and store items in results
+        for item in grab_top_widget(*args):
+            results.append(item)
+        # Return 0, or whatever exit code you like, so that
+        # QApp thinks exec() ended
+        return 0
+
+    patch_exec = patch.object(QApplication, "exec", patched_exec)
     with patch_app, patch_exec:
         # run the script
         runpy.run_path(str(script), run_name="__main__")
 
     # return the screenshot grabbed by the grab_top_widget function
-    return buffer.data().data()
+    return results
 
 
-def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
+def grab_top_widget(
+    fmt: str = "png",
+) -> Iterator[tuple[bytes, Literal["light", "dark"]]]:
     """Find the top widget and return bytes containing a screenshot."""
     from qtpy.QtWidgets import QFrame
 
@@ -141,8 +158,20 @@ def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
         time.sleep(0.05)
         QApplication.processEvents()
 
+    buffer = QBuffer()
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+
     pixmap = main_wdg.grab()
     pixmap.save(buffer, fmt)
+    bytes_ = buffer.data().data()
+    yield bytes_, "light"
+    if set_dark_mode(True):
+        QApplication.processEvents()
+        pixmap = main_wdg.grab()
+        pixmap.save(buffer, fmt)
+        bytes_ = buffer.data().data()
+        yield bytes_, "dark"
+        set_dark_mode(False)
 
     main_wdg.close()
     main_wdg.deleteLater()
@@ -151,6 +180,21 @@ def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
         wdg.close()
         wdg.deleteLater()
     QApplication.processEvents()
+
+
+def set_dark_mode(bool: bool) -> bool:
+    try:
+        subprocess.check_call(
+            [
+                "osascript",
+                "-e",
+                'tell application "System Events" to tell appearance preferences '
+                f"to set dark mode to {bool}",
+            ]
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 # ---------------------------- Custom Markdown Extension ----------------------------
