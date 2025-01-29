@@ -331,6 +331,8 @@ class ArrayViewer:
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
+        if self._data_model.data_wrapper is None:
+            return
         hidden_indices: set[int] = set(self._data_model.normed_visible_axes)
         if self._data_model.display.channel_mode.is_multichannel():
             if ch := self._data_model.normed_channel_axis:
