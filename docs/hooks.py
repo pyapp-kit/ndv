@@ -18,6 +18,7 @@ import runpy
 import subprocess
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from unittest.mock import patch
@@ -44,7 +45,7 @@ DOCS = Path(__file__).parent
 # pattern to detect {{ screenshot: some/file.py }}
 SCREENSHOT_RE = re.compile(r"{{\s*screenshot:\s*(.+?)\s*}}")
 # a mapping of {hash -> File} for all screenshots we've generated
-SCREENSHOTS: dict[int, File] = {}
+SCREENSHOTS: defaultdict[int, set[File]] = defaultdict(set)
 
 
 def on_startup(command: Literal["build", "gh-deploy", "serve"], dirty: bool) -> None:
@@ -62,25 +63,32 @@ def on_page_markdown(
     # ---------------------------------------------------------------------------
     # Find all {{ screenshot: some/file.py }},
     # generate a screenshot for each file and replace the tag with the image link
+    # this generates two links: one for light mode and one for dark mode
 
     def get_screenshot_link(match: re.Match) -> str:
         """Callback for SCREENSHOT_RE.sub."""
         script = Path(match.group(1))
         script_hash = hash(script.read_bytes())
-        if not (file := SCREENSHOTS.get(script_hash)):
+        if not (ss_files := SCREENSHOTS[script_hash]):
             LOGGER.info(f"Generating screenshot for {script}")
             for content, mode in generate_screenshots(script):
+                src_uri = f"screenshots/{script.stem}_{mode}.png"
+                LOGGER.info(f"   >> {mode}: {src_uri}, {hash(content)}")
                 file = File.generated(
                     config,
-                    f"screenshots/{script.stem}_{mode}.png",
+                    src_uri=src_uri,
                     content=content,
                     inclusion=InclusionLevel.NOT_IN_NAV,
                 )
-                files.append(file)
+                ss_files.add(file)
 
-        files.append(file)
-        x = f"![{script}](../{file.src_uri}){{ .auto-screenshot }}"
-        return x
+        link = ""
+        for file in ss_files:
+            files.append(file)
+            mode = "dark" if "dark" in file.src_uri else "light"
+            uri = f"../{file.src_uri}#only-{mode}"
+            link += f"![{script}]({uri}){{ .auto-screenshot loading=lazy }}\n"
+        return link
 
     new_markdown = SCREENSHOT_RE.sub(get_screenshot_link, markdown)
 
@@ -120,9 +128,9 @@ def generate_screenshots(script: Path) -> Iterable[tuple[bytes, Mode]]:
 
     # patch QApplication.exec to grab screenshots instead of running the event loop
 
-    def patched_exec(*args: Any, **kwargs: Any) -> int:
+    def patched_exec(_: Any) -> int:
         # Call the generator and store items in results
-        for item in grab_top_widget(*args):
+        for item in grab_top_widget():
             results.append(item)
         # Return 0, or whatever exit code you like, so that
         # QApp thinks exec() ended
@@ -158,19 +166,19 @@ def grab_top_widget(
         time.sleep(0.05)
         QApplication.processEvents()
 
-    buffer = QBuffer()
-    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-
-    pixmap = main_wdg.grab()
-    pixmap.save(buffer, fmt)
-    bytes_ = buffer.data().data()
-    yield bytes_, "light"
-    if set_dark_mode(True):
-        QApplication.processEvents()
+    def _get_bytes() -> bytes:
+        buffer = QBuffer()
+        buffer.open(QIODevice.OpenModeFlag.WriteOnly)
         pixmap = main_wdg.grab()
         pixmap.save(buffer, fmt)
-        bytes_ = buffer.data().data()
-        yield bytes_, "dark"
+        return buffer.data().data()
+
+    yield _get_bytes(), "light"
+    if set_dark_mode(True):
+        for _i in range(10):
+            time.sleep(0.05)
+            QApplication.processEvents()
+        yield _get_bytes(), "dark"
         set_dark_mode(False)
 
     main_wdg.close()
