@@ -80,6 +80,9 @@ docs = [
     "mkdocs-spellcheck[codespell]==1.1.0",
     "mike==2.1.3",
     "ruff",
+    # EXAMPLES
+    "openwfs==1.0.0",
+    "imageio[tifffile]",
 ]
 dev = [
     "ndv[test,vispy,pygfx,pyqt,jupyter]",

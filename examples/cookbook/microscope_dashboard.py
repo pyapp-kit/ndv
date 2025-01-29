@@ -1,7 +1,7 @@
 # /// script
 # dependencies = [
-#   "openwfs",
 #   "ndv[vispy,pyqt]",
+#   "openwfs",
 # ]
 # ///
 """A minimal microscope dashboard.

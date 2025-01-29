@@ -1,7 +1,7 @@
 # /// script
 # dependencies = [
-#   "imageio",
 #   "ndv[vispy,pyqt]",
+#   "imageio[tifffile]",
 # ]
 # ///
 """An example on how to embed the `ArrayViewer` controller in a custom Qt widget."""
@@ -22,7 +22,7 @@ class EmbeddingWidget(QtWidgets.QWidget):
         super().__init__()
         layout = QtWidgets.QGridLayout()
         self._data: npt.NDArray = cat()[:, :, 0]
-        self._viewer = ArrayViewer(self._data)
+        self._viewer = ArrayViewer(self._data, default_lut={"cmap": "magma"})
 
         self._cat_button = QtWidgets.QPushButton("Load cat image")
         self._astronaut_button = QtWidgets.QPushButton("Load astronaut image")

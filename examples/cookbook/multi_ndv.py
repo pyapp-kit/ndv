@@ -1,7 +1,7 @@
 # /// script
 # dependencies = [
-#   "imageio",
 #   "ndv[vispy,pyqt]",
+#   "imageio[tifffile]",
 # ]
 # ///
 """An example on how to embed multiple `ArrayViewer` controllers in a custom Qt widget.
@@ -21,7 +21,7 @@ class MultiNDVWrapper(QtWidgets.QWidget):
 
         layout = QtWidgets.QGridLayout()
         self._astronaut_viewer = ArrayViewer(astronaut()[:, :, 0])
-        self._cells_virewer = ArrayViewer(cells3d())
+        self._cells_virewer = ArrayViewer(cells3d(), current_index={0: 30, 1: 1})
 
         # get `ArrayViewer` widget and add it to the layout
         layout.addWidget(self._astronaut_viewer.widget(), 0, 0, 4, 4)

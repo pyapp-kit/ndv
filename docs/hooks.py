@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import runpy
 import sys
+import time
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, no_type_check
@@ -108,8 +109,12 @@ def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
         return
 
     QApplication.sendPostedEvents()
-    QApplication.processEvents()
-    QApplication.processEvents()
+    # the sleep here is mostly to allow the widget to render,
+    # the biggest issue at the time is the animated expansion of the luts
+    # QcollapsibleWidget.  That should be fixed at superqt to not animate if desired.
+    for _i in range(10):
+        time.sleep(0.05)
+        QApplication.processEvents()
 
     pixmap = main_wdg.grab()
     pixmap.save(buffer, fmt)
@@ -120,7 +125,6 @@ def grab_top_widget(*_: Any, buffer: QBuffer, fmt: str = "png") -> None:
     for wdg in QApplication.topLevelWidgets():
         wdg.close()
         wdg.deleteLater()
-    QApplication.processEvents()
     QApplication.processEvents()
 
 
