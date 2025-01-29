@@ -200,7 +200,7 @@ def grab_top_widget(
         pixmap.save(buffer, fmt)
         return buffer.data().data()
 
-    modes: list[Mode] = ["light", "dark"] if sys.platform == "darwin" else ["light"]
+    modes: list[Mode] = ["dark", "light"] if sys.platform == "darwin" else ["light"]
     for mode in modes:
         set_dark_mode(mode == "dark")
         for _i in range(12):
