@@ -75,7 +75,7 @@ class ArrayViewer:
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
         )
-        self._roi_model: RectangularROIModel | None = RectangularROIModel(visible=False)
+        self._roi_model: RectangularROIModel | None = None
 
         app = _app.gui_frontend()
 
@@ -105,7 +105,6 @@ class ArrayViewer:
         self._roi_view: RectangularROI | None = None
 
         self._set_model_connected(self._data_model.display)
-        self._set_roi_model_connected(self._roi_model)
         self._canvas.set_ndim(self.display_model.n_visible_axes)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
@@ -280,6 +279,12 @@ class ArrayViewer:
         ]:
             getattr(obj, _connect)(callback)
 
+        if _connect:
+            self._create_roi_view()
+        else:
+            if self._roi_view:
+                self._roi_view.remove()
+
     # ------------------ Model callbacks ------------------
 
     def _fully_synchronize_view(self) -> None:
@@ -336,35 +341,32 @@ class ArrayViewer:
     def _on_roi_model_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
-        if self._roi_view is None:
-            self._roi_view = self._canvas.add_bounding_box()
-            # HACK
-            self._roi_view.set_visible(True)
-            self._roi_view.boundingBoxChanged.connect(
-                self._on_roi_view_bounding_box_changed
-            )
-        self._roi_view.set_bounding_box(*bb)
+        self._roi_view.set_bounding_box(*bb)  # type: ignore
 
     def _on_roi_model_visible_changed(self, visible: bool) -> None:
-        if self._roi_view is None:
-            self._roi_view = self._canvas.add_bounding_box()
-            # HACK
-            self._roi_view.set_visible(True)
-            self._roi_view.boundingBoxChanged.connect(
-                self._on_roi_view_bounding_box_changed
-            )
-        self._roi_view.set_visible(visible)
+        self._roi_view.set_visible(visible)  # type: ignore
 
     def _on_interaction_mode_changed(self, mode: InteractionMode) -> None:
-        # TODO: Unify with _on_roi_model_bounding_box_changed
         if mode == InteractionMode.CREATE_ROI:
-            if self._roi_view:
-                self._roi_view.remove()
-            self._roi_view = self._canvas.add_bounding_box()
-            # HACK
-            self._roi_view.boundingBoxChanged.connect(
-                self._on_roi_view_bounding_box_changed
-            )
+            # Create ROI model if needed to store ROI state
+            if self.roi is None:
+                self.roi = RectangularROIModel(visible=False)
+
+            # Create a new ROI
+            self._create_roi_view()
+
+    def _create_roi_view(self) -> None:
+        # Remove old ROI view
+        # TODO: Enable multiple ROIs
+        if self._roi_view:
+            self._roi_view.remove()
+
+        # Create new ROI
+        self._roi_view = self._canvas.add_bounding_box()
+        # Connect signals
+        self._roi_view.boundingBoxChanged.connect(
+            self._on_roi_view_bounding_box_changed
+        )
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
