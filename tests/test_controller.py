@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
@@ -21,6 +22,15 @@ from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
     from ndv.controllers._channel_controller import ChannelController
+
+try:
+    from qtpy import API_NAME
+except ImportError:
+    API_NAME = None
+
+IS_WIN = os.name == "nt"
+IS_PYSIDE6 = API_NAME == "PySide6"
+IS_PYGFX = _app.canvas_backend(None) == "pygfx"
 
 
 def _get_mock_canvas(*_: Any) -> ArrayCanvas:
@@ -76,7 +86,7 @@ def test_controller() -> None:
     mock_view.create_sliders.assert_called_once_with(ranges)
     # visible-axis sliders are hidden
     # (2,3) because model.visible_axes is set to (-2, -1) and ndim is 4
-    mock_view.hide_sliders.assert_called_once_with((2, 3), show_remainder=True)
+    mock_view.hide_sliders.assert_called_once_with({2, 3}, show_remainder=True)
     # channel mode is set to default (which is currently grayscale)
     mock_view.set_channel_mode.assert_called_once_with(model.channel_mode)
     # data info is set
@@ -85,17 +95,17 @@ def test_controller() -> None:
 
     # changing visible axes updates which sliders are visible
     model.visible_axes = (0, 3)
-    mock_view.hide_sliders.assert_called_with((0, 3), show_remainder=True)
+    mock_view.hide_sliders.assert_called_with({0, 3}, show_remainder=True)
 
     # changing the channel mode updates the sliders and updates the view combobox
     mock_view.hide_sliders.reset_mock()
     model.channel_mode = "composite"
     mock_view.set_channel_mode.assert_called_with(ChannelMode.COMPOSITE)
     mock_view.hide_sliders.assert_called_once_with(
-        (0, 3, model.channel_axis), show_remainder=True
+        {0, 3, model.channel_axis}, show_remainder=True
     )
     model.channel_mode = ChannelMode.GRAYSCALE
-    mock_view.hide_sliders.assert_called_with((0, 3), show_remainder=True)
+    mock_view.hide_sliders.assert_called_with({0, 3}, show_remainder=True)
 
     # when the view changes the current index, the model is updated
     idx = {0: 1, 1: 2, 3: 8}
@@ -207,6 +217,35 @@ def test_array_viewer_with_app() -> None:
     if gui_frontend() != _app.GuiFrontend.WX:
         visax_mock.assert_called_once()
         assert viewer.display_model.visible_axes == (0, -2, -1)
+
+
+@pytest.mark.skipif(
+    bool(IS_WIN and IS_PYSIDE6 and IS_PYGFX), reason="combo still segfaulting on CI"
+)
+@pytest.mark.usefixtures("any_app")
+def test_array_viewer_histogram() -> None:
+    """Mostly a smoke test for basic functionality of histogram backends."""
+    if _app.gui_frontend() != _app.GuiFrontend.QT:
+        pytest.skip("histograms only implemented in Qt.")
+        return
+
+    viewer = ArrayViewer()
+    viewer.show()
+    viewer._add_histogram()
+    assert viewer._histogram is not None
+
+    # change views
+    if "pygfx" not in type(viewer._histogram).__name__.lower():
+        viewer._histogram.set_vertical(True)
+        viewer._histogram.set_log_base(10)
+
+    # update data
+    np.random.seed(0)
+    maxval = 2**16 - 1
+    data = np.random.randint(0, maxval, (1000,), dtype="uint16")
+    counts = np.bincount(data.flatten(), minlength=maxval + 1)
+    bin_edges = np.arange(maxval + 2) - 0.5
+    viewer._histogram.set_data(counts, bin_edges)
 
 
 @no_type_check

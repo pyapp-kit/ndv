@@ -150,7 +150,7 @@ class _WxDimsSliders(wx.Panel):
         self.layout = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.layout)
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         for axis, _coords in coords.items():
             slider = WxLabeledSlider(self)
@@ -349,7 +349,7 @@ class WxArrayView(ArrayView):
         wxwdg.Destroy()
         self._wxwidget.Layout()
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         self._wxwidget.dims_sliders.create_sliders(coords)
         self._wxwidget.Layout()
 

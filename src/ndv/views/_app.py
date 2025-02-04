@@ -127,7 +127,9 @@ class PygfxProvider(CanvasProvider):
 
     @staticmethod
     def histogram_canvas_class() -> type[HistogramCanvas]:
-        raise RuntimeError("Histogram not supported for pygfx")
+        from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
+
+        return PyGFXHistogramCanvas
 
 
 # -------------------- Provider selection --------------------

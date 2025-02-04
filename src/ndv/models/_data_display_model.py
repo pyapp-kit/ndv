@@ -1,5 +1,13 @@
+import logging
 import sys
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import (
+    Hashable,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union, cast
@@ -16,6 +24,8 @@ from ._data_wrapper import DataWrapper
 __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
 SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, **SLOTS)
@@ -99,24 +109,67 @@ class _ArrayDataDisplayModel(NDVModel):
         """Return the coordinates of the data as positive integers."""
         if (wrapper := self.data_wrapper) is None:
             return {}
-        return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
+        return {wrapper.normalize_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
 
     @property
     def normed_visible_axes(self) -> "tuple[int, int, int] | tuple[int, int]":
         """Return the visible axes as positive integers."""
         wrapper = self._ensure_wrapper()
         return tuple(  # type: ignore [return-value]
-            wrapper.normalized_axis_key(ax) for ax in self.display.visible_axes
+            wrapper.normalize_axis_key(ax) for ax in self.display.visible_axes
         )
 
     @property
     def normed_current_index(self) -> Mapping[int, Union[int, slice]]:
-        """Return the current index with positive integer axis keys."""
+        """Return the current index with positive integer axis keys.
+
+        This method has to handle cases where the the model current index is expressed
+        in a non-normalized way (e.g. with string labels for axes), AND it has to handle
+        cases where a non-normalized key resolves a normalized key that may *also* be in
+        the set: in that cases, priority is given to the non-normalized key and a
+        warning is issued.
+
+        For example, if current_index is {'Z': 0, 0: 10}, and the data has a 'Z'
+        dimension label, but Z is also the 0th axis, then the output normed index will
+        be {0: 0} (the string key is prioritized over the integer key), a warning
+        is issued, and the 0 key is removed from the current_index.
+        """
         wrapper = self._ensure_wrapper()
-        return {
-            wrapper.normalized_axis_key(ax): v
-            for ax, v in self.display.current_index.items()
-        }
+
+        output: MutableMapping[int, Union[int, slice]] = {}
+        rev_map: dict[Hashable, Hashable] = {}
+        to_remove: list[Hashable] = []
+
+        for key, val in self.display.current_index.items():
+            normed_key = wrapper.normalize_axis_key(key)
+            if normed_key in output:
+                to_remove.append(key)
+                was_already_normed = normed_key == key
+                if was_already_normed:
+                    original_key = rev_map[normed_key]
+                else:
+                    original_key = key
+
+                logger.warning(
+                    "Axis key %r normalized to %r, which is also in current_index. "
+                    "Using %r value.",
+                    original_key,
+                    normed_key,
+                    original_key,
+                )
+                if was_already_normed:
+                    # in the case of duplication, we give priority to NON-normed keys
+                    # (e.g. "Z" over 0)
+                    continue
+
+            output[normed_key] = val
+            rev_map[normed_key] = key
+
+        # cleanup the model so it doesn't have to be done again
+        for key in to_remove:
+            del self.display.current_index[key]
+
+        return output
 
     @property
     def normed_channel_axis(self) -> "int | None":
@@ -124,7 +177,7 @@ class _ArrayDataDisplayModel(NDVModel):
         if self.display.channel_axis is None:
             return None
         wrapper = self._ensure_wrapper()
-        return wrapper.normalized_axis_key(self.display.channel_axis)
+        return wrapper.normalize_axis_key(self.display.channel_axis)
 
     # Indexing and Data Slicing -----------------------------------------------------
 
