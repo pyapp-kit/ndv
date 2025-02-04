@@ -61,7 +61,7 @@ ndv.run_app()
     - `tensorstore.TensorStore` (supports named dimensions)
     - `torch.Tensor` (supports named dimensions)
     - `xarray.DataArray` (supports named dimensions)
-    - `zarr` (supports named dimensions)
+    - `zarr` (named dimensions WIP)
 
 See examples for each of these array types in
 [examples](https://github.com/pyapp-kit/ndv/tree/main/examples)

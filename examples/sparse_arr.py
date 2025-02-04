@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "sparse",
+# ]
+# ///
 from __future__ import annotations
 
 try:
@@ -9,10 +15,10 @@ import numpy as np
 
 import ndv
 
-shape = (256, 4, 512, 512)
+shape = (255, 4, 512, 512)
 N = int(np.prod(shape) * 0.001)
-coords = np.random.randint(low=0, high=shape, size=(N, len(shape))).T
-data = np.random.randint(0, 256, N)
+coords = np.random.randint(low=0, high=shape, size=(N, len(shape)), dtype=np.uint16).T
+data = np.random.randint(0, 255, N, dtype=np.uint8)
 
 
 # Create the sparse array from the coordinates and data

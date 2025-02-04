@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.2.2](https://github.com/pyapp-kit/ndv/tree/v0.2.2) (2025-01-29)
+
+[Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.2.1...v0.2.2)
+
+**Implemented enhancements:**
+
+- feat: bring back some labeled axes feature from v1 [\#121](https://github.com/pyapp-kit/ndv/pull/121) ([tlambert03](https://github.com/tlambert03))
+- feat: add pygfx-backed histogram [\#105](https://github.com/pyapp-kit/ndv/pull/105) ([gselzer](https://github.com/gselzer))
+
+**Fixed bugs:**
+
+- fix: don't \_update\_visible\_sliders if there is no data [\#127](https://github.com/pyapp-kit/ndv/pull/127) ([tlambert03](https://github.com/tlambert03))
+- bug: fix case where current\_index contains duplicate keys [\#122](https://github.com/pyapp-kit/ndv/pull/122) ([tlambert03](https://github.com/tlambert03))
+- fix: hide sliders for singleton axes [\#120](https://github.com/pyapp-kit/ndv/pull/120) ([tlambert03](https://github.com/tlambert03))
+
+**Documentation:**
+
+- docs: Add mechanism to generate screenshot from examples, and build during docs [\#126](https://github.com/pyapp-kit/ndv/pull/126) ([tlambert03](https://github.com/tlambert03))
+- docs: make all scripts pep 723 compliant [\#124](https://github.com/pyapp-kit/ndv/pull/124) ([tlambert03](https://github.com/tlambert03))
+- docs: Add a set of examples in `cookbook` [\#123](https://github.com/pyapp-kit/ndv/pull/123) ([jacopoabramo](https://github.com/jacopoabramo))
+- docs: fix ArrayViewer hide method docstring [\#107](https://github.com/pyapp-kit/ndv/pull/107) ([fdrgsp](https://github.com/fdrgsp))
+
+**Merged pull requests:**
+
+- refactor: extract GUI-specific logic to GUI folders [\#112](https://github.com/pyapp-kit/ndv/pull/112) ([tlambert03](https://github.com/tlambert03))
+- build: restrict qt a bit more [\#108](https://github.com/pyapp-kit/ndv/pull/108) ([tlambert03](https://github.com/tlambert03))
+
 ## [v0.2.1](https://github.com/pyapp-kit/ndv/tree/v0.2.1) (2025-01-17)
 
 [Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.2.0...v0.2.1)

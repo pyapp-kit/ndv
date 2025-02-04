@@ -129,10 +129,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.12"]
-  
+
   # make sure we can build docs without error
   test-docs:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest  # nicer screenshots
     steps:
       - uses: actions/checkout@v4
       - name: 🐍 Set up Python
@@ -146,6 +146,10 @@ jobs:
           python -m pip install -e '.[docs]'
       - name: 📚 Build docs
         run: mkdocs build --strict
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs
+          path: site
 
   upload_coverage:
     if: always()
