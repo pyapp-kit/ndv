@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
-from weakref import WeakKeyDictionary
+from weakref import ReferenceType, WeakKeyDictionary, ref
 
 import cmap as _cmap
 import numpy as np
@@ -408,7 +408,7 @@ class GfxArrayCanvas(ArrayCanvas):
         self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
         self._selection: CanvasElement | None = None
         # TODO: Weak Reference?
-        self._last_roi_created: PyGFXBoundingBox | None = None
+        self._last_roi_created: ReferenceType[PyGFXBoundingBox] | None = None
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -506,14 +506,15 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def add_bounding_box(self) -> PyGFXBoundingBox:
         """Add a new Rectangular ROI node to the scene."""
-        self._last_roi_created = PyGFXBoundingBox(
+        roi = PyGFXBoundingBox(
             render=self.refresh,
             canvas_to_world=self.canvas_to_world,
             parent=self._scene,
         )
-        self._last_roi_created.set_visible(False)
-        self._elements[self._last_roi_created._container] = self._last_roi_created
-        return self._last_roi_created
+        roi.set_visible(False)
+        self._elements[roi._container] = roi
+        self._last_roi_created = ref(roi)
+        return roi
 
     def set_range(
         self,
@@ -616,18 +617,19 @@ class GfxArrayCanvas(ArrayCanvas):
         if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             if self._last_roi_created is None:
                 raise ValueError("No ROI to create!")
-            new_roi = self._last_roi_created
-            # HACK: Provide a non-zero starting size so that if the user clicks
-            # and immediately releases, it's visible and can be selected again
-            _min = world_pos
-            _max = (world_pos[0] + 1, world_pos[1] + 1)
-            # Put the ROI where the user clicked
-            new_roi.boundingBoxChanged.emit((_min, _max))
-            # Make it visible
-            new_roi.set_visible(True)
-            # Select it so the mouse press event below triggers ROIMoveMode.HANDLE
-            # TODO: Make behavior more direct
-            new_roi.set_selected(True)
+            if new_roi := self._last_roi_created():
+                self._last_roi_created = None
+                # HACK: Provide a non-zero starting size so that if the user clicks
+                # and immediately releases, it's visible and can be selected again
+                _min = world_pos
+                _max = (world_pos[0] + 1, world_pos[1] + 1)
+                # Put the ROI where the user clicked
+                new_roi.boundingBoxChanged.emit((_min, _max))
+                # Make it visible
+                new_roi.set_visible(True)
+                # Select it so the mouse press event below triggers ROIMoveMode.HANDLE
+                # TODO: Make behavior more direct
+                new_roi.set_selected(True)
 
             # All done - exit the mode
             self._viewer.interaction_mode = InteractionMode.PAN_ZOOM
