@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
     from ndv.models._lut_model import ClimPolicy, LUTModel
 
-    pass
-
 
 class LutView(Viewable):
     """Manages LUT properties (contrast, colormap, etc...) in a view object."""

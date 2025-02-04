@@ -76,8 +76,6 @@ class PyGFXImageHandle(ImageHandle):
         return 1
 
     def set_gamma(self, gamma: float) -> None:
-        # self._material.gamma = gamma
-        # self._render()
         if gamma != 1:
             warnings.warn("Gamma correction is not supported in pygfx", stacklevel=2)
 

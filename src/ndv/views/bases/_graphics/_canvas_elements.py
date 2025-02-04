@@ -94,10 +94,6 @@ class ImageHandle(CanvasElement, LutView):
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         pass
 
-    #     if checked and self.model:
-    #         d = self.data()
-    #         self.model.clims = (d.min(), d.max())
-
     def set_channel_visible(self, visible: bool) -> None:
         self.set_visible(visible)
 

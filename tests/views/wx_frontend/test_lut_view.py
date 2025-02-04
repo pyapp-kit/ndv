@@ -62,12 +62,12 @@ def test_WxLutView_update_view(app: wx.App, model: LUTModel, view: WxLutView) ->
         wx.EventLoopActivator(evtLoop)
         evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
 
-    # new_clims = (5, 6)
-    # assert model.clims != new_clims
-    # clim_wdg = view._wxwidget.clims
-    # clim_wdg.SetValue(*new_clims)
-    # processEvent(wx.EVT_SLIDER, clim_wdg)
-    # assert model.clims == new_clims
+    new_clims = (5, 6)
+    assert model.clims != new_clims
+    clim_wdg = view._wxwidget.clims
+    clim_wdg.SetValue(*new_clims)
+    processEvent(wx.EVT_SLIDER, clim_wdg)
+    assert model.clims == ClimsManual(min=5, max=6)
 
     new_visible = not model.visible
     vis_wdg = view._wxwidget.visible
