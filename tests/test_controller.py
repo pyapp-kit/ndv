@@ -8,11 +8,12 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from ndv._types import MouseMoveEvent
+from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import LUTModel
 from ndv.models._roi_model import RectangularROIModel
+from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
@@ -209,15 +210,25 @@ def test_array_viewer_with_app() -> None:
 
 
 @no_type_check
-@_patch_views
 def test_roi_controller() -> None:
     ctrl = ArrayViewer()
+    roi = RectangularROIModel()
+    viewer = ctrl._viewer_model
 
     # Until a user interacts with ctrl.roi, there is no ROI model
     assert ctrl._roi_model is None
-    ctrl.roi = RectangularROIModel()
+    ctrl.roi = roi
     assert ctrl._roi_model is not None
-    ctrl.roi = None
-    assert ctrl._roi_model is None
 
     # Clicking the ROI button and then clicking the canvas creates a ROI
+    viewer.interaction_mode = InteractionMode.CREATE_ROI
+    canvas_pos = (5, 5)
+    mpe = MousePressEvent(canvas_pos[0], canvas_pos[1], MouseButton.LEFT)
+    ctrl._canvas.on_mouse_press(mpe)
+    world_pos = ctrl._canvas.canvas_to_world(canvas_pos)
+
+    assert roi.bounding_box == (
+        (world_pos[0], world_pos[1]),
+        (world_pos[0] + 1, world_pos[1] + 1),
+    )
+    assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
