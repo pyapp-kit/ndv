@@ -24,6 +24,9 @@ jobs:
   test:
     name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
     runs-on: ${{ matrix.os }}
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
@@ -82,12 +85,10 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
           enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
 
       - name: 📦 Install dependencies
-        run: uv pip install -e '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
+        run: uv sync --no-dev --extra ${{ matrix.gui }} --extra ${{ matrix.canvas }} --group test
 
       - uses: pyvista/setup-headless-display-action@v3
         with:
@@ -108,7 +109,7 @@ jobs:
 
       - name: ⬇️🧪 Test with minimum stated dependencies
         run: |
-          uv pip install '.[${{ matrix.gui }},${{ matrix.canvas }}]' --resolution lowest-direct -U --only-binary numpy --only-binary wxpython
+          uv pip install -e .[${{ matrix.gui }},${{ matrix.canvas }}] --resolution lowest-direct -U --only-binary numpy --only-binary wxpython
           uv run pytest -v --color yes tests -W ignore
 
       - uses: codecov/codecov-action@v5
@@ -132,7 +133,7 @@ jobs:
 
   # make sure we can build docs without error
   test-docs:
-    runs-on: macos-latest  # nicer screenshots
+    runs-on: macos-latest # nicer screenshots
     steps:
       - uses: actions/checkout@v4
       - name: 🐍 Set up Python
