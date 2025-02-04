@@ -6,7 +6,7 @@ import cmap
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
-from ndv.views._app import QtProvider
+from ndv.views._qt._app import QtAppWrap
 from ndv.views._qt._array_view import QLutView
 
 if TYPE_CHECKING:
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 @fixture(autouse=True)
 def init_provider() -> None:
-    provider = QtProvider()
+    provider = QtAppWrap()
     provider.create_app()
 
 

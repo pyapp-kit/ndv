@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -7,10 +8,12 @@ import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
-from ndv.models._data_display_model import _ArrayDataDisplayModel
+from ndv.models._data_display_model import DataResponse, _ArrayDataDisplayModel
 from ndv.views import _app
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+    from concurrent.futures import Future
     from typing import Any, Unpack
 
     from typing_extensions import TypeAlias
@@ -66,6 +69,17 @@ class ArrayViewer:
         self._data_model = _ArrayDataDisplayModel(
             data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
         )
+
+        app = _app.gui_frontend()
+
+        # whether to fetch data asynchronously.  Not publicly exposed yet...
+        # but can use 'NDV_SYNCHRONOUS' env var to set globally
+        # jupyter doesn't need async because it's already async (in that the
+        # GUI is already running in JS)
+        NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
+        self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
+        # set of futures for data requests
+        self._futures: set[Future[DataResponse]] = set()
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -154,7 +168,7 @@ class ArrayViewer:
         self._view.set_visible(True)
 
     def hide(self) -> None:
-        """Show the viewer."""
+        """Hide the viewer."""
         self._view.set_visible(False)
 
     def close(self) -> None:
@@ -230,21 +244,20 @@ class ArrayViewer:
     def _fully_synchronize_view(self) -> None:
         """Fully re-synchronize the view with the model."""
         display_model = self._data_model.display
-        with self._view.currentIndexChanged.blocked():
-            self._view.create_sliders(self._data_model.normed_data_coords)
         self._view.set_channel_mode(display_model.channel_mode)
-        if self.data is not None:
+        if (wrapper := self._data_model.data_wrapper) is not None:
+            with self._view.currentIndexChanged.blocked():
+                self._view.create_sliders(wrapper.coords)
             self._view.set_visible_axes(self._data_model.normed_visible_axes)
             self._update_visible_sliders()
             if cur_index := display_model.current_index:
                 self._view.set_current_index(cur_index)
             # reconcile view sliders with model
             self._on_view_current_index_changed()
-            if wrapper := self._data_model.data_wrapper:
-                self._view.set_data_info(wrapper.summary_info())
+            self._view.set_data_info(wrapper.summary_info())
 
             self._clear_canvas()
-            self._update_canvas()
+            self._request_data()
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
             self._update_hist_domain_for_dtype()
@@ -253,13 +266,13 @@ class ArrayViewer:
         self._view.set_visible_axes(self._data_model.normed_visible_axes)
         self._update_visible_sliders()
         self._clear_canvas()
-        self._update_canvas()
         self._canvas.set_ndim(self.display_model.n_visible_axes)
+        self._request_data()
 
     def _on_model_current_index_changed(self) -> None:
         value = self._data_model.display.current_index
         self._view.set_current_index(value)
-        self._update_canvas()
+        self._request_data()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._view.set_channel_mode(mode)
@@ -273,7 +286,7 @@ class ArrayViewer:
                     view.set_visible(show_channel_luts)
         # redraw
         self._clear_canvas()
-        self._update_canvas()
+        self._request_data()
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
@@ -318,15 +331,37 @@ class ArrayViewer:
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
-        hidden_sliders: tuple[int, ...] = self._data_model.normed_visible_axes
+        if self._data_model.data_wrapper is None:
+            return
+        hidden_indices: set[int] = set(self._data_model.normed_visible_axes)
         if self._data_model.display.channel_mode.is_multichannel():
             if ch := self._data_model.normed_channel_axis:
-                hidden_sliders += (ch,)
+                hidden_indices.add(ch)
+
+        # hide singleton axes
+        for ax, coord in self._data_model.normed_data_coords.items():
+            if len(coord) < 2:
+                hidden_indices.add(ax)
+
+        # here we look into the *non*-normalized wrapper.dims names
+        # and add those to the hidden indices as well (so that sliders are hidden
+        # regardless of the form in which they were expressed in the model)
+        hidden_sliders: set[Hashable] = set(hidden_indices)
+        if wrapper := self._data_model.data_wrapper:
+            for hidden in list(hidden_indices):
+                hidden_sliders.add(wrapper.dims[hidden])
 
         self._view.hide_sliders(hidden_sliders, show_remainder=True)
 
-    def _update_canvas(self) -> None:
-        """Force the canvas to fetch and update the displayed data.
+    # The request cycle looks like this:
+    # 1. something changes on the model requiring new data
+    # 2. _request_data is called
+    # 3. _data_model.request_sliced_data returns a list of futures
+    # 4. each future is connected to `_on_data_response_ready` and stored.
+    # 5. when the future resolves, `_on_data_response_ready` draws the response.
+
+    def _request_data(self) -> None:
+        """Fetch and update the displayed data.
 
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
@@ -334,13 +369,49 @@ class ArrayViewer:
         if not self._data_model.data_wrapper:
             return  # pragma: no cover
 
-        display_model = self._data_model.display
-        # TODO: make asynchronous
-        for future in self._data_model.request_sliced_data():
-            response = future.result()
-            key = response.channel_key
-            data = response.data
+        self._cancel_futures()
+        for future in self._data_model.request_sliced_data(self._async):
+            self._futures.add(future)
+            future.add_done_callback(self._on_data_response_ready)
 
+        if self._futures:
+            self._view.set_progress_spinner_visible(True)
+
+    def _is_idle(self) -> bool:
+        """Return True if no futures are running. Used for testing, and debugging."""
+        return all(f.done() for f in self._futures)
+
+    def _join(self) -> None:
+        """Block until all futures are done. Used for testing, and debugging."""
+        for future in self._futures:
+            future.result()
+
+    def _cancel_futures(self) -> None:
+        while self._futures:
+            self._futures.pop().cancel()
+        self._futures.clear()
+        self._view.set_progress_spinner_visible(False)
+
+    @_app.ensure_main_thread
+    def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
+        # NOTE: removing the reference to the last future here is important
+        # because the future has a reference to this widget in its _done_callbacks
+        # which will prevent the widget from being garbage collected if the future
+        self._futures.discard(future)
+        if not self._futures:
+            self._view.set_progress_spinner_visible(False)
+
+        if future.cancelled():
+            return
+
+        try:
+            response = future.result()
+        except Exception as e:
+            warnings.warn(f"Error fetching data: {e}", stacklevel=2)
+            return
+
+        display_model = self._data_model.display
+        for key, data in response.data.items():
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
                     model = display_model.default_lut

@@ -1,5 +1,6 @@
 """Abstract base classes for views and viewable objects."""
 
+from ._app import NDVApp
 from ._array_view import ArrayView
 from ._graphics._canvas import ArrayCanvas, HistogramCanvas
 from ._graphics._canvas_elements import CanvasElement, ImageHandle, RoiHandle
@@ -15,6 +16,7 @@ __all__ = [
     "ImageHandle",
     "LutView",
     "Mouseable",
+    "NDVApp",
     "RoiHandle",
     "Viewable",
 ]

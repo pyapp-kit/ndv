@@ -1,4 +1,13 @@
-from collections.abc import Iterable, Mapping, Sequence
+import logging
+import sys
+from collections.abc import (
+    Hashable,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union, cast
@@ -6,14 +15,20 @@ from typing import Any, Optional, Union, cast
 import numpy as np
 from pydantic import Field
 
+from ndv.views import _app
+
 from ._array_display_model import ArrayDisplayModel, ChannelMode
 from ._base_model import NDVModel
 from ._data_wrapper import DataWrapper
 
 __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
+SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
 
-@dataclass
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, **SLOTS)
 class DataRequest:
     """Request object for data slicing."""
 
@@ -23,20 +38,17 @@ class DataRequest:
     channel_axis: Optional[int]
 
 
-@dataclass
+@dataclass(frozen=True, **SLOTS)
 class DataResponse:
-    """Response object for data requests."""
+    """Response object for data requests.
 
-    data: np.ndarray = field(repr=False)
-    shape: tuple[int, ...] = field(init=False)
-    dtype: np.dtype = field(init=False)
-    channel_key: Optional[int]
+    In the response, the data is broken up according to channel keys.
+    """
+
+    # mapping of channel_key -> data
     n_visible_axes: int
+    data: Mapping[Optional[int], np.ndarray] = field(repr=False)
     request: Optional[DataRequest] = None
-
-    def __post_init__(self) -> None:
-        self.shape = self.data.shape
-        self.dtype = self.data.dtype
 
 
 # NOTE: nobody particularly likes this class.  It does important stuff, but we're
@@ -97,24 +109,67 @@ class _ArrayDataDisplayModel(NDVModel):
         """Return the coordinates of the data as positive integers."""
         if (wrapper := self.data_wrapper) is None:
             return {}
-        return {wrapper.normalized_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
+        return {wrapper.normalize_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
 
     @property
     def normed_visible_axes(self) -> "tuple[int, int, int] | tuple[int, int]":
         """Return the visible axes as positive integers."""
         wrapper = self._ensure_wrapper()
         return tuple(  # type: ignore [return-value]
-            wrapper.normalized_axis_key(ax) for ax in self.display.visible_axes
+            wrapper.normalize_axis_key(ax) for ax in self.display.visible_axes
         )
 
     @property
     def normed_current_index(self) -> Mapping[int, Union[int, slice]]:
-        """Return the current index with positive integer axis keys."""
+        """Return the current index with positive integer axis keys.
+
+        This method has to handle cases where the the model current index is expressed
+        in a non-normalized way (e.g. with string labels for axes), AND it has to handle
+        cases where a non-normalized key resolves a normalized key that may *also* be in
+        the set: in that cases, priority is given to the non-normalized key and a
+        warning is issued.
+
+        For example, if current_index is {'Z': 0, 0: 10}, and the data has a 'Z'
+        dimension label, but Z is also the 0th axis, then the output normed index will
+        be {0: 0} (the string key is prioritized over the integer key), a warning
+        is issued, and the 0 key is removed from the current_index.
+        """
         wrapper = self._ensure_wrapper()
-        return {
-            wrapper.normalized_axis_key(ax): v
-            for ax, v in self.display.current_index.items()
-        }
+
+        output: MutableMapping[int, Union[int, slice]] = {}
+        rev_map: dict[Hashable, Hashable] = {}
+        to_remove: list[Hashable] = []
+
+        for key, val in self.display.current_index.items():
+            normed_key = wrapper.normalize_axis_key(key)
+            if normed_key in output:
+                to_remove.append(key)
+                was_already_normed = normed_key == key
+                if was_already_normed:
+                    original_key = rev_map[normed_key]
+                else:
+                    original_key = key
+
+                logger.warning(
+                    "Axis key %r normalized to %r, which is also in current_index. "
+                    "Using %r value.",
+                    original_key,
+                    normed_key,
+                    original_key,
+                )
+                if was_already_normed:
+                    # in the case of duplication, we give priority to NON-normed keys
+                    # (e.g. "Z" over 0)
+                    continue
+
+            output[normed_key] = val
+            rev_map[normed_key] = key
+
+        # cleanup the model so it doesn't have to be done again
+        for key in to_remove:
+            del self.display.current_index[key]
+
+        return output
 
     @property
     def normed_channel_axis(self) -> "int | None":
@@ -122,7 +177,7 @@ class _ArrayDataDisplayModel(NDVModel):
         if self.display.channel_axis is None:
             return None
         wrapper = self._ensure_wrapper()
-        return wrapper.normalized_axis_key(self.display.channel_axis)
+        return wrapper.normalize_axis_key(self.display.channel_axis)
 
     # Indexing and Data Slicing -----------------------------------------------------
 
@@ -171,42 +226,46 @@ class _ArrayDataDisplayModel(NDVModel):
         )
         return [request]
 
-    # TODO: make async
-    def request_sliced_data(self) -> list[Future[DataResponse]]:
+    def request_sliced_data(
+        self, asynchronous: bool = True
+    ) -> Iterator[Future[DataResponse]]:
         """Return the slice of data requested by the current index (synchronous)."""
         if self.data_wrapper is None:
             raise ValueError("Data not set")
 
         if not (requests := self.current_slice_requests()):
-            return []
+            return
 
-        futures: list[Future[DataResponse]] = []
-        for req in requests:
-            data = req.wrapper.isel(req.index)
+        if not asynchronous:
+            for request in requests:
+                future: Future[DataResponse] = Future()
+                future.set_result(self.process_request(request))
+                yield future
+        else:
+            for request in requests:
+                yield _app.submit_task(self.process_request, request)
 
-            # for transposing according to the order of visible axes
-            vis_ax = req.visible_axes
-            t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
+    @staticmethod
+    def process_request(req: DataRequest) -> DataResponse:
+        """Process a data request and return the sliced data as a DataResponse."""
+        data = req.wrapper.isel(req.index)
 
-            if (ch_ax := req.channel_axis) is not None:
-                ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
+        # for transposing according to the order of visible axes
+        vis_ax = req.visible_axes
+        t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
+
+        if (ch_ax := req.channel_axis) is not None:
+            ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
+        else:
+            ch_indices = (None,)
+
+        data_response: dict[int | None, np.ndarray] = {}
+        for i in ch_indices:
+            if i is None:
+                ch_data = data
             else:
-                ch_indices = (None,)
+                ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
+                ch_data = data[ch_keepdims]
+            data_response[i] = ch_data.transpose(*t_dims).squeeze()
 
-            for i in ch_indices:
-                if i is None:
-                    ch_data = data
-                else:
-                    ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
-                    ch_data = data[ch_keepdims]
-                future = Future[DataResponse]()
-                response = DataResponse(
-                    data=ch_data.transpose(*t_dims).squeeze(),
-                    channel_key=i,
-                    n_visible_axes=len(vis_ax),
-                    request=req,
-                )
-                future.set_result(response)
-                futures.append(future)
-
-        return futures
+        return DataResponse(n_visible_axes=len(vis_ax), data=data_response, request=req)

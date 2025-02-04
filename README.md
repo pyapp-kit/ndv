@@ -6,7 +6,10 @@
 [![CI](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml/badge.svg)](https://github.com/pyapp-kit/ndv/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/pyapp-kit/ndv/branch/main/graph/badge.svg)](https://codecov.io/gh/pyapp-kit/ndv)
 
-Simple, fast-loading, asynchronous, n-dimensional array viewer, with minimal dependencies.
+Simple, fast-loading, asynchronous, n-dimensional array viewer, with minimal
+dependencies.
+
+Works in Qt, Jupyter, or wxPython.
 
 ```python
 import ndv
@@ -17,9 +20,9 @@ ndv.imshow(data)
 
 ![Montage](https://github.com/pyapp-kit/ndv/assets/1609449/712861f7-ddcb-4ecd-9a4c-ba5f0cc1ee2c)
 
-[`ndv.imshow()`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/#ndv.imshow)
+[`ndv.imshow()`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/#ndv.imshow)
 creates an instance of
-[`ndv.ArrayViewer`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/controllers/#ndv.controllers.ArrayViewer),
+[`ndv.ArrayViewer`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/controllers/#ndv.controllers.ArrayViewer),
 which you can also use directly:
 
 ```python
@@ -33,7 +36,7 @@ ndv.run_app()
 > [!TIP]
 > To embed the viewer in a broader Qt or wxPython application, you can
 > access the viewer's
-> [`widget`](https://pyapp-kit.github.io/ndv/dev/reference/ndv/controllers/#ndv.controllers.ArrayViewer.widget)
+> [`widget`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/controllers/#ndv.controllers.ArrayViewer.widget)
 > attribute and add it to your layout.
 
 ## Features
@@ -58,7 +61,7 @@ ndv.run_app()
     - `tensorstore.TensorStore` (supports named dimensions)
     - `torch.Tensor` (supports named dimensions)
     - `xarray.DataArray` (supports named dimensions)
-    - `zarr` (supports named dimensions)
+    - `zarr` (named dimensions WIP)
 
 See examples for each of these array types in
 [examples](https://github.com/pyapp-kit/ndv/tree/main/examples)
@@ -75,7 +78,7 @@ See examples for each of these array types in
 Because ndv supports many combinations of GUI and graphics frameworks,
 you must install it along with additional dependencies for your desired backend.
 
-See the [installation guide](https://pyapp-kit.github.io/ndv/dev/install/) for
+See the [installation guide](https://pyapp-kit.github.io/ndv/latest/install/) for
 complete details.
 
 To just get started quickly using Qt and vispy:
@@ -94,18 +97,3 @@ pip install ndv[jup]
 
 For more information, and complete API reference, see the
 [documentation](https://pyapp-kit.github.io/ndv/).
-
-## Motivation
-
-This package arose from the need for a way to *quickly* view multi-dimensional
-arrays with zero tolerance for long import times and/or excessive dependency
-lists. I want something that I can use to view any of the many multi-dimensional
-array types, out of the box, with no assumptions about dimensionality. I want it
-to work reasonably well with remote, asynchronously loaded data. I also want it
-to take advantage of things like named dimensions and categorical coordinate
-values when available. For now, it's a Qt-only widget, since that's where the
-need arose, but I can imagine a jupyter widget in the future (likely as a remote
-frame buffer for vispy/pygfx).
-
-I do not intend for this to grow into full-fledged application, or wrap a
-complete scene graph, though point and ROI selection would be welcome additions.

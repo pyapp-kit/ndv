@@ -19,6 +19,7 @@ nav:
   - install.md
   - motivation.md
   - env_var.md
+  - Cookbook: cookbook/
   # This is populated by scripts/gen_ref_nav.py
   - API reference: reference/
 
@@ -70,9 +71,13 @@ extra_javascript:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.details
   - pymdownx.keys
   - pymdownx.tilde
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -110,6 +115,7 @@ plugins:
         python:
           import:
             - https://docs.python.org/3/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
             - https://docs.pydantic.dev/latest/objects.inv
             - https://cmap-docs.readthedocs.io/objects.inv
             - https://psygnal.readthedocs.io/en/latest/objects.inv

@@ -11,11 +11,13 @@
 | **`NDV_DEBUG_EXCEPTIONS`** | Whether to drop into a debugger when an exception is raised. (for development) | `False` |
 | **`NDV_EXIT_ON_EXCEPTION`**  | Whether to exit the application on the first unhandled exception. (for development)  | `False` |
 | **`NDV_IPYTHON_MAGIC`** | Whether to use [`%gui` magic](https://ipython.readthedocs.io/en/stable/config/eventloops.html#integrating-with-gui-event-loops) when running in IPython, to enable interactive usage. | `True`  |
+| **`NDV_SYNCHRONOUS`** | Whether to force data request/draw to be synchronous. (*note: this currently has no effect on Jupyter, which is always asynchronous) | `False` |
 
 ## Framework selection
 
-If you have multiple supported GUI or graphics libraries installed, you can
-control which ones `ndv` uses with **`NDV_CANVAS_BACKEND`** and **`NDV_GUI_FRONTEND`**,
+Depending on how you've [installed ndv](./install.md), you may end up with
+multiple supported GUI or graphics libraries installed. You can control which
+ones `ndv` uses with **`NDV_CANVAS_BACKEND`** and **`NDV_GUI_FRONTEND`**,
 respectively, as described above.  Note that currently, only one GUI framework
 can be used per session.
 

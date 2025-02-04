@@ -5,14 +5,14 @@ import wx
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
-from ndv.views._app import WxProvider
+from ndv.views._wx._app import WxAppWrap
 from ndv.views._wx._array_view import WxLutView
 
 
 @fixture(autouse=True, scope="module")
 def app() -> wx.App:
     # Create wx app
-    provider = WxProvider()
+    provider = WxAppWrap()
     return provider.create_app()
 
 
