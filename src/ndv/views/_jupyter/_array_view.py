@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import warnings
 from typing import TYPE_CHECKING, Any, cast
 
@@ -10,9 +11,10 @@ from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
-    from collections.abc import Container, Hashable, Mapping, Sequence
+    from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
     import cmap
+    from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
@@ -20,6 +22,19 @@ if TYPE_CHECKING:
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
+
+
+@contextlib.contextmanager
+def notifications_blocked(
+    obj: HasTraits, name: str = "value", type: str = "change"
+) -> Iterator[None]:
+    # traitlets doesn't provide a public API for this
+    notifiers: list | None = obj._trait_notifiers.get(name, {}).pop(type, None)
+    try:
+        yield
+    finally:
+        if notifiers is not None:
+            obj._trait_notifiers[name][type] = notifiers
 
 
 class JupyterLutView(LutView):
@@ -71,25 +86,24 @@ class JupyterLutView(LutView):
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
-        self._updating: bool = False
 
     # ------------------ emit changes to the controller ------------------
 
     def _on_clims_changed(self, change: dict[str, Any]) -> None:
-        if self._model and not self._updating:
+        if self._model:
             clims = self._clims.value
             self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_visible_changed(self, change: dict[str, Any]) -> None:
-        if self._model and not self._updating:
+        if self._model:
             self._model.visible = self._visible.value
 
     def _on_cmap_changed(self, change: dict[str, Any]) -> None:
-        if self._model and not self._updating:
+        if self._model:
             self._model.cmap = self._cmap.value
 
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
-        if self._model and not self._updating:
+        if self._model:
             if change["new"]:  # Autoscale
                 self._model.clims = ClimsMinMax()
             else:  # Manually scale
@@ -101,28 +115,19 @@ class JupyterLutView(LutView):
     def set_channel_name(self, name: str) -> None:
         self._visible.description = name
 
-    # NOTE: it's important to block signals when setting values from the controller
-    # to avoid loops, unnecessary updates, and unexpected behavior
-
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._updating = True
         self._auto_clim.value = not policy.is_manual
-        self._updating = False
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._updating = True
         self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
-        self._updating = False
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        self._updating = True
-        self._clims.value = clims
-        self._updating = False
+        # block self._clims.observe, otherwise autoscale will be forced off
+        with notifications_blocked(self._clims):
+            self._clims.value = clims
 
     def set_channel_visible(self, visible: bool) -> None:
-        self._updating = True
         self._visible.value = visible
-        self._updating = False
 
     def set_gamma(self, gamma: float) -> None:
         pass
