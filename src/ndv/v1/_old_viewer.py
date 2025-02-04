@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         ImageHandle,
-        RectangularROI,
+        RectangularROIHandle,
     )
 
     DimKey = int
@@ -166,7 +166,7 @@ class NDViewer(QWidget):
         # Canvas selection
         self._selection: CanvasElement | None = None
         # ROI
-        self._roi: RectangularROI | None = None
+        self._roi: RectangularROIHandle | None = None
 
         # WIDGETS ----------------------------------------------------
 
@@ -764,9 +764,10 @@ class NDViewer(QWidget):
             self._qcanvas.setCursor(Qt.CursorShape.CrossCursor)
             return False
         # If any local elements have a preference, use it
+        mme = MouseMoveEvent(event.pos().x(), event.pos().y())
         pos = (event.pos().x(), event.pos().y())
         for e in self._canvas.elements_at(pos):
-            if (pref := e.get_cursor(pos)) is not None:
+            if (pref := e.get_cursor(mme)) is not None:
                 self._qcanvas.setCursor(pref.to_qt())
                 return False
         # Otherwise, normal cursor

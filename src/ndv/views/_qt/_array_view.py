@@ -38,7 +38,10 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
-    from ndv.views.bases._graphics._canvas_elements import CanvasElement, RectangularROI
+    from ndv.views.bases._graphics._canvas_elements import (
+        CanvasElement,
+        RectangularROIHandle,
+    )
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -346,7 +349,7 @@ class _QArrayViewer(QWidget):
         self.histogram_btn = QPushButton(add_histogram_icon, "", self)
 
         # button to draw ROIs
-        self._roi_handle: RectangularROI | None = None
+        self._roi_handle: RectangularROIHandle | None = None
         self._selection: CanvasElement | None = None
         self.add_roi_btn = ROIButton()
 

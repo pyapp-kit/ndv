@@ -28,7 +28,7 @@ from ndv.views.bases import ArrayCanvas
 from ndv.views.bases._graphics._canvas_elements import (
     CanvasElement,
     ImageHandle,
-    RectangularROI,
+    RectangularROIHandle,
     ROIMoveMode,
 )
 
@@ -116,7 +116,7 @@ class VispyImageHandle(ImageHandle):
         return None
 
 
-class VispyBoundingBox(RectangularROI):
+class VispyRectangle(RectangularROIHandle):
     def __init__(self, parent: Any) -> None:
         self._selected = False
         self._move_mode: ROIMoveMode | None = None
@@ -307,8 +307,8 @@ class VispyArrayCanvas(ArrayCanvas):
 
         self._elements: WeakKeyDictionary = WeakKeyDictionary()
         self._selection: CanvasElement | None = None
-        # TODO: Weak Reference?
-        self._last_roi_created: ReferenceType[VispyBoundingBox] | None = None
+        # Maintain weak reference to last ROI created
+        self._last_roi_created: ReferenceType[VispyRectangle] | None = None
 
     @property
     def _camera(self) -> vispy.scene.cameras.BaseCamera:
@@ -389,9 +389,9 @@ class VispyArrayCanvas(ArrayCanvas):
             self.set_range()
         return handle
 
-    def add_bounding_box(self) -> VispyBoundingBox:
+    def add_bounding_box(self) -> VispyRectangle:
         """Add a new Rectangular ROI node to the scene."""
-        roi = VispyBoundingBox(parent=self._view.scene)
+        roi = VispyRectangle(parent=self._view.scene)
         roi.set_visible(False)
         self._elements[roi._handles] = roi
         self._elements[roi._rect] = roi
@@ -423,7 +423,7 @@ class VispyArrayCanvas(ArrayCanvas):
                 _y[1] = max(_y[1], shape[1])
                 if len(shape) > 2:
                     _z[1] = max(_z[1], shape[2])
-            elif isinstance(handle, VispyBoundingBox):
+            elif isinstance(handle, VispyRectangle):
                 for v in handle.vertices:
                     _x[0] = min(_x[0], v[0])
                     _x[1] = max(_x[1], v[0])

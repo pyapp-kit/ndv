@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
-    from ndv.views.bases._graphics._canvas_elements import RectangularROI
+    from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
     LutKey: TypeAlias = int | None
 
@@ -102,7 +102,7 @@ class ArrayViewer:
             self._canvas.frontend_widget(), self._data_model, self._viewer_model
         )
 
-        self._roi_view: RectangularROI | None = None
+        self._roi_view: RectangularROIHandle | None = None
 
         self._set_model_connected(self._data_model.display)
         self._canvas.set_ndim(self.display_model.n_visible_axes)

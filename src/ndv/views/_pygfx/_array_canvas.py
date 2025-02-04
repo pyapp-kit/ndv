@@ -20,7 +20,7 @@ from ndv._types import (
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
-from ndv.views.bases._graphics._canvas_elements import RectangularROI, ROIMoveMode
+from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -110,7 +110,7 @@ class PyGFXImageHandle(ImageHandle):
         return None
 
 
-class PyGFXBoundingBox(RectangularROI):
+class PyGFXRectangle(RectangularROIHandle):
     def __init__(
         self,
         render: Callable,
@@ -407,8 +407,8 @@ class GfxArrayCanvas(ArrayCanvas):
 
         self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
         self._selection: CanvasElement | None = None
-        # TODO: Weak Reference?
-        self._last_roi_created: ReferenceType[PyGFXBoundingBox] | None = None
+        # Maintain a weak reference to the last ROI created.
+        self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -504,9 +504,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._elements[vol] = handle
         return handle
 
-    def add_bounding_box(self) -> PyGFXBoundingBox:
+    def add_bounding_box(self) -> PyGFXRectangle:
         """Add a new Rectangular ROI node to the scene."""
-        roi = PyGFXBoundingBox(
+        roi = PyGFXRectangle(
             render=self.refresh,
             canvas_to_world=self.canvas_to_world,
             parent=self._scene,

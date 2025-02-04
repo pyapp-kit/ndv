@@ -66,7 +66,7 @@ class ROIMoveMode(Enum):
     TRANSLATE = auto()  # Translating everything
 
 
-class RectangularROI(CanvasElement):
+class RectangularROIHandle(CanvasElement):
     """An axis-aligned rectanglular ROI."""
 
     boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
