@@ -154,12 +154,10 @@ class QLutView(LutView):
         self._qwidget.visible.setText(name)
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        with signals_blocked(self._qwidget.auto_clim):
-            self._qwidget.auto_clim.setChecked(not policy.is_manual)
+        self._qwidget.auto_clim.setChecked(not policy.is_manual)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        with signals_blocked(self._qwidget.cmap):
-            self._qwidget.cmap.setCurrentColormap(cmap)
+        self._qwidget.cmap.setCurrentColormap(cmap)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         with signals_blocked(self._qwidget.clims):
