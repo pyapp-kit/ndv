@@ -486,12 +486,11 @@ class VispyArrayCanvas(ArrayCanvas):
             # All done - exit the mode
             self._viewer.interaction_mode = InteractionMode.PAN_ZOOM
 
-        # Find all visuals at the point
+        # Select first selectable object at clicked point
         for vis in self.elements_at(canvas_pos):
             if vis.can_select():
                 self._selection = vis
                 self._selection.on_mouse_press(event)
-                self._camera.interactive = False
                 return False
 
         return False
@@ -507,7 +506,6 @@ class VispyArrayCanvas(ArrayCanvas):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         if self._selection:
             self._selection.on_mouse_release(event)
-        self._camera.interactive = True
         return False
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType:

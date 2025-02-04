@@ -176,12 +176,17 @@ class ArrayViewer:
 
     @property
     def roi(self) -> RectangularROIModel | None:
+        """Return ROI being displayed."""
         return self._roi_model
 
     @roi.setter
     def roi(self, roi_model: RectangularROIModel | None) -> None:
+        """Set ROI being displayed."""
+        # Disconnect old model
         if self._roi_model is not None:
             self._set_roi_model_connected(self._roi_model, False)
+
+        # Connect new model
         self._roi_model = roi_model
         if self._roi_model is not None:
             self._set_roi_model_connected(self._roi_model)
@@ -361,9 +366,9 @@ class ArrayViewer:
         if self._roi_view:
             self._roi_view.remove()
 
-        # Create new ROI
+        # Create new ROI view
         self._roi_view = self._canvas.add_bounding_box()
-        # Connect signals
+        # Connect view signals
         self._roi_view.boundingBoxChanged.connect(
             self._on_roi_view_bounding_box_changed
         )

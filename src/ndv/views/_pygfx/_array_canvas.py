@@ -632,7 +632,7 @@ class GfxArrayCanvas(ArrayCanvas):
             # All done - exit the mode
             self._viewer.interaction_mode = InteractionMode.PAN_ZOOM
 
-        # Find all visuals at the point
+        # Select first selectable object at clicked point
         for vis in self.elements_at(canvas_pos):
             if vis.can_select():
                 self._selection = vis
