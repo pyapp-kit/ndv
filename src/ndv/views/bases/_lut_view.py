@@ -24,13 +24,20 @@ class LutView(Viewable):
 
     @abstractmethod
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        """Set the autoscale button to checked if `checked` is True."""
+        """Set the clim policy to `policy`.
+
+        Usually corresponds to an "autoscale" checkbox.
+
+        Note that this method must not modify the backing LUTModel.
+        """
 
     @abstractmethod
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         """Set the colormap to `cmap`.
 
         Usually corresponds to a dropdown menu.
+
+        Note that this method must not modify the backing LUTModel.
         """
 
     @abstractmethod
@@ -38,6 +45,8 @@ class LutView(Viewable):
         """Set the (low, high) contrast limits to `clims`.
 
         Usually this will be a range slider or two text boxes.
+
+        Note that this method must not modify the backing LUTModel.
         """
 
     @abstractmethod
@@ -45,10 +54,15 @@ class LutView(Viewable):
         """Check or uncheck the visibility indicator of the LUT.
 
         Usually corresponds to a checkbox.
+
+        Note that this method must not modify the backing LUTModel.
         """
 
     def set_gamma(self, gamma: float) -> None:
-        """Set the gamma value of the LUT."""
+        """Set the gamma value of the LUT.
+
+        Note that this method must not modify the backing LUTModel.
+        """
         return None
 
     @property
