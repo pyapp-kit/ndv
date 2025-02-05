@@ -30,8 +30,9 @@ if TYPE_CHECKING:
     from pygfx.resources import Texture
     from wgpu.gui.jupyter import JupyterWgpuCanvas
     from wgpu.gui.qt import QWgpuCanvas
+    from wgpu.gui.wx import WxWgpuCanvas
 
-    WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas
+    WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas | WxWgpuCanvas
 
 
 def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:
