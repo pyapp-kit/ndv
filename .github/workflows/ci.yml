@@ -107,10 +107,15 @@ jobs:
       - name: 🧪 Test
         run: uv run pytest --cov --cov-report=xml -v --color yes tests
 
-      - name: ⬇️🧪 Test with minimum stated dependencies
+      - name: ⬇️ Install minimum stated dependencies
         run: |
-          uv pip install -e .[${{ matrix.gui }},${{ matrix.canvas }}] --resolution lowest-direct -U --only-binary numpy --only-binary wxpython
-          uv run pytest -v --color yes tests -W ignore
+          uv pip install --verbose \
+          -e .[${{ matrix.gui }},${{ matrix.canvas }}] \
+          --resolution lowest-direct -U \
+          --only-binary numpy --only-binary wxpython
+
+      - name: 🧪 🔁 Test again
+        run: uv run pytest -v --color yes tests -W ignore
 
       - uses: codecov/codecov-action@v5
         with:
