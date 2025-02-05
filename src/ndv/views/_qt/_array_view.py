@@ -185,8 +185,6 @@ class QLutView(LutView):
     def set_clims(self, clims: tuple[float, float]) -> None:
         # block self._qwidget._clims, otherwise autoscale will be forced off
         with signals_blocked(self._qwidget.clims):
-            if not isinstance(clims, tuple):
-                breakpoint()
             self._qwidget.clims.setValue(clims)
 
     def set_gamma(self, gamma: float) -> None:
