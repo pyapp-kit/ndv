@@ -273,6 +273,7 @@ def test_array_viewer_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_roi_controller() -> None:
     ctrl = ArrayViewer()
     roi = RectangularROIModel()
