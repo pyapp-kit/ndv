@@ -48,7 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 # Supported GUI frontends
 jupyter = [
-    "ipywidgets >=8",
+    "ipywidgets >=8.0.5",
     "jupyter >=1.1",
     "jupyter_rfb >=0.3.3",
     "glfw >=2.4",
