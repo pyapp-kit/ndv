@@ -27,6 +27,7 @@ from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
@@ -96,9 +97,15 @@ class _CmapCombo(QColormapComboBox):
         for idx in range(self.count()):
             if item := self.itemColormap(idx):
                 if item.name == cmap_.name:
+                    # cmap_ is already here - just select it
                     self.setCurrentIndex(idx)
-        else:
-            self.addColormap(cmap_)
+                    return
+
+        # cmap_ not in the combo box - add it!
+        self.addColormap(cmap_)
+        # then, select it!
+        # NB: "Add..." was at idx, now it's at idx+1 and cmap_ is at idx
+        self.setCurrentIndex(idx)
 
 
 class _QSpinner(QLabel):
@@ -164,10 +171,10 @@ class QLutView(LutView):
         super().__init__()
         self._qwidget = _QLUTWidget()
         # TODO: use emit_fast
-        self._qwidget.visible.toggled.connect(self.visibilityChanged.emit)
-        self._qwidget.cmap.currentColormapChanged.connect(self.cmapChanged.emit)
-        self._qwidget.clims.valueChanged.connect(self.climsChanged.emit)
-        self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit)
+        self._qwidget.visible.toggled.connect(self._on_q_visibility_changed)
+        self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
+        self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
+        self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
@@ -175,16 +182,16 @@ class QLutView(LutView):
     def set_channel_name(self, name: str) -> None:
         self._qwidget.visible.setText(name)
 
-    def set_auto_scale(self, auto: bool) -> None:
-        self._qwidget.auto_clim.setChecked(auto)
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        self._qwidget.auto_clim.setChecked(not policy.is_manual)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._qwidget.cmap.setCurrentColormap(cmap)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        if not isinstance(clims, tuple):
-            breakpoint()
-        self._qwidget.clims.setValue(clims)
+        # block self._qwidget._clims, otherwise autoscale will be forced off
+        with signals_blocked(self._qwidget.clims):
+            self._qwidget.clims.setValue(clims)
 
     def set_gamma(self, gamma: float) -> None:
         pass
@@ -197,6 +204,26 @@ class QLutView(LutView):
 
     def close(self) -> None:
         self._qwidget.close()
+
+    def _on_q_visibility_changed(self, visible: bool) -> None:
+        if self._model:
+            self._model.visible = visible
+
+    def _on_q_cmap_changed(self, cmap: cmap.Colormap) -> None:
+        if self._model:
+            self._model.cmap = cmap
+
+    def _on_q_clims_changed(self, clims: tuple[float, float]) -> None:
+        if self._model:
+            self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_q_auto_changed(self, autoscale: bool) -> None:
+        if self._model:
+            if autoscale:
+                self._model.clims = ClimsMinMax()
+            else:
+                clims = self._qwidget.clims.value()
+                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
 
 class ROIButton(QPushButton):

@@ -86,7 +86,7 @@ docs = [
     "imageio[tifffile]",
 ]
 dev = [
-    "ndv[test,vispy,pygfx,pyqt,jupyter]",
+    "ndv[test,vispy,pygfx,pyqt,jupyter,wxpython]",
     "pytest-qt",
     "ipython",
     "mypy",

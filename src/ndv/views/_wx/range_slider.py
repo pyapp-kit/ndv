@@ -86,8 +86,6 @@ class SliderThumb:
 
     def SetValue(self, value: int) -> None:
         self.value = value
-        # Post event notifying that value changed
-        self.PostEvent()
 
     def PostEvent(self) -> None:
         event = wx.PyCommandEvent(wx.EVT_SLIDER.typeId, self.parent.GetId())

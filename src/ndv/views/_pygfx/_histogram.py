@@ -10,6 +10,7 @@ import pygfx
 import pylinalg as la
 
 from ndv._types import CursorType, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
@@ -270,9 +271,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def set_gamma(self, gamma: float) -> None:
         # TODO: Support gamma
-        if gamma != self._gamma:
-            return
-        raise NotImplementedError("Setting gamma in PyGFX not yet supported")
+        if gamma != 1:
+            raise NotImplementedError("Setting gamma in PyGFX not yet supported")
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         self._clims = clims
@@ -289,7 +289,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # Redraw
         self.refresh()
 
-    def set_auto_scale(self, autoscale: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         # Nothing to do (yet)
         pass
 
@@ -457,7 +457,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 if self._bin_edges is not None:
                     new_right = min(new_right, self._bin_edges[-1])
                 newlims = (self._clims[0], new_right)
-            self.climsChanged.emit(newlims)
+            if self.model:
+                self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
         self.get_cursor(event).apply_to(self)
