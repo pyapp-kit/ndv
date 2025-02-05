@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from ndv.views.bases._lut_view import LutView
+
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ndv._types import CursorType
+    from ndv.models._lut_model import ClimPolicy
 
 
 class CanvasElement(Mouseable):
@@ -60,7 +63,7 @@ class CanvasElement(Mouseable):
         """Removes the element from the canvas."""
 
 
-class ImageHandle(CanvasElement):
+class ImageHandle(CanvasElement, LutView):
     @abstractmethod
     def data(self) -> np.ndarray: ...
     @abstractmethod
@@ -74,9 +77,25 @@ class ImageHandle(CanvasElement):
     @abstractmethod
     def set_gamma(self, gamma: float) -> None: ...
     @abstractmethod
-    def cmap(self) -> _cmap.Colormap: ...
+    def colormap(self) -> _cmap.Colormap: ...
     @abstractmethod
-    def set_cmap(self, cmap: _cmap.Colormap) -> None: ...
+    def set_colormap(self, cmap: _cmap.Colormap) -> None: ...
+
+    # -- LutView methods -- #
+    def close(self) -> None:
+        self.remove()
+
+    def frontend_widget(self) -> Any:
+        return None
+
+    def set_channel_name(self, name: str) -> None:
+        pass
+
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        pass
+
+    def set_channel_visible(self, visible: bool) -> None:
+        self.set_visible(visible)
 
 
 class RoiHandle(CanvasElement):

@@ -102,7 +102,7 @@ array-libs = [
 test = ["pytest >=8", "pytest-cov >=6"]
 dev = [
     { include-group = "test" },
-    "ndv[pyqt,vispy]",
+    "ndv[test,vispy,pygfx,pyqt,jupyter,wxpython]"
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",
