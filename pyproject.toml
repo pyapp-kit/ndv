@@ -110,7 +110,6 @@ dev = [
     "pdbpp>=0.10.3 ; sys_platform != 'win32'",
     "pre-commit>=4.1.0",
     "pytest-qt >=4.4",
-    # "pytest-qt>=4.4.0",
     "rich>=13.9.4",
     "ruff>=0.9.4",
 ]

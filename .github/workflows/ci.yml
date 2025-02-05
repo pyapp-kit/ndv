@@ -27,6 +27,7 @@ jobs:
     env:
       UV_PYTHON: ${{ matrix.python-version }}
       UV_FROZEN: 1
+      UV_SYNC: 0
     strategy:
       fail-fast: false
       matrix:
