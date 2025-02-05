@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class RectangularROIModel(NDVModel):
-    """Representation of how to display an axis-aligned rectangular Region of Interest (ROI).
+    """Representation of an axis-aligned rectangular Region of Interest (ROI).
 
     Parameters
     ----------
