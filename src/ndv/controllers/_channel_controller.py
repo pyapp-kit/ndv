@@ -32,7 +32,6 @@ class ChannelController:
         self.lut_model = lut_model
         self.lut_model.events.clims.connect(self._auto_scale)
         self.handles: list[ImageHandle] = []
-        self.clims: tuple[float, float] = (0, 1)
 
         for v in views:
             self.add_lut_view(v)
