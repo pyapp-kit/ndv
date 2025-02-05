@@ -10,6 +10,7 @@ import wx.lib.newevent
 from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
 from ndv.views._wx._labeled_slider import WxLabeledSlider
 from ndv.views.bases import ArrayView, LutView
 
@@ -92,16 +93,25 @@ class WxLutView(LutView):
 
     # Event Handlers
     def _on_visible_changed(self, event: wx.CommandEvent) -> None:
-        self.visibilityChanged.emit(self._wxwidget.visible.GetValue())
+        if self._model:
+            self._model.visible = self._wxwidget.visible.GetValue()
 
     def _on_cmap_changed(self, event: wx.CommandEvent) -> None:
-        self.cmapChanged.emit(self._wxwidget.cmap.GetValue())
+        if self._model:
+            self._model.cmap = self._wxwidget.cmap.GetValue()
 
     def _on_clims_changed(self, event: wx.CommandEvent) -> None:
-        self.climsChanged.emit(self._wxwidget.clims.GetValues())
+        if self._model:
+            clims = self._wxwidget.clims.GetValues()
+            self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_autoscale_changed(self, event: wx.CommandEvent) -> None:
-        self.autoscaleChanged.emit(self._wxwidget.auto_clim.GetValue())
+        if self._model:
+            if self._wxwidget.auto_clim.GetValue():
+                self._model.clims = ClimsMinMax()
+            else:  # Manually scale
+                clims = self._wxwidget.clims.GetValues()
+                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     # Public Methods
     def frontend_widget(self) -> wx.Window:
@@ -110,8 +120,8 @@ class WxLutView(LutView):
     def set_channel_name(self, name: str) -> None:
         self._wxwidget.visible.SetLabel(name)
 
-    def set_auto_scale(self, auto: bool) -> None:
-        self._wxwidget.auto_clim.SetValue(auto)
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        self._wxwidget.auto_clim.SetValue(not policy.is_manual)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         name = cmap.name.split(":")[-1]  # FIXME: this is a hack

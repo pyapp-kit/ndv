@@ -64,6 +64,13 @@ class ClimsManual(ClimPolicy):
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return self.min, self.max
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ClimsManual)
+            and self.min == other.min
+            and self.max == other.max
+        )
+
 
 class ClimsMinMax(ClimPolicy):
     """Autoscale contrast limits based on the minimum and maximum values in the data."""
@@ -72,6 +79,9 @@ class ClimsMinMax(ClimPolicy):
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return (np.nanmin(data), np.nanmax(data))
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, ClimsMinMax)
 
 
 class ClimsPercentile(ClimPolicy):
@@ -91,6 +101,13 @@ class ClimsPercentile(ClimPolicy):
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return tuple(np.nanpercentile(data, [self.min_percentile, self.max_percentile]))
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ClimsPercentile)
+            and self.min_percentile == other.min_percentile
+            and self.max_percentile == other.max_percentile
+        )
 
 
 class ClimsStdDev(ClimPolicy):
@@ -113,6 +130,13 @@ class ClimsStdDev(ClimPolicy):
         center = np.nanmean(data) if self.center is None else self.center
         diff = self.n_stdev * np.nanstd(data)
         return center - diff, center + diff
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ClimsStdDev)
+            and self.n_stdev == other.n_stdev
+            and self.center == other.center
+        )
 
 
 # we can add this, but it needs to have a proper pydantic serialization method

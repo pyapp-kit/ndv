@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any, Callable, cast, no_type_check
+from typing import Any, Callable, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
@@ -11,15 +11,13 @@ import pytest
 
 from ndv._types import MouseMoveEvent
 from ndv.controllers import ArrayViewer
+from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
-from ndv.models._lut_model import LUTModel
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases._graphics._canvas_elements import ImageHandle
-
-if TYPE_CHECKING:
-    from ndv.controllers._channel_controller import ChannelController
 
 try:
     from qtpy import API_NAME
@@ -123,7 +121,7 @@ def test_controller() -> None:
 
     # setting a new ArrayDisplay model updates the appropriate view widgets
     ch_ctrl = cast("ChannelController", ctrl._lut_controllers[None])
-    ch_ctrl.lut_views[0].set_colormap_without_signal.reset_mock()
+    ch_ctrl.lut_views[0].set_colormap.reset_mock()
     ctrl.display_model = ArrayDisplayModel(default_lut=LUTModel(cmap="green"))
     # fails
     # ch_ctrl.lut_views[0].set_colormap_without_signal.assert_called_once()
@@ -215,6 +213,32 @@ def test_array_viewer_with_app() -> None:
     if gui_frontend() != _app.GuiFrontend.WX:
         visax_mock.assert_called_once()
         assert viewer.display_model.visible_axes == (0, -2, -1)
+
+
+@pytest.mark.usefixtures("any_app")
+def test_channel_autoscale() -> None:
+    ctrl = ChannelController(key=None, lut_model=LUTModel(), views=[])
+
+    # NB: Use a planar dataset so we can manually compute the min/max
+    data = np.random.randint(0, 255, size=(10, 10), dtype="uint8")
+    mi, ma = np.nanmin(data), np.nanmax(data)
+    handle = MagicMock(spec=ImageHandle)
+    handle.data.return_value = data
+    ctrl.add_handle(handle)
+
+    # Test some random LutController
+    lut_model = ctrl.lut_model
+    lut_model.clims = ClimsManual(min=1, max=2)
+
+    # Ensure newly added lut views have the correct clims
+    mock_viewer = MagicMock(LutView)
+    ctrl.add_lut_view(mock_viewer)
+    mock_viewer.set_clims.assert_called_once_with((1, 2))
+
+    # Ensure autoscaling sets the clims
+    mock_viewer.set_clims.reset_mock()
+    lut_model.clims = ClimsMinMax()
+    mock_viewer.set_clims.assert_called_once_with((mi, ma))
 
 
 @pytest.mark.skipif(

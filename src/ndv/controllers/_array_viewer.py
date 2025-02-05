@@ -192,10 +192,10 @@ class ArrayViewer:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         self._histogram = histogram_cls()
         self._view.add_histogram(self._histogram.frontend_widget())
-        for view in self._lut_controllers.values():
-            view.add_lut_view(self._histogram)
+        for ctrl in self._lut_controllers.values():
+            ctrl.add_lut_view(self._histogram)
             # FIXME: hack
-            if handles := view.handles:
+            if handles := ctrl.handles:
                 data = handles[0].data()
                 counts, edges = _calc_hist_bins(data)
                 self._histogram.set_data(counts, edges)
@@ -259,7 +259,7 @@ class ArrayViewer:
             self._clear_canvas()
             self._request_data()
             for lut_ctr in self._lut_controllers.values():
-                lut_ctr._update_view_from_model()
+                lut_ctr.synchronize()
             self._update_hist_domain_for_dtype()
 
     def _on_model_visible_axes_changed(self) -> None:
@@ -427,7 +427,7 @@ class ArrayViewer:
                     lut_views.append(self._histogram)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
                     key=key,
-                    model=model,
+                    lut_model=model,
                     views=lut_views,
                 )
 
