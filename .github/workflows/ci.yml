@@ -27,7 +27,7 @@ jobs:
     env:
       UV_PYTHON: ${{ matrix.python-version }}
       UV_FROZEN: 1
-      UV_SYNC: 0
+      UV_NO_SYNC: 1
     strategy:
       fail-fast: false
       matrix:
@@ -109,11 +109,7 @@ jobs:
         run: uv run pytest --cov --cov-report=xml -v --color yes tests
 
       - name: ⬇️ Install minimum stated dependencies
-        run: |
-          uv pip install --verbose \
-          -e .[${{ matrix.gui }},${{ matrix.canvas }}] \
-          --resolution lowest-direct -U \
-          --only-binary numpy --only-binary wxpython
+        run: uv pip install --verbose -e .[${{ matrix.gui }},${{ matrix.canvas }}] --resolution lowest-direct -U --only-binary numpy --only-binary wxpython
 
       - name: 🧪 🔁 Test again
         run: uv run pytest -v --color yes tests -W ignore
