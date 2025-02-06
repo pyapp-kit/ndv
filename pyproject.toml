@@ -92,6 +92,7 @@ array-libs = [
     "jax[cpu]>=0.4.30",
     "numpy>=1.23",
     "pooch>=1.8.2",
+    "pyopencl>=2025.1",
     "pyopencl[pocl]>=2025.1 ; sys_platform == 'linux'",
     "sparse>=0.15.5",
     "tensorstore>=0.1.69",
