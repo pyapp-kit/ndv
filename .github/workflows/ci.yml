@@ -97,7 +97,7 @@ jobs:
 
       - name: 🧪 Test
         shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}"
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
 
       - name: 🧪 Test Min
         shell: bash
