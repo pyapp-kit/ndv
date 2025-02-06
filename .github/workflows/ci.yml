@@ -22,7 +22,7 @@ jobs:
       - run: pipx run check-manifest
 
   test:
-    name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
+    name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }}
     runs-on: ${{ matrix.os }}
     env:
       UV_PYTHON: ${{ matrix.python-version }}
