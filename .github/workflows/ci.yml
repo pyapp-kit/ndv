@@ -87,17 +87,30 @@ jobs:
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
-      - name: 🧪 Test
+      - name: 🧪 Test pygfx
         shell: bash
-        run: |
-          make test extras="${{ matrix.gui }},pygfx" cov=1
-          make test extras="${{ matrix.gui }},vispy" cov=1
+        run: make test extras="${{ matrix.gui }},pygfx" cov=1
+        env:
+          COVERAGE_FILE: .coverage.pygfx
 
-      - name: 🧪 Test Min
+      - name: 🧪 Test vispy
         shell: bash
+        run: make test extras="${{ matrix.gui }},vispy" cov=1
+        env:
+          COVERAGE_FILE: .coverage.vispy
+
+      - name: 🧪 Test pygfx min
+        shell: bash
+        run: make test extras="${{ matrix.gui }},pygfx" min=1
+
+      - name: 🧪 Test vispy min
+        shell: bash
+        run: make test extras="${{ matrix.gui }},vispy" min=1
+
+      - name: Combine coverage data
         run: |
-          make test extras="${{ matrix.gui }},pygfx" min=1
-          make test extras="${{ matrix.gui }},vispy" min=1
+          uv run coverage combine .coverage.*
+          uv run coverage xml
 
       - uses: codecov/codecov-action@v5
         with:
