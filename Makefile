@@ -6,7 +6,12 @@ extras ?= pyqt,pygfx
 EXTRA_FLAGS := $(foreach extra, $(subst $(comma), ,$(extras)),--extra=$(extra))
 GROUP_FLAGS := $(foreach extra, $(subst $(comma), ,$(groups)),--group=$(extra))
 
-PYTQT := $(if $(filter pyqt pyside, $(subst $(comma), ,$(extras))),--with="pytest-qt>=4.4")
+ifeq ($(filter pyqt pyside, $(subst $(comma), ,$(extras))),)
+    GROUP_FLAGS += '--group=test'
+else
+    GROUP_FLAGS += '--group=testqt'
+endif
+
 VERBOSE := $(if $(v),--verbose,)
 ISOLATED := $(if $(isolated),--isolated)
 PYTHON_FLAG := $(if $(py),-p=$(py))
@@ -14,7 +19,7 @@ RESOLUTION := $(if $(min),--resolution=lowest-direct)
 COV := $(if $(cov),--cov --cov-report=term-missing --cov-report=xml)
 
 test:
-	uv run $(VERBOSE) $(ISOLATED) $(PYTHON_FLAG) $(RESOLUTION) --exact --no-dev --group test $(EXTRA_FLAGS) $(GROUP_FLAGS) $(PYTQT) pytest $(VERBOSE) $(COV) --color=yes
+	uv run $(VERBOSE) $(ISOLATED) $(PYTHON_FLAG) $(RESOLUTION) --exact --no-dev $(EXTRA_FLAGS) $(GROUP_FLAGS) pytest $(VERBOSE) $(COV) --color=yes
 
 test-arrays:
 	$(MAKE) test extras=pyqt,pygfx groups=array-libs

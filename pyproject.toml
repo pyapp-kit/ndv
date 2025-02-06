@@ -101,8 +101,9 @@ array-libs = [
     "zarr >2,<3",
 ]
 test = ["pytest >=8", "pytest-cov >=6"]
+testqt = [{ include-group = "test" }, "pytest-qt >=4.4"]
 dev = [
-    { include-group = "test" },
+    { include-group = "testqt" },
     "ndv[vispy,pygfx,pyqt,jupyter,wxpython]",
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
@@ -110,7 +111,6 @@ dev = [
     "mypy>=1.14.1",
     "pdbpp>=0.10.3 ; sys_platform != 'win32'",
     "pre-commit>=4.1.0",
-    "pytest-qt >=4.4",
     "rich>=13.9.4",
     "ruff>=0.9.4",
 ]
