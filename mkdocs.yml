@@ -94,7 +94,8 @@ markdown_extensions:
       permalink: "#"
 
 plugins:
-  - autorefs
+  - autorefs:
+      resolve_closest: true
   - search
   - minify:
       minify_html: true
@@ -113,7 +114,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          import:
+          inventories:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
             - https://docs.pydantic.dev/latest/objects.inv

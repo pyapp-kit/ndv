@@ -13,6 +13,7 @@ Screenshots can be inserted into the documentation by using the following syntax
 
 from __future__ import annotations
 
+import os
 import re
 import runpy
 import subprocess
@@ -47,6 +48,7 @@ ROOT = DOCS.parent
 SCREENSHOT_RE = re.compile(r"{{\s*screenshot:\s*(.+?)\s*}}")
 # a mapping of {hash -> File} for all screenshots we've generated
 SCREENSHOTS: defaultdict[int, set[File]] = defaultdict(set)
+GEN_SCREENSHOTS = os.getenv("GEN_SCREENSHOTS", "1") not in ("0", "false", "False")
 
 
 def on_startup(command: Literal["build", "gh-deploy", "serve"], dirty: bool) -> None:
@@ -117,11 +119,12 @@ def on_page_markdown(
     # Find all {{ screenshot: some/file.py }},
     # generate a screenshot for each file and replace the tag with the image link
     # this generates two links: one for light mode and one for dark mode
-    new_markdown = SCREENSHOT_RE.sub(get_screenshot_link, markdown)
+    if GEN_SCREENSHOTS:
+        markdown = SCREENSHOT_RE.sub(get_screenshot_link, markdown)
 
     # ---------------------------------------------------------------------------
 
-    return new_markdown
+    return markdown
 
 
 # ---------------------------- ScreenShot Generation ----------------------------
