@@ -13,7 +13,7 @@ from ._view_base import Viewable
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases import LutView
 
@@ -28,7 +28,7 @@ class ArrayView(Viewable):
 
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
-    histogramRequested = Signal()
+    histogramRequested = Signal(int)
     visibleAxesChanged = Signal()
     channelModeChanged = Signal(ChannelMode)
 
@@ -60,11 +60,11 @@ class ArrayView(Viewable):
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
     ) -> None: ...
     @abstractmethod
-    def add_lut_view(self) -> LutView: ...
+    def add_lut_view(self, channel: ChannelKey) -> LutView: ...
     @abstractmethod
     def remove_lut_view(self, view: LutView) -> None: ...
 
-    def add_histogram(self, widget: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
         raise NotImplementedError
 
     def remove_histogram(self, widget: Any) -> None:

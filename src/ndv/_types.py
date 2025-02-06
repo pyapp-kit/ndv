@@ -51,6 +51,9 @@ AxisKey: TypeAlias = Annotated[
     Hashable, PlainValidator(_maybe_int), PlainSerializer(str, return_type=str)
 ]
 
+# A channel key is a value that can be used to identify a channel.
+ChannelKey: TypeAlias = int | None
+
 
 class MouseButton(IntFlag):
     LEFT = auto()
