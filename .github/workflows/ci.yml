@@ -22,7 +22,7 @@ jobs:
       - run: pipx run check-manifest
 
   test:
-    name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }}
+    name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
     runs-on: ${{ matrix.os }}
     env:
       UV_PYTHON: ${{ matrix.python-version }}
@@ -35,6 +35,7 @@ jobs:
         # is ubiquitous in upstream dependencies
         python-version: ["3.10", "3.12"]
         gui: [pyside, pyqt, jupyter, wxpython]
+        canvas: [vispy, pygfx]
         exclude:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
@@ -52,25 +53,32 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.13"
             gui: jupyter
+            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.13"
             gui: jupyter
+            canvas: pygfx
           # pyside6 is struggling with 3.9
           - os: ubuntu-latest
             python-version: "3.9"
             gui: pyqt
+            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.11"
             gui: pyqt
+            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.13"
             gui: pyqt
+            canvas: pygfx
           - os: macos-13
             gui: wxpython
             python-version: "3.9"
+            canvas: vispy
           - os: windows-latest
             gui: jupyter
             python-version: "3.9"
+            canvas: pygfx
 
     steps:
       - uses: actions/checkout@v4
@@ -82,35 +90,18 @@ jobs:
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
       - name: Install llvmpipe and lavapipe for offscreen canvas
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.canvas == 'pygfx'
         run: |
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
-      - name: 🧪 Test pygfx
+      - name: 🧪 Test
         shell: bash
-        run: make test extras="${{ matrix.gui }},pygfx" cov=1
-        env:
-          COVERAGE_FILE: .coverage.pygfx
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
 
-      - name: 🧪 Test vispy
+      - name: 🧪 Test Min
         shell: bash
-        run: make test extras="${{ matrix.gui }},vispy" cov=1
-        env:
-          COVERAGE_FILE: .coverage.vispy
-
-      - name: 🧪 Test pygfx min
-        shell: bash
-        run: make test extras="${{ matrix.gui }},pygfx" min=1
-
-      - name: 🧪 Test vispy min
-        shell: bash
-        run: make test extras="${{ matrix.gui }},vispy" min=1
-
-      - name: Combine coverage data
-        run: |
-          uv run coverage combine .coverage.*
-          uv run coverage xml
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
 
       - uses: codecov/codecov-action@v5
         with:
