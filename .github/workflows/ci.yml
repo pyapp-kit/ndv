@@ -27,7 +27,6 @@ jobs:
     env:
       UV_PYTHON: ${{ matrix.python-version }}
       UV_FROZEN: 1
-      UV_NO_SYNC: 1
     strategy:
       fail-fast: false
       matrix:
@@ -87,18 +86,9 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-
-      - name: 📦 Install dependencies
-        run: uv sync --no-dev --extra ${{ matrix.gui }} --extra ${{ matrix.canvas }} --group test
-
       - uses: pyvista/setup-headless-display-action@v3
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
-
-      - name: install pytest-qt
-        if: matrix.gui == 'pyside' || matrix.gui == 'pyqt'
-        run: uv pip install pytest-qt
-
       - name: Install llvmpipe and lavapipe for offscreen canvas
         if: matrix.os == 'ubuntu-latest' && matrix.canvas == 'pygfx'
         run: |
@@ -106,19 +96,12 @@ jobs:
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
       - name: 🧪 Test
-        run: uv run pytest --cov --cov-report=xml -v --color yes tests
-
-      - name: ⬇️ Install minimum stated dependencies
-        run: uv pip install --verbose -e .[${{ matrix.gui }},${{ matrix.canvas }}] --resolution lowest-direct -U --only-binary numpy --only-binary wxpython
-
-      - name: 🧪 🔁 Test again
         shell: bash
-        continue-on-error: true
-        run: |
-          if ! uv run pytest -v --color yes tests -W ignore; then
-            echo "::warning::Min requirements test failed."
-            exit 0  # Prevent step failure
-          fi
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}"
+
+      - name: 🧪 Test Min
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
 
       - uses: codecov/codecov-action@v5
         with:
