@@ -3284,7 +3284,7 @@ requires-dist = [
     { name = "pyqt6", marker = "python_full_version >= '3.12' and extra == 'qt'", specifier = ">=6.5.3" },
     { name = "pyqt6", marker = "extra == 'pyqt'", specifier = ">=6.4,!=6.6" },
     { name = "pyqt6", marker = "extra == 'qt'", specifier = ">=6.4,!=6.6" },
-    { name = "pyside6", marker = "python_full_version >= '3.12' and extra == 'pyside'", specifier = ">=6.5.3" },
+    { name = "pyside6", marker = "python_full_version >= '3.12' and extra == 'pyside'", specifier = ">=6.6" },
     { name = "pyside6", marker = "sys_platform == 'win32' and extra == 'pyside'", specifier = "==6.6.3" },
     { name = "pyside6", marker = "extra == 'pyside'", specifier = ">=6.4" },
     { name = "qtpy", marker = "extra == 'pyqt'", specifier = ">=2" },
