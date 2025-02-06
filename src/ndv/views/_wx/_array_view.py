@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import wx
 import wx.adv
 import wx.lib.newevent
+import wx.svg
 from psygnal import Signal
+from pyconify import svg_path
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
 
     import cmap
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 
@@ -70,21 +72,44 @@ class _WxLUTWidget(wx.Panel):
 
         self.auto_clim = wx.ToggleButton(self, label="Auto")
 
+        self.histogram = wx.ToggleButton(self)
+        # FIXME: Polish this code, make reusable
+        icon_path = svg_path("foundation:graph-bar")
+        icon = wx.svg.SVGimage.CreateFromFile(str(icon_path))
+        # NB 5 is a magic number for the margins
+        bmp_side_len = self.auto_clim.Size.height - 5
+        bmp_size = wx.Size(bmp_side_len, bmp_side_len)
+        self.histogram.SetBitmap(icon.ConvertToScaledBitmap(bmp_size))
+
+        btn_side_len = self.auto_clim.Size.height
+        btn_size = wx.Size(btn_side_len, btn_side_len)
+        self.histogram.SetMaxSize(btn_size)
+
         # Layout
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self.visible, 0, wx.ALIGN_CENTER_VERTICAL, 5)
         sizer.Add(self.cmap, 0, wx.ALIGN_CENTER_VERTICAL, 5)
         sizer.Add(self.clims, 1, wx.ALIGN_CENTER_VERTICAL, 5)
         sizer.Add(self.auto_clim, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        sizer.Add(self.histogram, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        sizer.SetSizeHints(self)
 
-        self.SetSizer(sizer)
+        f = wx.BoxSizer(wx.VERTICAL)
+        f.Add(sizer, 0, wx.EXPAND, 5)
+        self._histogram_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        f.Add(self._histogram_sizer, 1, wx.EXPAND, 5)
+
+        self.SetSizer(f)
         self.Layout()
 
 
 class WxLutView(LutView):
-    def __init__(self, parent: wx.Window) -> None:
+    def __init__(self, parent: wx.Window, channel: ChannelKey) -> None:
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent)
+        self._channel = channel
+        # TODO: Fix type
+        self._histogram: Any | None = None
         # TODO: use emit_fast
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
@@ -290,6 +315,8 @@ class WxArrayView(ArrayView):
     ) -> None:
         self._data_model = data_model
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
+        # Mapping of channel key to LutViews
+        self._luts: dict[ChannelKey, WxLutView] = {}
         self._visible_axes: Sequence[AxisKey] = []
 
         # TODO: use emit_fast
@@ -333,11 +360,46 @@ class WxArrayView(ArrayView):
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
 
-    def add_lut_view(self) -> WxLutView:
-        view = WxLutView(self.frontend_widget())
+    def add_lut_view(self, channel: ChannelKey) -> WxLutView:
+        view = WxLutView(self.frontend_widget(), channel)
+        self._luts[channel] = view
+
+        def _on_histogram_requested(event: wx.CommandEvent) -> None:
+            toggled = view._wxwidget.histogram.GetValue()
+            if view._histogram:
+                if toggled:
+                    view._histogram.Show()
+                else:
+                    view._histogram.Hide()
+            elif toggled:
+                self.histogramRequested.emit(view._channel)
+
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._wxwidget.Layout()
+        # TODO: This ugly
+        view._wxwidget.histogram.Bind(wx.EVT_TOGGLEBUTTON, _on_histogram_requested)
         return view
+
+    # TODO: Fix type
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+        if lut := self._luts.get(channel, None):
+            # FIXME: pygfx backend needs this to be widget._subwidget
+            if hasattr(widget, "_subwidget"):
+                widget = widget._subwidget
+
+            if (parent := widget.GetParent()) and parent is not self:
+                widget.Reparent(lut._wxwidget)  # Reparent widget to this frame
+                if parent:
+                    parent.Destroy()
+                widget.Show()
+            # FIXME: Yuck
+            size = wx.Size(lut._wxwidget.Size)
+            size.height += 100
+            lut._wxwidget.SetSize(size)
+            lut._wxwidget.SetMinSize(size)
+            # widget.SetMinSize(wx.Size(100, 100))
+            lut._wxwidget._histogram_sizer.Add(widget)
+            lut._histogram = widget
 
     def remove_lut_view(self, lut: LutView) -> None:
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
