@@ -19,9 +19,10 @@ nav:
   - install.md
   - motivation.md
   - env_var.md
-  - Cookbook: cookbook/
-  # This is populated by scripts/gen_ref_nav.py
-  - API reference: reference/
+  - Cookbook:
+      - cookbook/embedding.md
+  # This is populated by api-autonav plugin
+  # - API reference: reference/
 
 theme:
   name: material
@@ -94,26 +95,24 @@ markdown_extensions:
       permalink: "#"
 
 plugins:
-  - autorefs
+  - autorefs:
+      resolve_closest: true
   - search
   - minify:
       minify_html: true
       minify_js: true
       minify_css: true
       cache_safe: true
-  - gen-files:
-      scripts:
-        - scripts/gen_ref_nav.py
-  - literate-nav:
-      nav_file: SUMMARY.md
   - spellcheck:
       backends:
         - codespell:
             dictionaries: [clear]
+  - api-autonav:
+      modules: [src/ndv]
   - mkdocstrings:
       handlers:
         python:
-          import:
+          inventories:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
             - https://docs.pydantic.dev/latest/objects.inv
