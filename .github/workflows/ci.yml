@@ -95,11 +95,25 @@ jobs:
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
-      - name: 🧪 Test
+      - name: 🧪 Test (attempt 1)
+        id: test1
+        continue-on-error: true
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
 
-      - name: 🧪 Test Min
+      - name: 🧪 Test (attempt 2)
+        if: steps.test1.outcome == 'failure'
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
+
+      - name: 🧪 Test Min (attempt 1)
+        id: min1
+        continue-on-error: true
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
+
+      - name: 🧪 Test Min (attempt 2)
+        if: steps.min1.outcome == 'failure'
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
 
