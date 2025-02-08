@@ -140,7 +140,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}-${{ github.run_id }}
+          name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}
           path: ./.coverage*
           include-hidden-files: true
 
@@ -179,7 +179,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
-          name: covreport-py${{ matrix.python-version }}-array-libs-${{ github.run_id }}
+          name: covreport-py${{ matrix.python-version }}-array-libs
           path: ./.coverage*
           include-hidden-files: true
 
