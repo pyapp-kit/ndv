@@ -16,10 +16,10 @@ VERBOSE := $(if $(v),--verbose,)
 ISOLATED := $(if $(isolated),--isolated)
 PYTHON_FLAG := $(if $(py),-p=$(py))
 RESOLUTION := $(if $(min),--resolution=lowest-direct)
-COV := $(if $(cov),--cov --cov-report=term-missing --cov-report=xml)
+COV := $(if $(cov),coverage run -p -m)
 
 test:
-	uv run $(VERBOSE) $(ISOLATED) $(PYTHON_FLAG) $(RESOLUTION) --exact --no-dev $(EXTRA_FLAGS) $(GROUP_FLAGS) pytest $(VERBOSE) $(COV) --color=yes
+	uv run $(VERBOSE) $(ISOLATED) $(PYTHON_FLAG) $(RESOLUTION) --exact --no-dev $(EXTRA_FLAGS) $(GROUP_FLAGS) $(COV) pytest $(VERBOSE) --color=yes
 
 test-arrays:
 	$(MAKE) test extras=pyqt,pygfx groups=array-libs
