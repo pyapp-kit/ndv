@@ -103,7 +103,6 @@ plugins:
       minify_js: true
       minify_css: true
       cache_safe: true
-  - literate-nav:
   - spellcheck:
       backends:
         - codespell:
