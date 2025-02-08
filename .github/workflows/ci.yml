@@ -92,7 +92,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           echo --ssl-no-revoke > C:\Users\runneradmin\_curlrc
-          echo --retry 5 >> C:\Users\runneradmin\_curlrc
+          echo '--retry 5' >> C:\Users\runneradmin\_curlrc
+          type C:\Users\runneradmin\_curlrc
 
       - uses: pyvista/setup-headless-display-action@v3
         with:
