@@ -115,20 +115,18 @@ dev = [
     "ruff>=0.9.4",
 ]
 docs = [
-    "mkdocs-gen-files >=0.5.0",
-    "mkdocs-literate-nav >=0.6.1",
+    "mkdocs >=1.6.1",
+    "mkdocs-api-autonav >=0.1.2",
     "mkdocs-material >=9.5.49",
     "mkdocs-minify-plugin >=0.8.0",
-    "mkdocs >=1.6.1",
-    "mkdocstrings-python >=1.13.0",
     "mkdocs-spellcheck[codespell] >=1.1.0",
+    "mkdocstrings-python >=1.13.0",
     "mike >=2.1.3",
     "ruff>=0.9.4",
     # EXAMPLES
     "ndv[vispy,qt]",
     "openwfs >=1.0.0",
 ]
-
 [tool.uv.sources]
 ndv = { workspace = true }
 
