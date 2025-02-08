@@ -147,41 +147,6 @@ jobs:
           path: ./.coverage*
           include-hidden-files: true
 
-  upload-cov:
-    name: Upload coverage
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-
-      - name: Install coverage
-        run: pip install coverage
-
-      - name: Download coverage data
-        uses: actions/download-artifact@v4
-        with:
-          pattern: covreport-*
-          path: covreports
-          merge-multiple: true
-
-      - name: Combine coverage data
-        run: |
-          cd covreports
-          python -Im coverage combine covreports
-          python -Im coverage xml -o coverage.xml
-          python -Im coverage report
-          python -Im coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload to codecov
-        uses: codecov/codecov-action@v5
-        with:
-          fail_ci_if_error: true
-          verbose: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   test-array-libs:
     uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
     with:
