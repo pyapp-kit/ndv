@@ -167,12 +167,12 @@ jobs:
       - name: 🧪 Test (attempt 1)
         id: test1
         continue-on-error: true
-        run: test extras=pyqt,pygfx groups="array-libs" cov=1
+        run: test extras="pyqt,pygfx" groups="array-libs" cov=1
 
       - name: 🧪 Test (attempt 2)
         if: steps.test1.outcome == 'failure'
         id: test2
-        run: test extras=pyqt,pygfx groups="array-libs" cov=1 verbose=1
+        run: test extras="pyqt,pygfx" groups="array-libs" cov=1 verbose=1
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
