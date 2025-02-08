@@ -163,6 +163,8 @@ jobs:
       - uses: pyvista/setup-headless-display-action@v3
         with:
           qt: true
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        run: sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
       - name: 🧪 Test (attempt 1)
         id: test1
