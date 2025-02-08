@@ -104,7 +104,10 @@ test = ["pytest >=8", "pytest-cov >=6"]
 testqt = [{ include-group = "test" }, "pytest-qt >=4.4"]
 dev = [
     { include-group = "testqt" },
-    "ndv[vispy,pygfx,pyqt,jupyter,wxpython]",
+    # omitting wxpython from dev env for now
+    # because `uv sync && pytest hangs` on a wx test in the "full" env
+    # use `make test extras=wx,[pygfx|vispy] isolated=1` to test
+    "ndv[vispy,pygfx,pyqt,jupyter]",   
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",
