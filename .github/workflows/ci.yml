@@ -110,7 +110,7 @@ jobs:
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
 
-      - name: 🧪 Test Min (attempt 2)
+      - name: 🧪 Test (attempt 2)
         if: steps.test1.outcome == 'failure'
         id: test2
         continue-on-error: true
@@ -122,20 +122,20 @@ jobs:
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
 
-      - name: 🧪 Test Min (attempt 1)
+      - name: 🧪 Test min dependencies (attempt 1)
         id: min1
         continue-on-error: true
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
 
-      - name: 🧪 Test Min (attempt 2)
+      - name: 🧪 Test min dependencies (attempt 2)
         if: steps.min1.outcome == 'failure'
         id: min2
         continue-on-error: true
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
 
-      - name: 🧪 Test Min (attempt 3)
+      - name: 🧪 Test min dependencies (attempt 3)
         if: steps.min2.outcome == 'failure'
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
