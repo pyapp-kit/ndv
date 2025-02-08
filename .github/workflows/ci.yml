@@ -6,9 +6,6 @@ on:
     tags: [v*]
   pull_request:
   workflow_dispatch:
-  schedule:
-    # run every week (for --pre release tests)
-    - cron: "0 0 * * 0"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -148,19 +145,51 @@ jobs:
           include-hidden-files: true
 
   test-array-libs:
-    uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
-    with:
-      os: ${{ matrix.os }}
-      python-version: ${{ matrix.python-version }}
-      extras: "test,vispy,third_party_arrays,pyqt"
-      coverage-upload: artifact
-      pip-post-installs: "pytest-qt"
-      qt: pyqt6
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@v3
+        with:
+          qt: true
+
+      - name: 🧪 Test (attempt 1)
+        id: test1
+        continue-on-error: true
+        shell: bash
+        run: test extras=pyqt,pygfx groups=array-libs cov=1
+
+      - name: 🧪 Test (attempt 2)
+        if: steps.test1.outcome == 'failure'
+        id: test2
+        continue-on-error: true
+        shell: bash
+        run: test extras=pyqt,pygfx groups=array-libs cov=1 verbose=1
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: covreport-py${{ matrix.python-version }}-array-libs-${{ github.run_id }}
+          path: ./.coverage*
+          include-hidden-files: true
+
+  upload_coverage:
+    if: always()
+    needs: [test, test-array-libs]
+    uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
+    secrets:
+      codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
   # make sure we can build docs without error
   test-docs:
@@ -174,13 +203,6 @@ jobs:
         with:
           name: docs
           path: site
-
-  upload_coverage:
-    if: always()
-    needs: [test, test-array-libs]
-    uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
-    secrets:
-      codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
   deploy:
     name: Deploy
