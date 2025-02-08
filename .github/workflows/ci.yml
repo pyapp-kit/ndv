@@ -115,12 +115,12 @@ jobs:
         id: test2
         continue-on-error: true
         shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
 
       - name: 🧪 Test (attempt 3)
         if: steps.test2.outcome == 'failure'
         shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
 
       - name: 🧪 Test Min (attempt 1)
         id: min1
@@ -133,12 +133,12 @@ jobs:
         id: min2
         continue-on-error: true
         shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
 
       - name: 🧪 Test Min (attempt 3)
         if: steps.min2.outcome == 'failure'
         shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
