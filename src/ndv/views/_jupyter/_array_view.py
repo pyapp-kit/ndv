@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -75,11 +75,19 @@ class JupyterLutView(LutView):
             tooltip="Auto scale",
             layout=widgets.Layout(width="65px"),
         )
+        self._histogram = widgets.ToggleButton(
+            value=False,
+            # description="Auto",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            icon="chart-simple",
+            tooltip="View histogram",
+            layout=widgets.Layout(width="65px"),
+        )
 
         # LAYOUT
 
         self.layout = widgets.HBox(
-            [self._visible, self._cmap, self._clims, self._auto_clim]
+            [self._visible, self._cmap, self._clims, self._auto_clim, self._histogram]
         )
 
         # CONNECTIONS
@@ -293,7 +301,7 @@ class JupyterArrayView(ArrayView):
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self) -> JupyterLutView:
+    def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
         wdg = JupyterLutView()
         layout = self._luts_box
