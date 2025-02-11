@@ -286,12 +286,15 @@ class VispyImageHandle(ImageHandle):
 
         if data.ndim == self._ndim:
             # add channel dimension
-            data = data.reshape((*data.shape, 1))
+            data = data[..., np.newaxis]
         elif ndim != self._ndim + 1:  # already has channel dimension
             word = "few" if ndim < self._ndim else "many"
             raise ValueError(f"Too {word} dimensions for texture")
         if offset is None:
             offset = (0,) * ndim
+
+        # retaining this pointer seems to be necessary
+        self._visual._data = data
 
         # See vispy.gloo.texture.BaseTexture._set_data
         queue = cast("vispy.gloo.glir.GlirQueue", texture._glir)

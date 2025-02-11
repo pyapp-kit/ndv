@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
+    from ndv._types import MouseMoveEvent
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
     ChannelKey = int | str | None
@@ -31,10 +32,12 @@ class StreamingViewer:
         frontend_cls = _app.get_array_view_class()
         canvas_cls = _app.get_array_canvas_class()
         self._canvas = canvas_cls()
+        self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.set_ndim(2)
         self._view = frontend_cls(
             self._canvas.frontend_widget(), _ArrayDataDisplayModel()
         )
+        self._app = _app.ndv_app()
 
     def setup(
         self,
@@ -52,6 +55,7 @@ class StreamingViewer:
         for key, model in channels.items():
             lut_views = [self._view.add_lut_view()]
             data = np.zeros(shape, dtype=dtype)
+            print("ADD")
             self._handles[key] = handle = self._canvas.add_image(data)
             self._lut_controllers[key] = ctrl = ChannelController(
                 key=key,
@@ -60,13 +64,20 @@ class StreamingViewer:
             )
             ctrl.add_handle(handle)
 
+        info_str = f"Streaming: {len(channels)}x {shape} {dtype}"
+        self._view.set_data_info(info_str)
+
         self._canvas.set_range()
+        self._canvas.refresh()
 
     def set_data(self, data: npt.NDArray, channel: ChannelKey = 0) -> None:
         """Set the data to display."""
         self._lut_controllers[channel].update_texture_data(data, direct=True)
+        self._app.process_events()
 
-    def set_lut(self, lut: LUTModel, channel: int = 0) -> None: ...
+    def set_lut(self, lut: LUTModel, channel: int = 0) -> None:
+        """Set the LUT for a channel."""
+        ...
 
     def show(self) -> None:
         """Show the viewer."""
@@ -92,3 +103,30 @@ class StreamingViewer:
             issue](https://github.com/pyapp-kit/ndv/issues/new) if you have questions.
         """
         return self._view.frontend_widget()
+
+    def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
+        """Respond to a mouse move event in the view."""
+        x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+
+        # collect and format intensity values at the current mouse position
+        channel_values = self._get_values_at_world_point(int(x), int(y))
+        vals = []
+        for ch, value in channel_values.items():
+            # restrict to 2 decimal places, but remove trailing zeros
+            fval = f"{value:.2f}".rstrip("0").rstrip(".")
+            fch = f"{ch}: " if ch is not None else ""
+            vals.append(f"{fch}{fval}")
+        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
+        self._view.set_hover_info(text)
+
+    def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
+        # TODO: handle 3D data
+        if x < 0 or y < 0:
+            return {}
+
+        values: dict[ChannelKey, float] = {}
+        for key, ctrl in self._lut_controllers.items():
+            if (value := ctrl.get_value_at_index((y, x))) is not None:
+                values[key] = value
+
+        return values

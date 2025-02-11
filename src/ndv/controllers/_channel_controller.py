@@ -84,7 +84,7 @@ class ChannelController:
             # texture has already been reduced to 2D). But a more complete
             # implementation would gather the full current nD index and query
             # the data source directly.
-            return handle.data()[idx]  # type: ignore [no-any-return]
+            return float(handle.data()[idx])
         return None
 
     def _auto_scale(self) -> None:

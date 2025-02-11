@@ -74,6 +74,10 @@ class QtAppWrap(NDVApp):
         canvas.installEventFilter(f)
         return lambda: canvas.removeEventFilter(f)
 
+    def process_events(self) -> None:
+        """Process events for the application."""
+        QApplication.processEvents()
+
 
 class MouseEventFilter(QObject):
     def __init__(self, canvas: QObject, receiver: Mouseable):

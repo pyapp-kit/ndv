@@ -89,6 +89,10 @@ class NDVApp:
         sys._original_excepthook_ = sys.excepthook  # type: ignore
         sys.excepthook = ndv_excepthook
 
+    def process_events(self) -> None:
+        """Process events for the application."""
+        pass
+
 
 @cache
 def _thread_pool_executor() -> ThreadPoolExecutor:
