@@ -88,10 +88,8 @@ class ChannelController:
         return None
 
     def _auto_scale(self) -> None:
-        policy = self.lut_model.clims
-        if policy.is_manual:
-            return
         if self.lut_model and len(self.handles):
+            policy = self.lut_model.clims
             handle_clims = [policy.calc_clims(handle.data()) for handle in self.handles]
             mi, ma = handle_clims[0]
             for clims in handle_clims[1:]:

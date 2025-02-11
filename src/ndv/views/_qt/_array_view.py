@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._array_view import ArrayViewOptions
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -417,7 +418,9 @@ class _QArrayViewer(QWidget):
 
 class QtArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: QWidget, data_model: _ArrayDataDisplayModel
+        self,
+        canvas_widget: QWidget,
+        data_model: _ArrayDataDisplayModel,
     ) -> None:
         self._data_model = data_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
@@ -432,6 +435,16 @@ class QtArrayView(ArrayView):
         qwdg.ndims_btn.toggled.connect(self._on_ndims_toggled)
 
         self._visible_axes: Sequence[AxisKey] = []
+
+    def set_options(self, options: ArrayViewOptions) -> None:
+        if (show_3d := options.show_3d_button) is not None:
+            self._qwidget.ndims_btn.setVisible(show_3d)
+        if (show_hist := options.show_histogram_button) is not None:
+            self._qwidget.histogram_btn.setVisible(show_hist)
+        if (show_reset := options.show_reset_zoom_button) is not None:
+            self._qwidget.set_range_btn.setVisible(show_reset)
+        if (show_channel := options.show_channel_mode_selector) is not None:
+            self._qwidget.channel_mode_combo.setVisible(show_channel)
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()

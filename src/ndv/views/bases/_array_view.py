@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
@@ -16,6 +17,14 @@ if TYPE_CHECKING:
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases import LutView
+
+
+@dataclass
+class ArrayViewOptions:
+    show_3d_button: bool | None = None
+    show_histogram_button: bool | None = None
+    show_reset_zoom_button: bool | None = None
+    show_channel_mode_selector: bool | None = None
 
 
 class ArrayView(Viewable):
@@ -72,3 +81,6 @@ class ArrayView(Viewable):
 
     def set_progress_spinner_visible(self, visible: bool) -> None:
         return
+
+    def set_options(self, options: ArrayViewOptions) -> None:
+        pass
