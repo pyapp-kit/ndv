@@ -84,7 +84,10 @@ class JupyterAppWrap(NDVApp):
                     canvas.cursor = cursor.to_jupyter()
                 receiver.mouseMoved.emit(mme)
             elif etype == "pointer_down":
-                active_btn = JupyterAppWrap.mouse_btn(ev["button"])
+                if "button" in ev:
+                    active_btn = JupyterAppWrap.mouse_btn(ev["button"])
+                else:
+                    active_btn = MouseButton.NONE
                 mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 intercepted |= receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
