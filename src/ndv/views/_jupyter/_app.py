@@ -77,8 +77,6 @@ class JupyterAppWrap(NDVApp):
             nonlocal canvas
 
             etype = ev["event_type"]
-            if "button" in ev:
-                btn = JupyterAppWrap.mouse_btn(ev["button"])
             if etype == "pointer_move":
                 mme = MouseMoveEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 receiver.on_mouse_move(mme)
@@ -86,7 +84,7 @@ class JupyterAppWrap(NDVApp):
                     canvas.cursor = cursor.to_jupyter()
                 receiver.mouseMoved.emit(mme)
             elif etype == "pointer_down":
-                active_btn = btn
+                active_btn = JupyterAppWrap.mouse_btn(ev["button"])
                 mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
