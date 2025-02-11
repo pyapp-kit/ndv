@@ -288,7 +288,10 @@ def test_roi_controller() -> None:
     viewer.interaction_mode = InteractionMode.CREATE_ROI
     canvas_pos = (5, 5)
     mpe = MousePressEvent(canvas_pos[0], canvas_pos[1], MouseButton.LEFT)
-    ctrl._canvas.on_mouse_press(mpe)
+
+    # Note - avoid diving into rendering logic here - just identify view
+    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
+        ctrl._canvas.on_mouse_press(mpe)
     world_pos = ctrl._canvas.canvas_to_world(canvas_pos)
 
     assert roi.bounding_box == (
