@@ -63,7 +63,7 @@ class ChannelController:
             handle.directly_set_texture_data(data)
         else:
             handle.set_data(data)
-        self._auto_scale()
+            self._auto_scale()
 
     def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""
@@ -88,8 +88,10 @@ class ChannelController:
         return None
 
     def _auto_scale(self) -> None:
+        policy = self.lut_model.clims
+        if policy.is_manual:
+            return
         if self.lut_model and len(self.handles):
-            policy = self.lut_model.clims
             handle_clims = [policy.calc_clims(handle.data()) for handle in self.handles]
             mi, ma = handle_clims[0]
             for clims in handle_clims[1:]:

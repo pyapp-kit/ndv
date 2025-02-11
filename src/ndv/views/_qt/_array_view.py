@@ -494,7 +494,7 @@ class QtArrayView(ArrayView):
             if z_ax is None:
                 # get the last slider that is not in visible axes
                 sld = reversed(self._qwidget.dims_sliders._sliders)
-                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
+                z_ax = next((ax for ax in sld if ax not in self._visible_axes), 0)
             self._visible_axes = (z_ax, *self._visible_axes)
         # TODO: a future PR may decide to set this on the model directly...
         # since we now have access to it.
