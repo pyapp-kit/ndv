@@ -49,6 +49,20 @@ class PyGFXImageHandle(ImageHandle):
         self._grid.data[:] = data
         self._grid.update_range((0, 0, 0), self._grid.size)
 
+    def directly_set_texture_data(
+        self, data: np.ndarray, offset: tuple | None = None
+    ) -> None:
+        """LOW-LEVEL: Set the texture data at offset directly.
+
+        We are bypassing all data transformations and checks here, so data *must* be
+        the correct shape and dtype.
+        """
+        if offset is not None:
+            # need to use _grid.send_data()... but might need to setup texture
+            # differently for that
+            raise NotImplementedError("Offset not yet supported in pygfx backend")
+        self._grid.set_data(data)
+
     def visible(self) -> bool:
         return bool(self._image.visible)
 

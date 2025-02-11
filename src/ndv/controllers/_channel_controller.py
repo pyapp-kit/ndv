@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ndv.views.bases import LutView
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
-    LutKey = int | None
+    LutKey = int | None | str
 
 
 class ChannelController:
@@ -51,7 +51,7 @@ class ChannelController:
             view.synchronize()
             view.set_channel_name(name)
 
-    def update_texture_data(self, data: np.ndarray) -> None:
+    def update_texture_data(self, data: np.ndarray, direct: bool = False) -> None:
         """Update the data in the image handle."""
         # WIP:
         # until we have a more sophisticated way to handle updating data
@@ -59,7 +59,10 @@ class ChannelController:
         if not (handles := self.handles):
             return
         handle = handles[0]
-        handle.set_data(data)
+        if direct:
+            handle.directly_set_texture_data(data)
+        else:
+            handle.set_data(data)
         self._auto_scale()
 
     def add_handle(self, handle: ImageHandle) -> None:

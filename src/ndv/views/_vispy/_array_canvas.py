@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from typing import Callable
 
     import vispy.app
+    import vispy.gloo
+    import vispy.gloo.glir
 
 
 turn = np.sin(np.pi / 4)
@@ -270,6 +272,30 @@ class VispyImageHandle(ImageHandle):
             )
             return
         self._visual.set_data(data)
+
+    def directly_set_texture_data(
+        self, data: np.ndarray, offset: tuple | None = None
+    ) -> None:
+        """LOW-LEVEL: Set the texture data at offset directly.
+
+        We are bypassing all data transformations and checks here, so data *must* be
+        the correct shape and dtype.  Also, lots of private vispy usage here...
+        """
+        texture = cast("vispy.gloo.texture.BaseTexture", self._visual._texture)
+        ndim = data.ndim
+
+        if data.ndim == self._ndim:
+            # add channel dimension
+            data = data.reshape((*data.shape, 1))
+        elif ndim != self._ndim + 1:  # already has channel dimension
+            word = "few" if ndim < self._ndim else "many"
+            raise ValueError(f"Too {word} dimensions for texture")
+        if offset is None:
+            offset = (0,) * ndim
+
+        # See vispy.gloo.texture.BaseTexture._set_data
+        queue = cast("vispy.gloo.glir.GlirQueue", texture._glir)
+        queue.command("DATA", texture._id, offset, data)
 
     def visible(self) -> bool:
         return bool(self._visual.visible)

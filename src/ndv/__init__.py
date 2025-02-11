@@ -8,9 +8,9 @@ except PackageNotFoundError:
     __version__ = "uninstalled"
 
 from . import data
-from .controllers import ArrayViewer
+from .controllers import ArrayViewer, StreamingViewer
 from .models import DataWrapper
 from .util import imshow
 from .views import run_app
 
-__all__ = ["ArrayViewer", "DataWrapper", "data", "imshow", "run_app"]
+__all__ = ["ArrayViewer", "DataWrapper", "StreamingViewer", "data", "imshow", "run_app"]
