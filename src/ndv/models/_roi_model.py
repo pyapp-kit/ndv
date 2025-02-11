@@ -25,7 +25,7 @@ class RectangularROIModel(NDVModel):
     visible: bool = True
     bounding_box: tuple[tuple[float, float], tuple[float, float]] = ((0, 0), (0, 0))
 
-    @field_validator("bounding_box")
+    @field_validator("bounding_box", mode='after')
     @classmethod
     def _validate_bounding_box(
         cls, bb: Any
