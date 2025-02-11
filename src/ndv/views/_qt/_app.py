@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
-from qtpy.QtCore import QEvent, QObject
+from qtpy.QtCore import QEvent, QObject, Qt
 from qtpy.QtGui import QMouseEvent
 from qtpy.QtWidgets import QApplication, QWidget
 
@@ -89,8 +89,6 @@ class MouseEventFilter(QObject):
         self.active_button = MouseButton.NONE
 
     def mouse_btn(self, btn: Any) -> MouseButton:
-        from qtpy.QtCore import Qt
-
         if btn == Qt.MouseButton.LeftButton:
             return MouseButton.LEFT
         if btn == Qt.MouseButton.RightButton:
