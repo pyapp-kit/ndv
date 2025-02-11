@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
-from functools import lru_cache
+from functools import cache
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from pydantic import PlainSerializer, PlainValidator
@@ -126,7 +126,8 @@ class CursorType(Enum):
             CursorType.FDIAG_ARROW: "nwse-resize",
         }[self]
 
-    @lru_cache
+    # Note a new object must be created every time. We should cache it!
+    @cache
     def to_wx(self) -> Cursor:
         """Converts CursorType to jupyter cursor strings."""
         from wx import (
