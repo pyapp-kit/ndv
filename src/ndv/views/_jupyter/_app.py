@@ -74,26 +74,28 @@ class JupyterAppWrap(NDVApp):
 
         def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
             nonlocal active_btn
-            nonlocal canvas
 
+            intercepted = False
             etype = ev["event_type"]
             if etype == "pointer_move":
                 mme = MouseMoveEvent(x=ev["x"], y=ev["y"], btn=active_btn)
-                receiver.on_mouse_move(mme)
+                intercepted |= receiver.on_mouse_move(mme)
                 if cursor := receiver.get_cursor(mme):
                     canvas.cursor = cursor.to_jupyter()
                 receiver.mouseMoved.emit(mme)
             elif etype == "pointer_down":
                 active_btn = JupyterAppWrap.mouse_btn(ev["button"])
                 mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=active_btn)
-                receiver.on_mouse_press(mpe)
+                intercepted |= receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
             elif etype == "pointer_up":
                 mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 active_btn = MouseButton.NONE
-                receiver.on_mouse_release(mre)
+                intercepted |= receiver.on_mouse_release(mre)
                 receiver.mouseReleased.emit(mre)
-            super_handle_event(ev)
+
+            if not intercepted:
+                super_handle_event(ev)
 
         canvas.handle_event = MethodType(handle_event, canvas)
         return lambda: setattr(canvas, "handle_event", super_handle_event)
