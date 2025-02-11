@@ -17,9 +17,10 @@ class RectangularROIModel(NDVModel):
     ----------
     visible : bool
         Whether to display this roi.
-    bounding_box: tuple[Sequence[float], Sequence[float]]
-        The minimum point and the maximum point contained within the region.
-        Using these two points, an axis-aligned bounding box can be constructed.
+    bounding_box: tuple[tuple[float, float], tuple[float, float]]
+        The minimum (2D) point and the maximum (2D) point contained within the
+        region. Using these two points, an axis-aligned bounding box can be
+        constructed.
     """
 
     visible: bool = True
