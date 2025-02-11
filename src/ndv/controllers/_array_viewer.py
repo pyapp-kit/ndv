@@ -188,10 +188,13 @@ class ArrayViewer:
             self._set_roi_model_connected(self._roi_model, False)
 
         # Connect new model
-        self._roi_model = roi_model
+        if isinstance(roi_model, tuple):
+            self._roi_model = RectangularROIModel(bounding_box=roi_model)
+        else:
+            self._roi_model = roi_model
         if self._roi_model is not None:
             self._set_roi_model_connected(self._roi_model)
-        self._fully_synchronize_view()
+        self._synchronize_roi()
 
     def show(self) -> None:
         """Show the viewer."""
@@ -313,6 +316,10 @@ class ArrayViewer:
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
             self._update_hist_domain_for_dtype()
+        self._synchronize_roi()
+
+    def _synchronize_roi(self) -> None:
+        """Fully re-synchronize the ROI view with the model."""
         if self.roi is not None:
             self._on_roi_model_bounding_box_changed(self.roi.bounding_box)
             self._on_roi_model_visible_changed(self.roi.visible)
