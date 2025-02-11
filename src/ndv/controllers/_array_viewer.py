@@ -353,10 +353,12 @@ class ArrayViewer:
     def _on_roi_model_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
-        self._roi_view.set_bounding_box(*bb)  # type: ignore
+        if self._roi_view is not None:
+            self._roi_view.set_bounding_box(*bb)
 
     def _on_roi_model_visible_changed(self, visible: bool) -> None:
-        self._roi_view.set_visible(visible)  # type: ignore
+        if self._roi_view is not None:
+            self._roi_view.set_visible(visible)
 
     def _on_interaction_mode_changed(self, mode: InteractionMode) -> None:
         if mode == InteractionMode.CREATE_ROI:
