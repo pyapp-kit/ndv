@@ -387,7 +387,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
             np.array([(np.mean(clims), 2**-self._gamma)])
 
-        return np.vstack((X, Y, Z), dtype=np.float32).transpose()
+        return np.vstack((X, Y, Z)).astype(np.float32).transpose()
 
     def _generate_clim_colors(self, npoints: int) -> np.ndarray:
         # Gamma curve intensity between 0.2 and 0.8

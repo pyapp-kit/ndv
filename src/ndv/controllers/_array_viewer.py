@@ -435,7 +435,7 @@ class ArrayViewer:
             return
         hidden_indices: set[int] = set(self._data_model.normed_visible_axes)
         if self._data_model.display.channel_mode.is_multichannel():
-            if ch := self._data_model.normed_channel_axis:
+            if (ch := self._data_model.normed_channel_axis) is not None:
                 hidden_indices.add(ch)
 
         # hide singleton axes

@@ -200,7 +200,7 @@ class _ArrayDataDisplayModel(NDVModel):
 
         # if we need to request multiple channels (composite mode or RGB),
         # ensure that the channel axis is also sliced
-        if c_ax := self.normed_channel_axis:
+        if (c_ax := self.normed_channel_axis) is not None:
             if self.display.channel_mode.is_multichannel():
                 if not isinstance(requested_slice.get(c_ax), slice):
                     requested_slice[c_ax] = slice(None)
