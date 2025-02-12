@@ -182,7 +182,6 @@ class StreamingViewer(ArrayViewer):
             for key, ctrl in self._lut_controllers.items():
                 if key != channel:
                     ctrl.update_texture_data(np.zeros_like(data), direct=True)
-        self._app.process_events()
         self._update_hover_info()
 
     def _norm_channels(

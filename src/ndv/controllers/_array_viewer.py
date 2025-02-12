@@ -80,6 +80,7 @@ class ArrayViewer:
         self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
         # set of futures for data requests
         self._futures: set[Future[DataResponse]] = set()
+        self._last_mouse_pos: tuple[float, float] | None = None
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -317,6 +318,8 @@ class ArrayViewer:
         self._update_hover_info()
 
     def _update_hover_info(self) -> None:
+        if not self._last_mouse_pos:
+            return
         x, y = self._last_mouse_pos
         channel_values = self._get_values_at_world_point(int(x), int(y))
         vals = []

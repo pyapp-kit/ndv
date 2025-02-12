@@ -19,6 +19,8 @@ def stream() -> None:
         for c, channel in enumerate(plane):
             viewer.update_data(channel, channel=c, clear_others=(c == 0))
             time.sleep(0.01)
+            # bit of a hack to force updates for this example
+            viewer._app.process_events()
 
 
 ndv.call_later(200, stream)
