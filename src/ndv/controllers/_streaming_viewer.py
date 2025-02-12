@@ -38,7 +38,7 @@ class StreamingViewer(ArrayViewer):
         self._app = _app.ndv_app()
         self._handles: dict[ChannelKey, ImageHandle] = {}
         self._shape: tuple[int, int] | None = None
-        self._dtype: npt.DTypeLike | None = None
+        self._dtype: np.dtype | None = None
         self._view.set_options(
             ArrayViewOptions(
                 show_3d_button=False,
@@ -46,6 +46,35 @@ class StreamingViewer(ArrayViewer):
                 show_channel_mode_selector=False,
             )
         )
+
+    def reset(self) -> None:
+        """Reset the viewer to its initial state."""
+        for lut_ctrl in self._lut_controllers.values():
+            for lut_view in lut_ctrl.lut_views:
+                self._view.remove_lut_view(lut_view)
+            while lut_ctrl.handles:
+                lut_ctrl.handles.pop().remove()
+        self._handles.clear()
+        self._shape = None
+        self._dtype = None
+
+    @property
+    def shape(self) -> tuple[int, int] | None:
+        """Return the shape that the viewer is prepared to receive.
+
+        Call `setup` to set the shape and dtype.  (May be used to determine whether
+        setup has been called.)
+        """
+        return self._shape
+
+    @property
+    def dtype(self) -> np.dtype | None:
+        """Return the data type that the viewer is prepared to receive.
+
+        Call `setup` to set the shape and dtype. (May be used to determine whether
+        setup has been called.)
+        """
+        return self._dtype
 
     def setup(
         self,
@@ -80,10 +109,10 @@ class StreamingViewer(ArrayViewer):
             Defaults to `None`, in which case a single channel with a default `LUTModel`
             is created.
         """
-        self._clear_canvas()
+        self.reset()
         channels = self._norm_channels(channels)
         self._shape = shape
-        self._dtype = dtype
+        self._dtype = np.dtype(dtype)
         for key, model in channels.items():
             lut_views = [self._view.add_lut_view()]
             data = np.zeros(shape, dtype=dtype)

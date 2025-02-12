@@ -8,7 +8,7 @@ viewer.show()
 
 cells = ndv.data.cells3d()
 viewer.setup(
-    cells.shape[-2:],  # type: ignore
+    cells.shape[-2:],
     cells.dtype,
     channels={0: {"cmap": "green"}, 1: {"cmap": "magenta", "clims": (1500, 21000)}},
 )
