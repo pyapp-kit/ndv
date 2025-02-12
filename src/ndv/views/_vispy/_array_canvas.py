@@ -141,12 +141,13 @@ class VispyRectangle(RectangularROIHandle):
         self._handles.order = 100
         self._handles.interactive = True
 
-        self._tform = self._rect.transforms.get_transform("canvas", "scene")
-
         self.set_fill(_cmap.Color("transparent"))
         self.set_border(_cmap.Color("yellow"))
         self.set_handles(_cmap.Color("white"))
         self.set_visible(False)
+
+    def _tform(self) -> scene.transforms.BaseTransform:
+        return self._rect.transforms.get_transform("canvas", "scene")
 
     def can_select(self) -> bool:
         return True
@@ -206,7 +207,7 @@ class VispyRectangle(RectangularROIHandle):
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         # Convert canvas -> world
         canvas_pos = (event.x, event.y)
-        world_pos = self._tform.map(canvas_pos)[:2]
+        world_pos = self._tform().map(canvas_pos)[:2]
         # moving a handle
         if self._move_mode == ROIMoveMode.HANDLE:
             # The anchor is set to the opposite handle, which never moves.
@@ -229,7 +230,7 @@ class VispyRectangle(RectangularROIHandle):
         self.set_selected(True)
         # Convert canvas -> world
         canvas_pos = (event.x, event.y)
-        world_pos = self._tform.map(canvas_pos)[:2]
+        world_pos = self._tform().map(canvas_pos)[:2]
         drag_idx = self._handle_under(world_pos)
         # If a marker is pressed
         if drag_idx is not None:
@@ -247,7 +248,7 @@ class VispyRectangle(RectangularROIHandle):
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         canvas_pos = (mme.x, mme.y)
-        pos = self._tform.map(canvas_pos)[:2]
+        pos = self._tform().map(canvas_pos)[:2]
         if self._handle_under(pos) is not None:
             center = self._rect.center
             if pos[0] < center[0] and pos[1] < center[1]:

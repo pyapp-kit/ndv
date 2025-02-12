@@ -13,11 +13,11 @@ if TYPE_CHECKING:
 class RectangularROIModel(NDVModel):
     """Representation of an axis-aligned rectangular Region of Interest (ROI).
 
-    Parameters
+    Attributes
     ----------
     visible : bool
         Whether to display this roi.
-    bounding_box: tuple[tuple[float, float], tuple[float, float]]
+    bounding_box : tuple[tuple[float, float], tuple[float, float]]
         The minimum (2D) point and the maximum (2D) point contained within the
         region. Using these two points, an axis-aligned bounding box can be
         constructed.

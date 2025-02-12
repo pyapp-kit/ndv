@@ -9,7 +9,13 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
@@ -309,18 +315,25 @@ def test_roi_interaction() -> None:
         return
 
     ctrl = ArrayViewer()
-
-    canvas_roi_start = (0, 0)
-    world_roi_start = tuple(ctrl._canvas.canvas_to_world(canvas_roi_start)[:2])
-    canvas_new_start = (-100, -100)
-    world_new_start = tuple(ctrl._canvas.canvas_to_world(canvas_new_start)[:2])
-    canvas_roi_end = (100, 100)
-    world_roi_end = tuple(ctrl._canvas.canvas_to_world(canvas_roi_end)[:2])
-
-    roi = RectangularROIModel(bounding_box=(world_roi_start, world_roi_end))
+    roi = RectangularROIModel()
     ctrl.roi = roi
     roi_view = ctrl._roi_view
     assert roi_view is not None
+
+    # FIXME: We need a large world space on the canvas, but
+    # VispyArrayCanvas.set_range is not implemented yet. This workaround
+    # sets the range to the extent of the data i.e. the extent of the ROI
+    roi.bounding_box = ((0, 0), (500, 500))
+    ctrl._canvas.set_range()
+    # Note that these positions are far apart to satisfy sufficient distance
+    # in world space
+    canvas_roi_start = (200, 200)
+    world_roi_start = tuple(ctrl._canvas.canvas_to_world(canvas_roi_start)[:2])
+    canvas_new_start = (100, 100)
+    world_new_start = tuple(ctrl._canvas.canvas_to_world(canvas_new_start)[:2])
+    canvas_roi_end = (300, 300)
+    world_roi_end = tuple(ctrl._canvas.canvas_to_world(canvas_roi_end)[:2])
+    roi.bounding_box = (world_roi_start, world_roi_end)
 
     # Note - avoid diving into rendering logic here - just identify view
     with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
@@ -339,3 +352,42 @@ def test_roi_interaction() -> None:
             canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT
         )
         ctrl._canvas.on_mouse_release(mre)
+
+        # Test translation
+        roi.bounding_box = (world_roi_start, world_roi_end)
+        mpe = MousePressEvent(
+            (canvas_roi_start[0] + canvas_roi_end[0] / 2),
+            (canvas_roi_start[1] + canvas_roi_end[1] / 2),
+            MouseButton.LEFT,
+        )
+        ctrl._canvas.on_mouse_press(mpe)
+        assert roi_view.selected()
+        mme = MouseMoveEvent(
+            (canvas_roi_start[0] + canvas_new_start[0] / 2),
+            (canvas_roi_start[1] + canvas_new_start[1] / 2),
+            MouseButton.LEFT,
+        )
+        ctrl._canvas.on_mouse_move(mme)
+        assert roi.bounding_box[0] == pytest.approx(world_new_start, 1e-6)
+        assert roi.bounding_box[1] == pytest.approx(world_roi_start, 1e-6)
+        mre = MouseReleaseEvent(
+            (canvas_roi_start[0] + canvas_new_start[0] / 2),
+            (canvas_roi_start[1] + canvas_new_start[1] / 2),
+            MouseButton.LEFT,
+        )
+        ctrl._canvas.on_mouse_release(mre)
+
+    # Test cursors
+    roi.bounding_box = (world_roi_start, world_roi_end)
+    # Top-Left corner
+    mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_start[1])
+    assert roi_view.get_cursor(mme) == CursorType.FDIAG_ARROW
+    # Top-Right corner
+    mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_end[1])
+    assert roi_view.get_cursor(mme) == CursorType.BDIAG_ARROW
+    # Middle
+    mme = MouseMoveEvent(
+        (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
+        (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
+    )
+    assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
