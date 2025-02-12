@@ -90,6 +90,10 @@ class WxAppWrap(NDVApp):
 
         return _unbind
 
+    def process_events(self) -> None:
+        """Process events."""
+        wx.SafeYield()
+
     def call_later(self, msec: int, func: Callable[[], None]) -> None:
         """Call `func` after `msec` milliseconds."""
         wx.CallLater(msec, func)
