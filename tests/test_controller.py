@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent
+from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
@@ -299,3 +299,39 @@ def test_roi_controller() -> None:
         (world_pos[0] + 1, world_pos[1] + 1),
     )
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
+
+
+@no_type_check
+@pytest.mark.usefixtures("any_app")
+def test_roi_interaction() -> None:
+    ctrl = ArrayViewer()
+
+    canvas_roi_start = (0, 0)
+    world_roi_start = tuple(ctrl._canvas.canvas_to_world(canvas_roi_start)[:2])
+    canvas_new_start = (-100, -100)
+    world_new_start = tuple(ctrl._canvas.canvas_to_world(canvas_new_start)[:2])
+    canvas_roi_end = (100, 100)
+    world_roi_end = tuple(ctrl._canvas.canvas_to_world(canvas_roi_end)[:2])
+
+    roi = RectangularROIModel(bounding_box=(world_roi_start, world_roi_end))
+    ctrl.roi = roi
+    roi_view = ctrl._roi_view
+    assert roi_view is not None
+
+    # Note - avoid diving into rendering logic here - just identify view
+    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
+        # Test moving handle
+        assert not roi_view.selected()
+        mpe = MousePressEvent(
+            canvas_roi_start[0], canvas_roi_start[1], MouseButton.LEFT
+        )
+        ctrl._canvas.on_mouse_press(mpe)
+        assert roi_view.selected()
+        mme = MouseMoveEvent(canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT)
+        ctrl._canvas.on_mouse_move(mme)
+        assert roi.bounding_box[0] == pytest.approx(world_new_start, 1e-6)
+        assert roi.bounding_box[1] == pytest.approx(world_roi_end, 1e-6)
+        mre = MouseReleaseEvent(
+            canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT
+        )
+        ctrl._canvas.on_mouse_release(mre)
