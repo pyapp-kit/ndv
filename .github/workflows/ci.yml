@@ -37,6 +37,13 @@ jobs:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
             gui: pyside
+          # this one always segfaults
+          - python-version: "3.12"
+            os: windows-latest
+            gui: pyside
+            canvas: vispy
+          - python-version: "3.10"
+            gui: pyside
           # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
