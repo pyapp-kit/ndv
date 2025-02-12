@@ -304,6 +304,10 @@ def test_roi_controller() -> None:
 @no_type_check
 @pytest.mark.usefixtures("any_app")
 def test_roi_interaction() -> None:
+    if _app.gui_frontend() == _app.GuiFrontend.JUPYTER and IS_PYGFX:
+        pytest.skip("Invalid canvas size on CI")
+        return
+
     ctrl = ArrayViewer()
 
     canvas_roi_start = (0, 0)
