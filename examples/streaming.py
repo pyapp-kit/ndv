@@ -1,8 +1,5 @@
 import time
 
-# unfortunate leaking of abstraction... to schedule a callback
-from qtpy.QtCore import QTimer
-
 import ndv
 from ndv import StreamingViewer
 
@@ -11,21 +8,18 @@ viewer.show()
 
 cells = ndv.data.cells3d()
 viewer.setup(
-    cells.shape[-2:],
+    cells.shape[-2:],  # type: ignore
     cells.dtype,
-    channels={
-        0: {"cmap": "green"},
-        1: {"cmap": {"name": "indigo", "value": ["#000", "#AF22FF"]}},
-    },
+    channels={0: {"cmap": "green"}, 1: {"cmap": "magenta", "clims": (1500, 21000)}},
 )
 
 
-def stream(n: int = 50) -> None:
+def stream() -> None:
     for plane in cells:
         for c, channel in enumerate(plane):
             viewer.update_data(channel, channel=c, clear_others=(c == 0))
             time.sleep(0.01)
 
 
-QTimer.singleShot(500, stream)
+ndv.call_later(200, stream)
 ndv.run_app()

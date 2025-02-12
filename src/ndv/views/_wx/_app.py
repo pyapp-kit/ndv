@@ -89,3 +89,7 @@ class WxAppWrap(NDVApp):
             canvas.Unbind(EVT_LEFT_UP, on_mouse_release)
 
         return _unbind
+
+    def call_later(self, msec: int, func: Callable[[], None]) -> None:
+        """Call `func` after `msec` milliseconds."""
+        wx.CallLater(msec, func)

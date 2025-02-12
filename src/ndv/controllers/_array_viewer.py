@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
 
-    LutKey: TypeAlias = int | None
+    LutKey: TypeAlias = Hashable | None
 
 
 class ArrayViewer:

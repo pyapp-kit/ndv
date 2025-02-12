@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
-from qtpy.QtCore import QEvent, QObject
+from qtpy.QtCore import QEvent, QObject, Qt, QTimer
 from qtpy.QtGui import QMouseEvent
 from qtpy.QtWidgets import QApplication
 
@@ -77,6 +77,10 @@ class QtAppWrap(NDVApp):
     def process_events(self) -> None:
         """Process events for the application."""
         QApplication.processEvents()
+
+    def call_later(self, msec: int, func: Callable[[], None]) -> None:
+        """Call `func` after `msec` milliseconds."""
+        QTimer.singleShot(msec, Qt.TimerType.PreciseTimer, func)
 
 
 class MouseEventFilter(QObject):

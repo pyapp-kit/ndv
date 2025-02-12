@@ -4,7 +4,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Hashable, Iterable, Sequence
 
     import numpy as np
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ndv.views.bases import LutView
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
-    LutKey = int | None | str
+    LutKey = Hashable | None
 
 
 class ChannelController:
@@ -40,6 +40,7 @@ class ChannelController:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
+        view.set_channel_name(name=str(self.key) if self.key is not None else "")
         # TODO: Could probably reuse cached clims
         self._auto_scale()
 

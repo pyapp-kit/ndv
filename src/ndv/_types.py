@@ -11,10 +11,23 @@ from pydantic import PlainSerializer, PlainValidator
 from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
+    from collections.abc import ItemsView, KeysView, ValuesView
+    from typing import Protocol, TypeVar
+
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
 
     from ndv.views.bases import Viewable
+
+    KT_co = TypeVar("KT_co", covariant=True)
+    VT_co = TypeVar("VT_co", covariant=True)
+
+    class CovariantMapping(Protocol[KT_co, VT_co]):
+        def __eq__(self, value: object, /) -> bool: ...
+        def __ne__(self, value: object, /) -> bool: ...
+        def keys(self) -> KeysView[KT_co]: ...
+        def items(self) -> ItemsView[KT_co, VT_co]: ...
+        def values(self) -> ValuesView[VT_co]: ...
 
 
 def _maybe_int(val: Any) -> Any:
