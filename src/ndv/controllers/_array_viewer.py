@@ -312,8 +312,12 @@ class ArrayViewer:
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
-
+        self._last_mouse_pos = (x, y)
         # collect and format intensity values at the current mouse position
+        self._update_hover_info()
+
+    def _update_hover_info(self) -> None:
+        x, y = self._last_mouse_pos
         channel_values = self._get_values_at_world_point(int(x), int(y))
         vals = []
         for ch, value in channel_values.items():

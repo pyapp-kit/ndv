@@ -10,6 +10,7 @@ from ndv.controllers._channel_controller import ChannelController
 from ndv.models import LUTModel
 from ndv.views import _app
 from ndv.views.bases._array_view import ArrayViewOptions
+from ndv.views.bases._graphics._canvas_elements import CanvasElement
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -51,7 +52,14 @@ class StreamingViewer(ArrayViewer):
         """Reset the viewer to its initial state."""
         for lut_ctrl in self._lut_controllers.values():
             for lut_view in lut_ctrl.lut_views:
-                self._view.remove_lut_view(lut_view)
+                # FIXME:
+                # basically, we never want to ask the front-end ArrayView object
+                # to remove graphics elements (even if they are LutViews)
+                # https://github.com/pyapp-kit/ndv/issues/138
+                # I'd prefer to have an `IS isinstance()` rather than not...
+                # but LutView is already a low-level ABC
+                if not isinstance(lut_view, CanvasElement):
+                    self._view.remove_lut_view(lut_view)
             while lut_ctrl.handles:
                 lut_ctrl.handles.pop().remove()
         self._handles.clear()
@@ -175,6 +183,7 @@ class StreamingViewer(ArrayViewer):
                 if key != channel:
                     ctrl.update_texture_data(np.zeros_like(data), direct=True)
         self._app.process_events()
+        self._update_hover_info()
 
     def _norm_channels(
         self,
