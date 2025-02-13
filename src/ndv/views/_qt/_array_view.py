@@ -177,7 +177,7 @@ class _QLUTWidget(QWidget):
 
 
 class QLutView(LutView):
-    def __init__(self, channel: ChannelKey) -> None:
+    def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__()
         self._qwidget = _QLUTWidget()
         self._channel = channel

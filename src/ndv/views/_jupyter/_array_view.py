@@ -39,7 +39,7 @@ def notifications_blocked(
 
 
 class JupyterLutView(LutView):
-    def __init__(self, channel: ChannelKey) -> None:
+    def __init__(self, channel: ChannelKey = None) -> None:
         self._channel = channel
         self._histogram_wdg: widgets.Widget | None = None
         # WIDGETS

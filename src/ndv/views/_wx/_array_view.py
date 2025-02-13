@@ -104,7 +104,7 @@ class _WxLUTWidget(wx.Panel):
 
 
 class WxLutView(LutView):
-    def __init__(self, parent: wx.Window, channel: ChannelKey) -> None:
+    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent)
         self._channel = channel

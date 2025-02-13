@@ -185,11 +185,11 @@ class ArrayViewer:
 
     # --------------------- PRIVATE ------------------------------------------
 
-    def _add_histogram(self, channel: ChannelKey) -> None:
+    def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
-        self._view.add_histogram(channel, hist.frontend_widget())
         if ctrl := self._lut_controllers.get(channel, None):
+            self._view.add_histogram(channel, hist.frontend_widget())
             ctrl.add_lut_view(hist)
             # FIXME: hack
             if handles := ctrl.handles:
