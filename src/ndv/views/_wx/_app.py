@@ -84,8 +84,8 @@ class WxAppWrap(NDVApp):
         canvas.Bind(EVT_LEFT_UP, on_mouse_release)
 
         def _unbind() -> None:
-            canvas.Unbind(EVT_MOTION, on_mouse_move)
-            canvas.Unbind(EVT_LEFT_DOWN, on_mouse_press)
-            canvas.Unbind(EVT_LEFT_UP, on_mouse_release)
+            canvas.Unbind(EVT_MOTION, handler=on_mouse_move)
+            canvas.Unbind(EVT_LEFT_DOWN, handler=on_mouse_press)
+            canvas.Unbind(EVT_LEFT_UP, handler=on_mouse_release)
 
         return _unbind

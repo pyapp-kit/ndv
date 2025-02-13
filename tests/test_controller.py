@@ -247,9 +247,6 @@ def test_channel_autoscale() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_array_viewer_histogram() -> None:
     """Mostly a smoke test for basic functionality of histogram backends."""
-    if _app.gui_frontend() != _app.GuiFrontend.QT:
-        pytest.skip("histograms only implemented in Qt.")
-        return
 
     viewer = ArrayViewer()
     viewer.show()
