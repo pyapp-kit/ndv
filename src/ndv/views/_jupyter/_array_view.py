@@ -39,7 +39,9 @@ def notifications_blocked(
 
 
 class JupyterLutView(LutView):
-    def __init__(self) -> None:
+    def __init__(self, channel: ChannelKey) -> None:
+        self._channel = channel
+        self._histogram_wdg: widgets.Widget | None = None
         # WIDGETS
         self._visible = widgets.Checkbox(value=True, indent=False)
         self._visible.layout.width = "60px"
@@ -73,22 +75,24 @@ class JupyterLutView(LutView):
             description="Auto",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
-            layout=widgets.Layout(width="65px"),
+            layout=widgets.Layout(min_width="40px"),
         )
         self._histogram = widgets.ToggleButton(
             value=False,
-            # description="Auto",
+            description="",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            icon="chart-simple",
-            tooltip="View histogram",
-            layout=widgets.Layout(width="65px"),
+            icon="bar-chart",
+            tooltip="View Histogram",
+            layout=widgets.Layout(width="40px"),
         )
 
         # LAYOUT
 
-        self.layout = widgets.HBox(
+        lut_ctrls = widgets.HBox(
             [self._visible, self._cmap, self._clims, self._auto_clim, self._histogram]
         )
+        self._histogram_container = widgets.HBox([])
+        self.layout = widgets.VBox([lut_ctrls, self._histogram_container])
 
         # CONNECTIONS
         self._visible.observe(self._on_visible_changed, names="value")
@@ -165,6 +169,7 @@ class JupyterArrayView(ArrayView):
         self._data_model = data_model
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
+        self._luts: dict[ChannelKey, JupyterLutView] = {}
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
@@ -303,8 +308,21 @@ class JupyterArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterLutView()
+        wdg = JupyterLutView(channel)
         layout = self._luts_box
+        self._luts[channel] = wdg
+
+        def _on_histogram_requested(change: dict[str, Any]) -> None:
+            if wdg._histogram_wdg:
+                # show or hide the actual widget itself
+                wdg._histogram_container.layout.display = (
+                    "flex" if change["new"] else "none"
+                )
+            else:
+                self.histogramRequested.emit(wdg._channel)
+
+        # TODO: This ugly
+        wdg._histogram.observe(_on_histogram_requested, names="value")
         layout.children = (*layout.children, wdg.layout)
         return wdg
 
@@ -334,7 +352,15 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
-    def add_histogram(self, widget: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+        if lut := self._luts.get(channel, None):
+            # FIXME: Yuck
+            widget.set_trait("css_height", "100px")
+            lut._histogram_container.children = (
+                *lut._histogram_container.children,
+                widget,
+            )
+            lut._histogram_wdg = widget
         """Add a histogram widget to the viewer."""
         warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
 
