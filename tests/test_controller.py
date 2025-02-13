@@ -269,3 +269,5 @@ def test_array_viewer_histogram() -> None:
     counts = np.bincount(data.flatten(), minlength=maxval + 1)
     bin_edges = np.arange(maxval + 2) - 0.5
     histogram.set_data(counts, bin_edges)
+
+    histogram.close()
