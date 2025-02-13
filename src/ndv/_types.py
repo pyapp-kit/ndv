@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, Optional, cast
 
 from pydantic import PlainSerializer, PlainValidator
 from typing_extensions import TypeAlias
@@ -52,7 +52,7 @@ AxisKey: TypeAlias = Annotated[
 ]
 
 # A channel key is a value that can be used to identify a channel.
-ChannelKey: TypeAlias = int | None
+ChannelKey: TypeAlias = Optional[int]
 
 
 class MouseButton(IntFlag):
