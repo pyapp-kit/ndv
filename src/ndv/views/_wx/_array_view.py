@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
+from sys import version_info
 from typing import TYPE_CHECKING, Any, cast
 
 import wx
@@ -52,6 +53,24 @@ class _WxSpinner(wx.Panel):
         self.SetSizer(sizer)
 
 
+def _add_icon(btn: wx.AnyButton, icon: str) -> None:
+    # Avoids https://github.com/urllib3/urllib3/issues/3020
+    if version_info.minor < 10:
+        return
+
+    icon_path = svg_path(icon)
+    wx_icon = wx.svg.SVGimage.CreateFromFile(str(icon_path))
+    side_length = btn.Size.height
+    # NB 5 is a magic number for the margins
+    bmp_side_len = side_length - 5
+    bmp_size = wx.Size(bmp_side_len, bmp_side_len)
+    btn.SetBitmap(wx_icon.ConvertToScaledBitmap(bmp_size))
+
+    btn_side_len = side_length
+    btn_size = wx.Size(btn_side_len, btn_side_len)
+    btn.SetMaxSize(btn_size)
+
+
 # mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
@@ -73,17 +92,7 @@ class _WxLUTWidget(wx.Panel):
         self.auto_clim = wx.ToggleButton(self, label="Auto")
 
         self.histogram = wx.ToggleButton(self)
-        # FIXME: Polish this code, make reusable
-        icon_path = svg_path("foundation:graph-bar")
-        icon = wx.svg.SVGimage.CreateFromFile(str(icon_path))
-        # NB 5 is a magic number for the margins
-        bmp_side_len = self.auto_clim.Size.height - 5
-        bmp_size = wx.Size(bmp_side_len, bmp_side_len)
-        self.histogram.SetBitmap(icon.ConvertToScaledBitmap(bmp_size))
-
-        btn_side_len = self.auto_clim.Size.height
-        btn_size = wx.Size(btn_side_len, btn_side_len)
-        self.histogram.SetMaxSize(btn_size)
+        _add_icon(self.histogram, "foundation:graph-bar")
 
         # Layout
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -272,7 +281,8 @@ class _WxArrayViewer(wx.Frame):
         )
 
         # Reset zoom button
-        self.reset_zoom_btn = wx.Button(self, label="Reset Zoom")
+        self.reset_zoom_btn = wx.Button(self)
+        _add_icon(self.reset_zoom_btn, "fluent:full-screen-maximize-24-filled")
 
         # 3d view button
         self.ndims_btn = wx.ToggleButton(self, label="3D")
@@ -283,8 +293,8 @@ class _WxArrayViewer(wx.Frame):
         btns = wx.BoxSizer(wx.HORIZONTAL)
         btns.AddStretchSpacer()
         btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
-        btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
         btns.Add(self.ndims_btn, 0, wx.ALL, 5)
+        btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
 
         self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
         top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
