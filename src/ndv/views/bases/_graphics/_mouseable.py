@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from psygnal import Signal
 
-from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import CursorType, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
 
 class Mouseable:
@@ -28,3 +28,6 @@ class Mouseable:
 
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
+
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType | None:
+        return None

@@ -9,6 +9,8 @@ import numpy as np
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._data_display_model import DataResponse, _ArrayDataDisplayModel
+from ndv.models._roi_model import RectangularROIModel
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
 
 if TYPE_CHECKING:
@@ -21,6 +23,7 @@ if TYPE_CHECKING:
     from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
+    from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
     LutKey: TypeAlias = Hashable | None
 
@@ -69,6 +72,11 @@ class ArrayViewer:
         self._data_model = _ArrayDataDisplayModel(
             data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
         )
+        self._viewer_model = ArrayViewerModel()
+        self._viewer_model.events.interaction_mode.connect(
+            self._on_interaction_mode_changed
+        )
+        self._roi_model: RectangularROIModel | None = None
 
         app = _app.gui_frontend()
 
@@ -89,10 +97,14 @@ class ArrayViewer:
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
         canvas_cls = _app.get_array_canvas_class()
-        self._canvas = canvas_cls()
+        self._canvas = canvas_cls(self._viewer_model)
 
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(self._canvas.frontend_widget(), self._data_model)
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._data_model, self._viewer_model
+        )
+
+        self._roi_view: RectangularROIHandle | None = None
 
         self._set_model_connected(self._data_model.display)
         self._canvas.set_ndim(self.display_model.n_visible_axes)
@@ -163,6 +175,27 @@ class ArrayViewer:
         else:
             self._data_model.data_wrapper = DataWrapper.create(data)
         self._fully_synchronize_view()
+
+    @property
+    def roi(self) -> RectangularROIModel | None:
+        """Return ROI being displayed."""
+        return self._roi_model
+
+    @roi.setter
+    def roi(self, roi_model: RectangularROIModel | None) -> None:
+        """Set ROI being displayed."""
+        # Disconnect old model
+        if self._roi_model is not None:
+            self._set_roi_model_connected(self._roi_model, False)
+
+        # Connect new model
+        if isinstance(roi_model, tuple):
+            self._roi_model = RectangularROIModel(bounding_box=roi_model)
+        else:
+            self._roi_model = roi_model
+        if self._roi_model is not None:
+            self._set_roi_model_connected(self._roi_model)
+        self._synchronize_roi()
 
     def show(self) -> None:
         """Show the viewer."""
@@ -240,6 +273,28 @@ class ArrayViewer:
         ]:
             getattr(obj, _connect)(callback)
 
+    def _set_roi_model_connected(
+        self, model: RectangularROIModel, connect: bool = True
+    ) -> None:
+        """Connect or disconnect the model to/from the viewer.
+
+        We do this in a single method so that we are sure to connect and disconnect
+        the same events in the same order.  (but it's kinda ugly)
+        """
+        _connect = "connect" if connect else "disconnect"
+
+        for obj, callback in [
+            (model.events.bounding_box, self._on_roi_model_bounding_box_changed),
+            (model.events.visible, self._on_roi_model_visible_changed),
+        ]:
+            getattr(obj, _connect)(callback)
+
+        if _connect:
+            self._create_roi_view()
+        else:
+            if self._roi_view:
+                self._roi_view.remove()
+
     # ------------------ Model callbacks ------------------
 
     def _fully_synchronize_view(self) -> None:
@@ -262,6 +317,13 @@ class ArrayViewer:
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
             self._update_hist_domain_for_dtype()
+        self._synchronize_roi()
+
+    def _synchronize_roi(self) -> None:
+        """Fully re-synchronize the ROI view with the model."""
+        if self.roi is not None:
+            self._on_roi_model_bounding_box_changed(self.roi.bounding_box)
+            self._on_roi_model_visible_changed(self.roi.visible)
 
     def _on_model_visible_axes_changed(self) -> None:
         self._view.set_visible_axes(self._data_model.normed_visible_axes)
@@ -289,6 +351,38 @@ class ArrayViewer:
         self._clear_canvas()
         self._request_data()
 
+    def _on_roi_model_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
+        if self._roi_view is not None:
+            self._roi_view.set_bounding_box(*bb)
+
+    def _on_roi_model_visible_changed(self, visible: bool) -> None:
+        if self._roi_view is not None:
+            self._roi_view.set_visible(visible)
+
+    def _on_interaction_mode_changed(self, mode: InteractionMode) -> None:
+        if mode == InteractionMode.CREATE_ROI:
+            # Create ROI model if needed to store ROI state
+            if self.roi is None:
+                self.roi = RectangularROIModel(visible=False)
+
+            # Create a new ROI
+            self._create_roi_view()
+
+    def _create_roi_view(self) -> None:
+        # Remove old ROI view
+        # TODO: Enable multiple ROIs
+        if self._roi_view:
+            self._roi_view.remove()
+
+        # Create new ROI view
+        self._roi_view = self._canvas.add_bounding_box()
+        # Connect view signals
+        self._roi_view.boundingBoxChanged.connect(
+            self._on_roi_view_bounding_box_changed
+        )
+
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
             # self._view.remove_lut_view(lut_ctrl.lut_view)
@@ -309,6 +403,12 @@ class ArrayViewer:
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
         self._canvas.set_range()
+
+    def _on_roi_view_bounding_box_changed(
+        self, bb: tuple[tuple[float, float], tuple[float, float]]
+    ) -> None:
+        if self._roi_model:
+            self._roi_model.bounding_box = bb
 
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
