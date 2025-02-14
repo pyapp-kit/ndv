@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models import LUTModel
 from ndv.views import _app
 from ndv.views.bases._array_view import ArrayViewOptions
 from ndv.views.bases._graphics._canvas_elements import CanvasElement
+
+from ._base_array_viewer import _BaseArrayViewer
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     ChannelKey = Any
 
 
-class StreamingViewer(ArrayViewer):
+class StreamingViewer(_BaseArrayViewer):
     """2D streaming data viewer.
 
     Simplified viewer for streaming 2D data. This viewer is designed to display
@@ -44,6 +45,7 @@ class StreamingViewer(ArrayViewer):
             ArrayViewOptions(
                 show_3d_button=False,
                 show_histogram_button=False,
+                show_roi_button=False,
                 show_channel_mode_selector=False,
             )
         )

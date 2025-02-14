@@ -25,6 +25,7 @@ class ArrayViewOptions:
     show_3d_button: bool | None = None
     show_histogram_button: bool | None = None
     show_reset_zoom_button: bool | None = None
+    show_roi_button: bool | None = None
     show_channel_mode_selector: bool | None = None
 
 

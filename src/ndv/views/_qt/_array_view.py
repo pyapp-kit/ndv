@@ -473,6 +473,8 @@ class QtArrayView(ArrayView):
             self._qwidget.set_range_btn.setVisible(show_reset)
         if (show_channel := options.show_channel_mode_selector) is not None:
             self._qwidget.channel_mode_combo.setVisible(show_channel)
+        if (show_roi := options.show_roi_button) is not None:
+            self._qwidget.add_roi_btn.setVisible(show_roi)
 
     def add_lut_view(self) -> QLutView:
         view = QLutView()
