@@ -162,12 +162,10 @@ class WxLutView(LutView):
         self._wxwidget.cmap.SetValue(name)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        self._wxwidget.clims.SetValue(*clims)
-        # FIXME: this is a hack.
-        # it's required to make `set_auto_scale_without_signal` work as intended
-        # But it's not a complete solution.  The general pattern of blocking signals
-        # in Wx needs to be re-evaluated.
-        wx.Yield()
+        # Block signals from changing clims
+        with wx.EventBlocker(self._wxwidget.clims, wx.EVT_SLIDER.typeId):
+            self._wxwidget.clims.SetValue(*clims)
+            wx.Yield()
 
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
