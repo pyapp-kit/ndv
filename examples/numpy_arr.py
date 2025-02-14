@@ -6,12 +6,7 @@
 # ///
 from __future__ import annotations
 
-import os
-
 import ndv
-
-# os.environ["NDV_CANVAS_BACKEND"] = "pygfx"
-os.environ["NDV_GUI_FRONTEND"] = "wx"
 
 try:
     img = ndv.data.cells3d()
