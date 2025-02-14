@@ -12,6 +12,8 @@ from qtpy.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidge
 from superqt import QCollapsible, QElidingLabel, QIconifyIcon, ensure_main_thread
 from superqt.utils import qthrottled, signals_blocked
 
+from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import get_array_canvas_class
 
 from ._old_data_wrapper import DataWrapper
@@ -37,7 +39,7 @@ if TYPE_CHECKING:
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         ImageHandle,
-        RoiHandle,
+        RectangularROIHandle,
     )
 
     DimKey = int
@@ -129,6 +131,10 @@ class NDViewer(QWidget):
         channel_mode: ChannelMode | str = ChannelMode.MONO,
     ):
         super().__init__(parent=parent)
+        self._array_viewer_model = ArrayViewerModel()
+        self._array_viewer_model.events.interaction_mode.connect(
+            self._on_view_model_mode_changed
+        )
 
         # ATTRIBUTES ----------------------------------------------------
         self._data_wrapper: DataWrapper | None = None
@@ -160,7 +166,7 @@ class NDViewer(QWidget):
         # Canvas selection
         self._selection: CanvasElement | None = None
         # ROI
-        self._roi: RoiHandle | None = None
+        self._roi: RectangularROIHandle | None = None
 
         # WIDGETS ----------------------------------------------------
 
@@ -187,7 +193,7 @@ class NDViewer(QWidget):
         # place to display arbitrary text
         self._hover_info_label = QLabel("", self)
         # the canvas that displays the images
-        self._canvas: ArrayCanvas = get_array_canvas_class()()
+        self._canvas: ArrayCanvas = get_array_canvas_class()(self._array_viewer_model)
         self._canvas.set_ndim(self._ndims)
         self._qcanvas = self._canvas.frontend_widget()
 
@@ -343,14 +349,30 @@ class NDViewer(QWidget):
         border_color : str, tuple, list, array, Color, or int
             The border color.  Can be any "ColorLike".
         """
-        # Remove the old ROI
+        roi = self._canvas.add_bounding_box()
+        if color:
+            roi.set_fill(cmap.Color(color))
+        if border_color:
+            roi.set_border(cmap.Color(border_color))
+        if vertices:
+            roi.set_bounding_box(vertices[0], vertices[2])
+
+        # Assert vertices represent axis-aligned rectangle
+        if vertices is not None:
+            if len(vertices) != 4:
+                raise ValueError("Only rectangles are currently supported")
+            if (
+                vertices[0][1] != vertices[1][1]
+                or vertices[1][0] != vertices[2][0]
+                or vertices[2][1] != vertices[3][1]
+                or vertices[3][0] != vertices[0][0]
+            ):
+                raise ValueError("Only axis-aligned rectangles are currently supported")
+
+        # Remove the old ROI and add the new one
         if self._roi:
             self._roi.remove()
-        color = cmap.Color(color) if color is not None else None
-        border_color = cmap.Color(border_color) if border_color is not None else None
-        self._roi = self._canvas.add_roi(
-            vertices=vertices, color=color, border_color=border_color
-        )
+        self._roi = roi
 
     def set_visualized_dims(self, dims: Iterable[DimKey]) -> None:
         """Set the dimensions that will be visualized.
@@ -474,10 +496,23 @@ class NDViewer(QWidget):
         # using method to swallow the parameter passed by _set_range_btn.clicked
         self._canvas.set_range()
 
-    def _on_add_roi_clicked(self, checked: bool) -> None:
-        if checked:
-            # Add new roi
+    def _on_view_model_mode_changed(self, mode: InteractionMode) -> None:
+        if mode == InteractionMode.CREATE_ROI:
             self.set_roi()
+            # Since we have no ROIModel, HACK the view to listen to itself
+            if (roi := self._roi) is not None:
+
+                def on_bounding_box_edited(
+                    bb: tuple[tuple[float, float], tuple[float, float]],
+                ) -> None:
+                    roi.set_bounding_box(bb[0], bb[1])
+
+                roi.boundingBoxChanged.connect(on_bounding_box_edited)
+
+    def _on_add_roi_clicked(self, checked: bool) -> None:
+        self._array_viewer_model.interaction_mode = (
+            InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
+        )
 
     def _image_key(self, index: Indices) -> ImgKey:
         """Return the key for image handle(s) corresponding to `index`."""
@@ -683,35 +718,39 @@ class NDViewer(QWidget):
     # FIXME: This is ugly
     def _begin_roi(self, event: QMouseEvent) -> bool:
         if self._roi:
-            ev_pos = event.position()
-            pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
-            self._roi.move(pos)
+            canvas_pos = (event.pos().x(), event.pos().y())
+            world_pos = self._canvas.canvas_to_world(canvas_pos)[:2]
+            # HACK: Provide a non-zero starting size so that if the user clicks
+            # and immediately releases, it's visible and can be selected again
+            _min = world_pos
+            _max = (world_pos[0] + 1, world_pos[1] + 1)
+            # Put the ROI where the user clicked
+            self._roi.set_bounding_box(_min, _max)
             self._roi.set_visible(True)
         return False
 
     def _press_element(self, event: QMouseEvent) -> bool:
         ev_pos = (event.position().x(), event.position().y())
-        pos = self._canvas.canvas_to_world(ev_pos)
-        # TODO why does the canvas need this point untransformed??
         elements = self._canvas.elements_at(ev_pos)
         # Deselect prior selection before editing new selection
         if self._selection:
             self._selection.set_selected(False)
+        # Select a new element, if one is under the mouse
         for e in elements:
             if e.can_select():
-                e.start_move(pos)
-                # Select new selection
                 self._selection = e
-                self._selection.set_selected(True)
+                self._selection.on_mouse_press(
+                    MousePressEvent(ev_pos[0], ev_pos[1], MouseButton.LEFT)
+                )
                 return False
         return False
 
     def _move_selection(self, event: QMouseEvent) -> bool:
         if event.buttons() == Qt.MouseButton.LeftButton:
             if self._selection and self._selection.selected():
-                ev_pos = event.pos()
-                pos = self._canvas.canvas_to_world((ev_pos.x(), ev_pos.y()))
-                self._selection.move(pos)
+                self._selection.on_mouse_move(
+                    MouseMoveEvent(event.pos().x(), event.pos().y(), MouseButton.LEFT)
+                )
                 # If we are moving the object, we don't want to move the camera
                 return True
         return False
@@ -725,9 +764,10 @@ class NDViewer(QWidget):
             self._qcanvas.setCursor(Qt.CursorShape.CrossCursor)
             return False
         # If any local elements have a preference, use it
+        mme = MouseMoveEvent(event.pos().x(), event.pos().y())
         pos = (event.pos().x(), event.pos().y())
         for e in self._canvas.elements_at(pos):
-            if (pref := e.cursor_at(pos)) is not None:
+            if (pref := e.get_cursor(mme)) is not None:
                 self._qcanvas.setCursor(pref.to_qt())
                 return False
         # Otherwise, normal cursor

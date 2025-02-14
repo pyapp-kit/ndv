@@ -26,8 +26,10 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
+from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
@@ -38,6 +40,10 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._graphics._canvas_elements import (
+        CanvasElement,
+        RectangularROIHandle,
+    )
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -252,6 +258,14 @@ class QLutView(LutView):
             self.histogramRequested.emit(self._channel)
 
 
+class ROIButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setToolTip("Add ROI")
+        self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
+
+
 class _QDimsSliders(QWidget):
     currentIndexChanged = Signal()
 
@@ -269,15 +283,20 @@ class _QDimsSliders(QWidget):
         """Update sliders with the given coordinate ranges."""
         layout = cast("QFormLayout", self.layout())
         for axis, _coords in coords.items():
-            sld = QLabeledSlider(Qt.Orientation.Horizontal)
-            sld.valueChanged.connect(self.currentIndexChanged)
+            # Create a slider for axis if necessary
+            if axis not in self._sliders:
+                sld = QLabeledSlider(Qt.Orientation.Horizontal)
+                sld.valueChanged.connect(self.currentIndexChanged)
+                layout.addRow(str(axis), sld)
+                self._sliders[axis] = sld
+
+            # Update axis slider with coordinates
+            sld = self._sliders[axis]
             if isinstance(_coords, range):
                 sld.setRange(_coords.start, _coords.stop - 1)
                 sld.setSingleStep(_coords.step)
             else:
                 sld.setRange(0, len(_coords) - 1)
-            layout.addRow(str(axis), sld)
-            self._sliders[axis] = sld
         self.currentIndexChanged.emit()
 
     def hide_dimensions(
@@ -384,6 +403,11 @@ class _QArrayViewer(QWidget):
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
         self.set_range_btn = QPushButton(set_range_icon, "", self)
 
+        # button to draw ROIs
+        self._roi_handle: RectangularROIHandle | None = None
+        self._selection: CanvasElement | None = None
+        self.add_roi_btn = ROIButton()
+
         self.luts = _UpCollapsible(
             "LUTs",
             parent=self,
@@ -399,8 +423,8 @@ class _QArrayViewer(QWidget):
 
         self._btn_layout.addWidget(self.channel_mode_combo)
         self._btn_layout.addWidget(self.ndims_btn)
+        self._btn_layout.addWidget(self.add_roi_btn)
         self._btn_layout.addWidget(self.set_range_btn)
-        # self._btns.addWidget(self._add_roi_btn)
 
         # above the canvas
         info_widget = QWidget()
@@ -444,12 +468,18 @@ class _QArrayViewer(QWidget):
 
 class QtArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: QWidget, data_model: _ArrayDataDisplayModel
+        self,
+        canvas_widget: QWidget,
+        data_model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
     ) -> None:
         self._data_model = data_model
+        self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         # Mapping of channel key to LutViews
         self._luts: dict[ChannelKey, QLutView] = {}
+        qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
+        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -493,6 +523,13 @@ class QtArrayView(ArrayView):
             )
             widget.resize(QSize(lut._qwidget.width(), 100))
             lut._qwidget._histogram_container.addWidget(widget)
+
+    def _on_model_mode_changed(
+        self, new: InteractionMode, old: InteractionMode
+    ) -> None:
+        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+        if old == InteractionMode.CREATE_ROI:
+            self._qwidget.add_roi_btn.setChecked(False)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
@@ -563,3 +600,8 @@ class QtArrayView(ArrayView):
 
     def set_progress_spinner_visible(self, visible: bool) -> None:
         self._qwidget._progress_spinner.setVisible(visible)
+
+    def _on_add_roi_clicked(self, checked: bool) -> None:
+        self._viewer_model.interaction_mode = (
+            InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
+        )
