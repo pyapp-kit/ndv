@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
@@ -17,6 +18,17 @@ if TYPE_CHECKING:
     from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.models._viewer_model import ArrayViewerModel
     from ndv.views.bases import LutView
+
+
+@dataclass
+class ArrayViewOptions:
+    """Options for configuring an ArrayView widget."""
+
+    show_3d_button: bool | None = None
+    show_histogram_button: bool | None = None
+    show_reset_zoom_button: bool | None = None
+    show_roi_button: bool | None = None
+    show_channel_mode_selector: bool | None = None
 
 
 class ArrayView(Viewable):
@@ -75,5 +87,10 @@ class ArrayView(Viewable):
     def remove_histogram(self, widget: Any) -> None:
         raise NotImplementedError
 
+    # could be moved to set_options?
     def set_progress_spinner_visible(self, visible: bool) -> None:
         return
+
+    def set_options(self, options: ArrayViewOptions) -> None:
+        """Configure the viewer with the given options."""
+        pass

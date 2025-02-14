@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._array_view import ArrayViewOptions
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -411,3 +412,15 @@ class JupyterArrayView(ArrayView):
 
     def set_progress_spinner_visible(self, visible: bool) -> None:
         self._progress_spinner.layout.display = "flex" if visible else "none"
+
+    def set_options(self, options: ArrayViewOptions) -> None:
+        if (show_3d := options.show_3d_button) is not None:
+            self._ndims_btn.layout.display = "flex" if show_3d else "none"
+        # if (show_hist := options.show_histogram_button) is not None:
+        # self._hist_btn.layout.display = "flex" if show_hist else "none"
+        if (show_reset := options.show_reset_zoom_button) is not None:
+            self._reset_zoom_btn.layout.display = "flex" if show_reset else "none"
+        if (show_channel := options.show_channel_mode_selector) is not None:
+            self._channel_mode_combo.layout.display = "flex" if show_channel else "none"
+        if (show_roi := options.show_roi_button) is not None:
+            self._add_roi_btn.layout.display = "flex" if show_roi else "none"

@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._array_view import ArrayViewOptions
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         RectangularROIHandle,
@@ -572,3 +573,15 @@ class QtArrayView(ArrayView):
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
         )
+
+    def set_options(self, options: ArrayViewOptions) -> None:
+        if (show_3d := options.show_3d_button) is not None:
+            self._qwidget.ndims_btn.setVisible(show_3d)
+        if (show_hist := options.show_histogram_button) is not None:
+            self._qwidget.histogram_btn.setVisible(show_hist)
+        if (show_reset := options.show_reset_zoom_button) is not None:
+            self._qwidget.set_range_btn.setVisible(show_reset)
+        if (show_channel := options.show_channel_mode_selector) is not None:
+            self._qwidget.channel_mode_combo.setVisible(show_channel)
+        if (show_roi := options.show_roi_button) is not None:
+            self._qwidget.add_roi_btn.setVisible(show_roi)

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._array_view import ArrayViewOptions
 
 
 class _WxSpinner(wx.Panel):
@@ -403,3 +404,17 @@ class WxArrayView(ArrayView):
             self._wxwidget._top_info.Layout()
         else:
             self._wxwidget._progress_spinner.Hide()
+
+    def set_options(self, options: ArrayViewOptions) -> None:
+        if (show_3d := options.show_3d_button) is not None:
+            getattr(self._wxwidget.ndims_btn, "Show" if show_3d else "Hide")()
+        # if (show_hist := options.show_histogram_button) is not None:
+        # self._wxwidget.histogram_btn.setVisible(show_hist)
+        if (show_reset := options.show_reset_zoom_button) is not None:
+            getattr(self._wxwidget.reset_zoom_btn, "Show" if show_reset else "Hide")()
+        if (show_channel := options.show_channel_mode_selector) is not None:
+            getattr(
+                self._wxwidget.channel_mode_combo, "Show" if show_channel else "Hide"
+            )()
+        if (show_roi := options.show_roi_button) is not None:
+            getattr(self._wxwidget.add_roi_btn, "Show" if show_roi else "Hide")()

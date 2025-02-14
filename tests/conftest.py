@@ -33,7 +33,7 @@ def asyncio_app() -> Iterator[AbstractEventLoop]:
     loop.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def wxapp() -> Iterator[wx.App]:
     import wx
 
