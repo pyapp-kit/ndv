@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.models._viewer_model import ArrayViewerModel
     from ndv.views.bases import LutView
 
 
@@ -35,7 +36,11 @@ class ArrayView(Viewable):
     # model: _ArrayDataDisplayModel is likely a temporary parameter
     @abstractmethod
     def __init__(
-        self, canvas_widget: Any, model: _ArrayDataDisplayModel, **kwargs: Any
+        self,
+        canvas_widget: Any,
+        model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
+        **kwargs: Any,
     ) -> None: ...
     @abstractmethod
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None: ...

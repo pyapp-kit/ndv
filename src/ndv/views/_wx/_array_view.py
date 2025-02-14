@@ -11,6 +11,7 @@ from psygnal import Signal
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
 from ndv.views.bases import ArrayView, LutView
 
@@ -162,18 +163,22 @@ class _WxDimsSliders(wx.Panel):
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         for axis, _coords in coords.items():
-            slider = WxLabeledSlider(self)
-            slider.label.SetLabel(str(axis))
-            slider.slider.Bind(wx.EVT_SLIDER, self._on_slider_changed)
+            # Create a slider for axis if necessary
+            if axis not in self._sliders:
+                slider = WxLabeledSlider(self)
+                slider.slider.Bind(wx.EVT_SLIDER, self._on_slider_changed)
+                slider.label.SetLabel(str(axis))
+                self.layout.Add(slider, 0, wx.EXPAND | wx.ALL, 5)
+                self._sliders[axis] = slider
 
+            # Update axis slider with coordinates
+            slider = self._sliders[axis]
             if isinstance(_coords, range):
                 slider.setRange(_coords.start, _coords.stop - 1)
                 slider.setSingleStep(_coords.step)
             else:
                 slider.setRange(0, len(_coords) - 1)
 
-            self.layout.Add(slider, 0, wx.EXPAND | wx.ALL, 5)
-            self._sliders[axis] = slider
         self.currentIndexChanged.emit()
 
     def hide_dimensions(
@@ -252,6 +257,9 @@ class _WxArrayViewer(wx.Frame):
         # 3d view button
         self.ndims_btn = wx.ToggleButton(self, label="3D")
 
+        # Add ROI button
+        self.add_roi_btn = wx.ToggleButton(self, label="Add ROI")
+
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
 
@@ -260,6 +268,7 @@ class _WxArrayViewer(wx.Frame):
         btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
         btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
         btns.Add(self.ndims_btn, 0, wx.ALL, 5)
+        btns.Add(self.add_roi_btn, 0, wx.ALL, 5)
 
         self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
         top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
@@ -286,9 +295,11 @@ class WxArrayView(ArrayView):
         self,
         canvas_widget: wx.Window,
         data_model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
         parent: wx.Window = None,
     ) -> None:
         self._data_model = data_model
+        self._viewer_model = viewer_model
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
         self._visible_axes: Sequence[AxisKey] = []
 
@@ -297,6 +308,7 @@ class WxArrayView(ArrayView):
         wdg.channel_mode_combo.Bind(wx.EVT_COMBOBOX, self._on_channel_mode_changed)
         wdg.reset_zoom_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
+        wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
@@ -322,6 +334,12 @@ class WxArrayView(ArrayView):
         # TODO: a future PR may decide to set this on the model directly...
         # since we now have access to it.
         self.visibleAxesChanged.emit()
+
+    def _on_add_roi_toggled(self, event: wx.CommandEvent) -> None:
+        create_roi = self._wxwidget.add_roi_btn.GetValue()
+        self._viewer_model.interaction_mode = (
+            InteractionMode.CREATE_ROI if create_roi else InteractionMode.PAN_ZOOM
+        )
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet
