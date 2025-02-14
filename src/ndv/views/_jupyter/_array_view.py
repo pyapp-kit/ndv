@@ -16,12 +16,12 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
     import cmap
+    from psygnal import EmissionInfo
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
-    from ndv.views.bases._array_view import ArrayViewOptions
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -157,7 +157,7 @@ class JupyterArrayView(ArrayView):
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
-        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
+        self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
         self._data_model = data_model
         self._canvas_widget = canvas_widget
@@ -353,13 +353,6 @@ class JupyterArrayView(ArrayView):
             InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
         )
 
-    def _on_model_mode_changed(
-        self, new: InteractionMode, old: InteractionMode
-    ) -> None:
-        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-        if old == InteractionMode.CREATE_ROI:
-            self._add_roi_btn.value = False
-
     def add_histogram(self, widget: Any) -> None:
         """Add a histogram widget to the viewer."""
         warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
@@ -413,14 +406,21 @@ class JupyterArrayView(ArrayView):
     def set_progress_spinner_visible(self, visible: bool) -> None:
         self._progress_spinner.layout.display = "flex" if visible else "none"
 
-    def set_options(self, options: ArrayViewOptions) -> None:
-        if (show_3d := options.show_3d_button) is not None:
-            self._ndims_btn.layout.display = "flex" if show_3d else "none"
-        # if (show_hist := options.show_histogram_button) is not None:
-        # self._hist_btn.layout.display = "flex" if show_hist else "none"
-        if (show_reset := options.show_reset_zoom_button) is not None:
-            self._reset_zoom_btn.layout.display = "flex" if show_reset else "none"
-        if (show_channel := options.show_channel_mode_selector) is not None:
-            self._channel_mode_combo.layout.display = "flex" if show_channel else "none"
-        if (show_roi := options.show_roi_button) is not None:
-            self._add_roi_btn.layout.display = "flex" if show_roi else "none"
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._add_roi_btn.value = False
+        elif sig_name == "show_histogram_button":
+            ...
+        elif sig_name == "show_roi_button":
+            self._add_roi_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_channel_mode_selector":
+            self._channel_mode_combo.layout.display = "flex" if value else "none"
+        elif sig_name == "show_reset_zoom_button":
+            self._reset_zoom_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_3d_button":
+            self._ndims_btn.layout.display = "flex" if value else "none"

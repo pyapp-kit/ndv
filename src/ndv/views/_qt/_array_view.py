@@ -35,11 +35,11 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     import cmap
+    from psygnal import EmissionInfo
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
-    from ndv.views.bases._array_view import ArrayViewOptions
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         RectangularROIHandle,
@@ -452,7 +452,8 @@ class QtArrayView(ArrayView):
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
-        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
+
+        self._viewer_model.events.connect(self._on_viewer_model_event)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -484,13 +485,6 @@ class QtArrayView(ArrayView):
                 splitter.setSizes([sum(sizes), 0])
         else:
             self.histogramRequested.emit()
-
-    def _on_model_mode_changed(
-        self, new: InteractionMode, old: InteractionMode
-    ) -> None:
-        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-        if old == InteractionMode.CREATE_ROI:
-            self._qwidget.add_roi_btn.setChecked(False)
 
     def add_histogram(self, widget: QWidget) -> None:
         if hasattr(self, "_hist"):
@@ -574,14 +568,21 @@ class QtArrayView(ArrayView):
             InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
         )
 
-    def set_options(self, options: ArrayViewOptions) -> None:
-        if (show_3d := options.show_3d_button) is not None:
-            self._qwidget.ndims_btn.setVisible(show_3d)
-        if (show_hist := options.show_histogram_button) is not None:
-            self._qwidget.histogram_btn.setVisible(show_hist)
-        if (show_reset := options.show_reset_zoom_button) is not None:
-            self._qwidget.set_range_btn.setVisible(show_reset)
-        if (show_channel := options.show_channel_mode_selector) is not None:
-            self._qwidget.channel_mode_combo.setVisible(show_channel)
-        if (show_roi := options.show_roi_button) is not None:
-            self._qwidget.add_roi_btn.setVisible(show_roi)
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._qwidget.add_roi_btn.setChecked(False)
+        elif sig_name == "show_histogram_button":
+            self._qwidget.histogram_btn.setVisible(value)
+        elif sig_name == "show_roi_button":
+            self._qwidget.add_roi_btn.setVisible(value)
+        elif sig_name == "show_channel_mode_selector":
+            self._qwidget.channel_mode_combo.setVisible(value)
+        elif sig_name == "show_reset_zoom_button":
+            self._qwidget.set_range_btn.setVisible(value)
+        elif sig_name == "show_3d_button":
+            self._qwidget.ndims_btn.setVisible(value)
