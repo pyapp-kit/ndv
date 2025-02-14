@@ -160,9 +160,7 @@
 </span><span id=__span-0-6>    <span class=n><a class="autorefs autorefs-internal" href=#ndv.v1.NDViewer(channel_axis)>channel_axis</a></span><span class=p>:</span> <span class=n><span title=ndv.v1._old_viewer.DimKey>DimKey</span></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-7>    <span class=n><a class="autorefs autorefs-internal" href=#ndv.v1.NDViewer(channel_mode)>channel_mode</a></span><span class=p>:</span> <span class=n><span title=ndv.v1._qt._components.ChannelMode>ChannelMode</span></span> <span class=o>|</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/stdtypes.html#str>str</a></span> <span class=o>=</span> <span class=n><span title=ndv.v1._qt._components.ChannelMode.MONO>MONO</span></span><span class=p>,</span>
 </span><span id=__span-0-8><span class=p>)</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><span title=qtpy.QtWidgets.QWidget>QWidget</span></code></p> <p>A viewer for ND arrays.</p> <p>This widget displays a single slice from an ND array (or a composite of slices in different colormaps). The widget provides sliders to select the slice to display, and buttons to control the display mode of the channels.</p> <p>An important concept in this widget is the "index". The index is a mapping of dimensions to integers or slices that define the slice of the data to display. For example, a numpy slice of <code>[0, 1, 5:10]</code> would be represented as <code>{0: 0, 1: 1, 2: slice(5, 10)}</code>, but dimensions can also be named, e.g. <code>{'t': 0, 'c': 1, 'z': slice(5, 10)}</code>. The index is used to select the data from the datastore, and to determine the position of the sliders.</p> <p>The flow of data is as follows:</p> <ul> <li>The user sets the data using the <code>set_data</code> method. This will set the number and range of the sliders to the shape of the data, and display the first slice.</li> <li>The user can then use the sliders to select the slice to display. The current slice is defined as a <code>Mapping</code> of <code>{dim -&gt; int|slice}</code> and can be retrieved with the <code>_dims_sliders.value()</code> method. To programmatically set the current position, use the <code>setIndex</code> method. This will set the values of the sliders, which in turn will trigger the display of the new slice via the <code>_update_data_for_index</code> method.</li> <li><code>_update_data_for_index</code> is an asynchronous method that retrieves the data for the given index from the datastore (using <code>_isel</code>) and queues the <code>_on_data_slice_ready</code> method to be called when the data is ready. The logic for extracting data from the datastore is defined in <code>_data_wrapper.py</code>, which handles idiosyncrasies of different datastores (e.g. xarray, tensorstore, etc).</li> <li><code>_on_data_slice_ready</code> is called when the data is ready, and updates the image. Note that if the slice is multidimensional, the data will be reduced to 2D using max intensity projection (and double-clicking on any given dimension slider will turn it into a range slider allowing a projection to be made over that dimension).</li> <li>The image is displayed on the canvas, which is an object that implements the <code>PCanvas</code> protocol (mostly, it has an <code>add_image</code> method that returns a handle to the added image that can be used to update the data and display). This small abstraction allows for various backends to be used (e.g. vispy, pygfx, etc).</li> </ul> <p><span class=doc-section-title>Parameters:</span></p> <ul> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(data) class="doc doc-heading doc-heading-parameter"> <b><code>data</code></b> <a href=#ndv.v1.NDViewer(data) class=headerlink title="Permanent link">#</a></h3> (<code><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The data to display. This can be any duck-like ND array, including numpy, dask, xarray, jax, tensorstore, zarr, etc. You can add support for new datastores by subclassing <code>DataWrapper</code> and implementing the required methods. See <code>DataWrapper</code> for more information.</p> </div> </li> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(parent) class="doc doc-heading doc-heading-parameter"> <b><code>parent</code></b> <a href=#ndv.v1.NDViewer(parent) class=headerlink title="Permanent link">#</a></h3> (<code><span title=qtpy.QtWidgets.QWidget>QWidget</span></code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The parent widget of this widget.</p> </div> </li> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(channel_axis) class="doc doc-heading doc-heading-parameter"> <b><code>channel_axis</code></b> <a href=#ndv.v1.NDViewer(channel_axis) class=headerlink title="Permanent link">#</a></h3> (<code>Hashable</code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The axis that represents the channels in the data. If not provided, this will be guessed from the data.</p> </div> </li> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(channel_mode) class="doc doc-heading doc-heading-parameter"> <b><code>channel_mode</code></b> <a href=#ndv.v1.NDViewer(channel_mode) class=headerlink title="Permanent link">#</a></h3> (<code><span title=ndv.v1._qt._components.ChannelMode>ChannelMode</span></code>, default: <code><span title=ndv.v1._qt._components.ChannelMode.MONO>MONO</span></code> ) – <div class=doc-md-description> <p>The initial mode for displaying the channels. If not provided, this will be set to ChannelMode.MONO.</p> </div> </li> </ul> <p><span class=doc-section-title>Methods:</span></p> <ul> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.eventFilter href=#ndv.v1.NDViewer.eventFilter>eventFilter</a></code></b> – <div class=doc-md-description> <p>Event filter installed on the canvas to handle mouse events.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.refresh href=#ndv.v1.NDViewer.refresh>refresh</a></code></b> – <div class=doc-md-description> <p>Refresh the canvas.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_channel_mode href=#ndv.v1.NDViewer.set_channel_mode>set_channel_mode</a></code></b> – <div class=doc-md-description> <p>Set the mode for displaying the channels.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_current_index href=#ndv.v1.NDViewer.set_current_index>set_current_index</a></code></b> – <div class=doc-md-description> <p>Set the index of the displayed image.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_data href=#ndv.v1.NDViewer.set_data>set_data</a></code></b> – <div class=doc-md-description> <p>Set the datastore, and, optionally, the sizes of the data.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_ndim href=#ndv.v1.NDViewer.set_ndim>set_ndim</a></code></b> – <div class=doc-md-description> <p>Set the number of dimensions to display.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_roi href=#ndv.v1.NDViewer.set_roi>set_roi</a></code></b> – <div class=doc-md-description> <p>Set the properties of the ROI overlaid on the displayed data.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_visualized_dims href=#ndv.v1.NDViewer.set_visualized_dims>set_visualized_dims</a></code></b> – <div class=doc-md-description> <p>Set the dimensions that will be visualized.</p> </div> </li> </ul> <p><span class=doc-section-title>Attributes:</span></p> <ul> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.data href=#ndv.v1.NDViewer.data>data</a></code></b> (<code><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></code>) – <div class=doc-md-description> <p>Return the data backing the view.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.data_wrapper href=#ndv.v1.NDViewer.data_wrapper>data_wrapper</a></code></b> (<code><a class="autorefs autorefs-internal" title=ndv.v1._old_data_wrapper.DataWrapper href=#ndv.v1.DataWrapper>DataWrapper</a> | None</code>) – <div class=doc-md-description> <p>Return the DataWrapper object around the datastore.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.dims_sliders href=#ndv.v1.NDViewer.dims_sliders>dims_sliders</a></code></b> (<code><span title=ndv.v1._qt._dims_slider.DimsSliders>DimsSliders</span></code>) – <div class=doc-md-description> <p>Return the DimsSliders widget.</p> </div> </li> </ul> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>122</span>
-<span class=normal>123</span>
-<span class=normal>124</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><span title=qtpy.QtWidgets.QWidget>QWidget</span></code></p> <p>A viewer for ND arrays.</p> <p>This widget displays a single slice from an ND array (or a composite of slices in different colormaps). The widget provides sliders to select the slice to display, and buttons to control the display mode of the channels.</p> <p>An important concept in this widget is the "index". The index is a mapping of dimensions to integers or slices that define the slice of the data to display. For example, a numpy slice of <code>[0, 1, 5:10]</code> would be represented as <code>{0: 0, 1: 1, 2: slice(5, 10)}</code>, but dimensions can also be named, e.g. <code>{'t': 0, 'c': 1, 'z': slice(5, 10)}</code>. The index is used to select the data from the datastore, and to determine the position of the sliders.</p> <p>The flow of data is as follows:</p> <ul> <li>The user sets the data using the <code>set_data</code> method. This will set the number and range of the sliders to the shape of the data, and display the first slice.</li> <li>The user can then use the sliders to select the slice to display. The current slice is defined as a <code>Mapping</code> of <code>{dim -&gt; int|slice}</code> and can be retrieved with the <code>_dims_sliders.value()</code> method. To programmatically set the current position, use the <code>setIndex</code> method. This will set the values of the sliders, which in turn will trigger the display of the new slice via the <code>_update_data_for_index</code> method.</li> <li><code>_update_data_for_index</code> is an asynchronous method that retrieves the data for the given index from the datastore (using <code>_isel</code>) and queues the <code>_on_data_slice_ready</code> method to be called when the data is ready. The logic for extracting data from the datastore is defined in <code>_data_wrapper.py</code>, which handles idiosyncrasies of different datastores (e.g. xarray, tensorstore, etc).</li> <li><code>_on_data_slice_ready</code> is called when the data is ready, and updates the image. Note that if the slice is multidimensional, the data will be reduced to 2D using max intensity projection (and double-clicking on any given dimension slider will turn it into a range slider allowing a projection to be made over that dimension).</li> <li>The image is displayed on the canvas, which is an object that implements the <code>PCanvas</code> protocol (mostly, it has an <code>add_image</code> method that returns a handle to the added image that can be used to update the data and display). This small abstraction allows for various backends to be used (e.g. vispy, pygfx, etc).</li> </ul> <p><span class=doc-section-title>Parameters:</span></p> <ul> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(data) class="doc doc-heading doc-heading-parameter"> <b><code>data</code></b> <a href=#ndv.v1.NDViewer(data) class=headerlink title="Permanent link">#</a></h3> (<code><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The data to display. This can be any duck-like ND array, including numpy, dask, xarray, jax, tensorstore, zarr, etc. You can add support for new datastores by subclassing <code>DataWrapper</code> and implementing the required methods. See <code>DataWrapper</code> for more information.</p> </div> </li> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(parent) class="doc doc-heading doc-heading-parameter"> <b><code>parent</code></b> <a href=#ndv.v1.NDViewer(parent) class=headerlink title="Permanent link">#</a></h3> (<code><span title=qtpy.QtWidgets.QWidget>QWidget</span></code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The parent widget of this widget.</p> </div> </li> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(channel_axis) class="doc doc-heading doc-heading-parameter"> <b><code>channel_axis</code></b> <a href=#ndv.v1.NDViewer(channel_axis) class=headerlink title="Permanent link">#</a></h3> (<code>Hashable</code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The axis that represents the channels in the data. If not provided, this will be guessed from the data.</p> </div> </li> <li class="doc-section-item field-body"> <h3 id=ndv.v1.NDViewer(channel_mode) class="doc doc-heading doc-heading-parameter"> <b><code>channel_mode</code></b> <a href=#ndv.v1.NDViewer(channel_mode) class=headerlink title="Permanent link">#</a></h3> (<code><span title=ndv.v1._qt._components.ChannelMode>ChannelMode</span></code>, default: <code><span title=ndv.v1._qt._components.ChannelMode.MONO>MONO</span></code> ) – <div class=doc-md-description> <p>The initial mode for displaying the channels. If not provided, this will be set to ChannelMode.MONO.</p> </div> </li> </ul> <p><span class=doc-section-title>Methods:</span></p> <ul> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.eventFilter href=#ndv.v1.NDViewer.eventFilter>eventFilter</a></code></b> – <div class=doc-md-description> <p>Event filter installed on the canvas to handle mouse events.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.refresh href=#ndv.v1.NDViewer.refresh>refresh</a></code></b> – <div class=doc-md-description> <p>Refresh the canvas.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_channel_mode href=#ndv.v1.NDViewer.set_channel_mode>set_channel_mode</a></code></b> – <div class=doc-md-description> <p>Set the mode for displaying the channels.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_current_index href=#ndv.v1.NDViewer.set_current_index>set_current_index</a></code></b> – <div class=doc-md-description> <p>Set the index of the displayed image.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_data href=#ndv.v1.NDViewer.set_data>set_data</a></code></b> – <div class=doc-md-description> <p>Set the datastore, and, optionally, the sizes of the data.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_ndim href=#ndv.v1.NDViewer.set_ndim>set_ndim</a></code></b> – <div class=doc-md-description> <p>Set the number of dimensions to display.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_roi href=#ndv.v1.NDViewer.set_roi>set_roi</a></code></b> – <div class=doc-md-description> <p>Set the properties of the ROI overlaid on the displayed data.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.set_visualized_dims href=#ndv.v1.NDViewer.set_visualized_dims>set_visualized_dims</a></code></b> – <div class=doc-md-description> <p>Set the dimensions that will be visualized.</p> </div> </li> </ul> <p><span class=doc-section-title>Attributes:</span></p> <ul> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.data href=#ndv.v1.NDViewer.data>data</a></code></b> (<code><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></code>) – <div class=doc-md-description> <p>Return the data backing the view.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.data_wrapper href=#ndv.v1.NDViewer.data_wrapper>data_wrapper</a></code></b> (<code><a class="autorefs autorefs-internal" title=ndv.v1._old_data_wrapper.DataWrapper href=#ndv.v1.DataWrapper>DataWrapper</a> | None</code>) – <div class=doc-md-description> <p>Return the DataWrapper object around the datastore.</p> </div> </li> <li class="doc-section-item field-body"> <b><code><a class="autorefs autorefs-internal" title=ndv.v1.NDViewer.dims_sliders href=#ndv.v1.NDViewer.dims_sliders>dims_sliders</a></code></b> (<code><span title=ndv.v1._qt._dims_slider.DimsSliders>DimsSliders</span></code>) – <div class=doc-md-description> <p>Return the DimsSliders widget.</p> </div> </li> </ul> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>124</span>
 <span class=normal>125</span>
 <span class=normal>126</span>
 <span class=normal>127</span>
@@ -286,204 +284,192 @@
 <span class=normal>245</span>
 <span class=normal>246</span>
 <span class=normal>247</span>
-<span class=normal>248</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-122><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
-</span><span id=__span-0-123>    <span class=bp>self</span><span class=p>,</span>
-</span><span id=__span-0-124>    <span class=n>data</span><span class=p>:</span> <span class=n>DataWrapper</span> <span class=o>|</span> <span class=n>Any</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-125>    <span class=o>*</span><span class=p>,</span>
-</span><span id=__span-0-126>    <span class=n>colormaps</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>cmap</span><span class=o>.</span><span class=n>_colormap</span><span class=o>.</span><span class=n>ColorStopsLike</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-127>    <span class=n>parent</span><span class=p>:</span> <span class=n>QWidget</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-128>    <span class=n>channel_axis</span><span class=p>:</span> <span class=n>DimKey</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-129>    <span class=n>channel_mode</span><span class=p>:</span> <span class=n>ChannelMode</span> <span class=o>|</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>ChannelMode</span><span class=o>.</span><span class=n>MONO</span><span class=p>,</span>
-</span><span id=__span-0-130><span class=p>):</span>
-</span><span id=__span-0-131>    <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span><span class=n>parent</span><span class=o>=</span><span class=n>parent</span><span class=p>)</span>
-</span><span id=__span-0-132>
-</span><span id=__span-0-133>    <span class=c1># ATTRIBUTES ----------------------------------------------------</span>
-</span><span id=__span-0-134>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=p>:</span> <span class=n>DataWrapper</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
-</span><span id=__span-0-135>
-</span><span id=__span-0-136>    <span class=c1># mapping of key to a list of objects that control image nodes in the canvas</span>
-</span><span id=__span-0-137>    <span class=bp>self</span><span class=o>.</span><span class=n>_img_handles</span><span class=p>:</span> <span class=n>defaultdict</span><span class=p>[</span><span class=n>ImgKey</span><span class=p>,</span> <span class=nb>list</span><span class=p>[</span><span class=n>ImageHandle</span><span class=p>]]</span> <span class=o>=</span> <span class=n>defaultdict</span><span class=p>(</span><span class=nb>list</span><span class=p>)</span>
-</span><span id=__span-0-138>    <span class=c1># mapping of same keys to the LutControl objects control image display props</span>
-</span><span id=__span-0-139>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_ctrls</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>ImgKey</span><span class=p>,</span> <span class=n>LutControl</span><span class=p>]</span> <span class=o>=</span> <span class=p>{}</span>
-</span><span id=__span-0-140>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_ctrl_state</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>ImgKey</span><span class=p>,</span> <span class=nb>dict</span><span class=p>]</span> <span class=o>=</span> <span class=p>{}</span>
-</span><span id=__span-0-141>    <span class=c1># the set of dimensions we are currently visualizing (e.g. XY)</span>
-</span><span id=__span-0-142>    <span class=c1># this is used to control which dimensions have sliders and the behavior</span>
-</span><span id=__span-0-143>    <span class=c1># of isel when selecting data from the datastore</span>
-</span><span id=__span-0-144>    <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span><span class=p>:</span> <span class=nb>set</span><span class=p>[</span><span class=n>DimKey</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>()</span>
-</span><span id=__span-0-145>    <span class=c1># the axis that represents the channels in the data</span>
-</span><span id=__span-0-146>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=o>=</span> <span class=n>channel_axis</span>
-</span><span id=__span-0-147>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode</span><span class=p>:</span> <span class=n>ChannelMode</span> <span class=o>=</span> <span class=kc>None</span>  <span class=c1># type: ignore # set in set_channel_mode</span>
-</span><span id=__span-0-148>    <span class=c1># colormaps that will be cycled through when displaying composite images</span>
-</span><span id=__span-0-149>    <span class=k>if</span> <span class=n>colormaps</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-150>        <span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span> <span class=o>=</span> <span class=p>[</span><span class=n>cmap</span><span class=o>.</span><span class=n>Colormap</span><span class=p>(</span><span class=n>c</span><span class=p>)</span> <span class=k>for</span> <span class=n>c</span> <span class=ow>in</span> <span class=n>colormaps</span><span class=p>]</span>
-</span><span id=__span-0-151>    <span class=k>else</span><span class=p>:</span>
-</span><span id=__span-0-152>        <span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span> <span class=o>=</span> <span class=n>DEFAULT_COLORMAPS</span>
-</span><span id=__span-0-153>    <span class=bp>self</span><span class=o>.</span><span class=n>_cmap_cycle</span> <span class=o>=</span> <span class=n>cycle</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span><span class=p>)</span>
-</span><span id=__span-0-154>    <span class=c1># the last future that was created by _update_data_for_index</span>
-</span><span id=__span-0-155>    <span class=bp>self</span><span class=o>.</span><span class=n>_last_future</span><span class=p>:</span> <span class=n>Future</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
-</span><span id=__span-0-156>
-</span><span id=__span-0-157>    <span class=c1># number of dimensions to display</span>
-</span><span id=__span-0-158>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span><span class=p>:</span> <span class=n>Literal</span><span class=p>[</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>]</span> <span class=o>=</span> <span class=mi>2</span>
-</span><span id=__span-0-159>
-</span><span id=__span-0-160>    <span class=c1># Canvas selection</span>
-</span><span id=__span-0-161>    <span class=bp>self</span><span class=o>.</span><span class=n>_selection</span><span class=p>:</span> <span class=n>CanvasElement</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
-</span><span id=__span-0-162>    <span class=c1># ROI</span>
-</span><span id=__span-0-163>    <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span><span class=p>:</span> <span class=n>RoiHandle</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
-</span><span id=__span-0-164>
-</span><span id=__span-0-165>    <span class=c1># WIDGETS ----------------------------------------------------</span>
-</span><span id=__span-0-166>
-</span><span id=__span-0-167>    <span class=c1># the button that controls the display mode of the channels</span>
-</span><span id=__span-0-168>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span> <span class=o>=</span> <span class=n>ChannelModeButton</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-169>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=o>.</span><span class=n>clicked</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>set_channel_mode</span><span class=p>)</span>
-</span><span id=__span-0-170>    <span class=c1># button to reset the zoom of the canvas</span>
-</span><span id=__span-0-171>    <span class=bp>self</span><span class=o>.</span><span class=n>_set_range_btn</span> <span class=o>=</span> <span class=n>QPushButton</span><span class=p>(</span>
-</span><span id=__span-0-172>        <span class=n>QIconifyIcon</span><span class=p>(</span><span class=s2>&quot;fluent:full-screen-maximize-24-filled&quot;</span><span class=p>),</span> <span class=s2>&quot;&quot;</span><span class=p>,</span> <span class=bp>self</span>
-</span><span id=__span-0-173>    <span class=p>)</span>
-</span><span id=__span-0-174>    <span class=bp>self</span><span class=o>.</span><span class=n>_set_range_btn</span><span class=o>.</span><span class=n>clicked</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_on_set_range_clicked</span><span class=p>)</span>
-</span><span id=__span-0-175>    <span class=c1># button to draw ROIs</span>
-</span><span id=__span-0-176>    <span class=bp>self</span><span class=o>.</span><span class=n>_add_roi_btn</span> <span class=o>=</span> <span class=n>ROIButton</span><span class=p>()</span>
-</span><span id=__span-0-177>    <span class=bp>self</span><span class=o>.</span><span class=n>_add_roi_btn</span><span class=o>.</span><span class=n>toggled</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_on_add_roi_clicked</span><span class=p>)</span>
-</span><span id=__span-0-178>
-</span><span id=__span-0-179>    <span class=c1># button to change number of displayed dimensions</span>
-</span><span id=__span-0-180>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims_btn</span> <span class=o>=</span> <span class=n>DimToggleButton</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-181>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims_btn</span><span class=o>.</span><span class=n>clicked</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_toggle_3d</span><span class=p>)</span>
-</span><span id=__span-0-182>
-</span><span id=__span-0-183>    <span class=c1># place to display dataset summary</span>
-</span><span id=__span-0-184>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span> <span class=o>=</span> <span class=n>QElidingLabel</span><span class=p>(</span><span class=s2>&quot;&quot;</span><span class=p>,</span> <span class=n>parent</span><span class=o>=</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-185>    <span class=bp>self</span><span class=o>.</span><span class=n>_progress_spinner</span> <span class=o>=</span> <span class=n>QSpinner</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-186>
-</span><span id=__span-0-187>    <span class=c1># place to display arbitrary text</span>
-</span><span id=__span-0-188>    <span class=bp>self</span><span class=o>.</span><span class=n>_hover_info_label</span> <span class=o>=</span> <span class=n>QLabel</span><span class=p>(</span><span class=s2>&quot;&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-189>    <span class=c1># the canvas that displays the images</span>
-</span><span id=__span-0-190>    <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=p>:</span> <span class=n>ArrayCanvas</span> <span class=o>=</span> <span class=n>get_array_canvas_class</span><span class=p>()()</span>
-</span><span id=__span-0-191>    <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>set_ndim</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span><span class=p>)</span>
-</span><span id=__span-0-192>    <span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>frontend_widget</span><span class=p>()</span>
-</span><span id=__span-0-193>
-</span><span id=__span-0-194>    <span class=c1># Install an event filter so we can intercept mouse/key events</span>
-</span><span id=__span-0-195>    <span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span><span class=o>.</span><span class=n>installEventFilter</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-196>
-</span><span id=__span-0-197>    <span class=c1># the sliders that control the index of the displayed image</span>
-</span><span id=__span-0-198>    <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span> <span class=o>=</span> <span class=n>DimsSliders</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-199>    <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>valueChanged</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span>
-</span><span id=__span-0-200>        <span class=n>qthrottled</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_update_data_for_index</span><span class=p>,</span> <span class=mi>20</span><span class=p>,</span> <span class=n>leading</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
-</span><span id=__span-0-201>    <span class=p>)</span>
+<span class=normal>248</span>
+<span class=normal>249</span>
+<span class=normal>250</span>
+<span class=normal>251</span>
+<span class=normal>252</span>
+<span class=normal>253</span>
+<span class=normal>254</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-124><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+</span><span id=__span-0-125>    <span class=bp>self</span><span class=p>,</span>
+</span><span id=__span-0-126>    <span class=n>data</span><span class=p>:</span> <span class=n>DataWrapper</span> <span class=o>|</span> <span class=n>Any</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-127>    <span class=o>*</span><span class=p>,</span>
+</span><span id=__span-0-128>    <span class=n>colormaps</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>cmap</span><span class=o>.</span><span class=n>_colormap</span><span class=o>.</span><span class=n>ColorStopsLike</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-129>    <span class=n>parent</span><span class=p>:</span> <span class=n>QWidget</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-130>    <span class=n>channel_axis</span><span class=p>:</span> <span class=n>DimKey</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-131>    <span class=n>channel_mode</span><span class=p>:</span> <span class=n>ChannelMode</span> <span class=o>|</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>ChannelMode</span><span class=o>.</span><span class=n>MONO</span><span class=p>,</span>
+</span><span id=__span-0-132><span class=p>):</span>
+</span><span id=__span-0-133>    <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span><span class=n>parent</span><span class=o>=</span><span class=n>parent</span><span class=p>)</span>
+</span><span id=__span-0-134>    <span class=bp>self</span><span class=o>.</span><span class=n>_array_viewer_model</span> <span class=o>=</span> <span class=n>ArrayViewerModel</span><span class=p>()</span>
+</span><span id=__span-0-135>    <span class=bp>self</span><span class=o>.</span><span class=n>_array_viewer_model</span><span class=o>.</span><span class=n>events</span><span class=o>.</span><span class=n>interaction_mode</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span>
+</span><span id=__span-0-136>        <span class=bp>self</span><span class=o>.</span><span class=n>_on_view_model_mode_changed</span>
+</span><span id=__span-0-137>    <span class=p>)</span>
+</span><span id=__span-0-138>
+</span><span id=__span-0-139>    <span class=c1># ATTRIBUTES ----------------------------------------------------</span>
+</span><span id=__span-0-140>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=p>:</span> <span class=n>DataWrapper</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+</span><span id=__span-0-141>
+</span><span id=__span-0-142>    <span class=c1># mapping of key to a list of objects that control image nodes in the canvas</span>
+</span><span id=__span-0-143>    <span class=bp>self</span><span class=o>.</span><span class=n>_img_handles</span><span class=p>:</span> <span class=n>defaultdict</span><span class=p>[</span><span class=n>ImgKey</span><span class=p>,</span> <span class=nb>list</span><span class=p>[</span><span class=n>ImageHandle</span><span class=p>]]</span> <span class=o>=</span> <span class=n>defaultdict</span><span class=p>(</span><span class=nb>list</span><span class=p>)</span>
+</span><span id=__span-0-144>    <span class=c1># mapping of same keys to the LutControl objects control image display props</span>
+</span><span id=__span-0-145>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_ctrls</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>ImgKey</span><span class=p>,</span> <span class=n>LutControl</span><span class=p>]</span> <span class=o>=</span> <span class=p>{}</span>
+</span><span id=__span-0-146>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_ctrl_state</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>ImgKey</span><span class=p>,</span> <span class=nb>dict</span><span class=p>]</span> <span class=o>=</span> <span class=p>{}</span>
+</span><span id=__span-0-147>    <span class=c1># the set of dimensions we are currently visualizing (e.g. XY)</span>
+</span><span id=__span-0-148>    <span class=c1># this is used to control which dimensions have sliders and the behavior</span>
+</span><span id=__span-0-149>    <span class=c1># of isel when selecting data from the datastore</span>
+</span><span id=__span-0-150>    <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span><span class=p>:</span> <span class=nb>set</span><span class=p>[</span><span class=n>DimKey</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>()</span>
+</span><span id=__span-0-151>    <span class=c1># the axis that represents the channels in the data</span>
+</span><span id=__span-0-152>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=o>=</span> <span class=n>channel_axis</span>
+</span><span id=__span-0-153>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode</span><span class=p>:</span> <span class=n>ChannelMode</span> <span class=o>=</span> <span class=kc>None</span>  <span class=c1># type: ignore # set in set_channel_mode</span>
+</span><span id=__span-0-154>    <span class=c1># colormaps that will be cycled through when displaying composite images</span>
+</span><span id=__span-0-155>    <span class=k>if</span> <span class=n>colormaps</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-156>        <span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span> <span class=o>=</span> <span class=p>[</span><span class=n>cmap</span><span class=o>.</span><span class=n>Colormap</span><span class=p>(</span><span class=n>c</span><span class=p>)</span> <span class=k>for</span> <span class=n>c</span> <span class=ow>in</span> <span class=n>colormaps</span><span class=p>]</span>
+</span><span id=__span-0-157>    <span class=k>else</span><span class=p>:</span>
+</span><span id=__span-0-158>        <span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span> <span class=o>=</span> <span class=n>DEFAULT_COLORMAPS</span>
+</span><span id=__span-0-159>    <span class=bp>self</span><span class=o>.</span><span class=n>_cmap_cycle</span> <span class=o>=</span> <span class=n>cycle</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span><span class=p>)</span>
+</span><span id=__span-0-160>    <span class=c1># the last future that was created by _update_data_for_index</span>
+</span><span id=__span-0-161>    <span class=bp>self</span><span class=o>.</span><span class=n>_last_future</span><span class=p>:</span> <span class=n>Future</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+</span><span id=__span-0-162>
+</span><span id=__span-0-163>    <span class=c1># number of dimensions to display</span>
+</span><span id=__span-0-164>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span><span class=p>:</span> <span class=n>Literal</span><span class=p>[</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>]</span> <span class=o>=</span> <span class=mi>2</span>
+</span><span id=__span-0-165>
+</span><span id=__span-0-166>    <span class=c1># Canvas selection</span>
+</span><span id=__span-0-167>    <span class=bp>self</span><span class=o>.</span><span class=n>_selection</span><span class=p>:</span> <span class=n>CanvasElement</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+</span><span id=__span-0-168>    <span class=c1># ROI</span>
+</span><span id=__span-0-169>    <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span><span class=p>:</span> <span class=n>RectangularROIHandle</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+</span><span id=__span-0-170>
+</span><span id=__span-0-171>    <span class=c1># WIDGETS ----------------------------------------------------</span>
+</span><span id=__span-0-172>
+</span><span id=__span-0-173>    <span class=c1># the button that controls the display mode of the channels</span>
+</span><span id=__span-0-174>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span> <span class=o>=</span> <span class=n>ChannelModeButton</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-175>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=o>.</span><span class=n>clicked</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>set_channel_mode</span><span class=p>)</span>
+</span><span id=__span-0-176>    <span class=c1># button to reset the zoom of the canvas</span>
+</span><span id=__span-0-177>    <span class=bp>self</span><span class=o>.</span><span class=n>_set_range_btn</span> <span class=o>=</span> <span class=n>QPushButton</span><span class=p>(</span>
+</span><span id=__span-0-178>        <span class=n>QIconifyIcon</span><span class=p>(</span><span class=s2>&quot;fluent:full-screen-maximize-24-filled&quot;</span><span class=p>),</span> <span class=s2>&quot;&quot;</span><span class=p>,</span> <span class=bp>self</span>
+</span><span id=__span-0-179>    <span class=p>)</span>
+</span><span id=__span-0-180>    <span class=bp>self</span><span class=o>.</span><span class=n>_set_range_btn</span><span class=o>.</span><span class=n>clicked</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_on_set_range_clicked</span><span class=p>)</span>
+</span><span id=__span-0-181>    <span class=c1># button to draw ROIs</span>
+</span><span id=__span-0-182>    <span class=bp>self</span><span class=o>.</span><span class=n>_add_roi_btn</span> <span class=o>=</span> <span class=n>ROIButton</span><span class=p>()</span>
+</span><span id=__span-0-183>    <span class=bp>self</span><span class=o>.</span><span class=n>_add_roi_btn</span><span class=o>.</span><span class=n>toggled</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_on_add_roi_clicked</span><span class=p>)</span>
+</span><span id=__span-0-184>
+</span><span id=__span-0-185>    <span class=c1># button to change number of displayed dimensions</span>
+</span><span id=__span-0-186>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims_btn</span> <span class=o>=</span> <span class=n>DimToggleButton</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-187>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims_btn</span><span class=o>.</span><span class=n>clicked</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_toggle_3d</span><span class=p>)</span>
+</span><span id=__span-0-188>
+</span><span id=__span-0-189>    <span class=c1># place to display dataset summary</span>
+</span><span id=__span-0-190>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span> <span class=o>=</span> <span class=n>QElidingLabel</span><span class=p>(</span><span class=s2>&quot;&quot;</span><span class=p>,</span> <span class=n>parent</span><span class=o>=</span><span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-191>    <span class=bp>self</span><span class=o>.</span><span class=n>_progress_spinner</span> <span class=o>=</span> <span class=n>QSpinner</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-192>
+</span><span id=__span-0-193>    <span class=c1># place to display arbitrary text</span>
+</span><span id=__span-0-194>    <span class=bp>self</span><span class=o>.</span><span class=n>_hover_info_label</span> <span class=o>=</span> <span class=n>QLabel</span><span class=p>(</span><span class=s2>&quot;&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-195>    <span class=c1># the canvas that displays the images</span>
+</span><span id=__span-0-196>    <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=p>:</span> <span class=n>ArrayCanvas</span> <span class=o>=</span> <span class=n>get_array_canvas_class</span><span class=p>()(</span><span class=bp>self</span><span class=o>.</span><span class=n>_array_viewer_model</span><span class=p>)</span>
+</span><span id=__span-0-197>    <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>set_ndim</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span><span class=p>)</span>
+</span><span id=__span-0-198>    <span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>frontend_widget</span><span class=p>()</span>
+</span><span id=__span-0-199>
+</span><span id=__span-0-200>    <span class=c1># Install an event filter so we can intercept mouse/key events</span>
+</span><span id=__span-0-201>    <span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span><span class=o>.</span><span class=n>installEventFilter</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
 </span><span id=__span-0-202>
-</span><span id=__span-0-203>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span> <span class=o>=</span> <span class=n>QCollapsible</span><span class=p>(</span><span class=s2>&quot;LUTs&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-204>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>setCollapsedIcon</span><span class=p>(</span><span class=n>QIconifyIcon</span><span class=p>(</span><span class=s2>&quot;bi:chevron-down&quot;</span><span class=p>,</span> <span class=n>color</span><span class=o>=</span><span class=n>MID_GRAY</span><span class=p>))</span>
-</span><span id=__span-0-205>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>setExpandedIcon</span><span class=p>(</span><span class=n>QIconifyIcon</span><span class=p>(</span><span class=s2>&quot;bi:chevron-up&quot;</span><span class=p>,</span> <span class=n>color</span><span class=o>=</span><span class=n>MID_GRAY</span><span class=p>))</span>
-</span><span id=__span-0-206>    <span class=n>lut_layout</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=s2>&quot;QVBoxLayout&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>layout</span><span class=p>())</span>
-</span><span id=__span-0-207>    <span class=n>lut_layout</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
-</span><span id=__span-0-208>    <span class=n>lut_layout</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
-</span><span id=__span-0-209>    <span class=k>if</span> <span class=p>(</span>
-</span><span id=__span-0-210>        <span class=nb>hasattr</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=p>,</span> <span class=s2>&quot;_content&quot;</span><span class=p>)</span>
-</span><span id=__span-0-211>        <span class=ow>and</span> <span class=p>(</span><span class=n>layout</span> <span class=o>:=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>_content</span><span class=o>.</span><span class=n>layout</span><span class=p>())</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span>
-</span><span id=__span-0-212>    <span class=p>):</span>
-</span><span id=__span-0-213>        <span class=n>layout</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>)</span>
-</span><span id=__span-0-214>        <span class=n>layout</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
-</span><span id=__span-0-215>
-</span><span id=__span-0-216>    <span class=c1># LAYOUT -----------------------------------------------------</span>
-</span><span id=__span-0-217>
-</span><span id=__span-0-218>    <span class=bp>self</span><span class=o>.</span><span class=n>_btns</span> <span class=o>=</span> <span class=n>btns</span> <span class=o>=</span> <span class=n>QHBoxLayout</span><span class=p>()</span>
-</span><span id=__span-0-219>    <span class=n>btns</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>)</span>
-</span><span id=__span-0-220>    <span class=n>btns</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
-</span><span id=__span-0-221>    <span class=n>btns</span><span class=o>.</span><span class=n>addStretch</span><span class=p>()</span>
-</span><span id=__span-0-222>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=p>)</span>
-</span><span id=__span-0-223>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_ndims_btn</span><span class=p>)</span>
-</span><span id=__span-0-224>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_set_range_btn</span><span class=p>)</span>
-</span><span id=__span-0-225>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_add_roi_btn</span><span class=p>)</span>
-</span><span id=__span-0-226>
-</span><span id=__span-0-227>    <span class=n>info_widget</span> <span class=o>=</span> <span class=n>QWidget</span><span class=p>()</span>
-</span><span id=__span-0-228>    <span class=n>info</span> <span class=o>=</span> <span class=n>QHBoxLayout</span><span class=p>(</span><span class=n>info_widget</span><span class=p>)</span>
-</span><span id=__span-0-229>    <span class=n>info</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>2</span><span class=p>)</span>
-</span><span id=__span-0-230>    <span class=n>info</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
-</span><span id=__span-0-231>    <span class=n>info</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span><span class=p>)</span>
-</span><span id=__span-0-232>    <span class=n>info</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_progress_spinner</span><span class=p>)</span>
-</span><span id=__span-0-233>    <span class=n>info_widget</span><span class=o>.</span><span class=n>setFixedHeight</span><span class=p>(</span><span class=mi>16</span><span class=p>)</span>
-</span><span id=__span-0-234>
-</span><span id=__span-0-235>    <span class=n>layout</span> <span class=o>=</span> <span class=n>QVBoxLayout</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
-</span><span id=__span-0-236>    <span class=n>layout</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>2</span><span class=p>)</span>
-</span><span id=__span-0-237>    <span class=n>layout</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>6</span><span class=p>,</span> <span class=mi>6</span><span class=p>,</span> <span class=mi>6</span><span class=p>,</span> <span class=mi>6</span><span class=p>)</span>
-</span><span id=__span-0-238>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=n>info_widget</span><span class=p>)</span>
-</span><span id=__span-0-239>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
-</span><span id=__span-0-240>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_hover_info_label</span><span class=p>)</span>
-</span><span id=__span-0-241>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=p>)</span>
-</span><span id=__span-0-242>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=p>)</span>
-</span><span id=__span-0-243>    <span class=n>layout</span><span class=o>.</span><span class=n>addLayout</span><span class=p>(</span><span class=n>btns</span><span class=p>)</span>
-</span><span id=__span-0-244>
-</span><span id=__span-0-245>    <span class=c1># SETUP ------------------------------------------------------</span>
-</span><span id=__span-0-246>
-</span><span id=__span-0-247>    <span class=bp>self</span><span class=o>.</span><span class=n>set_channel_mode</span><span class=p>(</span><span class=n>channel_mode</span><span class=p>)</span>
-</span><span id=__span-0-248>    <span class=bp>self</span><span class=o>.</span><span class=n>set_data</span><span class=p>(</span><span class=n>data</span><span class=p>)</span>
+</span><span id=__span-0-203>    <span class=c1># the sliders that control the index of the displayed image</span>
+</span><span id=__span-0-204>    <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span> <span class=o>=</span> <span class=n>DimsSliders</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-205>    <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>valueChanged</span><span class=o>.</span><span class=n>connect</span><span class=p>(</span>
+</span><span id=__span-0-206>        <span class=n>qthrottled</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_update_data_for_index</span><span class=p>,</span> <span class=mi>20</span><span class=p>,</span> <span class=n>leading</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+</span><span id=__span-0-207>    <span class=p>)</span>
+</span><span id=__span-0-208>
+</span><span id=__span-0-209>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span> <span class=o>=</span> <span class=n>QCollapsible</span><span class=p>(</span><span class=s2>&quot;LUTs&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-210>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>setCollapsedIcon</span><span class=p>(</span><span class=n>QIconifyIcon</span><span class=p>(</span><span class=s2>&quot;bi:chevron-down&quot;</span><span class=p>,</span> <span class=n>color</span><span class=o>=</span><span class=n>MID_GRAY</span><span class=p>))</span>
+</span><span id=__span-0-211>    <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>setExpandedIcon</span><span class=p>(</span><span class=n>QIconifyIcon</span><span class=p>(</span><span class=s2>&quot;bi:chevron-up&quot;</span><span class=p>,</span> <span class=n>color</span><span class=o>=</span><span class=n>MID_GRAY</span><span class=p>))</span>
+</span><span id=__span-0-212>    <span class=n>lut_layout</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=s2>&quot;QVBoxLayout&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>layout</span><span class=p>())</span>
+</span><span id=__span-0-213>    <span class=n>lut_layout</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
+</span><span id=__span-0-214>    <span class=n>lut_layout</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span><span id=__span-0-215>    <span class=k>if</span> <span class=p>(</span>
+</span><span id=__span-0-216>        <span class=nb>hasattr</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=p>,</span> <span class=s2>&quot;_content&quot;</span><span class=p>)</span>
+</span><span id=__span-0-217>        <span class=ow>and</span> <span class=p>(</span><span class=n>layout</span> <span class=o>:=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=o>.</span><span class=n>_content</span><span class=o>.</span><span class=n>layout</span><span class=p>())</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span>
+</span><span id=__span-0-218>    <span class=p>):</span>
+</span><span id=__span-0-219>        <span class=n>layout</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>)</span>
+</span><span id=__span-0-220>        <span class=n>layout</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span><span id=__span-0-221>
+</span><span id=__span-0-222>    <span class=c1># LAYOUT -----------------------------------------------------</span>
+</span><span id=__span-0-223>
+</span><span id=__span-0-224>    <span class=bp>self</span><span class=o>.</span><span class=n>_btns</span> <span class=o>=</span> <span class=n>btns</span> <span class=o>=</span> <span class=n>QHBoxLayout</span><span class=p>()</span>
+</span><span id=__span-0-225>    <span class=n>btns</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>)</span>
+</span><span id=__span-0-226>    <span class=n>btns</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span><span id=__span-0-227>    <span class=n>btns</span><span class=o>.</span><span class=n>addStretch</span><span class=p>()</span>
+</span><span id=__span-0-228>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=p>)</span>
+</span><span id=__span-0-229>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_ndims_btn</span><span class=p>)</span>
+</span><span id=__span-0-230>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_set_range_btn</span><span class=p>)</span>
+</span><span id=__span-0-231>    <span class=n>btns</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_add_roi_btn</span><span class=p>)</span>
+</span><span id=__span-0-232>
+</span><span id=__span-0-233>    <span class=n>info_widget</span> <span class=o>=</span> <span class=n>QWidget</span><span class=p>()</span>
+</span><span id=__span-0-234>    <span class=n>info</span> <span class=o>=</span> <span class=n>QHBoxLayout</span><span class=p>(</span><span class=n>info_widget</span><span class=p>)</span>
+</span><span id=__span-0-235>    <span class=n>info</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>2</span><span class=p>)</span>
+</span><span id=__span-0-236>    <span class=n>info</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+</span><span id=__span-0-237>    <span class=n>info</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span><span class=p>)</span>
+</span><span id=__span-0-238>    <span class=n>info</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_progress_spinner</span><span class=p>)</span>
+</span><span id=__span-0-239>    <span class=n>info_widget</span><span class=o>.</span><span class=n>setFixedHeight</span><span class=p>(</span><span class=mi>16</span><span class=p>)</span>
+</span><span id=__span-0-240>
+</span><span id=__span-0-241>    <span class=n>layout</span> <span class=o>=</span> <span class=n>QVBoxLayout</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
+</span><span id=__span-0-242>    <span class=n>layout</span><span class=o>.</span><span class=n>setSpacing</span><span class=p>(</span><span class=mi>2</span><span class=p>)</span>
+</span><span id=__span-0-243>    <span class=n>layout</span><span class=o>.</span><span class=n>setContentsMargins</span><span class=p>(</span><span class=mi>6</span><span class=p>,</span> <span class=mi>6</span><span class=p>,</span> <span class=mi>6</span><span class=p>,</span> <span class=mi>6</span><span class=p>)</span>
+</span><span id=__span-0-244>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=n>info_widget</span><span class=p>)</span>
+</span><span id=__span-0-245>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
+</span><span id=__span-0-246>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_hover_info_label</span><span class=p>)</span>
+</span><span id=__span-0-247>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=p>)</span>
+</span><span id=__span-0-248>    <span class=n>layout</span><span class=o>.</span><span class=n>addWidget</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_lut_drop</span><span class=p>)</span>
+</span><span id=__span-0-249>    <span class=n>layout</span><span class=o>.</span><span class=n>addLayout</span><span class=p>(</span><span class=n>btns</span><span class=p>)</span>
+</span><span id=__span-0-250>
+</span><span id=__span-0-251>    <span class=c1># SETUP ------------------------------------------------------</span>
+</span><span id=__span-0-252>
+</span><span id=__span-0-253>    <span class=bp>self</span><span class=o>.</span><span class=n>set_channel_mode</span><span class=p>(</span><span class=n>channel_mode</span><span class=p>)</span>
+</span><span id=__span-0-254>    <span class=bp>self</span><span class=o>.</span><span class=n>set_data</span><span class=p>(</span><span class=n>data</span><span class=p>)</span>
 </span></code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=ndv.v1.NDViewer.data class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">data</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-property"><code>property</code></small> <small class="doc doc-label doc-label-writable"><code>writable</code></small> </span> <a href=#ndv.v1.NDViewer.data class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=n>data</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></span>
 </span></code></pre></div> <div class="doc doc-contents "> <p>Return the data backing the view.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=ndv.v1.NDViewer.data_wrapper class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">data_wrapper</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-property"><code>property</code></small> </span> <a href=#ndv.v1.NDViewer.data_wrapper class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=n>data_wrapper</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-internal" title=ndv.v1._old_data_wrapper.DataWrapper href=#ndv.v1.DataWrapper>DataWrapper</a></span> <span class=o>|</span> <span class=kc>None</span>
 </span></code></pre></div> <div class="doc doc-contents "> <p>Return the DataWrapper object around the datastore.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=ndv.v1.NDViewer.dims_sliders class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">dims_sliders</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-property"><code>property</code></small> </span> <a href=#ndv.v1.NDViewer.dims_sliders class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=n>dims_sliders</span><span class=p>:</span> <span class=n><span title=ndv.v1._qt._dims_slider.DimsSliders>DimsSliders</span></span>
 </span></code></pre></div> <div class="doc doc-contents "> <p>Return the DimsSliders widget.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.eventFilter class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eventFilter</span> <a href=#ndv.v1.NDViewer.eventFilter class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>eventFilter</span><span class=p>(</span>
 </span><span id=__span-0-2>    <span class=n>obj</span><span class=p>:</span> <span class=n><span title=qtpy.QtCore.QObject>QObject</span></span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span> <span class=n>event</span><span class=p>:</span> <span class=n><span title=qtpy.QtCore.QEvent>QEvent</span></span> <span class=o>|</span> <span class=kc>None</span>
 </span><span id=__span-0-3><span class=p>)</span> <span class=o>-&gt;</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/functions.html#bool>bool</a></span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Event filter installed on the canvas to handle mouse events.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>650</span>
-<span class=normal>651</span>
-<span class=normal>652</span>
-<span class=normal>653</span>
-<span class=normal>654</span>
-<span class=normal>655</span>
-<span class=normal>656</span>
-<span class=normal>657</span>
-<span class=normal>658</span>
-<span class=normal>659</span>
-<span class=normal>660</span>
-<span class=normal>661</span>
-<span class=normal>662</span>
-<span class=normal>663</span>
-<span class=normal>664</span>
-<span class=normal>665</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-650><span class=k>def</span><span class=w> </span><span class=nf>eventFilter</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>obj</span><span class=p>:</span> <span class=n>QObject</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span> <span class=n>event</span><span class=p>:</span> <span class=n>QEvent</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
-</span><span id=__span-0-651><span class=w>    </span><span class=sd>&quot;&quot;&quot;Event filter installed on the canvas to handle mouse events.&quot;&quot;&quot;</span>
-</span><span id=__span-0-652>    <span class=k>if</span> <span class=n>event</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-653>        <span class=k>return</span> <span class=kc>False</span>  <span class=c1># pragma: no cover</span>
-</span><span id=__span-0-654>
-</span><span id=__span-0-655>    <span class=c1># here is where we get a chance to intercept mouse events before passing them</span>
-</span><span id=__span-0-656>    <span class=c1># to the canvas. Return `True` to prevent the event from being passed to</span>
-</span><span id=__span-0-657>    <span class=c1># the backend widget.</span>
-</span><span id=__span-0-658>    <span class=n>intercept</span> <span class=o>=</span> <span class=kc>False</span>
-</span><span id=__span-0-659>    <span class=c1># use children in case backend has a subwidget stealing events.</span>
-</span><span id=__span-0-660>    <span class=k>if</span> <span class=n>obj</span> <span class=ow>is</span> <span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span> <span class=ow>or</span> <span class=n>obj</span> <span class=ow>in</span> <span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span><span class=o>.</span><span class=n>children</span><span class=p>()):</span>
-</span><span id=__span-0-661>        <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>event</span><span class=p>,</span> <span class=n>QMouseEvent</span><span class=p>):</span>
-</span><span id=__span-0-662>            <span class=n>intercept</span> <span class=o>|=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_canvas_mouse_event</span><span class=p>(</span><span class=n>event</span><span class=p>)</span>
-</span><span id=__span-0-663>        <span class=k>if</span> <span class=n>event</span><span class=o>.</span><span class=n>type</span><span class=p>()</span> <span class=o>==</span> <span class=n>QEvent</span><span class=o>.</span><span class=n>Type</span><span class=o>.</span><span class=n>KeyPress</span><span class=p>:</span>
-</span><span id=__span-0-664>            <span class=bp>self</span><span class=o>.</span><span class=n>keyPressEvent</span><span class=p>(</span><span class=n>cast</span><span class=p>(</span><span class=s2>&quot;QKeyEvent&quot;</span><span class=p>,</span> <span class=n>event</span><span class=p>))</span>
-</span><span id=__span-0-665>    <span class=k>return</span> <span class=n>intercept</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Event filter installed on the canvas to handle mouse events.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>685</span>
+<span class=normal>686</span>
+<span class=normal>687</span>
+<span class=normal>688</span>
+<span class=normal>689</span>
+<span class=normal>690</span>
+<span class=normal>691</span>
+<span class=normal>692</span>
+<span class=normal>693</span>
+<span class=normal>694</span>
+<span class=normal>695</span>
+<span class=normal>696</span>
+<span class=normal>697</span>
+<span class=normal>698</span>
+<span class=normal>699</span>
+<span class=normal>700</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-685><span class=k>def</span><span class=w> </span><span class=nf>eventFilter</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>obj</span><span class=p>:</span> <span class=n>QObject</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span> <span class=n>event</span><span class=p>:</span> <span class=n>QEvent</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
+</span><span id=__span-0-686><span class=w>    </span><span class=sd>&quot;&quot;&quot;Event filter installed on the canvas to handle mouse events.&quot;&quot;&quot;</span>
+</span><span id=__span-0-687>    <span class=k>if</span> <span class=n>event</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-688>        <span class=k>return</span> <span class=kc>False</span>  <span class=c1># pragma: no cover</span>
+</span><span id=__span-0-689>
+</span><span id=__span-0-690>    <span class=c1># here is where we get a chance to intercept mouse events before passing them</span>
+</span><span id=__span-0-691>    <span class=c1># to the canvas. Return `True` to prevent the event from being passed to</span>
+</span><span id=__span-0-692>    <span class=c1># the backend widget.</span>
+</span><span id=__span-0-693>    <span class=n>intercept</span> <span class=o>=</span> <span class=kc>False</span>
+</span><span id=__span-0-694>    <span class=c1># use children in case backend has a subwidget stealing events.</span>
+</span><span id=__span-0-695>    <span class=k>if</span> <span class=n>obj</span> <span class=ow>is</span> <span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span> <span class=ow>or</span> <span class=n>obj</span> <span class=ow>in</span> <span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_qcanvas</span><span class=o>.</span><span class=n>children</span><span class=p>()):</span>
+</span><span id=__span-0-696>        <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>event</span><span class=p>,</span> <span class=n>QMouseEvent</span><span class=p>):</span>
+</span><span id=__span-0-697>            <span class=n>intercept</span> <span class=o>|=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_canvas_mouse_event</span><span class=p>(</span><span class=n>event</span><span class=p>)</span>
+</span><span id=__span-0-698>        <span class=k>if</span> <span class=n>event</span><span class=o>.</span><span class=n>type</span><span class=p>()</span> <span class=o>==</span> <span class=n>QEvent</span><span class=o>.</span><span class=n>Type</span><span class=o>.</span><span class=n>KeyPress</span><span class=p>:</span>
+</span><span id=__span-0-699>            <span class=bp>self</span><span class=o>.</span><span class=n>keyPressEvent</span><span class=p>(</span><span class=n>cast</span><span class=p>(</span><span class=s2>&quot;QKeyEvent&quot;</span><span class=p>,</span> <span class=n>event</span><span class=p>))</span>
+</span><span id=__span-0-700>    <span class=k>return</span> <span class=n>intercept</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.refresh class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">refresh</span> <a href=#ndv.v1.NDViewer.refresh class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>refresh</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Refresh the canvas.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>420</span>
-<span class=normal>421</span>
-<span class=normal>422</span>
-<span class=normal>423</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-420><span class=k>def</span><span class=w> </span><span class=nf>refresh</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-421><span class=w>    </span><span class=sd>&quot;&quot;&quot;Refresh the canvas.&quot;&quot;&quot;</span>
-</span><span id=__span-0-422>    <span class=bp>self</span><span class=o>.</span><span class=n>_clear_images</span><span class=p>()</span>
-</span><span id=__span-0-423>    <span class=bp>self</span><span class=o>.</span><span class=n>_update_data_for_index</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>value</span><span class=p>())</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Refresh the canvas.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>442</span>
+<span class=normal>443</span>
+<span class=normal>444</span>
+<span class=normal>445</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-442><span class=k>def</span><span class=w> </span><span class=nf>refresh</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-443><span class=w>    </span><span class=sd>&quot;&quot;&quot;Refresh the canvas.&quot;&quot;&quot;</span>
+</span><span id=__span-0-444>    <span class=bp>self</span><span class=o>.</span><span class=n>_clear_images</span><span class=p>()</span>
+</span><span id=__span-0-445>    <span class=bp>self</span><span class=o>.</span><span class=n>_update_data_for_index</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>value</span><span class=p>())</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_channel_mode class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_channel_mode</span> <a href=#ndv.v1.NDViewer.set_channel_mode class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_channel_mode</span><span class=p>(</span>
 </span><span id=__span-0-2>    <span class=n><a class="autorefs autorefs-internal" href=#ndv.v1.NDViewer.set_channel_mode(mode)>mode</a></span><span class=p>:</span> <span class=n><span title=ndv.v1._qt._components.ChannelMode>ChannelMode</span></span> <span class=o>|</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/stdtypes.html#str>str</a></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-3><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Set the mode for displaying the channels.</p> <p>In "composite" mode, the channels are displayed as a composite image, using self._channel_axis as the channel axis. In "grayscale" mode, each channel is displayed separately. (If mode is None, the current value of the channel_mode_picker button is used)</p> <p><span class=doc-section-title>Parameters:</span></p> <ul> <li class="doc-section-item field-body"> <h4 id=ndv.v1.NDViewer.set_channel_mode(mode) class="doc doc-heading doc-heading-parameter"> <b><code>mode</code></b> <a href=#ndv.v1.NDViewer.set_channel_mode(mode) class=headerlink title="Permanent link">#</a></h4> (<code><span title=ndv.v1._qt._components.ChannelMode>ChannelMode</span> | <a class="autorefs autorefs-external" href=https://docs.python.org/3/library/stdtypes.html#str>str</a> | None</code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The mode to set, must be one of 'composite' or 'mono'.</p> </div> </li> </ul> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>388</span>
-<span class=normal>389</span>
-<span class=normal>390</span>
-<span class=normal>391</span>
-<span class=normal>392</span>
-<span class=normal>393</span>
-<span class=normal>394</span>
-<span class=normal>395</span>
-<span class=normal>396</span>
-<span class=normal>397</span>
-<span class=normal>398</span>
-<span class=normal>399</span>
-<span class=normal>400</span>
-<span class=normal>401</span>
-<span class=normal>402</span>
-<span class=normal>403</span>
-<span class=normal>404</span>
-<span class=normal>405</span>
-<span class=normal>406</span>
-<span class=normal>407</span>
-<span class=normal>408</span>
-<span class=normal>409</span>
-<span class=normal>410</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Set the mode for displaying the channels.</p> <p>In "composite" mode, the channels are displayed as a composite image, using self._channel_axis as the channel axis. In "grayscale" mode, each channel is displayed separately. (If mode is None, the current value of the channel_mode_picker button is used)</p> <p><span class=doc-section-title>Parameters:</span></p> <ul> <li class="doc-section-item field-body"> <h4 id=ndv.v1.NDViewer.set_channel_mode(mode) class="doc doc-heading doc-heading-parameter"> <b><code>mode</code></b> <a href=#ndv.v1.NDViewer.set_channel_mode(mode) class=headerlink title="Permanent link">#</a></h4> (<code><span title=ndv.v1._qt._components.ChannelMode>ChannelMode</span> | <a class="autorefs autorefs-external" href=https://docs.python.org/3/library/stdtypes.html#str>str</a> | None</code>, default: <code>None</code> ) – <div class=doc-md-description> <p>The mode to set, must be one of 'composite' or 'mono'.</p> </div> </li> </ul> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>410</span>
 <span class=normal>411</span>
 <span class=normal>412</span>
 <span class=normal>413</span>
@@ -491,39 +477,14 @@
 <span class=normal>415</span>
 <span class=normal>416</span>
 <span class=normal>417</span>
-<span class=normal>418</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-388><span class=k>def</span><span class=w> </span><span class=nf>set_channel_mode</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>mode</span><span class=p>:</span> <span class=n>ChannelMode</span> <span class=o>|</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-389><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the mode for displaying the channels.</span>
-</span><span id=__span-0-390>
-</span><span id=__span-0-391><span class=sd>    In &quot;composite&quot; mode, the channels are displayed as a composite image, using</span>
-</span><span id=__span-0-392><span class=sd>    self._channel_axis as the channel axis. In &quot;grayscale&quot; mode, each channel is</span>
-</span><span id=__span-0-393><span class=sd>    displayed separately. (If mode is None, the current value of the</span>
-</span><span id=__span-0-394><span class=sd>    channel_mode_picker button is used)</span>
-</span><span id=__span-0-395>
-</span><span id=__span-0-396><span class=sd>    Parameters</span>
-</span><span id=__span-0-397><span class=sd>    ----------</span>
-</span><span id=__span-0-398><span class=sd>    mode : ChannelMode | str | None</span>
-</span><span id=__span-0-399><span class=sd>        The mode to set, must be one of &#39;composite&#39; or &#39;mono&#39;.</span>
-</span><span id=__span-0-400><span class=sd>    &quot;&quot;&quot;</span>
-</span><span id=__span-0-401>    <span class=c1># bool may happen when called from the button clicked signal</span>
-</span><span id=__span-0-402>    <span class=k>if</span> <span class=n>mode</span> <span class=ow>is</span> <span class=kc>None</span> <span class=ow>or</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>mode</span><span class=p>,</span> <span class=nb>bool</span><span class=p>):</span>
-</span><span id=__span-0-403>        <span class=n>mode</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=o>.</span><span class=n>mode</span><span class=p>()</span>
-</span><span id=__span-0-404>    <span class=k>else</span><span class=p>:</span>
-</span><span id=__span-0-405>        <span class=n>mode</span> <span class=o>=</span> <span class=n>ChannelMode</span><span class=p>(</span><span class=n>mode</span><span class=p>)</span>
-</span><span id=__span-0-406>        <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=o>.</span><span class=n>setMode</span><span class=p>(</span><span class=n>mode</span><span class=p>)</span>
-</span><span id=__span-0-407>    <span class=k>if</span> <span class=n>mode</span> <span class=o>==</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode</span><span class=p>:</span>
-</span><span id=__span-0-408>        <span class=k>return</span>
-</span><span id=__span-0-409>
-</span><span id=__span-0-410>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode</span> <span class=o>=</span> <span class=n>mode</span>
-</span><span id=__span-0-411>    <span class=bp>self</span><span class=o>.</span><span class=n>_cmap_cycle</span> <span class=o>=</span> <span class=n>cycle</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span><span class=p>)</span>  <span class=c1># reset the colormap cycle</span>
-</span><span id=__span-0-412>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-413>        <span class=c1># set the visibility of the channel slider</span>
-</span><span id=__span-0-414>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span>
-</span><span id=__span-0-415>            <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span><span class=p>,</span> <span class=n>mode</span> <span class=o>!=</span> <span class=n>ChannelMode</span><span class=o>.</span><span class=n>COMPOSITE</span>
-</span><span id=__span-0-416>        <span class=p>)</span>
-</span><span id=__span-0-417>
-</span><span id=__span-0-418>    <span class=bp>self</span><span class=o>.</span><span class=n>refresh</span><span class=p>()</span>
-</span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_current_index class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_current_index</span> <a href=#ndv.v1.NDViewer.set_current_index class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_current_index</span><span class=p>(</span><span class=n>index</span><span class=p>:</span> <span class=n><span title=ndv.v1._old_viewer.Indices>Indices</span></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Set the index of the displayed image.</p> <p><code>index</code> is a mapping of dimensions to integers or slices that define the slice of the data to display. For example, a numpy slice of <code>[0, 1, 5:10]</code> would be represented as <code>{0: 0, 1: 1, 2: slice(5, 10)}</code>, but dimensions can also be named, e.g. <code>{'t': 0, 'c': 1, 'z': slice(5, 10)}</code> if the data has named dimensions.</p> <p>Note, calling <code>.set_current_index()</code> with no arguments will force the widget to redraw the current slice.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>425</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
 <span class=normal>426</span>
 <span class=normal>427</span>
 <span class=normal>428</span>
@@ -535,31 +496,72 @@
 <span class=normal>434</span>
 <span class=normal>435</span>
 <span class=normal>436</span>
-<span class=normal>437</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-425><span class=k>def</span><span class=w> </span><span class=nf>set_current_index</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>index</span><span class=p>:</span> <span class=n>Indices</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-426><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the index of the displayed image.</span>
-</span><span id=__span-0-427>
-</span><span id=__span-0-428><span class=sd>    `index` is a mapping of dimensions to integers or slices that define the slice</span>
-</span><span id=__span-0-429><span class=sd>    of the data to display.  For example, a numpy slice of `[0, 1, 5:10]` would be</span>
-</span><span id=__span-0-430><span class=sd>    represented as `{0: 0, 1: 1, 2: slice(5, 10)}`, but dimensions can also be</span>
-</span><span id=__span-0-431><span class=sd>    named, e.g. `{&#39;t&#39;: 0, &#39;c&#39;: 1, &#39;z&#39;: slice(5, 10)}` if the data has named</span>
-</span><span id=__span-0-432><span class=sd>    dimensions.</span>
-</span><span id=__span-0-433>
-</span><span id=__span-0-434><span class=sd>    Note, calling `.set_current_index()` with no arguments will force the widget</span>
-</span><span id=__span-0-435><span class=sd>    to redraw the current slice.</span>
-</span><span id=__span-0-436><span class=sd>    &quot;&quot;&quot;</span>
-</span><span id=__span-0-437>    <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>setValue</span><span class=p>(</span><span class=n>index</span> <span class=ow>or</span> <span class=p>{})</span>
+<span class=normal>437</span>
+<span class=normal>438</span>
+<span class=normal>439</span>
+<span class=normal>440</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-410><span class=k>def</span><span class=w> </span><span class=nf>set_channel_mode</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>mode</span><span class=p>:</span> <span class=n>ChannelMode</span> <span class=o>|</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-411><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the mode for displaying the channels.</span>
+</span><span id=__span-0-412>
+</span><span id=__span-0-413><span class=sd>    In &quot;composite&quot; mode, the channels are displayed as a composite image, using</span>
+</span><span id=__span-0-414><span class=sd>    self._channel_axis as the channel axis. In &quot;grayscale&quot; mode, each channel is</span>
+</span><span id=__span-0-415><span class=sd>    displayed separately. (If mode is None, the current value of the</span>
+</span><span id=__span-0-416><span class=sd>    channel_mode_picker button is used)</span>
+</span><span id=__span-0-417>
+</span><span id=__span-0-418><span class=sd>    Parameters</span>
+</span><span id=__span-0-419><span class=sd>    ----------</span>
+</span><span id=__span-0-420><span class=sd>    mode : ChannelMode | str | None</span>
+</span><span id=__span-0-421><span class=sd>        The mode to set, must be one of &#39;composite&#39; or &#39;mono&#39;.</span>
+</span><span id=__span-0-422><span class=sd>    &quot;&quot;&quot;</span>
+</span><span id=__span-0-423>    <span class=c1># bool may happen when called from the button clicked signal</span>
+</span><span id=__span-0-424>    <span class=k>if</span> <span class=n>mode</span> <span class=ow>is</span> <span class=kc>None</span> <span class=ow>or</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>mode</span><span class=p>,</span> <span class=nb>bool</span><span class=p>):</span>
+</span><span id=__span-0-425>        <span class=n>mode</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=o>.</span><span class=n>mode</span><span class=p>()</span>
+</span><span id=__span-0-426>    <span class=k>else</span><span class=p>:</span>
+</span><span id=__span-0-427>        <span class=n>mode</span> <span class=o>=</span> <span class=n>ChannelMode</span><span class=p>(</span><span class=n>mode</span><span class=p>)</span>
+</span><span id=__span-0-428>        <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode_btn</span><span class=o>.</span><span class=n>setMode</span><span class=p>(</span><span class=n>mode</span><span class=p>)</span>
+</span><span id=__span-0-429>    <span class=k>if</span> <span class=n>mode</span> <span class=o>==</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode</span><span class=p>:</span>
+</span><span id=__span-0-430>        <span class=k>return</span>
+</span><span id=__span-0-431>
+</span><span id=__span-0-432>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_mode</span> <span class=o>=</span> <span class=n>mode</span>
+</span><span id=__span-0-433>    <span class=bp>self</span><span class=o>.</span><span class=n>_cmap_cycle</span> <span class=o>=</span> <span class=n>cycle</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_cmaps</span><span class=p>)</span>  <span class=c1># reset the colormap cycle</span>
+</span><span id=__span-0-434>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-435>        <span class=c1># set the visibility of the channel slider</span>
+</span><span id=__span-0-436>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span>
+</span><span id=__span-0-437>            <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span><span class=p>,</span> <span class=n>mode</span> <span class=o>!=</span> <span class=n>ChannelMode</span><span class=o>.</span><span class=n>COMPOSITE</span>
+</span><span id=__span-0-438>        <span class=p>)</span>
+</span><span id=__span-0-439>
+</span><span id=__span-0-440>    <span class=bp>self</span><span class=o>.</span><span class=n>refresh</span><span class=p>()</span>
+</span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_current_index class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_current_index</span> <a href=#ndv.v1.NDViewer.set_current_index class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_current_index</span><span class=p>(</span><span class=n>index</span><span class=p>:</span> <span class=n><span title=ndv.v1._old_viewer.Indices>Indices</span></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Set the index of the displayed image.</p> <p><code>index</code> is a mapping of dimensions to integers or slices that define the slice of the data to display. For example, a numpy slice of <code>[0, 1, 5:10]</code> would be represented as <code>{0: 0, 1: 1, 2: slice(5, 10)}</code>, but dimensions can also be named, e.g. <code>{'t': 0, 'c': 1, 'z': slice(5, 10)}</code> if the data has named dimensions.</p> <p>Note, calling <code>.set_current_index()</code> with no arguments will force the widget to redraw the current slice.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>447</span>
+<span class=normal>448</span>
+<span class=normal>449</span>
+<span class=normal>450</span>
+<span class=normal>451</span>
+<span class=normal>452</span>
+<span class=normal>453</span>
+<span class=normal>454</span>
+<span class=normal>455</span>
+<span class=normal>456</span>
+<span class=normal>457</span>
+<span class=normal>458</span>
+<span class=normal>459</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-447><span class=k>def</span><span class=w> </span><span class=nf>set_current_index</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>index</span><span class=p>:</span> <span class=n>Indices</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-448><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the index of the displayed image.</span>
+</span><span id=__span-0-449>
+</span><span id=__span-0-450><span class=sd>    `index` is a mapping of dimensions to integers or slices that define the slice</span>
+</span><span id=__span-0-451><span class=sd>    of the data to display.  For example, a numpy slice of `[0, 1, 5:10]` would be</span>
+</span><span id=__span-0-452><span class=sd>    represented as `{0: 0, 1: 1, 2: slice(5, 10)}`, but dimensions can also be</span>
+</span><span id=__span-0-453><span class=sd>    named, e.g. `{&#39;t&#39;: 0, &#39;c&#39;: 1, &#39;z&#39;: slice(5, 10)}` if the data has named</span>
+</span><span id=__span-0-454><span class=sd>    dimensions.</span>
+</span><span id=__span-0-455>
+</span><span id=__span-0-456><span class=sd>    Note, calling `.set_current_index()` with no arguments will force the widget</span>
+</span><span id=__span-0-457><span class=sd>    to redraw the current slice.</span>
+</span><span id=__span-0-458><span class=sd>    &quot;&quot;&quot;</span>
+</span><span id=__span-0-459>    <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>setValue</span><span class=p>(</span><span class=n>index</span> <span class=ow>or</span> <span class=p>{})</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_data class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_data</span> <a href=#ndv.v1.NDViewer.set_data class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_data</span><span class=p>(</span>
 </span><span id=__span-0-2>    <span class=n>data</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-internal" title=ndv.v1._old_data_wrapper.DataWrapper href=#ndv.v1.DataWrapper>DataWrapper</a></span> <span class=o>|</span> <span class=n><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></span><span class=p>,</span>
 </span><span id=__span-0-3>    <span class=o>*</span><span class=p>,</span>
 </span><span id=__span-0-4>    <span class=n>initial_index</span><span class=p>:</span> <span class=n><span title=ndv.v1._old_viewer.Indices>Indices</span></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-5><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Set the datastore, and, optionally, the sizes of the data.</p> <details class=properties open> <summary>Properties</summary> <p>data : DataWrapper | Any The data to display. This can be any duck-like ND array, including numpy, dask, xarray, jax, tensorstore, zarr, etc. You can add support for new datastores by subclassing <code>DataWrapper</code> and implementing the required methods. If a <code>DataWrapper</code> instance is passed, it is used directly. See <code>DataWrapper</code> for more information. initial_index : Indices | None The initial index to display. This is a mapping of dimensions to integers or slices that define the slice of the data to display. If not provided, the initial index will be set to the middle of the data.</p> </details> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>273</span>
-<span class=normal>274</span>
-<span class=normal>275</span>
-<span class=normal>276</span>
-<span class=normal>277</span>
-<span class=normal>278</span>
-<span class=normal>279</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Set the datastore, and, optionally, the sizes of the data.</p> <details class=properties open> <summary>Properties</summary> <p>data : DataWrapper | Any The data to display. This can be any duck-like ND array, including numpy, dask, xarray, jax, tensorstore, zarr, etc. You can add support for new datastores by subclassing <code>DataWrapper</code> and implementing the required methods. If a <code>DataWrapper</code> instance is passed, it is used directly. See <code>DataWrapper</code> for more information. initial_index : Indices | None The initial index to display. This is a mapping of dimensions to integers or slices that define the slice of the data to display. If not provided, the initial index will be set to the middle of the data.</p> </details> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>279</span>
 <span class=normal>280</span>
 <span class=normal>281</span>
 <span class=normal>282</span>
@@ -607,115 +609,115 @@
 <span class=normal>324</span>
 <span class=normal>325</span>
 <span class=normal>326</span>
-<span class=normal>327</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-273><span class=k>def</span><span class=w> </span><span class=nf>set_data</span><span class=p>(</span>
-</span><span id=__span-0-274>    <span class=bp>self</span><span class=p>,</span> <span class=n>data</span><span class=p>:</span> <span class=n>DataWrapper</span> <span class=o>|</span> <span class=n>Any</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>initial_index</span><span class=p>:</span> <span class=n>Indices</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
-</span><span id=__span-0-275><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-276><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the datastore, and, optionally, the sizes of the data.</span>
-</span><span id=__span-0-277>
-</span><span id=__span-0-278><span class=sd>    Properties</span>
-</span><span id=__span-0-279><span class=sd>    ----------</span>
-</span><span id=__span-0-280><span class=sd>    data : DataWrapper | Any</span>
-</span><span id=__span-0-281><span class=sd>        The data to display.  This can be any duck-like ND array, including numpy,</span>
-</span><span id=__span-0-282><span class=sd>        dask, xarray, jax, tensorstore, zarr, etc.  You can add support for new</span>
-</span><span id=__span-0-283><span class=sd>        datastores by subclassing `DataWrapper` and implementing the required</span>
-</span><span id=__span-0-284><span class=sd>        methods. If a `DataWrapper` instance is passed, it is used directly.</span>
-</span><span id=__span-0-285><span class=sd>        See `DataWrapper` for more information.</span>
-</span><span id=__span-0-286><span class=sd>    initial_index : Indices | None</span>
-</span><span id=__span-0-287><span class=sd>        The initial index to display.  This is a mapping of dimensions to integers</span>
-</span><span id=__span-0-288><span class=sd>        or slices that define the slice of the data to display.  If not provided,</span>
-</span><span id=__span-0-289><span class=sd>        the initial index will be set to the middle of the data.</span>
-</span><span id=__span-0-290><span class=sd>    &quot;&quot;&quot;</span>
-</span><span id=__span-0-291>    <span class=c1># clear current data</span>
-</span><span id=__span-0-292>    <span class=k>if</span> <span class=n>data</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-293>        <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span> <span class=o>=</span> <span class=kc>None</span>
-</span><span id=__span-0-294>        <span class=bp>self</span><span class=o>.</span><span class=n>_clear_images</span><span class=p>()</span>
-</span><span id=__span-0-295>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>clear</span><span class=p>()</span>
-</span><span id=__span-0-296>        <span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span><span class=o>.</span><span class=n>setText</span><span class=p>(</span><span class=s2>&quot;&quot;</span><span class=p>)</span>
-</span><span id=__span-0-297>        <span class=k>return</span>
-</span><span id=__span-0-298>
-</span><span id=__span-0-299>    <span class=c1># store the data</span>
-</span><span id=__span-0-300>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span> <span class=o>=</span> <span class=n>DataWrapper</span><span class=o>.</span><span class=n>create</span><span class=p>(</span><span class=n>data</span><span class=p>)</span>
-</span><span id=__span-0-301>
-</span><span id=__span-0-302>    <span class=c1># set channel axis</span>
-</span><span id=__span-0-303>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>guess_channel_axis</span><span class=p>()</span>
+<span class=normal>327</span>
+<span class=normal>328</span>
+<span class=normal>329</span>
+<span class=normal>330</span>
+<span class=normal>331</span>
+<span class=normal>332</span>
+<span class=normal>333</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-279><span class=k>def</span><span class=w> </span><span class=nf>set_data</span><span class=p>(</span>
+</span><span id=__span-0-280>    <span class=bp>self</span><span class=p>,</span> <span class=n>data</span><span class=p>:</span> <span class=n>DataWrapper</span> <span class=o>|</span> <span class=n>Any</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>initial_index</span><span class=p>:</span> <span class=n>Indices</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+</span><span id=__span-0-281><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-282><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the datastore, and, optionally, the sizes of the data.</span>
+</span><span id=__span-0-283>
+</span><span id=__span-0-284><span class=sd>    Properties</span>
+</span><span id=__span-0-285><span class=sd>    ----------</span>
+</span><span id=__span-0-286><span class=sd>    data : DataWrapper | Any</span>
+</span><span id=__span-0-287><span class=sd>        The data to display.  This can be any duck-like ND array, including numpy,</span>
+</span><span id=__span-0-288><span class=sd>        dask, xarray, jax, tensorstore, zarr, etc.  You can add support for new</span>
+</span><span id=__span-0-289><span class=sd>        datastores by subclassing `DataWrapper` and implementing the required</span>
+</span><span id=__span-0-290><span class=sd>        methods. If a `DataWrapper` instance is passed, it is used directly.</span>
+</span><span id=__span-0-291><span class=sd>        See `DataWrapper` for more information.</span>
+</span><span id=__span-0-292><span class=sd>    initial_index : Indices | None</span>
+</span><span id=__span-0-293><span class=sd>        The initial index to display.  This is a mapping of dimensions to integers</span>
+</span><span id=__span-0-294><span class=sd>        or slices that define the slice of the data to display.  If not provided,</span>
+</span><span id=__span-0-295><span class=sd>        the initial index will be set to the middle of the data.</span>
+</span><span id=__span-0-296><span class=sd>    &quot;&quot;&quot;</span>
+</span><span id=__span-0-297>    <span class=c1># clear current data</span>
+</span><span id=__span-0-298>    <span class=k>if</span> <span class=n>data</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-299>        <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span> <span class=o>=</span> <span class=kc>None</span>
+</span><span id=__span-0-300>        <span class=bp>self</span><span class=o>.</span><span class=n>_clear_images</span><span class=p>()</span>
+</span><span id=__span-0-301>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>clear</span><span class=p>()</span>
+</span><span id=__span-0-302>        <span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span><span class=o>.</span><span class=n>setText</span><span class=p>(</span><span class=s2>&quot;&quot;</span><span class=p>)</span>
+</span><span id=__span-0-303>        <span class=k>return</span>
 </span><span id=__span-0-304>
-</span><span id=__span-0-305>    <span class=c1># update the dimensions we are visualizing</span>
-</span><span id=__span-0-306>    <span class=n>sizes</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>sizes</span><span class=p>()</span>
-</span><span id=__span-0-307>    <span class=n>visualized_dims</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>sizes</span><span class=p>)[</span><span class=o>-</span><span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span> <span class=p>:]</span>
-</span><span id=__span-0-308>    <span class=bp>self</span><span class=o>.</span><span class=n>set_visualized_dims</span><span class=p>(</span><span class=n>visualized_dims</span><span class=p>)</span>
-</span><span id=__span-0-309>
-</span><span id=__span-0-310>    <span class=c1># update the range of all the sliders to match the sizes we set above</span>
-</span><span id=__span-0-311>    <span class=k>with</span> <span class=n>signals_blocked</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=p>):</span>
-</span><span id=__span-0-312>        <span class=bp>self</span><span class=o>.</span><span class=n>_update_slider_ranges</span><span class=p>()</span>
-</span><span id=__span-0-313>
-</span><span id=__span-0-314>    <span class=c1># redraw</span>
-</span><span id=__span-0-315>    <span class=k>if</span> <span class=n>initial_index</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-316>        <span class=n>idx</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>value</span><span class=p>()</span> <span class=ow>or</span> <span class=p>{</span>
-</span><span id=__span-0-317>            <span class=n>k</span><span class=p>:</span> <span class=nb>int</span><span class=p>(</span><span class=n>v</span> <span class=o>//</span> <span class=mi>2</span><span class=p>)</span> <span class=k>for</span> <span class=n>k</span><span class=p>,</span> <span class=n>v</span> <span class=ow>in</span> <span class=n>sizes</span><span class=o>.</span><span class=n>items</span><span class=p>()</span>
-</span><span id=__span-0-318>        <span class=p>}</span>
-</span><span id=__span-0-319>    <span class=k>else</span><span class=p>:</span>
-</span><span id=__span-0-320>        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>initial_index</span><span class=p>,</span> <span class=nb>dict</span><span class=p>):</span>  <span class=c1># pragma: no cover</span>
-</span><span id=__span-0-321>            <span class=k>raise</span> <span class=ne>TypeError</span><span class=p>(</span><span class=s2>&quot;initial_index must be a dict&quot;</span><span class=p>)</span>
-</span><span id=__span-0-322>        <span class=n>idx</span> <span class=o>=</span> <span class=n>initial_index</span>
-</span><span id=__span-0-323>    <span class=k>with</span> <span class=n>signals_blocked</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=p>):</span>
-</span><span id=__span-0-324>        <span class=bp>self</span><span class=o>.</span><span class=n>set_current_index</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span>
-</span><span id=__span-0-325>    <span class=c1># update the data info label</span>
-</span><span id=__span-0-326>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span><span class=o>.</span><span class=n>setText</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>summary_info</span><span class=p>())</span>
-</span><span id=__span-0-327>    <span class=bp>self</span><span class=o>.</span><span class=n>refresh</span><span class=p>()</span>
+</span><span id=__span-0-305>    <span class=c1># store the data</span>
+</span><span id=__span-0-306>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span> <span class=o>=</span> <span class=n>DataWrapper</span><span class=o>.</span><span class=n>create</span><span class=p>(</span><span class=n>data</span><span class=p>)</span>
+</span><span id=__span-0-307>
+</span><span id=__span-0-308>    <span class=c1># set channel axis</span>
+</span><span id=__span-0-309>    <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>guess_channel_axis</span><span class=p>()</span>
+</span><span id=__span-0-310>
+</span><span id=__span-0-311>    <span class=c1># update the dimensions we are visualizing</span>
+</span><span id=__span-0-312>    <span class=n>sizes</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>sizes</span><span class=p>()</span>
+</span><span id=__span-0-313>    <span class=n>visualized_dims</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>sizes</span><span class=p>)[</span><span class=o>-</span><span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span> <span class=p>:]</span>
+</span><span id=__span-0-314>    <span class=bp>self</span><span class=o>.</span><span class=n>set_visualized_dims</span><span class=p>(</span><span class=n>visualized_dims</span><span class=p>)</span>
+</span><span id=__span-0-315>
+</span><span id=__span-0-316>    <span class=c1># update the range of all the sliders to match the sizes we set above</span>
+</span><span id=__span-0-317>    <span class=k>with</span> <span class=n>signals_blocked</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=p>):</span>
+</span><span id=__span-0-318>        <span class=bp>self</span><span class=o>.</span><span class=n>_update_slider_ranges</span><span class=p>()</span>
+</span><span id=__span-0-319>
+</span><span id=__span-0-320>    <span class=c1># redraw</span>
+</span><span id=__span-0-321>    <span class=k>if</span> <span class=n>initial_index</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-322>        <span class=n>idx</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>value</span><span class=p>()</span> <span class=ow>or</span> <span class=p>{</span>
+</span><span id=__span-0-323>            <span class=n>k</span><span class=p>:</span> <span class=nb>int</span><span class=p>(</span><span class=n>v</span> <span class=o>//</span> <span class=mi>2</span><span class=p>)</span> <span class=k>for</span> <span class=n>k</span><span class=p>,</span> <span class=n>v</span> <span class=ow>in</span> <span class=n>sizes</span><span class=o>.</span><span class=n>items</span><span class=p>()</span>
+</span><span id=__span-0-324>        <span class=p>}</span>
+</span><span id=__span-0-325>    <span class=k>else</span><span class=p>:</span>
+</span><span id=__span-0-326>        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>initial_index</span><span class=p>,</span> <span class=nb>dict</span><span class=p>):</span>  <span class=c1># pragma: no cover</span>
+</span><span id=__span-0-327>            <span class=k>raise</span> <span class=ne>TypeError</span><span class=p>(</span><span class=s2>&quot;initial_index must be a dict&quot;</span><span class=p>)</span>
+</span><span id=__span-0-328>        <span class=n>idx</span> <span class=o>=</span> <span class=n>initial_index</span>
+</span><span id=__span-0-329>    <span class=k>with</span> <span class=n>signals_blocked</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=p>):</span>
+</span><span id=__span-0-330>        <span class=bp>self</span><span class=o>.</span><span class=n>set_current_index</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span>
+</span><span id=__span-0-331>    <span class=c1># update the data info label</span>
+</span><span id=__span-0-332>    <span class=bp>self</span><span class=o>.</span><span class=n>_data_info_label</span><span class=o>.</span><span class=n>setText</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>summary_info</span><span class=p>())</span>
+</span><span id=__span-0-333>    <span class=bp>self</span><span class=o>.</span><span class=n>refresh</span><span class=p>()</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_ndim class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_ndim</span> <a href=#ndv.v1.NDViewer.set_ndim class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_ndim</span><span class=p>(</span><span class=n>ndim</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=typing.Literal href=https://docs.python.org/3/library/typing.html#typing.Literal>Literal</a></span><span class=p>[</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Set the number of dimensions to display.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
-<span class=normal>378</span>
-<span class=normal>379</span>
-<span class=normal>380</span>
-<span class=normal>381</span>
-<span class=normal>382</span>
-<span class=normal>383</span>
-<span class=normal>384</span>
-<span class=normal>385</span>
-<span class=normal>386</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-366><span class=k>def</span><span class=w> </span><span class=nf>set_ndim</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>ndim</span><span class=p>:</span> <span class=n>Literal</span><span class=p>[</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-367><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the number of dimensions to display.&quot;&quot;&quot;</span>
-</span><span id=__span-0-368>    <span class=k>if</span> <span class=n>ndim</span> <span class=ow>not</span> <span class=ow>in</span> <span class=p>(</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>):</span>
-</span><span id=__span-0-369>        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>&quot;ndim must be 2 or 3&quot;</span><span class=p>)</span>
-</span><span id=__span-0-370>
-</span><span id=__span-0-371>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span> <span class=o>=</span> <span class=n>ndim</span>
-</span><span id=__span-0-372>    <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>set_ndim</span><span class=p>(</span><span class=n>ndim</span><span class=p>)</span>
-</span><span id=__span-0-373>
-</span><span id=__span-0-374>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-375>        <span class=k>return</span>
-</span><span id=__span-0-376>
-</span><span id=__span-0-377>    <span class=c1># set the visibility of the last non-channel dimension</span>
-</span><span id=__span-0-378>    <span class=n>sizes</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>sizes</span><span class=p>())</span>
-</span><span id=__span-0-379>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-380>        <span class=n>sizes</span> <span class=o>=</span> <span class=p>[</span><span class=n>x</span> <span class=k>for</span> <span class=n>x</span> <span class=ow>in</span> <span class=n>sizes</span> <span class=k>if</span> <span class=n>x</span> <span class=o>!=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span><span class=p>]</span>
-</span><span id=__span-0-381>    <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>sizes</span><span class=p>)</span> <span class=o>&gt;=</span> <span class=mi>3</span><span class=p>:</span>
-</span><span id=__span-0-382>        <span class=n>dim3</span> <span class=o>=</span> <span class=n>sizes</span><span class=p>[</span><span class=o>-</span><span class=mi>3</span><span class=p>]</span>
-</span><span id=__span-0-383>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span><span class=n>dim3</span><span class=p>,</span> <span class=kc>True</span> <span class=k>if</span> <span class=n>ndim</span> <span class=o>==</span> <span class=mi>2</span> <span class=k>else</span> <span class=kc>False</span><span class=p>)</span>
-</span><span id=__span-0-384>
-</span><span id=__span-0-385>    <span class=c1># clear image handles and redraw</span>
-</span><span id=__span-0-386>    <span class=bp>self</span><span class=o>.</span><span class=n>refresh</span><span class=p>()</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Set the number of dimensions to display.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>388</span>
+<span class=normal>389</span>
+<span class=normal>390</span>
+<span class=normal>391</span>
+<span class=normal>392</span>
+<span class=normal>393</span>
+<span class=normal>394</span>
+<span class=normal>395</span>
+<span class=normal>396</span>
+<span class=normal>397</span>
+<span class=normal>398</span>
+<span class=normal>399</span>
+<span class=normal>400</span>
+<span class=normal>401</span>
+<span class=normal>402</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-388><span class=k>def</span><span class=w> </span><span class=nf>set_ndim</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>ndim</span><span class=p>:</span> <span class=n>Literal</span><span class=p>[</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-389><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the number of dimensions to display.&quot;&quot;&quot;</span>
+</span><span id=__span-0-390>    <span class=k>if</span> <span class=n>ndim</span> <span class=ow>not</span> <span class=ow>in</span> <span class=p>(</span><span class=mi>2</span><span class=p>,</span> <span class=mi>3</span><span class=p>):</span>
+</span><span id=__span-0-391>        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>&quot;ndim must be 2 or 3&quot;</span><span class=p>)</span>
+</span><span id=__span-0-392>
+</span><span id=__span-0-393>    <span class=bp>self</span><span class=o>.</span><span class=n>_ndims</span> <span class=o>=</span> <span class=n>ndim</span>
+</span><span id=__span-0-394>    <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>set_ndim</span><span class=p>(</span><span class=n>ndim</span><span class=p>)</span>
+</span><span id=__span-0-395>
+</span><span id=__span-0-396>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-397>        <span class=k>return</span>
+</span><span id=__span-0-398>
+</span><span id=__span-0-399>    <span class=c1># set the visibility of the last non-channel dimension</span>
+</span><span id=__span-0-400>    <span class=n>sizes</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_data_wrapper</span><span class=o>.</span><span class=n>sizes</span><span class=p>())</span>
+</span><span id=__span-0-401>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-402>        <span class=n>sizes</span> <span class=o>=</span> <span class=p>[</span><span class=n>x</span> <span class=k>for</span> <span class=n>x</span> <span class=ow>in</span> <span class=n>sizes</span> <span class=k>if</span> <span class=n>x</span> <span class=o>!=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_channel_axis</span><span class=p>]</span>
+</span><span id=__span-0-403>    <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>sizes</span><span class=p>)</span> <span class=o>&gt;=</span> <span class=mi>3</span><span class=p>:</span>
+</span><span id=__span-0-404>        <span class=n>dim3</span> <span class=o>=</span> <span class=n>sizes</span><span class=p>[</span><span class=o>-</span><span class=mi>3</span><span class=p>]</span>
+</span><span id=__span-0-405>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span><span class=n>dim3</span><span class=p>,</span> <span class=kc>True</span> <span class=k>if</span> <span class=n>ndim</span> <span class=o>==</span> <span class=mi>2</span> <span class=k>else</span> <span class=kc>False</span><span class=p>)</span>
+</span><span id=__span-0-406>
+</span><span id=__span-0-407>    <span class=c1># clear image handles and redraw</span>
+</span><span id=__span-0-408>    <span class=bp>self</span><span class=o>.</span><span class=n>refresh</span><span class=p>()</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_roi class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_roi</span> <a href=#ndv.v1.NDViewer.set_roi class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_roi</span><span class=p>(</span>
 </span><span id=__span-0-2>    <span class=n>vertices</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/stdtypes.html#list>list</a></span><span class=p>[</span><span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/stdtypes.html#tuple>tuple</a></span><span class=p>[</span><span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/functions.html#float>float</a></span><span class=p>,</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/functions.html#float>float</a></span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-3>    <span class=n>color</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-4>    <span class=n>border_color</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-5><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Set the properties of the ROI overlaid on the displayed data.</p> <details class=properties open> <summary>Properties</summary> <p>vertices : list[tuple[float, float]] | None The vertices of the ROI. color : str, tuple, list, array, Color, or int The fill color. Can be any "ColorLike". border_color : str, tuple, list, array, Color, or int The border color. Can be any "ColorLike".</p> </details> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>329</span>
-<span class=normal>330</span>
-<span class=normal>331</span>
-<span class=normal>332</span>
-<span class=normal>333</span>
-<span class=normal>334</span>
-<span class=normal>335</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Set the properties of the ROI overlaid on the displayed data.</p> <details class=properties open> <summary>Properties</summary> <p>vertices : list[tuple[float, float]] | None The vertices of the ROI. color : str, tuple, list, array, Color, or int The fill color. Can be any "ColorLike". border_color : str, tuple, list, array, Color, or int The border color. Can be any "ColorLike".</p> </details> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>335</span>
 <span class=normal>336</span>
 <span class=normal>337</span>
 <span class=normal>338</span>
@@ -733,33 +735,9 @@
 <span class=normal>350</span>
 <span class=normal>351</span>
 <span class=normal>352</span>
-<span class=normal>353</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-329><span class=k>def</span><span class=w> </span><span class=nf>set_roi</span><span class=p>(</span>
-</span><span id=__span-0-330>    <span class=bp>self</span><span class=p>,</span>
-</span><span id=__span-0-331>    <span class=n>vertices</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>tuple</span><span class=p>[</span><span class=nb>float</span><span class=p>,</span> <span class=nb>float</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-332>    <span class=n>color</span><span class=p>:</span> <span class=n>Any</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-333>    <span class=n>border_color</span><span class=p>:</span> <span class=n>Any</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-</span><span id=__span-0-334><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-335><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the properties of the ROI overlaid on the displayed data.</span>
-</span><span id=__span-0-336>
-</span><span id=__span-0-337><span class=sd>    Properties</span>
-</span><span id=__span-0-338><span class=sd>    ----------</span>
-</span><span id=__span-0-339><span class=sd>    vertices : list[tuple[float, float]] | None</span>
-</span><span id=__span-0-340><span class=sd>        The vertices of the ROI.</span>
-</span><span id=__span-0-341><span class=sd>    color : str, tuple, list, array, Color, or int</span>
-</span><span id=__span-0-342><span class=sd>        The fill color.  Can be any &quot;ColorLike&quot;.</span>
-</span><span id=__span-0-343><span class=sd>    border_color : str, tuple, list, array, Color, or int</span>
-</span><span id=__span-0-344><span class=sd>        The border color.  Can be any &quot;ColorLike&quot;.</span>
-</span><span id=__span-0-345><span class=sd>    &quot;&quot;&quot;</span>
-</span><span id=__span-0-346>    <span class=c1># Remove the old ROI</span>
-</span><span id=__span-0-347>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span><span class=p>:</span>
-</span><span id=__span-0-348>        <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span><span class=o>.</span><span class=n>remove</span><span class=p>()</span>
-</span><span id=__span-0-349>    <span class=n>color</span> <span class=o>=</span> <span class=n>cmap</span><span class=o>.</span><span class=n>Color</span><span class=p>(</span><span class=n>color</span><span class=p>)</span> <span class=k>if</span> <span class=n>color</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span> <span class=k>else</span> <span class=kc>None</span>
-</span><span id=__span-0-350>    <span class=n>border_color</span> <span class=o>=</span> <span class=n>cmap</span><span class=o>.</span><span class=n>Color</span><span class=p>(</span><span class=n>border_color</span><span class=p>)</span> <span class=k>if</span> <span class=n>border_color</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span> <span class=k>else</span> <span class=kc>None</span>
-</span><span id=__span-0-351>    <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>add_roi</span><span class=p>(</span>
-</span><span id=__span-0-352>        <span class=n>vertices</span><span class=o>=</span><span class=n>vertices</span><span class=p>,</span> <span class=n>color</span><span class=o>=</span><span class=n>color</span><span class=p>,</span> <span class=n>border_color</span><span class=o>=</span><span class=n>border_color</span>
-</span><span id=__span-0-353>    <span class=p>)</span>
-</span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_visualized_dims class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_visualized_dims</span> <a href=#ndv.v1.NDViewer.set_visualized_dims class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_visualized_dims</span><span class=p>(</span><span class=n>dims</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=collections.abc.Iterable href=https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable>Iterable</a></span><span class=p>[</span><span class=n><span title=ndv.v1._old_viewer.DimKey>DimKey</span></span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</span></code></pre></div> <div class="doc doc-contents "> <p>Set the dimensions that will be visualized.</p> <p>This dims will NOT have sliders associated with them.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>355</span>
+<span class=normal>353</span>
+<span class=normal>354</span>
+<span class=normal>355</span>
 <span class=normal>356</span>
 <span class=normal>357</span>
 <span class=normal>358</span>
@@ -768,16 +746,78 @@
 <span class=normal>361</span>
 <span class=normal>362</span>
 <span class=normal>363</span>
-<span class=normal>364</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-355><span class=k>def</span><span class=w> </span><span class=nf>set_visualized_dims</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>dims</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>DimKey</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-</span><span id=__span-0-356><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the dimensions that will be visualized.</span>
-</span><span id=__span-0-357>
-</span><span id=__span-0-358><span class=sd>    This dims will NOT have sliders associated with them.</span>
-</span><span id=__span-0-359><span class=sd>    &quot;&quot;&quot;</span>
-</span><span id=__span-0-360>    <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span> <span class=o>=</span> <span class=nb>set</span><span class=p>(</span><span class=n>dims</span><span class=p>)</span>
-</span><span id=__span-0-361>    <span class=k>for</span> <span class=n>d</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>_sliders</span><span class=p>:</span>
-</span><span id=__span-0-362>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span><span class=n>d</span><span class=p>,</span> <span class=n>d</span> <span class=ow>not</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span><span class=p>)</span>
-</span><span id=__span-0-363>    <span class=k>for</span> <span class=n>d</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span><span class=p>:</span>
-</span><span id=__span-0-364>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span><span class=n>d</span><span class=p>,</span> <span class=kc>False</span><span class=p>)</span>
+<span class=normal>364</span>
+<span class=normal>365</span>
+<span class=normal>366</span>
+<span class=normal>367</span>
+<span class=normal>368</span>
+<span class=normal>369</span>
+<span class=normal>370</span>
+<span class=normal>371</span>
+<span class=normal>372</span>
+<span class=normal>373</span>
+<span class=normal>374</span>
+<span class=normal>375</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-335><span class=k>def</span><span class=w> </span><span class=nf>set_roi</span><span class=p>(</span>
+</span><span id=__span-0-336>    <span class=bp>self</span><span class=p>,</span>
+</span><span id=__span-0-337>    <span class=n>vertices</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>tuple</span><span class=p>[</span><span class=nb>float</span><span class=p>,</span> <span class=nb>float</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-338>    <span class=n>color</span><span class=p>:</span> <span class=n>Any</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-339>    <span class=n>border_color</span><span class=p>:</span> <span class=n>Any</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-340><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-341><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the properties of the ROI overlaid on the displayed data.</span>
+</span><span id=__span-0-342>
+</span><span id=__span-0-343><span class=sd>    Properties</span>
+</span><span id=__span-0-344><span class=sd>    ----------</span>
+</span><span id=__span-0-345><span class=sd>    vertices : list[tuple[float, float]] | None</span>
+</span><span id=__span-0-346><span class=sd>        The vertices of the ROI.</span>
+</span><span id=__span-0-347><span class=sd>    color : str, tuple, list, array, Color, or int</span>
+</span><span id=__span-0-348><span class=sd>        The fill color.  Can be any &quot;ColorLike&quot;.</span>
+</span><span id=__span-0-349><span class=sd>    border_color : str, tuple, list, array, Color, or int</span>
+</span><span id=__span-0-350><span class=sd>        The border color.  Can be any &quot;ColorLike&quot;.</span>
+</span><span id=__span-0-351><span class=sd>    &quot;&quot;&quot;</span>
+</span><span id=__span-0-352>    <span class=n>roi</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_canvas</span><span class=o>.</span><span class=n>add_bounding_box</span><span class=p>()</span>
+</span><span id=__span-0-353>    <span class=k>if</span> <span class=n>color</span><span class=p>:</span>
+</span><span id=__span-0-354>        <span class=n>roi</span><span class=o>.</span><span class=n>set_fill</span><span class=p>(</span><span class=n>cmap</span><span class=o>.</span><span class=n>Color</span><span class=p>(</span><span class=n>color</span><span class=p>))</span>
+</span><span id=__span-0-355>    <span class=k>if</span> <span class=n>border_color</span><span class=p>:</span>
+</span><span id=__span-0-356>        <span class=n>roi</span><span class=o>.</span><span class=n>set_border</span><span class=p>(</span><span class=n>cmap</span><span class=o>.</span><span class=n>Color</span><span class=p>(</span><span class=n>border_color</span><span class=p>))</span>
+</span><span id=__span-0-357>    <span class=k>if</span> <span class=n>vertices</span><span class=p>:</span>
+</span><span id=__span-0-358>        <span class=n>roi</span><span class=o>.</span><span class=n>set_bounding_box</span><span class=p>(</span><span class=n>vertices</span><span class=p>[</span><span class=mi>0</span><span class=p>],</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>2</span><span class=p>])</span>
+</span><span id=__span-0-359>
+</span><span id=__span-0-360>    <span class=c1># Assert vertices represent axis-aligned rectangle</span>
+</span><span id=__span-0-361>    <span class=k>if</span> <span class=n>vertices</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-362>        <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>vertices</span><span class=p>)</span> <span class=o>!=</span> <span class=mi>4</span><span class=p>:</span>
+</span><span id=__span-0-363>            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>&quot;Only rectangles are currently supported&quot;</span><span class=p>)</span>
+</span><span id=__span-0-364>        <span class=k>if</span> <span class=p>(</span>
+</span><span id=__span-0-365>            <span class=n>vertices</span><span class=p>[</span><span class=mi>0</span><span class=p>][</span><span class=mi>1</span><span class=p>]</span> <span class=o>!=</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>1</span><span class=p>][</span><span class=mi>1</span><span class=p>]</span>
+</span><span id=__span-0-366>            <span class=ow>or</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>1</span><span class=p>][</span><span class=mi>0</span><span class=p>]</span> <span class=o>!=</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>2</span><span class=p>][</span><span class=mi>0</span><span class=p>]</span>
+</span><span id=__span-0-367>            <span class=ow>or</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>2</span><span class=p>][</span><span class=mi>1</span><span class=p>]</span> <span class=o>!=</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>3</span><span class=p>][</span><span class=mi>1</span><span class=p>]</span>
+</span><span id=__span-0-368>            <span class=ow>or</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>3</span><span class=p>][</span><span class=mi>0</span><span class=p>]</span> <span class=o>!=</span> <span class=n>vertices</span><span class=p>[</span><span class=mi>0</span><span class=p>][</span><span class=mi>0</span><span class=p>]</span>
+</span><span id=__span-0-369>        <span class=p>):</span>
+</span><span id=__span-0-370>            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>&quot;Only axis-aligned rectangles are currently supported&quot;</span><span class=p>)</span>
+</span><span id=__span-0-371>
+</span><span id=__span-0-372>    <span class=c1># Remove the old ROI and add the new one</span>
+</span><span id=__span-0-373>    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span><span class=p>:</span>
+</span><span id=__span-0-374>        <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span><span class=o>.</span><span class=n>remove</span><span class=p>()</span>
+</span><span id=__span-0-375>    <span class=bp>self</span><span class=o>.</span><span class=n>_roi</span> <span class=o>=</span> <span class=n>roi</span>
+</span></code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=ndv.v1.NDViewer.set_visualized_dims class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set_visualized_dims</span> <a href=#ndv.v1.NDViewer.set_visualized_dims class=headerlink title="Permanent link">#</a></h3> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>set_visualized_dims</span><span class=p>(</span><span class=n>dims</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=collections.abc.Iterable href=https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable>Iterable</a></span><span class=p>[</span><span class=n><span title=ndv.v1._old_viewer.DimKey>DimKey</span></span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span>
+</span></code></pre></div> <div class="doc doc-contents "> <p>Set the dimensions that will be visualized.</p> <p>This dims will NOT have sliders associated with them.</p> <details class=quote> <summary>Source code in <code>src/ndv/v1/_old_viewer.py</code></summary> <div class="language-python highlight"><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
+<span class=normal>378</span>
+<span class=normal>379</span>
+<span class=normal>380</span>
+<span class=normal>381</span>
+<span class=normal>382</span>
+<span class=normal>383</span>
+<span class=normal>384</span>
+<span class=normal>385</span>
+<span class=normal>386</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-377><span class=k>def</span><span class=w> </span><span class=nf>set_visualized_dims</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>dims</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>DimKey</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</span><span id=__span-0-378><span class=w>    </span><span class=sd>&quot;&quot;&quot;Set the dimensions that will be visualized.</span>
+</span><span id=__span-0-379>
+</span><span id=__span-0-380><span class=sd>    This dims will NOT have sliders associated with them.</span>
+</span><span id=__span-0-381><span class=sd>    &quot;&quot;&quot;</span>
+</span><span id=__span-0-382>    <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span> <span class=o>=</span> <span class=nb>set</span><span class=p>(</span><span class=n>dims</span><span class=p>)</span>
+</span><span id=__span-0-383>    <span class=k>for</span> <span class=n>d</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>_sliders</span><span class=p>:</span>
+</span><span id=__span-0-384>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span><span class=n>d</span><span class=p>,</span> <span class=n>d</span> <span class=ow>not</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span><span class=p>)</span>
+</span><span id=__span-0-385>    <span class=k>for</span> <span class=n>d</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_visualized_dims</span><span class=p>:</span>
+</span><span id=__span-0-386>        <span class=bp>self</span><span class=o>.</span><span class=n>_dims_sliders</span><span class=o>.</span><span class=n>set_dimension_visible</span><span class=p>(</span><span class=n>d</span><span class=p>,</span> <span class=kc>False</span><span class=p>)</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-function"> <h2 id=ndv.v1.imshow class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">imshow</span> <a href=#ndv.v1.imshow class=headerlink title="Permanent link">#</a></h2> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>imshow</span><span class=p>(</span>
 </span><span id=__span-0-2>    <span class=n><a class="autorefs autorefs-internal" href=#ndv.v1.imshow(data)>data</a></span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></span> <span class=o>|</span> <span class=n><a class="autorefs autorefs-internal" title=ndv.v1._old_data_wrapper.DataWrapper href=#ndv.v1.DataWrapper>DataWrapper</a></span><span class=p>,</span>
 </span><span id=__span-0-3>    <span class=n><a class="autorefs autorefs-internal" href=#ndv.v1.imshow(cmap)>cmap</a></span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=typing.Any href=https://docs.python.org/3/library/typing.html#typing.Any>Any</a></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
