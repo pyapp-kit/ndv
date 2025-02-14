@@ -400,7 +400,7 @@ class WxArrayView(ArrayView):
         sig_name = info.signal.name
         value = info.args[0]
         if sig_name == "show_progress_spinner":
-            _set_visible(self._wxwidget._progress_spinner, value)
+            self._wxwidget._progress_spinner.Show(value)
             self._wxwidget._top_info.Layout()
         elif sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
@@ -411,21 +411,14 @@ class WxArrayView(ArrayView):
             # _set_visible(self._wxwidget.histogram_btn, value)
             ...
         elif sig_name == "show_roi_button":
-            _set_visible(self._wxwidget.add_roi_btn, value)
+            self._wxwidget.add_roi_btn.Show(value)
             self._wxwidget._btns.Layout()
         elif sig_name == "show_channel_mode_selector":
-            _set_visible(self._wxwidget.channel_mode_combo, value)
+            self._wxwidget.channel_mode_combo.Show(value)
             self._wxwidget._btns.Layout()
         elif sig_name == "show_reset_zoom_button":
-            _set_visible(self._wxwidget.set_range_btn, value)
+            self._wxwidget.set_range_btn.Show(value)
             self._wxwidget._btns.Layout()
         elif sig_name == "show_3d_button":
-            _set_visible(self._wxwidget.ndims_btn, value)
+            self._wxwidget.ndims_btn.Show(value)
             self._wxwidget._btns.Layout()
-
-
-def _set_visible(widget: wx.Window, visible: bool) -> None:
-    if visible:
-        widget.Show()
-    else:
-        widget.Hide()
