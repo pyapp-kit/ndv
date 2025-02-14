@@ -377,8 +377,18 @@ class WxArrayView(ArrayView):
             if view._histogram:
                 if toggled:
                     view._histogram.Show()
+                    size = wx.Size(view._wxwidget.Size)
+                    size.height += 100
+                    view._wxwidget.SetSize(size)
+                    view._wxwidget.SetMinSize(size)
                 else:
                     view._histogram.Hide()
+                    size = wx.Size(view._wxwidget.Size)
+                    size.height -= 100
+                    view._wxwidget.SetSize(size)
+                    view._wxwidget.SetMinSize(size)
+                evt = wx.CommandEvent(wx.EVT_SIZE.typeId, view._wxwidget.GetId())
+                wx.PostEvent(view._wxwidget.GetEventHandler(), evt)
             elif toggled:
                 self.histogramRequested.emit(view._channel)
 
@@ -400,14 +410,17 @@ class WxArrayView(ArrayView):
                 if parent:
                     parent.Destroy()
                 widget.Show()
-            # FIXME: Yuck
+
             size = wx.Size(lut._wxwidget.Size)
             size.height += 100
             lut._wxwidget.SetSize(size)
             lut._wxwidget.SetMinSize(size)
-            # widget.SetMinSize(wx.Size(100, 100))
+            widget.SetMinSize(wx.Size(lut._wxwidget.Size.width, 100))
             lut._wxwidget._histogram_sizer.Add(widget)
             lut._histogram = widget
+
+            evt = wx.CommandEvent(wx.EVT_SIZE.typeId, self._wxwidget.GetId())
+            wx.PostEvent(self._wxwidget.GetEventHandler(), evt)
 
     def remove_lut_view(self, lut: LutView) -> None:
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
