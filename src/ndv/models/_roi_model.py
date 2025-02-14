@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pydantic import field_validator
 
 from ndv.models._base_model import NDVModel
-
-if TYPE_CHECKING:
-    from typing import Any
 
 
 class RectangularROIModel(NDVModel):
