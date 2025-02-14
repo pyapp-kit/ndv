@@ -475,7 +475,7 @@ class ArrayViewer:
             future.add_done_callback(self._on_data_response_ready)
 
         if self._futures:
-            self._view.set_progress_spinner_visible(True)
+            self._viewer_model.show_progress_spinner = True
 
     def _is_idle(self) -> bool:
         """Return True if no futures are running. Used for testing, and debugging."""
@@ -490,7 +490,7 @@ class ArrayViewer:
         while self._futures:
             self._futures.pop().cancel()
         self._futures.clear()
-        self._view.set_progress_spinner_visible(False)
+        self._viewer_model.show_progress_spinner = False
 
     @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
@@ -499,7 +499,7 @@ class ArrayViewer:
         # which will prevent the widget from being garbage collected if the future
         self._futures.discard(future)
         if not self._futures:
-            self._view.set_progress_spinner_visible(False)
+            self._viewer_model.show_progress_spinner = False
 
         if future.cancelled():
             return

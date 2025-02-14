@@ -403,13 +403,12 @@ class JupyterArrayView(ArrayView):
     def close(self) -> None:
         self.layout.close()
 
-    def set_progress_spinner_visible(self, visible: bool) -> None:
-        self._progress_spinner.layout.display = "flex" if visible else "none"
-
     def _on_viewer_model_event(self, info: EmissionInfo) -> None:
         sig_name = info.signal.name
         value = info.args[0]
-        if sig_name == "interaction_mode":
+        if sig_name == "show_progress_spinner":
+            self._progress_spinner.layout.display = "flex" if value else "none"
+        elif sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
             new, old = info.args
             if old == InteractionMode.CREATE_ROI:

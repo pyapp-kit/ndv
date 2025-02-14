@@ -560,9 +560,6 @@ class QtArrayView(ArrayView):
     def frontend_widget(self) -> QWidget:
         return self._qwidget
 
-    def set_progress_spinner_visible(self, visible: bool) -> None:
-        self._qwidget._progress_spinner.setVisible(visible)
-
     def _on_add_roi_clicked(self, checked: bool) -> None:
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
@@ -571,6 +568,8 @@ class QtArrayView(ArrayView):
     def _on_viewer_model_event(self, info: EmissionInfo) -> None:
         sig_name = info.signal.name
         value = info.args[0]
+        if sig_name == "show_progress_spinner":
+            self._qwidget._progress_spinner.setVisible(value)
         if sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
             new, old = info.args
