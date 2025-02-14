@@ -29,10 +29,8 @@ class RectangularROIModel(NDVModel):
     @field_validator("bounding_box", mode="after")
     @classmethod
     def _validate_bounding_box(
-        cls, bb: Any
+        cls, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> tuple[tuple[float, float], tuple[float, float]]:
-        if not isinstance(bb, tuple):
-            raise ValueError(f"{bb} not a tuple of points!")
         x1 = min(bb[0][0], bb[1][0])
         y1 = min(bb[0][1], bb[1][1])
         x2 = max(bb[0][0], bb[1][0])
