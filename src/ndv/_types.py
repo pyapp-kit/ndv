@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
+from functools import cache
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from pydantic import PlainSerializer, PlainValidator
@@ -13,6 +14,7 @@ from typing_extensions import TypeAlias
 if TYPE_CHECKING:
     from qtpy.QtCore import Qt
     from qtpy.QtWidgets import QWidget
+    from wx import Cursor
 
     from ndv.views.bases import Viewable
 
@@ -56,6 +58,7 @@ class MouseButton(IntFlag):
     LEFT = auto()
     MIDDLE = auto()
     RIGHT = auto()
+    NONE = auto()
 
 
 class MouseMoveEvent(NamedTuple):
@@ -63,6 +66,7 @@ class MouseMoveEvent(NamedTuple):
 
     x: float
     y: float
+    btn: MouseButton = MouseButton.NONE
 
 
 class MousePressEvent(NamedTuple):
@@ -70,7 +74,7 @@ class MousePressEvent(NamedTuple):
 
     x: float
     y: float
-    btn: MouseButton = MouseButton.LEFT
+    btn: MouseButton
 
 
 class MouseReleaseEvent(NamedTuple):
@@ -78,11 +82,12 @@ class MouseReleaseEvent(NamedTuple):
 
     x: float
     y: float
-    btn: MouseButton = MouseButton.LEFT
+    btn: MouseButton
 
 
 class CursorType(Enum):
     DEFAULT = "default"
+    CROSS = "cross"
     V_ARROW = "v_arrow"
     H_ARROW = "h_arrow"
     ALL_ARROW = "all_arrow"
@@ -101,9 +106,47 @@ class CursorType(Enum):
 
         return {
             CursorType.DEFAULT: Qt.CursorShape.ArrowCursor,
+            CursorType.CROSS: Qt.CursorShape.CrossCursor,
             CursorType.V_ARROW: Qt.CursorShape.SizeVerCursor,
             CursorType.H_ARROW: Qt.CursorShape.SizeHorCursor,
             CursorType.ALL_ARROW: Qt.CursorShape.SizeAllCursor,
             CursorType.BDIAG_ARROW: Qt.CursorShape.SizeBDiagCursor,
             CursorType.FDIAG_ARROW: Qt.CursorShape.SizeFDiagCursor,
+        }[self]
+
+    def to_jupyter(self) -> str:
+        """Converts CursorType to jupyter cursor strings."""
+        return {
+            CursorType.DEFAULT: "default",
+            CursorType.CROSS: "crosshair",
+            CursorType.V_ARROW: "ns-resize",
+            CursorType.H_ARROW: "ew-resize",
+            CursorType.ALL_ARROW: "move",
+            CursorType.BDIAG_ARROW: "nesw-resize",
+            CursorType.FDIAG_ARROW: "nwse-resize",
+        }[self]
+
+    # Note a new object must be created every time. We should cache it!
+    @cache
+    def to_wx(self) -> Cursor:
+        """Converts CursorType to jupyter cursor strings."""
+        from wx import (
+            CURSOR_ARROW,
+            CURSOR_CROSS,
+            CURSOR_SIZENESW,
+            CURSOR_SIZENS,
+            CURSOR_SIZENWSE,
+            CURSOR_SIZEWE,
+            CURSOR_SIZING,
+            Cursor,
+        )
+
+        return {
+            CursorType.DEFAULT: Cursor(CURSOR_ARROW),
+            CursorType.CROSS: Cursor(CURSOR_CROSS),
+            CursorType.V_ARROW: Cursor(CURSOR_SIZENS),
+            CursorType.H_ARROW: Cursor(CURSOR_SIZEWE),
+            CursorType.ALL_ARROW: Cursor(CURSOR_SIZING),
+            CursorType.BDIAG_ARROW: Cursor(CURSOR_SIZENESW),
+            CursorType.FDIAG_ARROW: Cursor(CURSOR_SIZENWSE),
         }[self]

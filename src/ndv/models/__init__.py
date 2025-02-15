@@ -11,6 +11,7 @@ from ._lut_model import (
     ClimsStdDev,
     LUTModel,
 )
+from ._roi_model import RectangularROIModel
 
 __all__ = [
     "ArrayDisplayModel",
@@ -23,4 +24,5 @@ __all__ = [
     "DataWrapper",
     "LUTModel",
     "NDVModel",
+    "RectangularROIModel",
 ]
