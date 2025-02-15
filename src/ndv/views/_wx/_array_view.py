@@ -223,7 +223,6 @@ class _WxArrayViewer(wx.Frame):
 
         # FIXME: pygfx backend needs this to be canvas_widget._subwidget
         if hasattr(canvas_widget, "_subwidget"):
-            breakpoint()
             canvas_widget = canvas_widget._subwidget
 
         if (parent := canvas_widget.GetParent()) and parent is not self:
