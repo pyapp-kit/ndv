@@ -9,7 +9,6 @@ from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models import LUTModel
 from ndv.views import _app
-from ndv.views.bases._array_view import ArrayViewOptions
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -39,13 +38,9 @@ class StreamingViewer(ArrayViewer):
         self._handles: dict[ChannelKey, ImageHandle] = {}
         self._shape: tuple[int, int] | None = None
         self._dtype: npt.DTypeLike | None = None
-        self._view.set_options(
-            ArrayViewOptions(
-                show_3d_button=False,
-                show_histogram_button=False,
-                show_channel_mode_selector=False,
-            )
-        )
+        self._viewer_model.show_3d_button = False
+        self._viewer_model.show_histogram_button = False
+        self._viewer_model.show_channel_mode_selector = False
 
     def setup(
         self,

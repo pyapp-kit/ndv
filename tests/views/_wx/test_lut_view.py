@@ -5,15 +5,7 @@ import wx
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
-from ndv.views._wx._app import WxAppWrap
 from ndv.views._wx._array_view import WxLutView
-
-
-@fixture(autouse=True, scope="module")
-def app() -> wx.App:
-    # Create wx app
-    provider = WxAppWrap()
-    return provider.create_app()
 
 
 @fixture
@@ -22,7 +14,7 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(app: wx.App, model: LUTModel) -> WxLutView:
+def view(wxapp: wx.App, model: LUTModel) -> WxLutView:
     # NB: wx.App necessary although unused
     frame = wx.Frame(None)
     view = WxLutView(frame)
@@ -50,7 +42,7 @@ def test_WxLutView_update_model(model: LUTModel, view: WxLutView) -> None:
     assert view._wxwidget.cmap.GetValue() == new_cmap
 
 
-def test_WxLutView_update_view(app: wx.App, model: LUTModel, view: WxLutView) -> None:
+def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) -> None:
     """Ensures the model updates when the view is changed."""
 
     def processEvent(evt: wx.PyEventBinder, wdg: wx.Control) -> None:
@@ -58,7 +50,7 @@ def test_WxLutView_update_view(app: wx.App, model: LUTModel, view: WxLutView) ->
         wx.PostEvent(wdg.GetEventHandler(), ev)
         # Borrowed from:
         # https://github.com/wxWidgets/Phoenix/blob/master/unittests/wtc.py#L41
-        evtLoop = app.GetTraits().CreateEventLoop()
+        evtLoop = wxapp.GetTraits().CreateEventLoop()
         wx.EventLoopActivator(evtLoop)
         evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
 
