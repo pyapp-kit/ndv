@@ -9,8 +9,6 @@ import cmap as _cmap
 import numpy as np
 import vispy
 import vispy.color
-import vispy.scene
-import vispy.visuals
 from vispy import scene
 from vispy.util.quaternion import Quaternion
 
@@ -341,7 +339,7 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created: ReferenceType[VispyRectangle] | None = None
 
     @property
-    def _camera(self) -> vispy.scene.cameras.BaseCamera:
+    def _camera(self) -> scene.BaseCamera:
         return self._view.camera
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:

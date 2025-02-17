@@ -8,10 +8,11 @@ import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
-from ndv.models._data_display_model import DataResponse, _ArrayDataDisplayModel
 from ndv.models._roi_model import RectangularROIModel
-from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
+from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app
+
+from ._base_array_viewer import _BaseArrayViewer
 
 if TYPE_CHECKING:
     from collections.abc import Hashable
@@ -20,15 +21,15 @@ if TYPE_CHECKING:
 
     from typing_extensions import TypeAlias
 
-    from ndv._types import MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
+    from ndv.models._data_display_model import DataResponse
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
     LutKey: TypeAlias = Hashable | None
 
 
-class ArrayViewer:
+class ArrayViewer(_BaseArrayViewer):
     """Viewer dedicated to displaying a single n-dimensional array.
 
     This wraps a model and sview into a single object, and defines the
@@ -64,22 +65,14 @@ class ArrayViewer:
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
-        if display_model is not None and kwargs:
-            warnings.warn(
-                "When display_model is provided, kwargs are be ignored.",
-                stacklevel=2,
-            )
-        self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
-        )
-        self._viewer_model = ArrayViewerModel()
+        super().__init__(data, display_model=display_model, **kwargs)
+
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
         )
         self._roi_model: RectangularROIModel | None = None
 
         app = _app.gui_frontend()
-
         # whether to fetch data asynchronously.  Not publicly exposed yet...
         # but can use 'NDV_SYNCHRONOUS' env var to set globally
         # jupyter doesn't need async because it's already async (in that the
@@ -88,55 +81,17 @@ class ArrayViewer:
         self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
         # set of futures for data requests
         self._futures: set[Future[DataResponse]] = set()
-
-        # mapping of channel keys to their respective controllers
-        # where None is the default channel
-        self._lut_controllers: dict[LutKey, ChannelController] = {}
-
-        # get and create the front-end and canvas classes
-        frontend_cls = _app.get_array_view_class()
-        canvas_cls = _app.get_array_canvas_class()
-        self._canvas = canvas_cls(self._viewer_model)
-
         self._histogram: HistogramCanvas | None = None
-        self._view = frontend_cls(
-            self._canvas.frontend_widget(), self._data_model, self._viewer_model
-        )
-
         self._roi_view: RectangularROIHandle | None = None
 
         self._set_model_connected(self._data_model.display)
-        self._canvas.set_ndim(self.display_model.n_visible_axes)
 
-        self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
-        self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
-        self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
-        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
-
-        self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
 
         if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
 
     # -------------- public attributes and methods -------------------------
-
-    # @property
-    # def view(self) -> ArrayView:
-    #     return self._view
-
-    def widget(self) -> Any:
-        """Return the native front-end widget.
-
-        !!! Warning
-
-            If you directly manipulate the frontend widget, you're on your own :smile:.
-            No guarantees can be made about synchronization with the model.  It is
-            exposed for embedding in an application, and for experimentation and custom
-            use cases.  Please [open an
-            issue](https://github.com/pyapp-kit/ndv/issues/new) if you have questions.
-        """
-        return self._view.frontend_widget()
 
     @property
     def display_model(self) -> ArrayDisplayModel:
@@ -195,29 +150,6 @@ class ArrayViewer:
         if self._roi_model is not None:
             self._set_roi_model_connected(self._roi_model)
         self._synchronize_roi()
-
-    def show(self) -> None:
-        """Show the viewer."""
-        self._view.set_visible(True)
-
-    def hide(self) -> None:
-        """Hide the viewer."""
-        self._view.set_visible(False)
-
-    def close(self) -> None:
-        """Close the viewer."""
-        self._view.set_visible(False)
-
-    def clone(self) -> ArrayViewer:
-        """Return a new ArrayViewer instance with the same data and display model.
-
-        Currently, this is a shallow copy.  Modifying one viewer will affect the state
-        of the other.
-        """
-        # TODO: provide deep_copy option
-        return ArrayViewer(
-            self._data_model.data_wrapper, display_model=self.display_model
-        )
 
     # --------------------- PRIVATE ------------------------------------------
 
@@ -391,41 +323,11 @@ class ArrayViewer:
 
     # ------------------ View callbacks ------------------
 
-    def _on_view_current_index_changed(self) -> None:
-        """Update the model when slider value changes."""
-        self._data_model.display.current_index.update(self._view.current_index())
-
-    def _on_view_visible_axes_changed(self) -> None:
-        """Update the model when the visible axes change."""
-        self.display_model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
-
-    def _on_view_reset_zoom_clicked(self) -> None:
-        """Reset the zoom level of the canvas."""
-        self._canvas.set_range()
-
     def _on_roi_view_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
         if self._roi_model:
             self._roi_model.bounding_box = bb
-
-    def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
-        """Respond to a mouse move event in the view."""
-        x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
-
-        # collect and format intensity values at the current mouse position
-        channel_values = self._get_values_at_world_point(int(x), int(y))
-        vals = []
-        for ch, value in channel_values.items():
-            # restrict to 2 decimal places, but remove trailing zeros
-            fval = f"{value:.2f}".rstrip("0").rstrip(".")
-            fch = f"{ch}: " if ch is not None else ""
-            vals.append(f"{fch}{fval}")
-        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
-        self._view.set_hover_info(text)
-
-    def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
-        self._data_model.display.channel_mode = mode
 
     # ------------------ Helper methods ------------------
 
@@ -553,20 +455,6 @@ class ArrayViewer:
                 self._histogram.set_range()
 
         self._canvas.refresh()
-
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
-        # TODO: handle 3D data
-        if (
-            x < 0 or y < 0
-        ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
-            return {}
-
-        values: dict[LutKey, float] = {}
-        for key, ctrl in self._lut_controllers.items():
-            if (value := ctrl.get_value_at_index((y, x))) is not None:
-                values[key] = value
-
-        return values
 
 
 def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
