@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
     import cmap
+    from psygnal import EmissionInfo
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
@@ -156,7 +157,7 @@ class JupyterArrayView(ArrayView):
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
-        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
+        self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
         self._data_model = data_model
         self._canvas_widget = canvas_widget
@@ -352,13 +353,6 @@ class JupyterArrayView(ArrayView):
             InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
         )
 
-    def _on_model_mode_changed(
-        self, new: InteractionMode, old: InteractionMode
-    ) -> None:
-        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-        if old == InteractionMode.CREATE_ROI:
-            self._add_roi_btn.value = False
-
     def add_histogram(self, widget: Any) -> None:
         """Add a histogram widget to the viewer."""
         warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
@@ -409,5 +403,23 @@ class JupyterArrayView(ArrayView):
     def close(self) -> None:
         self.layout.close()
 
-    def set_progress_spinner_visible(self, visible: bool) -> None:
-        self._progress_spinner.layout.display = "flex" if visible else "none"
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "show_progress_spinner":
+            self._progress_spinner.layout.display = "flex" if value else "none"
+        elif sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._add_roi_btn.value = False
+        elif sig_name == "show_histogram_button":
+            ...
+        elif sig_name == "show_roi_button":
+            self._add_roi_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_channel_mode_selector":
+            self._channel_mode_combo.layout.display = "flex" if value else "none"
+        elif sig_name == "show_reset_zoom_button":
+            self._reset_zoom_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_3d_button":
+            self._ndims_btn.layout.display = "flex" if value else "none"
