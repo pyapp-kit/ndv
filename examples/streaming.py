@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,pygfx]",
+#     "imageio[tifffile]",
+# ]
+# ///
 import time
 
 import ndv
