@@ -8,10 +8,7 @@ from weakref import ReferenceType, WeakKeyDictionary
 import cmap as _cmap
 import numpy as np
 import vispy
-import vispy.app
 import vispy.color
-import vispy.scene
-import vispy.visuals
 from vispy import scene
 from vispy.util.quaternion import Quaternion
 
@@ -34,6 +31,9 @@ from ndv.views.bases._graphics._canvas_elements import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from vispy.gloo.glir import GlirQueue
+    from vispy.gloo.texture import BaseTexture
 
 
 turn = np.sin(np.pi / 4)
@@ -60,6 +60,33 @@ class VispyImageHandle(ImageHandle):
             )
             return
         self._visual.set_data(data)
+
+    def directly_set_texture_data(
+        self, data: np.ndarray, offset: tuple | None = None
+    ) -> None:
+        """LOW-LEVEL: Set the texture data at offset directly.
+
+        We are bypassing all data transformations and checks here, so data *must* be
+        the correct shape and dtype.  Also, lots of private vispy usage here...
+        """
+        texture = cast("BaseTexture", self._visual._texture)
+        ndim = data.ndim
+
+        if data.ndim == self._ndim:
+            # add channel dimension
+            data = data[..., np.newaxis]
+        elif ndim != self._ndim + 1:  # already has channel dimension
+            word = "few" if ndim < self._ndim else "many"
+            raise ValueError(f"Too {word} dimensions for texture")
+        if offset is None:
+            offset = (0,) * ndim
+
+        # retaining this pointer seems to be necessary
+        self._visual._data = data
+
+        # See vispy.gloo.texture.BaseTexture._set_data
+        queue = cast("GlirQueue", texture._glir)
+        queue.command("DATA", texture._id, offset, data)
 
     def visible(self) -> bool:
         return bool(self._visual.visible)
@@ -312,7 +339,7 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created: ReferenceType[VispyRectangle] | None = None
 
     @property
-    def _camera(self) -> vispy.scene.cameras.BaseCamera:
+    def _camera(self) -> scene.BaseCamera:
         return self._view.camera
 
     def set_ndim(self, ndim: Literal[2, 3]) -> None:
