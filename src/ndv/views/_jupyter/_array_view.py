@@ -446,7 +446,9 @@ class JupyterArrayView(ArrayView):
             if old == InteractionMode.CREATE_ROI:
                 self._add_roi_btn.value = False
         elif sig_name == "show_histogram_button":
-            ...
+            # Note that "block" displays the icon better than "flex"
+            for lut in self._luts.values():
+                lut._histogram.layout.display = "block" if value else "none"
         elif sig_name == "show_roi_button":
             self._add_roi_btn.layout.display = "flex" if value else "none"
         elif sig_name == "show_channel_mode_selector":

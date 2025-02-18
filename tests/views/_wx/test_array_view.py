@@ -15,20 +15,23 @@ if TYPE_CHECKING:
 
 @fixture
 def viewer(wxapp: wx.App) -> WxArrayView:
-    return WxArrayView(MagicMock(), _ArrayDataDisplayModel(), ArrayViewerModel())
+    viewer = WxArrayView(MagicMock(), _ArrayDataDisplayModel(), ArrayViewerModel())
+    viewer.add_lut_view(None)
+    return viewer
 
 
 def test_array_options(viewer: WxArrayView) -> None:
     wxwdg = viewer._wxwidget
     wxwdg.Show()
+    wxlut = viewer._luts[None]._wxwidget
 
     assert wxwdg.ndims_btn.IsShown()
     viewer._viewer_model.show_3d_button = False
     assert not wxwdg.ndims_btn.IsShown()
 
-    # assert wxwdg.histogram_btn.IsShown()
-    # viewer._viewer_model.show_histogram_button = False
-    # assert not wxwdg.histogram_btn.IsShown()
+    assert wxlut.histogram.IsShown()
+    viewer._viewer_model.show_histogram_button = False
+    assert not wxlut.histogram.IsShown()
 
     assert wxwdg.set_range_btn.IsShown()
     viewer._viewer_model.show_reset_zoom_button = False

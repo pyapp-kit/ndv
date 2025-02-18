@@ -10,15 +10,23 @@ from ndv.views._jupyter._array_view import JupyterArrayView
 
 @fixture
 def viewer() -> JupyterArrayView:
-    return JupyterArrayView(
+    viewer = JupyterArrayView(
         ipywidgets.DOMWidget(), _ArrayDataDisplayModel(), ArrayViewerModel()
     )
+    viewer.add_lut_view(None)
+    return viewer
 
 
 def test_array_options(viewer: JupyterArrayView) -> None:
+    lut = viewer._luts[None]
+
     assert viewer._ndims_btn.layout.display is None
     viewer._viewer_model.show_3d_button = False
     assert viewer._ndims_btn.layout.display == "none"
+
+    assert lut._histogram.display is None
+    viewer._viewer_model.show_histogram_button = False
+    assert not lut._histogram.display == "none"
 
     assert viewer._reset_zoom_btn.layout.display is None
     viewer._viewer_model.show_reset_zoom_button = False

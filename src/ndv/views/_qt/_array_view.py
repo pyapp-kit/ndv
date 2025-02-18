@@ -599,7 +599,8 @@ class QtArrayView(ArrayView):
             if old == InteractionMode.CREATE_ROI:
                 self._qwidget.add_roi_btn.setChecked(False)
         elif sig_name == "show_histogram_button":
-            self._qwidget.histogram_btn.setVisible(value)
+            for lut in self._luts.values():
+                lut._qwidget.histogram_btn.setVisible(value)
         elif sig_name == "show_roi_button":
             self._qwidget.add_roi_btn.setVisible(value)
         elif sig_name == "show_channel_mode_selector":

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 @fixture
 def viewer(qtbot: QtBot) -> QtArrayView:
     viewer = QtArrayView(QWidget(), _ArrayDataDisplayModel(), ArrayViewerModel())
+    viewer.add_lut_view(None)
     qtbot.addWidget(viewer.frontend_widget())
     return viewer
 
@@ -23,13 +24,15 @@ def viewer(qtbot: QtBot) -> QtArrayView:
 def test_array_options(viewer: QtArrayView) -> None:
     qwdg = viewer._qwidget
     qwdg.show()
+    qlut = viewer._luts[None]._qwidget
+
     assert qwdg.ndims_btn.isVisible()
     viewer._viewer_model.show_3d_button = False
     assert not qwdg.ndims_btn.isVisible()
 
-    assert qwdg.histogram_btn.isVisible()
+    assert qlut.histogram_btn.isVisible()
     viewer._viewer_model.show_histogram_button = False
-    assert not qwdg.histogram_btn.isVisible()
+    assert not qlut.histogram_btn.isVisible()
 
     assert qwdg.set_range_btn.isVisible()
     viewer._viewer_model.show_reset_zoom_button = False
