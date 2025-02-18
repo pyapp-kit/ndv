@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import ipywidgets as widgets
+import psygnal
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
@@ -41,6 +42,9 @@ def notifications_blocked(
 
 
 class JupyterLutView(LutView):
+    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    histogramRequested = psygnal.Signal(object)
+
     def __init__(self, channel: ChannelKey = None) -> None:
         self._channel = channel
         self._histogram_wdg: widgets.Widget | None = None
@@ -101,6 +105,7 @@ class JupyterLutView(LutView):
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
+        self._histogram.observe(self._on_histogram_requested, names="value")
 
     # ------------------ emit changes to the controller ------------------
 
@@ -124,6 +129,15 @@ class JupyterLutView(LutView):
             else:  # Manually scale
                 clims = self._clims.value
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_histogram_requested(self, change: dict[str, Any]) -> None:
+        if self._histogram_wdg:
+            # show or hide the actual widget itself
+            self._histogram_container.layout.display = (
+                "flex" if change["new"] else "none"
+            )
+        else:
+            self.histogramRequested.emit(self._channel)
 
     # ------------------ receive changes from the controller ---------------
 
@@ -333,17 +347,7 @@ class JupyterArrayView(ArrayView):
         layout = self._luts_box
         self._luts[channel] = wdg
 
-        def _on_histogram_requested(change: dict[str, Any]) -> None:
-            if wdg._histogram_wdg:
-                # show or hide the actual widget itself
-                wdg._histogram_container.layout.display = (
-                    "flex" if change["new"] else "none"
-                )
-            else:
-                self.histogramRequested.emit(wdg._channel)
-
-        # TODO: This ugly
-        wdg._histogram.observe(_on_histogram_requested, names="value")
+        wdg.histogramRequested.connect(self.histogramRequested)
         layout.children = (*layout.children, wdg.layout)
         return wdg
 
@@ -375,8 +379,9 @@ class JupyterArrayView(ArrayView):
 
     def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
         if lut := self._luts.get(channel, None):
-            # FIXME: Yuck
+            # Resize widget to a respectable size
             widget.set_trait("css_height", "100px")
+            # Add widget to view
             lut._histogram_container.children = (
                 *lut._histogram_container.children,
                 widget,

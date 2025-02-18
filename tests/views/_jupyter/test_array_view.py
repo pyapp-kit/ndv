@@ -24,9 +24,9 @@ def test_array_options(viewer: JupyterArrayView) -> None:
     viewer._viewer_model.show_3d_button = False
     assert viewer._ndims_btn.layout.display == "none"
 
-    assert lut._histogram.display is None
+    assert lut._histogram.layout.display is None
     viewer._viewer_model.show_histogram_button = False
-    assert not lut._histogram.display == "none"
+    assert lut._histogram.layout.display == "none"
 
     assert viewer._reset_zoom_btn.layout.display is None
     viewer._viewer_model.show_reset_zoom_button = False
