@@ -18,14 +18,10 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
     from typing import Any, Unpack
 
-    from typing_extensions import TypeAlias
-
-    from ndv._types import MouseMoveEvent
+    from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
-
-    LutKey: TypeAlias = int | None
 
 
 class ArrayViewer:
@@ -91,14 +87,15 @@ class ArrayViewer:
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
-        self._lut_controllers: dict[LutKey, ChannelController] = {}
+        self._lut_controllers: dict[ChannelKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
         canvas_cls = _app.get_array_canvas_class()
         self._canvas = canvas_cls(self._viewer_model)
 
-        self._histogram: HistogramCanvas | None = None
+        # TODO: Is this necessary?
+        self._histograms: dict[ChannelKey, HistogramCanvas] = {}
         self._view = frontend_cls(
             self._canvas.frontend_widget(), self._data_model, self._viewer_model
         )
@@ -221,25 +218,26 @@ class ArrayViewer:
 
     # --------------------- PRIVATE ------------------------------------------
 
-    def _add_histogram(self) -> None:
+    def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
-        self._histogram = histogram_cls()
-        self._view.add_histogram(self._histogram.frontend_widget())
-        for ctrl in self._lut_controllers.values():
-            ctrl.add_lut_view(self._histogram)
+        hist = histogram_cls()
+        if ctrl := self._lut_controllers.get(channel, None):
+            self._view.add_histogram(channel, hist.frontend_widget())
+            ctrl.add_lut_view(hist)
             # FIXME: hack
             if handles := ctrl.handles:
                 data = handles[0].data()
                 counts, edges = _calc_hist_bins(data)
-                self._histogram.set_data(counts, edges)
+                hist.set_data(counts, edges)
 
+        self._histograms[channel] = hist
         if self.data is not None:
             self._update_hist_domain_for_dtype()
 
     def _update_hist_domain_for_dtype(
         self, dtype: np.typing.DTypeLike | None = None
     ) -> None:
-        if self._histogram is None:
+        if len(self._histograms) == 0:
             return
         if dtype is None:
             if (wrapper := self._data_model.data_wrapper) is None:
@@ -249,7 +247,8 @@ class ArrayViewer:
             dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
-            self._histogram.set_range(x=(iinfo.min, iinfo.max))
+            for hist in self._histograms.values():
+                hist.set_range(x=(iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -522,9 +521,9 @@ class ArrayViewer:
                     # so we create a new LUT model for it
                     model = display_model.luts[key] = LUTModel()
 
-                lut_views = [self._view.add_lut_view()]
-                if self._histogram is not None:
-                    lut_views.append(self._histogram)
+                lut_views = [self._view.add_lut_view(key)]
+                if hist := self._histograms.get(key, None):
+                    lut_views.append(hist)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
                     key=key,
                     lut_model=model,
@@ -543,25 +542,25 @@ class ArrayViewer:
             else:
                 lut_ctrl.update_texture_data(data)
 
-            if self._histogram is not None:
+            if hist := self._histograms.get(key, None):
                 # TODO: once data comes in in chunks, we'll need a proper stateful
                 # stats object that calculates the histogram incrementally
                 counts, bin_edges = _calc_hist_bins(data)
                 # FIXME: currently this is updating the histogram on *any*
                 # channel index... so it doesn't work with composite mode
-                self._histogram.set_data(counts, bin_edges)
-                self._histogram.set_range()
+                hist.set_data(counts, bin_edges)
+                hist.set_range()
 
         self._canvas.refresh()
 
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
+    def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
         if (
             x < 0 or y < 0
         ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
             return {}
 
-        values: dict[LutKey, float] = {}
+        values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
                 values[key] = value

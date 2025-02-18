@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
     from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 
+MIN_GAMMA: np.float64 = np.float64(1e-6)
+
 
 class Grabbable(Enum):
     NONE = auto()
@@ -333,7 +335,7 @@ class VispyHistogramCanvas(HistogramCanvas):
             if y < np.maximum(y0, 0) or y > y1:
                 return False
             if self.model:
-                self.model.gamma = -np.log2(y / y1)
+                self.model.gamma = max(MIN_GAMMA, -np.log2(y / y1))
             return False
 
         self.get_cursor(event).apply_to(self)
