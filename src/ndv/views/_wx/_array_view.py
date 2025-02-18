@@ -284,7 +284,8 @@ class _WxArrayViewer(wx.Frame):
         )
 
         # Reset zoom button
-        self.set_range_btn = wx.Button(self, label="Reset Zoom")
+        self.set_range_btn = wx.Button(self)
+        self.set_range_btn.SetToolTip("Reset Zoom")
         _add_icon(self.set_range_btn, "fluent:full-screen-maximize-24-filled")
 
         # 3d view button
