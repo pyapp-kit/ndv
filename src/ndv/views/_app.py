@@ -293,6 +293,23 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
     return ndv_app().filter_mouse_events(canvas, receiver)
 
 
+def call_later(msec: int, func: Callable[[], None]) -> None:
+    """Call `func` after `msec` milliseconds.
+
+    This can be used to enqueue a function to be called after the current event loop
+    iteration.  For example, before calling `run_app()`, to ensure that the event
+    loop is running before the function is called.
+
+    Parameters
+    ----------
+    msec : int
+        The number of milliseconds to wait before calling `func`.
+    func : Callable[[], None]
+        The function to call.
+    """
+    ndv_app().call_later(msec, func)
+
+
 def run_app() -> None:
     """Start the active GUI application event loop."""
     ndv_app().run()

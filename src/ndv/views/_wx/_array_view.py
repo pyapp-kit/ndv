@@ -9,7 +9,7 @@ import wx
 import wx.adv
 import wx.lib.newevent
 import wx.svg
-from psygnal import Signal
+from psygnal import EmissionInfo, Signal
 from pyconify import svg_path
 
 from ndv.models._array_display_model import ChannelMode
@@ -284,8 +284,8 @@ class _WxArrayViewer(wx.Frame):
         )
 
         # Reset zoom button
-        self.reset_zoom_btn = wx.Button(self)
-        _add_icon(self.reset_zoom_btn, "fluent:full-screen-maximize-24-filled")
+        self.set_range_btn = wx.Button(self, label="Reset Zoom")
+        _add_icon(self.set_range_btn, "fluent:full-screen-maximize-24-filled")
 
         # 3d view button
         self.ndims_btn = wx.ToggleButton(self, label="3D")
@@ -297,12 +297,12 @@ class _WxArrayViewer(wx.Frame):
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
 
-        btns = wx.BoxSizer(wx.HORIZONTAL)
-        btns.AddStretchSpacer()
-        btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
-        btns.Add(self.ndims_btn, 0, wx.ALL, 5)
-        btns.Add(self.add_roi_btn, 0, wx.ALL, 5)
-        btns.Add(self.reset_zoom_btn, 0, wx.ALL, 5)
+        self._btns = wx.BoxSizer(wx.HORIZONTAL)
+        self._btns.AddStretchSpacer()
+        self._btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
+        self._btns.Add(self.set_range_btn, 0, wx.ALL, 5)
+        self._btns.Add(self.ndims_btn, 0, wx.ALL, 5)
+        self._btns.Add(self.add_roi_btn, 0, wx.ALL, 5)
 
         self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
         top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
@@ -315,7 +315,7 @@ class _WxArrayViewer(wx.Frame):
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.luts, 0, wx.EXPAND)
-        inner.Add(btns, 0, wx.EXPAND)
+        inner.Add(self._btns, 0, wx.EXPAND)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(inner, 1, wx.EXPAND | wx.ALL, 10)
@@ -334,15 +334,15 @@ class WxArrayView(ArrayView):
     ) -> None:
         self._data_model = data_model
         self._viewer_model = viewer_model
+        self._viewer_model.events.connect(self._on_viewer_model_event)
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
         # Mapping of channel key to LutViews
         self._luts: dict[ChannelKey, WxLutView] = {}
         self._visible_axes: Sequence[AxisKey] = []
 
-        # TODO: use emit_fast
         wdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
         wdg.channel_mode_combo.Bind(wx.EVT_COMBOBOX, self._on_channel_mode_changed)
-        wdg.reset_zoom_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
+        wdg.set_range_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
 
@@ -481,9 +481,29 @@ class WxArrayView(ArrayView):
     def close(self) -> None:
         self._wxwidget.Close()
 
-    def set_progress_spinner_visible(self, visible: bool) -> None:
-        if visible:
-            self._wxwidget._progress_spinner.Show()
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "show_progress_spinner":
+            self._wxwidget._progress_spinner.Show(value)
             self._wxwidget._top_info.Layout()
-        else:
-            self._wxwidget._progress_spinner.Hide()
+        elif sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._wxwidget.add_roi_btn.SetValue(False)
+        elif sig_name == "show_histogram_button":
+            # _set_visible(self._wxwidget.histogram_btn, value)
+            ...
+        elif sig_name == "show_roi_button":
+            self._wxwidget.add_roi_btn.Show(value)
+            self._wxwidget._btns.Layout()
+        elif sig_name == "show_channel_mode_selector":
+            self._wxwidget.channel_mode_combo.Show(value)
+            self._wxwidget._btns.Layout()
+        elif sig_name == "show_reset_zoom_button":
+            self._wxwidget.set_range_btn.Show(value)
+            self._wxwidget._btns.Layout()
+        elif sig_name == "show_3d_button":
+            self._wxwidget.ndims_btn.Show(value)
+            self._wxwidget._btns.Layout()
