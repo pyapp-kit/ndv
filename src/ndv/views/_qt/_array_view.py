@@ -507,16 +507,6 @@ class QtArrayView(ArrayView):
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
 
-    def _on_add_histogram_clicked(self, channel: int) -> None:
-        splitter = self._qwidget.splitter
-        if hasattr(self, "_hist"):
-            if not (sizes := splitter.sizes())[-1]:
-                splitter.setSizes([self._qwidget.height() - 100, 100])
-            else:
-                splitter.setSizes([sum(sizes), 0])
-        else:
-            self.histogramRequested.emit()
-
     def add_histogram(self, channel: ChannelKey, widget: QWidget) -> None:
         if lut := self._luts.get(channel, None):
             # # FIXME: Yuck
