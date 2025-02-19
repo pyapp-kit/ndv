@@ -8,11 +8,10 @@ if TYPE_CHECKING:
 
     import numpy as np
 
+    from ndv._types import ChannelKey
     from ndv.models._lut_model import LUTModel
     from ndv.views.bases import LutView
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
-
-    LutKey = int | None
 
 
 class ChannelController:
@@ -25,7 +24,7 @@ class ChannelController:
     """
 
     def __init__(
-        self, key: LutKey, lut_model: LUTModel, views: Sequence[LutView]
+        self, key: ChannelKey, lut_model: LUTModel, views: Sequence[LutView]
     ) -> None:
         self.key = key
         self.lut_views: list[LutView] = []

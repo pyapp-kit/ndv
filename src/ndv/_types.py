@@ -50,6 +50,12 @@ Slice = Annotated[slice, PlainValidator(_to_slice)]
 AxisKey: TypeAlias = Annotated[
     Hashable, PlainValidator(_maybe_int), PlainSerializer(str, return_type=str)
 ]
+# An channel key is any hashable object that can be used to describe a position along
+# an axis. In many cases it will be an integer, but it might also provide a contextual
+# label for one or more positions.
+ChannelKey: TypeAlias = Annotated[
+    Hashable, PlainValidator(_maybe_int), PlainSerializer(str, return_type=str)
+]
 
 
 class MouseButton(IntFlag):

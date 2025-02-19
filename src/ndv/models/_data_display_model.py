@@ -2,7 +2,6 @@ import logging
 import sys
 from collections.abc import (
     Hashable,
-    Iterable,
     Iterator,
     Mapping,
     MutableMapping,
@@ -15,6 +14,7 @@ from typing import Any, Optional, Union, cast
 import numpy as np
 from pydantic import Field
 
+from ndv._types import ChannelKey
 from ndv.views import _app
 
 from ._array_display_model import ArrayDisplayModel, ChannelMode
@@ -47,7 +47,7 @@ class DataResponse:
 
     # mapping of channel_key -> data
     n_visible_axes: int
-    data: Mapping[Optional[int], np.ndarray] = field(repr=False)
+    data: Mapping[ChannelKey, np.ndarray] = field(repr=False)
     request: Optional[DataRequest] = None
 
 
@@ -95,6 +95,8 @@ class _ArrayDataDisplayModel(NDVModel):
             guess = self.data_wrapper.guess_channel_axis()
             if guess not in self.normed_visible_axes:
                 self.display.channel_axis = guess
+            # else:
+            #     self.data_wrapper.sizes()
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
@@ -245,8 +247,7 @@ class _ArrayDataDisplayModel(NDVModel):
             for request in requests:
                 yield _app.submit_task(self.process_request, request)
 
-    @staticmethod
-    def process_request(req: DataRequest) -> DataResponse:
+    def process_request(self, req: DataRequest) -> DataResponse:
         """Process a data request and return the sliced data as a DataResponse."""
         data = req.wrapper.isel(req.index)
 
@@ -254,18 +255,18 @@ class _ArrayDataDisplayModel(NDVModel):
         vis_ax = req.visible_axes
         t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
 
-        if (ch_ax := req.channel_axis) is not None:
-            ch_indices: Iterable[Optional[int]] = range(data.shape[ch_ax])
+        data_response: dict[ChannelKey, np.ndarray] = {}
+        ch_ax = req.channel_axis
+        # For RGB and Grayscale - keep the whole array together
+        if self.display.channel_mode == ChannelMode.RGBA:
+            data_response["RGB"] = data.transpose(*t_dims).squeeze()
+        elif req.channel_axis is None:
+            data_response[None] = data.transpose(*t_dims).squeeze()
+        # For Composite and Color - slice along channel axis
         else:
-            ch_indices = (None,)
-
-        data_response: dict[int | None, np.ndarray] = {}
-        for i in ch_indices:
-            if i is None:
-                ch_data = data
-            else:
+            for i in range(data.shape[req.channel_axis]):
                 ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
                 ch_data = data[ch_keepdims]
-            data_response[i] = ch_data.transpose(*t_dims).squeeze()
+                data_response[i] = ch_data.transpose(*t_dims).squeeze()
 
         return DataResponse(n_visible_axes=len(vis_ax), data=data_response, request=req)

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import TypeAlias
 
-    from ndv._types import MouseMoveEvent
+    from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
 
@@ -83,7 +83,7 @@ class ArrayViewer:
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
-        self._lut_controllers: dict[LutKey, ChannelController] = {}
+        self._lut_controllers: dict[ChannelKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
@@ -275,15 +275,22 @@ class ArrayViewer:
         self._request_data()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
+        # When the channel view changes, two things must be done:
         self._view.set_channel_mode(mode)
+        # 1. A slider must be shown for each axis that is not a:
+        # (a) channel axis
+        # (b) visible axis
         self._update_visible_sliders()
-        show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
+        # 2. LutViews must be updated:
+        # -
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
                 if lut_ctrl.key is None:
-                    view.set_visible(not show_channel_luts)
+                    view.set_visible(mode == ChannelMode.GRAYSCALE)
+                elif lut_ctrl.key == "RGB":
+                    view.set_visible(mode == ChannelMode.RGBA)
                 else:
-                    view.set_visible(show_channel_luts)
+                    view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
         # redraw
         self._clear_canvas()
         self._request_data()
@@ -311,6 +318,9 @@ class ArrayViewer:
 
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
+        # FIXME
+        if self.display_model.channel_mode == ChannelMode.RGBA:
+            return
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
 
         # collect and format intensity values at the current mouse position
@@ -422,7 +432,7 @@ class ArrayViewer:
                     # so we create a new LUT model for it
                     model = display_model.luts[key] = LUTModel()
 
-                lut_views = [self._view.add_lut_view()]
+                lut_views = [self._view.add_lut_view(key)]
                 if self._histogram is not None:
                     lut_views.append(self._histogram)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
@@ -454,14 +464,14 @@ class ArrayViewer:
 
         self._canvas.refresh()
 
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
+    def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
         if (
             x < 0 or y < 0
         ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
             return {}
 
-        values: dict[LutKey, float] = {}
+        values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
                 values[key] = value

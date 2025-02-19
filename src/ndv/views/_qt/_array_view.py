@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     import cmap
     from qtpy.QtGui import QIcon
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 SLIDER_STYLE = """
@@ -220,6 +220,12 @@ class QLutView(LutView):
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
 
+class QRGBView(QLutView):
+    def __init__(self) -> None:
+        super().__init__()
+        self._qwidget.cmap.setVisible(False)
+
+
 class _QDimsSliders(QWidget):
     currentIndexChanged = Signal()
 
@@ -344,7 +350,11 @@ class _QArrayViewer(QWidget):
         # not using QEnumComboBox because we want to exclude some values for now
         self.channel_mode_combo = QComboBox(self)
         self.channel_mode_combo.addItems(
-            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+            [
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ]
         )
 
         # button to reset the zoom of the canvas
@@ -433,8 +443,8 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self) -> QLutView:
-        view = QLutView()
+    def add_lut_view(self, channel: ChannelKey = None) -> QLutView:
+        view = QRGBView() if channel == "RGB" else QLutView()
         self._qwidget.luts.addWidget(view.frontend_widget())
         return view
 
