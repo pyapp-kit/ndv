@@ -509,10 +509,11 @@ class QtArrayView(ArrayView):
 
     def add_histogram(self, channel: ChannelKey, widget: QWidget) -> None:
         if lut := self._luts.get(channel, None):
-            # # FIXME: Yuck
+            # Resize widget to a respectable size
             lut._qwidget.resize(
                 QSize(lut._qwidget.width(), lut._qwidget.height() + 100)
             )
+            # Add widget to view
             widget.resize(QSize(lut._qwidget.width(), 100))
             lut._qwidget._histogram_container.addWidget(widget)
 
