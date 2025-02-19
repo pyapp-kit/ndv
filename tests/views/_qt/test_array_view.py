@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+from unittest.mock import Mock
 
 from pytest import fixture
 from qtpy.QtWidgets import QWidget
 
 from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
+from ndv.views._app import get_histogram_canvas_class
 from ndv.views._qt._array_view import QtArrayView
 
 if TYPE_CHECKING:
@@ -45,3 +47,21 @@ def test_array_options(viewer: QtArrayView) -> None:
     assert qwdg.add_roi_btn.isVisible()
     viewer._viewer_model.show_roi_button = False
     assert not qwdg.add_roi_btn.isVisible()
+
+
+def test_histogram(viewer: QtArrayView) -> None:
+    channel = None
+    lut = viewer._luts[channel]
+
+    # Ensure lut signal gets passed through the viewer with the channel as the arg
+    histogram_mock = Mock()
+    viewer.histogramRequested.connect(histogram_mock)
+    lut._qwidget.histogram_btn.setChecked(True)
+    histogram_mock.assert_called_once_with(channel)
+
+    # Test adding the histogram widget puts it on the relevant lut
+    assert lut._qwidget._histogram_container.isEmpty()
+    histogram = get_histogram_canvas_class()()  # will raise if not supported
+    histogram_wdg = cast(QWidget, histogram.frontend_widget())
+    viewer.add_histogram(channel, histogram_wdg)
+    assert not lut._qwidget._histogram_container.isEmpty()
