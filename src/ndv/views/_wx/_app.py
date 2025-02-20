@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import wx
 from wx import EVT_LEFT_DOWN, EVT_LEFT_UP, EVT_MOTION, EvtHandler, MouseEvent
 
-from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 from ndv.views.bases._app import NDVApp
 
 from ._main_thread import call_in_main_thread
@@ -59,33 +59,59 @@ class WxAppWrap(NDVApp):
                 f"Expected vispy canvas to be wx EvtHandler, got {type(canvas)}"
             )
 
+        if hasattr(canvas, "_subwidget"):
+            canvas = canvas._subwidget
+
         # TIP: event.Skip() allows the event to propagate to other handlers.
 
+        active_button: MouseButton = MouseButton.NONE
+
         def on_mouse_move(event: MouseEvent) -> None:
-            mme = MouseMoveEvent(x=event.GetX(), y=event.GetY())
+            nonlocal active_button
+            nonlocal canvas
+
+            mme = MouseMoveEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
             if not receiver.on_mouse_move(mme):
                 receiver.mouseMoved.emit(mme)
                 event.Skip()
+            # FIXME: get_cursor is VERY slow, unsure why.
+            if cursor := receiver.get_cursor(mme):
+                canvas.SetCursor(cursor.to_wx())
 
         def on_mouse_press(event: MouseEvent) -> None:
-            mpe = MousePressEvent(x=event.GetX(), y=event.GetY())
+            nonlocal active_button
+
+            # NB This function is bound to the left mouse button press
+            active_button = MouseButton.LEFT
+            mpe = MousePressEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
             if not receiver.on_mouse_press(mpe):
                 receiver.mousePressed.emit(mpe)
                 event.Skip()
 
         def on_mouse_release(event: MouseEvent) -> None:
-            mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY())
+            nonlocal active_button
+
+            mre = MouseReleaseEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
+            active_button = MouseButton.NONE
             if not receiver.on_mouse_release(mre):
                 receiver.mouseReleased.emit(mre)
                 event.Skip()
 
-        canvas.Bind(EVT_MOTION, on_mouse_move)
-        canvas.Bind(EVT_LEFT_DOWN, on_mouse_press)
-        canvas.Bind(EVT_LEFT_UP, on_mouse_release)
+        canvas.Bind(EVT_MOTION, handler=on_mouse_move)
+        canvas.Bind(EVT_LEFT_DOWN, handler=on_mouse_press)
+        canvas.Bind(EVT_LEFT_UP, handler=on_mouse_release)
 
         def _unbind() -> None:
-            canvas.Unbind(EVT_MOTION, on_mouse_move)
-            canvas.Unbind(EVT_LEFT_DOWN, on_mouse_press)
-            canvas.Unbind(EVT_LEFT_UP, on_mouse_release)
+            canvas.Unbind(EVT_MOTION, handler=on_mouse_move)
+            canvas.Unbind(EVT_LEFT_DOWN, handler=on_mouse_press)
+            canvas.Unbind(EVT_LEFT_UP, handler=on_mouse_release)
 
         return _unbind
+
+    def process_events(self) -> None:
+        """Process events."""
+        wx.SafeYield()
+
+    def call_later(self, msec: int, func: Callable[[], None]) -> None:
+        """Call `func` after `msec` milliseconds."""
+        wx.CallLater(msec, func)

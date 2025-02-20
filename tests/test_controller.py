@@ -9,11 +9,19 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from ndv._types import MouseMoveEvent
+from ndv._types import (
+    CursorType,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
+from ndv.models._roi_model import RectangularROIModel
+from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
@@ -29,7 +37,7 @@ IS_PYSIDE6 = API_NAME == "PySide6"
 IS_PYGFX = _app.canvas_backend(None) == "pygfx"
 
 
-def _get_mock_canvas() -> ArrayCanvas:
+def _get_mock_canvas(*_: Any) -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
     img_handle = MagicMock(spec=ImageHandle)
     img_handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
@@ -268,3 +276,118 @@ def test_array_viewer_histogram() -> None:
     counts = np.bincount(data.flatten(), minlength=maxval + 1)
     bin_edges = np.arange(maxval + 2) - 0.5
     viewer._histogram.set_data(counts, bin_edges)
+
+
+@no_type_check
+@pytest.mark.usefixtures("any_app")
+def test_roi_controller() -> None:
+    ctrl = ArrayViewer()
+    roi = RectangularROIModel()
+    viewer = ctrl._viewer_model
+
+    # Until a user interacts with ctrl.roi, there is no ROI model
+    assert ctrl._roi_model is None
+    ctrl.roi = roi
+    assert ctrl._roi_model is not None
+
+    # Clicking the ROI button and then clicking the canvas creates a ROI
+    viewer.interaction_mode = InteractionMode.CREATE_ROI
+    canvas_pos = (5, 5)
+    mpe = MousePressEvent(canvas_pos[0], canvas_pos[1], MouseButton.LEFT)
+
+    # Note - avoid diving into rendering logic here - just identify view
+    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
+        ctrl._canvas.on_mouse_press(mpe)
+    world_pos = ctrl._canvas.canvas_to_world(canvas_pos)
+
+    assert roi.bounding_box == (
+        (world_pos[0], world_pos[1]),
+        (world_pos[0] + 1, world_pos[1] + 1),
+    )
+    assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
+
+
+@no_type_check
+@pytest.mark.usefixtures("any_app")
+def test_roi_interaction() -> None:
+    if _app.gui_frontend() == _app.GuiFrontend.JUPYTER and IS_PYGFX:
+        pytest.skip("Invalid canvas size on CI")
+        return
+
+    ctrl = ArrayViewer()
+    roi = RectangularROIModel()
+    ctrl.roi = roi
+    roi_view = ctrl._roi_view
+    assert roi_view is not None
+
+    # FIXME: We need a large world space on the canvas, but
+    # VispyArrayCanvas.set_range is not implemented yet. This workaround
+    # sets the range to the extent of the data i.e. the extent of the ROI
+    roi.bounding_box = ((0, 0), (500, 500))
+    ctrl._canvas.set_range()
+    # Note that these positions are far apart to satisfy sufficient distance
+    # in world space
+    canvas_roi_start = (200, 200)
+    world_roi_start = tuple(ctrl._canvas.canvas_to_world(canvas_roi_start)[:2])
+    canvas_new_start = (100, 100)
+    world_new_start = tuple(ctrl._canvas.canvas_to_world(canvas_new_start)[:2])
+    canvas_roi_end = (300, 300)
+    world_roi_end = tuple(ctrl._canvas.canvas_to_world(canvas_roi_end)[:2])
+    roi.bounding_box = (world_roi_start, world_roi_end)
+
+    # Note - avoid diving into rendering logic here - just identify view
+    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
+        # Test moving handle
+        assert not roi_view.selected()
+        mpe = MousePressEvent(
+            canvas_roi_start[0], canvas_roi_start[1], MouseButton.LEFT
+        )
+        ctrl._canvas.on_mouse_press(mpe)
+        assert roi_view.selected()
+        mme = MouseMoveEvent(canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT)
+        ctrl._canvas.on_mouse_move(mme)
+        assert roi.bounding_box[0] == pytest.approx(world_new_start, 1e-6)
+        assert roi.bounding_box[1] == pytest.approx(world_roi_end, 1e-6)
+        mre = MouseReleaseEvent(
+            canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT
+        )
+        ctrl._canvas.on_mouse_release(mre)
+
+        # Test translation
+        roi.bounding_box = (world_roi_start, world_roi_end)
+        mpe = MousePressEvent(
+            (canvas_roi_start[0] + canvas_roi_end[0] / 2),
+            (canvas_roi_start[1] + canvas_roi_end[1] / 2),
+            MouseButton.LEFT,
+        )
+        ctrl._canvas.on_mouse_press(mpe)
+        assert roi_view.selected()
+        mme = MouseMoveEvent(
+            (canvas_roi_start[0] + canvas_new_start[0] / 2),
+            (canvas_roi_start[1] + canvas_new_start[1] / 2),
+            MouseButton.LEFT,
+        )
+        ctrl._canvas.on_mouse_move(mme)
+        assert roi.bounding_box[0] == pytest.approx(world_new_start, 1e-6)
+        assert roi.bounding_box[1] == pytest.approx(world_roi_start, 1e-6)
+        mre = MouseReleaseEvent(
+            (canvas_roi_start[0] + canvas_new_start[0] / 2),
+            (canvas_roi_start[1] + canvas_new_start[1] / 2),
+            MouseButton.LEFT,
+        )
+        ctrl._canvas.on_mouse_release(mre)
+
+    # Test cursors
+    roi.bounding_box = (world_roi_start, world_roi_end)
+    # Top-Left corner
+    mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_start[1])
+    assert roi_view.get_cursor(mme) == CursorType.FDIAG_ARROW
+    # Top-Right corner
+    mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_end[1])
+    assert roi_view.get_cursor(mme) == CursorType.BDIAG_ARROW
+    # Middle
+    mme = MouseMoveEvent(
+        (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
+        (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
+    )
+    assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW

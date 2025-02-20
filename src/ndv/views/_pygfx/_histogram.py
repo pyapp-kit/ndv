@@ -405,7 +405,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         return color
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+    def get_cursor(self, mme: MouseMoveEvent) -> CursorType:
+        pos = (mme.x, mme.y)
         nearby = self._find_nearby_node(pos)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
@@ -460,7 +461,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
-        self.get_cursor(pos).apply_to(self)
+        self.get_cursor(event).apply_to(self)
         return False
 
     def _find_nearby_node(

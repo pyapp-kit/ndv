@@ -9,12 +9,14 @@ import ipywidgets as widgets
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
     import cmap
+    from psygnal import EmissionInfo
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
@@ -161,7 +163,10 @@ class JupyterArrayView(ArrayView):
         self,
         canvas_widget: _jupyter_rfb.CanvasBackend,
         data_model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
     ) -> None:
+        self._viewer_model = viewer_model
+        self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
         self._data_model = data_model
         self._canvas_widget = canvas_widget
@@ -207,6 +212,17 @@ class JupyterArrayView(ArrayView):
         )
         self._ndims_btn.observe(self._on_ndims_toggled, names="value")
 
+        # Add ROI button
+        self._add_roi_btn = widgets.ToggleButton(
+            value=False,
+            description="New ROI",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="Adds a new Rectangular ROI.",
+            icon="square",
+        )
+
+        self._add_roi_btn.observe(self._on_add_roi_button_toggle, names="value")
+
         # LAYOUT
 
         top_row = widgets.HBox(
@@ -225,7 +241,12 @@ class JupyterArrayView(ArrayView):
             width = "604px"
 
         btns = widgets.HBox(
-            [self._channel_mode_combo, self._ndims_btn, self._reset_zoom_btn],
+            [
+                self._channel_mode_combo,
+                self._ndims_btn,
+                self._add_roi_btn,
+                self._reset_zoom_btn,
+            ],
             layout=widgets.Layout(justify_content="flex-end"),
         )
         self.layout = widgets.VBox(
@@ -335,6 +356,12 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
+    def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
+        """Emit signal when the channel mode changes."""
+        self._viewer_model.interaction_mode = (
+            InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
+        )
+
     def add_histogram(self, widget: Any) -> None:
         """Add a histogram widget to the viewer."""
         warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
@@ -385,5 +412,23 @@ class JupyterArrayView(ArrayView):
     def close(self) -> None:
         self.layout.close()
 
-    def set_progress_spinner_visible(self, visible: bool) -> None:
-        self._progress_spinner.layout.display = "flex" if visible else "none"
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "show_progress_spinner":
+            self._progress_spinner.layout.display = "flex" if value else "none"
+        elif sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._add_roi_btn.value = False
+        elif sig_name == "show_histogram_button":
+            ...
+        elif sig_name == "show_roi_button":
+            self._add_roi_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_channel_mode_selector":
+            self._channel_mode_combo.layout.display = "flex" if value else "none"
+        elif sig_name == "show_reset_zoom_button":
+            self._reset_zoom_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_3d_button":
+            self._ndims_btn.layout.display = "flex" if value else "none"
