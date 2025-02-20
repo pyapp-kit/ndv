@@ -282,7 +282,6 @@ class ArrayViewer:
         # (b) visible axis
         self._update_visible_sliders()
         # 2. LutViews must be updated:
-        # -
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
                 if lut_ctrl.key is None:

@@ -84,19 +84,27 @@ class _ArrayDataDisplayModel(NDVModel):
         self.display.events.channel_mode.connect(self._on_channel_mode_change)
 
     def _on_channel_mode_change(self) -> None:
-        # if the mode is not grayscale, and the channel axis is not set,
-        # we let the data wrapper guess the channel axis
-        if (
-            self.display.channel_mode != ChannelMode.GRAYSCALE
-            and self.display.channel_axis is None
-            and self.data_wrapper is not None
-        ):
-            # only use the guess if it's not already in the visible axes
-            guess = self.data_wrapper.guess_channel_axis()
-            if guess not in self.normed_visible_axes:
+        # TODO: Refactor into separate methods?
+        # FIXME: If user specified the axes, how can we remember that?
+        mode = self.display.channel_mode
+        if mode == ChannelMode.GRAYSCALE:
+            self.display.visible_axes = (-2, -1)
+            self.display.channel_axis = None
+        elif mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}:
+            self.display.visible_axes = (-2, -1)
+            if self.data_wrapper is not None:
+                guess = self.data_wrapper.guess_channel_axis()
+                # only use the guess if it's not already in the visible axes
+                if guess not in self.normed_visible_axes:
+                    self.display.channel_axis = guess
+        elif mode == ChannelMode.RGBA:
+            if self.data_wrapper is not None:
+                guess = self.data_wrapper.guess_channel_axis()
+                other_dims = dict(self.data_wrapper.sizes())
+                other_dims.pop(guess)
+                other_axes = list(other_dims.keys())
+                self.display.visible_axes = (other_axes[-2], other_axes[-1])
                 self.display.channel_axis = guess
-            # else:
-            #     self.data_wrapper.sizes()
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
