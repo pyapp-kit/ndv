@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -144,6 +144,15 @@ class JupyterLutView(LutView):
         return self.layout
 
 
+class JupyterRGBView(JupyterLutView):
+    def __init__(self) -> None:
+        super().__init__()
+        self._cmap.layout.display = "none"
+        children = list(self.layout.children)
+        lbl = widgets.Label(value="RGB")
+        self.layout.children = (children[0], lbl, *children[1:])
+
+
 SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 
 
@@ -173,7 +182,7 @@ class JupyterArrayView(ArrayView):
 
         # the button that controls the display mode of the channels
         self._channel_mode_combo = widgets.Dropdown(
-            options=[ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE],
+            options=[ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE, ChannelMode.RGBA],
             value=str(ChannelMode.GRAYSCALE),
         )
         self._channel_mode_combo.layout.width = "120px"
@@ -293,9 +302,9 @@ class JupyterArrayView(ArrayView):
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self) -> JupyterLutView:
+    def add_lut_view(self, channel: ChannelKey = None) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterLutView()
+        wdg = JupyterRGBView() if channel == "RGB" else JupyterLutView()
         layout = self._luts_box
         layout.children = (*layout.children, wdg.layout)
         return wdg

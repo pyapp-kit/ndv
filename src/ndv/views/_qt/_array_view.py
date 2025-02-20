@@ -151,13 +151,13 @@ class _QLUTWidget(QWidget):
         self.auto_clim.setMaximumWidth(42)
         self.auto_clim.setCheckable(True)
 
-        layout = QHBoxLayout(self)
-        layout.setSpacing(5)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.visible)
-        layout.addWidget(self.cmap)
-        layout.addWidget(self.clims)
-        layout.addWidget(self.auto_clim)
+        self._layout = QHBoxLayout(self)
+        self._layout.setSpacing(5)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.addWidget(self.visible)
+        self._layout.addWidget(self.cmap)
+        self._layout.addWidget(self.clims)
+        self._layout.addWidget(self.auto_clim)
 
 
 class QLutView(LutView):
@@ -224,6 +224,7 @@ class QRGBView(QLutView):
     def __init__(self) -> None:
         super().__init__()
         self._qwidget.cmap.setVisible(False)
+        self._qwidget._layout.insertWidget(1, QLabel("RGB"))
 
 
 class _QDimsSliders(QWidget):
@@ -444,6 +445,7 @@ class QtArrayView(ArrayView):
         self._visible_axes: Sequence[AxisKey] = []
 
     def add_lut_view(self, channel: ChannelKey = None) -> QLutView:
+        view = QLutView()
         view = QRGBView() if channel == "RGB" else QLutView()
         self._qwidget.luts.addWidget(view.frontend_widget())
         return view

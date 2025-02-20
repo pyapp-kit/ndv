@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     import cmap
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 
@@ -71,13 +71,13 @@ class _WxLUTWidget(wx.Panel):
         self.auto_clim = wx.ToggleButton(self, label="Auto")
 
         # Layout
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.visible, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        sizer.Add(self.cmap, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        sizer.Add(self.clims, 1, wx.ALIGN_CENTER_VERTICAL, 5)
-        sizer.Add(self.auto_clim, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._sizer.Add(self.visible, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._sizer.Add(self.cmap, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._sizer.Add(self.clims, 1, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._sizer.Add(self.auto_clim, 0, wx.ALIGN_CENTER_VERTICAL, 5)
 
-        self.SetSizer(sizer)
+        self.SetSizer(self._sizer)
         self.Layout()
 
 
@@ -146,6 +146,16 @@ class WxLutView(LutView):
 
     def close(self) -> None:
         self._wxwidget.Close()
+
+
+class WxRGBView(WxLutView):
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+        self._wxwidget.cmap.Hide()
+        # FIXME
+        # lbl = wx.StaticText(self, label="RGB")
+        # self._wxwidget._sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        # self._wxwidget.Layout()
 
 
 # mostly copied from _qt.qt_view._QDimsSliders
@@ -242,7 +252,11 @@ class _WxArrayViewer(wx.Frame):
         # Channel mode combo box
         self.channel_mode_combo = wx.ComboBox(
             self,
-            choices=[ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value],
+            choices=[
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ],
             style=wx.CB_DROPDOWN,
         )
 
@@ -333,8 +347,9 @@ class WxArrayView(ArrayView):
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
 
-    def add_lut_view(self) -> WxLutView:
-        view = WxLutView(self.frontend_widget())
+    def add_lut_view(self, channel: ChannelKey = None) -> WxLutView:
+        wdg = self.frontend_widget()
+        view = WxRGBView(wdg) if channel == "RGB" else WxLutView(wdg)
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._wxwidget.Layout()
         return view
