@@ -263,6 +263,7 @@ class ArrayViewer:
 
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
+            (model.events.channel_axis, self._on_model_channel_axis_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
@@ -329,6 +330,9 @@ class ArrayViewer:
         self._update_visible_sliders()
         self._clear_canvas()
         self._canvas.set_ndim(self.display_model.n_visible_axes)
+        self._request_data()
+
+    def _on_model_channel_axis_changed(self) -> None:
         self._request_data()
 
     def _on_model_current_index_changed(self) -> None:

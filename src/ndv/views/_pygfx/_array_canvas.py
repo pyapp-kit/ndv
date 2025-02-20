@@ -55,8 +55,14 @@ class PyGFXImageHandle(ImageHandle):
         return self._grid.data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
-        self._grid.data[:] = data
-        self._grid.update_range((0, 0, 0), self._grid.size)
+        if data.shape == self._grid.data.shape:
+            self._grid.data[:] = data
+            self._grid.update_range((0, 0, 0), self._grid.size)
+        else:
+            self._grid = pygfx.Texture(data, dim=2)
+            self._image.geometry = pygfx.Geometry(grid=self._grid)
+            if data.ndim == 3:
+                self._material.map = None
 
     def visible(self) -> bool:
         return bool(self._image.visible)

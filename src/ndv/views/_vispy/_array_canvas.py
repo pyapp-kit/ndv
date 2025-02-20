@@ -52,7 +52,7 @@ class VispyImageHandle(ImageHandle):
             return self._visual._last_data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
-        if not data.ndim == self._ndim:
+        if data.ndim < 1 or data.ndim > 4:
             warnings.warn(
                 f"Got wrong number of dimensions ({data.ndim}) for vispy "
                 f"visual of type {type(self._visual)}.",

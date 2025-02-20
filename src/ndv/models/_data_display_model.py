@@ -17,7 +17,7 @@ from pydantic import Field
 from ndv._types import ChannelKey
 from ndv.views import _app
 
-from ._array_display_model import ArrayDisplayModel, ChannelMode
+from ._array_display_model import ArrayDisplayModel, ChannelMode, TwoOrThreeAxisTuple
 from ._base_model import NDVModel
 from ._data_wrapper import DataWrapper
 
@@ -82,29 +82,34 @@ class _ArrayDataDisplayModel(NDVModel):
     def model_post_init(self, __context: Any) -> None:
         # connect the channel mode change signal to the channel axis guessing method
         self.display.events.channel_mode.connect(self._on_channel_mode_change)
+        # initial model synchronization
+        self._on_channel_mode_change()
 
     def _on_channel_mode_change(self) -> None:
         # TODO: Refactor into separate methods?
-        # FIXME: If user specified the axes, how can we remember that?
         mode = self.display.channel_mode
         if mode == ChannelMode.GRAYSCALE:
-            self.display.visible_axes = (-2, -1)
             self.display.channel_axis = None
         elif mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}:
-            self.display.visible_axes = (-2, -1)
             if self.data_wrapper is not None:
                 guess = self.data_wrapper.guess_channel_axis()
                 # only use the guess if it's not already in the visible axes
-                if guess not in self.normed_visible_axes:
-                    self.display.channel_axis = guess
+                self.display.channel_axis = (
+                    None if guess in self.normed_visible_axes else guess
+                )
         elif mode == ChannelMode.RGBA:
-            if self.data_wrapper is not None:
+            if self.data_wrapper is not None and self.display.channel_axis is None:
+                # Coerce image to RGB
+                # FIXME? going back another ChannelMode retains these changes
+                if len(self.data_wrapper.sizes()) != 3:
+                    raise Exception("RGBA datasets must be 3-dimensional")
                 guess = self.data_wrapper.guess_channel_axis()
-                other_dims = dict(self.data_wrapper.sizes())
-                other_dims.pop(guess)
-                other_axes = list(other_dims.keys())
-                self.display.visible_axes = (other_axes[-2], other_axes[-1])
                 self.display.channel_axis = guess
+                other_axes = dict(self.data_wrapper.sizes())
+                other_axes.pop(guess)
+                self.display.visible_axes = cast(
+                    TwoOrThreeAxisTuple, tuple(other_axes.keys())
+                )
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
