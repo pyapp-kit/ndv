@@ -66,7 +66,9 @@ class ChannelController:
         self.handles.append(handle)
         self.add_lut_view(handle)
 
-    def get_value_at_index(self, idx: tuple[int, ...]) -> float | None:
+    def get_value_at_index(
+        self, idx: tuple[int, ...]
+    ) -> tuple[float, ...] | float | None:
         """Get the value of the data at the given index."""
         if not (handles := self.handles):
             return None
@@ -77,7 +79,7 @@ class ChannelController:
             # stored by the backend visual, rather than querying the data itself
             # this is a quick workaround to get the value without having to
             # worry about other dimensions in the data source (since the
-            # texture has already been reduced to 2D). But a more complete
+            # texture has already been reduced to RGB/RGBA/2D). But a more complete
             # implementation would gather the full current nD index and query
             # the data source directly.
             return handle.data()[idx]  # type: ignore [no-any-return]

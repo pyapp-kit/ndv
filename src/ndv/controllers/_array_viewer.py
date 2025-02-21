@@ -421,9 +421,6 @@ class ArrayViewer:
 
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
-        # FIXME
-        if self.display_model.channel_mode == ChannelMode.RGBA:
-            return
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
 
         # collect and format intensity values at the current mouse position
@@ -577,7 +574,15 @@ class ArrayViewer:
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
-                values[key] = value
+                # Handle RGB
+                if key == "RGB" and isinstance(value, tuple):
+                    values["R"] = value[0]
+                    values["G"] = value[1]
+                    values["B"] = value[2]
+                    if len(value) > 3:
+                        values["A"] = value[3]
+                elif isinstance(value, float):
+                    values[key] = value
 
         return values
 
