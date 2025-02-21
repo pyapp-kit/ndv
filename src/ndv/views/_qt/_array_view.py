@@ -177,7 +177,7 @@ class _QLUTWidget(QWidget):
 
         # Retain a reference to this layout so we can add self._histogram later
         self._layout = QVBoxLayout(self)
-        self._layout.setSpacing(5)
+        self._layout.setSpacing(0)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.addLayout(top)
 
