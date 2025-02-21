@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import TypeAlias
 
-    from ndv._types import MouseMoveEvent
+    from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
@@ -91,7 +91,7 @@ class ArrayViewer:
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
-        self._lut_controllers: dict[LutKey, ChannelController] = {}
+        self._lut_controllers: dict[ChannelKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
@@ -263,6 +263,7 @@ class ArrayViewer:
 
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
+            (model.events.channel_axis, self._on_model_channel_axis_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
@@ -331,21 +332,30 @@ class ArrayViewer:
         self._canvas.set_ndim(self.display_model.n_visible_axes)
         self._request_data()
 
+    def _on_model_channel_axis_changed(self) -> None:
+        self._request_data()
+
     def _on_model_current_index_changed(self) -> None:
         value = self._data_model.display.current_index
         self._view.set_current_index(value)
         self._request_data()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
+        # When the channel view changes, two things must be done:
         self._view.set_channel_mode(mode)
+        # 1. A slider must be shown for each axis that is not a:
+        # (a) channel axis
+        # (b) visible axis
         self._update_visible_sliders()
-        show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
+        # 2. LutViews must be updated:
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
                 if lut_ctrl.key is None:
-                    view.set_visible(not show_channel_luts)
+                    view.set_visible(mode == ChannelMode.GRAYSCALE)
+                elif lut_ctrl.key == "RGB":
+                    view.set_visible(mode == ChannelMode.RGBA)
                 else:
-                    view.set_visible(show_channel_luts)
+                    view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
         # redraw
         self._clear_canvas()
         self._request_data()
@@ -522,7 +532,7 @@ class ArrayViewer:
                     # so we create a new LUT model for it
                     model = display_model.luts[key] = LUTModel()
 
-                lut_views = [self._view.add_lut_view()]
+                lut_views = [self._view.add_lut_view(key)]
                 if self._histogram is not None:
                     lut_views.append(self._histogram)
                 self._lut_controllers[key] = lut_ctrl = ChannelController(
@@ -554,17 +564,25 @@ class ArrayViewer:
 
         self._canvas.refresh()
 
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
+    def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
         if (
             x < 0 or y < 0
         ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
             return {}
 
-        values: dict[LutKey, float] = {}
+        values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
-                values[key] = value
+                # Handle RGB
+                if key == "RGB" and isinstance(value, tuple):
+                    values["R"] = value[0]
+                    values["G"] = value[1]
+                    values["B"] = value[2]
+                    if len(value) > 3:
+                        values["A"] = value[3]
+                elif isinstance(value, float):
+                    values[key] = value
 
         return values
 

@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from psygnal import EmissionInfo
     from qtpy.QtGui import QIcon
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
@@ -158,13 +158,13 @@ class _QLUTWidget(QWidget):
         self.auto_clim.setMaximumWidth(42)
         self.auto_clim.setCheckable(True)
 
-        layout = QHBoxLayout(self)
-        layout.setSpacing(5)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.visible)
-        layout.addWidget(self.cmap)
-        layout.addWidget(self.clims)
-        layout.addWidget(self.auto_clim)
+        self._layout = QHBoxLayout(self)
+        self._layout.setSpacing(5)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.addWidget(self.visible)
+        self._layout.addWidget(self.cmap)
+        self._layout.addWidget(self.clims)
+        self._layout.addWidget(self.auto_clim)
 
 
 class QLutView(LutView):
@@ -225,6 +225,13 @@ class QLutView(LutView):
             else:
                 clims = self._qwidget.clims.value()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+
+class QRGBView(QLutView):
+    def __init__(self) -> None:
+        super().__init__()
+        self._qwidget.cmap.setVisible(False)
+        self._qwidget._layout.insertWidget(1, QLabel("RGB"))
 
 
 class ROIButton(QPushButton):
@@ -364,7 +371,11 @@ class _QArrayViewer(QWidget):
         # not using QEnumComboBox because we want to exclude some values for now
         self.channel_mode_combo = QComboBox(self)
         self.channel_mode_combo.addItems(
-            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+            [
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ]
         )
 
         # button to reset the zoom of the canvas
@@ -465,8 +476,9 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self) -> QLutView:
+    def add_lut_view(self, channel: ChannelKey = None) -> QLutView:
         view = QLutView()
+        view = QRGBView() if channel == "RGB" else QLutView()
         self._qwidget.luts.addWidget(view.frontend_widget())
         return view
 
