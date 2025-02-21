@@ -173,15 +173,13 @@ class _QLUTWidget(QWidget):
         top.addWidget(self.auto_clim)
         top.addWidget(self.histogram_btn)
 
-        # TODO: Replace with histogram
-        self._histogram_container = QHBoxLayout()
-        self._histogram_container.setSpacing(5)
-        self._histogram_container.setContentsMargins(0, 0, 0, 0)
+        self._histogram: QWidget | None = None
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(top)
-        layout.addLayout(self._histogram_container)
+        # Retain a reference to this layout so we can add self._histogram later
+        self._layout = QVBoxLayout(self)
+        self._layout.setSpacing(5)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.addLayout(top)
 
 
 class QLutView(LutView):
@@ -249,12 +247,8 @@ class QLutView(LutView):
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_q_histogram_toggled(self, toggled: bool) -> None:
-        container = self._qwidget._histogram_container
-        if count := container.count():
-            for i in range(count):
-                item = container.itemAt(i).widget()
-                if isinstance(item, QWidget):
-                    item.setVisible(toggled)
+        if hist := self._qwidget._histogram:
+            hist.setVisible(toggled)
         elif toggled:
             self.histogramRequested.emit(self._channel)
 
@@ -515,7 +509,8 @@ class QtArrayView(ArrayView):
             )
             # Add widget to view
             widget.resize(QSize(lut._qwidget.width(), 100))
-            lut._qwidget._histogram_container.addWidget(widget)
+            lut._qwidget._histogram = widget
+            lut._qwidget._layout.addWidget(widget)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
