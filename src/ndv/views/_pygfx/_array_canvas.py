@@ -102,7 +102,7 @@ class PyGFXImageHandle(ImageHandle):
 
     def set_colormap(self, cmap: _cmap.Colormap) -> None:
         # RGB (i.e. 3D) images should not have a colormap
-        if self.data().ndim != 3:
+        if self.data().ndim == 3:
             warnings.warn("Cannot set colormap on an RGB image", stacklevel=2)
             return
         self._cmap = cmap
