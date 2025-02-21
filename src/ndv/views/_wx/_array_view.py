@@ -152,10 +152,9 @@ class WxRGBView(WxLutView):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
         self._wxwidget.cmap.Hide()
-        # FIXME
-        # lbl = wx.StaticText(self, label="RGB")
-        # self._wxwidget._sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        # self._wxwidget.Layout()
+        lbl = wx.StaticText(self._wxwidget, label="RGB")
+        self._wxwidget._sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._wxwidget.Layout()
 
 
 # mostly copied from _qt.qt_view._QDimsSliders
