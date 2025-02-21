@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -581,8 +581,8 @@ class ArrayViewer:
                     values["B"] = value[2]
                     if len(value) > 3:
                         values["A"] = value[3]
-                elif isinstance(value, float):
-                    values[key] = value
+                else:
+                    values[key] = cast(float, value)
 
         return values
 
