@@ -100,16 +100,18 @@ class _ArrayDataDisplayModel(NDVModel):
         elif mode == ChannelMode.RGBA:
             if self.data_wrapper is not None and self.display.channel_axis is None:
                 # Coerce image to RGB
-                # FIXME? going back another ChannelMode retains these changes
-                if len(self.data_wrapper.sizes()) != 3:
-                    raise Exception("RGBA datasets must be 3-dimensional")
+                if len(self.normed_visible_axes) == 3:
+                    raise Exception("")
                 guess = self.data_wrapper.guess_channel_axis()
                 self.display.channel_axis = guess
-                other_axes = dict(self.data_wrapper.sizes())
-                other_axes.pop(guess)
-                self.display.visible_axes = cast(
-                    TwoOrThreeAxisTuple, tuple(other_axes.keys())
-                )
+                # FIXME? going back another ChannelMode retains these changes
+                if guess in self.normed_visible_axes:
+                    dims = list(self.data_wrapper.sizes().keys())
+                    dims.remove(guess)
+                    new_visible_axes = dims[-self.display.n_visible_axes :]
+                    self.display.visible_axes = cast(
+                        TwoOrThreeAxisTuple, tuple(new_visible_axes)
+                    )
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
