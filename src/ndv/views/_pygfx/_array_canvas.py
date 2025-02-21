@@ -65,7 +65,7 @@ class PyGFXImageHandle(ImageHandle):
             self._grid = pygfx.Texture(data, dim=2)
             self._image.geometry = pygfx.Geometry(grid=self._grid)
             # RGB images (i.e. 3D datasets) cannot have a colormap
-            self._material.map = None if data.ndim == 3 else self._cmap.to_pygfx()
+            self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
 
     def visible(self) -> bool:
         return bool(self._image.visible)
@@ -102,7 +102,7 @@ class PyGFXImageHandle(ImageHandle):
 
     def set_colormap(self, cmap: _cmap.Colormap) -> None:
         # RGB (i.e. 3D) images should not have a colormap
-        if self.data().ndim == 3:
+        if self._is_rgb():
             warnings.warn("Cannot set colormap on an RGB image", stacklevel=2)
             return
         self._cmap = cmap
@@ -121,6 +121,9 @@ class PyGFXImageHandle(ImageHandle):
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
+
+    def _is_rgb(self) -> bool:
+        return self.data().ndim == 3 and isinstance(self._image, pygfx.Image)
 
 
 class PyGFXRectangle(RectangularROIHandle):
