@@ -222,7 +222,7 @@ class ArrayViewer:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
         if ctrl := self._lut_controllers.get(channel, None):
-            self._view.add_histogram(channel, hist.frontend_widget())
+            self._view.add_histogram(channel, hist)
             ctrl.add_lut_view(hist)
             # FIXME: hack
             if handles := ctrl.handles:

@@ -17,6 +17,7 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSlider,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._graphics._canvas import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         RectangularROIHandle,
@@ -173,13 +175,19 @@ class _QLUTWidget(QWidget):
         top.addWidget(self.auto_clim)
         top.addWidget(self.histogram_btn)
 
-        self._histogram: QWidget | None = None
+        self._histogram_layout = QHBoxLayout()
+        self.log_slider = QSlider(Qt.Orientation.Vertical)
+        self.log_slider.setRange(0, 10)
+        self.log_slider.setVisible(False)
+        self.histogram: HistogramCanvas | None = None
+        self._histogram_layout.addWidget(self.log_slider)
 
         # Retain a reference to this layout so we can add self._histogram later
         self._layout = QVBoxLayout(self)
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.addLayout(top)
+        self._layout.addLayout(self._histogram_layout)
 
 
 class QLutView(LutView):
@@ -192,6 +200,7 @@ class QLutView(LutView):
         self._channel = channel
         # TODO: use emit_fast
         self._qwidget.histogram_btn.toggled.connect(self._on_q_histogram_toggled)
+        self._qwidget.log_slider.valueChanged.connect(self._on_log_slider_changed)
         self._qwidget.visible.toggled.connect(self._on_q_visibility_changed)
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
@@ -247,10 +256,16 @@ class QLutView(LutView):
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_q_histogram_toggled(self, toggled: bool) -> None:
-        if hist := self._qwidget._histogram:
-            hist.setVisible(toggled)
-        elif toggled:
+        if count := self._qwidget._histogram_layout.count():
+            for i in range(count):
+                item = self._qwidget._histogram_layout.itemAt(i)
+                if item and item.widget() and isinstance(item.widget(), QWidget):
+                    item.widget().setVisible(toggled)
+        if self._qwidget.histogram is None:
             self.histogramRequested.emit(self._channel)
+
+    def _on_log_slider_changed(self, value: float) -> None:
+        pass
 
 
 class ROIButton(QPushButton):
@@ -501,16 +516,17 @@ class QtArrayView(ArrayView):
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
 
-    def add_histogram(self, channel: ChannelKey, widget: QWidget) -> None:
+    def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
             # Resize widget to a respectable size
             lut._qwidget.resize(
                 QSize(lut._qwidget.width(), lut._qwidget.height() + 100)
             )
             # Add widget to view
+            lut._qwidget.histogram = histogram
+            widget = cast(QWidget, histogram.frontend_widget())
             widget.resize(QSize(lut._qwidget.width(), 100))
-            lut._qwidget._histogram = widget
-            lut._qwidget._layout.addWidget(widget)
+            lut._qwidget._histogram_layout.addWidget(widget)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
