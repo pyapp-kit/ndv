@@ -61,16 +61,8 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
         return
 
     icon_path = svg_path(icon)
-    wx_icon = wx.svg.SVGimage.CreateFromFile(str(icon_path))
-    side_length = btn.Size.height
-    # NB 5 is a magic number for the margins
-    bmp_side_len = side_length - 5
-    bmp_size = wx.Size(bmp_side_len, bmp_side_len)
-    btn.SetBitmap(wx_icon.ConvertToScaledBitmap(bmp_size))
-
-    btn_side_len = side_length
-    btn_size = wx.Size(btn_side_len, btn_side_len)
-    btn.SetMaxSize(btn_size)
+    bitmap = wx.BitmapBundle.FromSVGFile(str(icon_path), wx.Size(16, 16))
+    btn.SetBitmapLabel(bitmap)
 
 
 # mostly copied from _qt.qt_view._QLUTWidget
@@ -91,18 +83,18 @@ class _WxLUTWidget(wx.Panel):
         self.clims.SetMax(65000)
         self.clims.SetValue(0, 65000)
 
-        self.auto_clim = wx.ToggleButton(self, label="Auto")
+        self.auto_clim = wx.ToggleButton(self, label="Auto", size=(50, -1))
 
-        self.histogram = wx.ToggleButton(self)
+        self.histogram = wx.ToggleButton(self, label="Hist", size=(40, -1))
         _add_icon(self.histogram, "foundation:graph-bar")
 
         # Layout
         widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        widget_sizer.Add(self.visible, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        widget_sizer.Add(self.cmap, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        widget_sizer.Add(self.clims, 1, wx.ALIGN_CENTER_VERTICAL, 5)
-        widget_sizer.Add(self.auto_clim, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        widget_sizer.Add(self.histogram, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        widget_sizer.Add(self.visible, 0, wx.ALL, 2)
+        widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
+        widget_sizer.Add(self.clims, 1, wx.ALL, 2)
+        widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
+        widget_sizer.Add(self.histogram, 0, wx.ALL, 2)
         widget_sizer.SetSizeHints(self)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
@@ -320,15 +312,15 @@ class _WxArrayViewer(wx.Frame):
         )
 
         # Reset zoom button
-        self.set_range_btn = wx.Button(self)
+        self.set_range_btn = wx.Button(self, label="Reset Zoom", size=(40, -1))
         self.set_range_btn.SetToolTip("Reset Zoom")
         _add_icon(self.set_range_btn, "fluent:full-screen-maximize-24-filled")
 
         # 3d view button
-        self.ndims_btn = wx.ToggleButton(self, label="3D")
+        self.ndims_btn = wx.ToggleButton(self, label="3D", size=(40, -1))
 
         # Add ROI button
-        self.add_roi_btn = wx.ToggleButton(self)
+        self.add_roi_btn = wx.ToggleButton(self, label="Add ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
         # LUT layout (simple vertical grouping for LUT widgets)
@@ -336,10 +328,10 @@ class _WxArrayViewer(wx.Frame):
 
         self._btns = wx.BoxSizer(wx.HORIZONTAL)
         self._btns.AddStretchSpacer()
-        self._btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
-        self._btns.Add(self.set_range_btn, 0, wx.ALL, 5)
-        self._btns.Add(self.ndims_btn, 0, wx.ALL, 5)
-        self._btns.Add(self.add_roi_btn, 0, wx.ALL, 5)
+        self._btns.Add(self.channel_mode_combo, 0, wx.ALL, 4)
+        self._btns.Add(self.set_range_btn, 0, wx.ALL, 4)
+        self._btns.Add(self.ndims_btn, 0, wx.ALL, 4)
+        self._btns.Add(self.add_roi_btn, 0, wx.ALL, 4)
 
         self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
         top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
