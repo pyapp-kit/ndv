@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.3.0](https://github.com/pyapp-kit/ndv/tree/v0.3.0) (2025-02-24)
+
+[Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.2.2...v0.3.0)
+
+**Implemented enhancements:**
+
+- feat: add widget visibility options to ArrayViewerModel [\#139](https://github.com/pyapp-kit/ndv/pull/139) ([tlambert03](https://github.com/tlambert03))
+- feat: add `call_later` \(public\) and `process_events` \(private\) to the NDVApp API [\#136](https://github.com/pyapp-kit/ndv/pull/136) ([tlambert03](https://github.com/tlambert03))
+- feat: per-channel histograms [\#132](https://github.com/pyapp-kit/ndv/pull/132) ([gselzer](https://github.com/gselzer))
+- feat: Rectangular ROIs [\#114](https://github.com/pyapp-kit/ndv/pull/114) ([gselzer](https://github.com/gselzer))
+
+**Fixed bugs:**
+
+- fix: fix conditional when normalized channel axis resolves to 0 [\#135](https://github.com/pyapp-kit/ndv/pull/135) ([tlambert03](https://github.com/tlambert03))
+
+**Tests & CI:**
+
+- test: skip ubuntu-vispy-pyside-3.12 [\#137](https://github.com/pyapp-kit/ndv/pull/137) ([tlambert03](https://github.com/tlambert03))
+- test: test minimum stated dependencies on CI with `uv --resolution lowest-direct` [\#109](https://github.com/pyapp-kit/ndv/pull/109) ([tlambert03](https://github.com/tlambert03))
+
+**Documentation:**
+
+- docs: use mkdocs-api-autonav to generate nav [\#133](https://github.com/pyapp-kit/ndv/pull/133) ([tlambert03](https://github.com/tlambert03))
+
+**Merged pull requests:**
+
+- chore: Purge v1 [\#142](https://github.com/pyapp-kit/ndv/pull/142) ([gselzer](https://github.com/gselzer))
+- refactor: Pass LUTModel to LUTView [\#87](https://github.com/pyapp-kit/ndv/pull/87) ([gselzer](https://github.com/gselzer))
+
 ## [v0.2.2](https://github.com/pyapp-kit/ndv/tree/v0.2.2) (2025-01-29)
 
 [Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.2.1...v0.2.2)
