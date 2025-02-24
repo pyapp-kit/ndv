@@ -5,6 +5,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import psygnal
 from qtpy.QtCore import QSize, Qt, Signal
 from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import (
@@ -38,7 +39,7 @@ if TYPE_CHECKING:
     from psygnal import EmissionInfo
     from qtpy.QtGui import QIcon
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
@@ -158,20 +159,39 @@ class _QLUTWidget(QWidget):
         self.auto_clim.setMaximumWidth(42)
         self.auto_clim.setCheckable(True)
 
-        layout = QHBoxLayout(self)
-        layout.setSpacing(5)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.visible)
-        layout.addWidget(self.cmap)
-        layout.addWidget(self.clims)
-        layout.addWidget(self.auto_clim)
+        # TODO: Consider other options here
+        add_histogram_icon = QIconifyIcon("foundation:graph-bar")
+        self.histogram_btn = QPushButton(add_histogram_icon, "")
+        self.histogram_btn.setCheckable(True)
+
+        top = QHBoxLayout()
+        top.setSpacing(5)
+        top.setContentsMargins(0, 0, 0, 0)
+        top.addWidget(self.visible)
+        top.addWidget(self.cmap)
+        top.addWidget(self.clims)
+        top.addWidget(self.auto_clim)
+        top.addWidget(self.histogram_btn)
+
+        self._histogram: QWidget | None = None
+
+        # Retain a reference to this layout so we can add self._histogram later
+        self._layout = QVBoxLayout(self)
+        self._layout.setSpacing(0)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.addLayout(top)
 
 
 class QLutView(LutView):
-    def __init__(self) -> None:
+    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    histogramRequested = psygnal.Signal(object)
+
+    def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__()
         self._qwidget = _QLUTWidget()
+        self._channel = channel
         # TODO: use emit_fast
+        self._qwidget.histogram_btn.toggled.connect(self._on_q_histogram_toggled)
         self._qwidget.visible.toggled.connect(self._on_q_visibility_changed)
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
@@ -225,6 +245,12 @@ class QLutView(LutView):
             else:
                 clims = self._qwidget.clims.value()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_q_histogram_toggled(self, toggled: bool) -> None:
+        if hist := self._qwidget._histogram:
+            hist.setVisible(toggled)
+        elif toggled:
+            self.histogramRequested.emit(self._channel)
 
 
 class ROIButton(QPushButton):
@@ -372,10 +398,6 @@ class _QArrayViewer(QWidget):
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
         self.set_range_btn = QPushButton(set_range_icon, "", self)
 
-        # button to add a histogram
-        add_histogram_icon = QIconifyIcon("foundation:graph-bar")
-        self.histogram_btn = QPushButton(add_histogram_icon, "", self)
-
         # button to draw ROIs
         self._roi_handle: RectangularROIHandle | None = None
         self._selection: CanvasElement | None = None
@@ -396,7 +418,6 @@ class _QArrayViewer(QWidget):
 
         self._btn_layout.addWidget(self.channel_mode_combo)
         self._btn_layout.addWidget(self.ndims_btn)
-        self._btn_layout.addWidget(self.histogram_btn)
         self._btn_layout.addWidget(self.add_roi_btn)
         self._btn_layout.addWidget(self.set_range_btn)
 
@@ -450,7 +471,8 @@ class QtArrayView(ArrayView):
         self._data_model = data_model
         self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
-        qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
+        # Mapping of channel key to LutViews
+        self._luts: dict[ChannelKey, QLutView] = {}
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
@@ -465,8 +487,11 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self) -> QLutView:
-        view = QLutView()
+    def add_lut_view(self, channel: ChannelKey) -> QLutView:
+        view = QLutView(channel)
+        self._luts[channel] = view
+
+        view.histogramRequested.connect(self.histogramRequested)
         self._qwidget.luts.addWidget(view.frontend_widget())
         return view
 
@@ -476,22 +501,16 @@ class QtArrayView(ArrayView):
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
 
-    def _on_add_histogram_clicked(self) -> None:
-        splitter = self._qwidget.splitter
-        if hasattr(self, "_hist"):
-            if not (sizes := splitter.sizes())[-1]:
-                splitter.setSizes([self._qwidget.height() - 100, 100])
-            else:
-                splitter.setSizes([sum(sizes), 0])
-        else:
-            self.histogramRequested.emit()
-
-    def add_histogram(self, widget: QWidget) -> None:
-        if hasattr(self, "_hist"):
-            raise RuntimeError("Only one histogram can be added at a time")
-        self._hist = widget
-        self._qwidget.splitter.addWidget(widget)
-        self._qwidget.splitter.setSizes([self._qwidget.height() - 100, 100])
+    def add_histogram(self, channel: ChannelKey, widget: QWidget) -> None:
+        if lut := self._luts.get(channel, None):
+            # Resize widget to a respectable size
+            lut._qwidget.resize(
+                QSize(lut._qwidget.width(), lut._qwidget.height() + 100)
+            )
+            # Add widget to view
+            widget.resize(QSize(lut._qwidget.width(), 100))
+            lut._qwidget._histogram = widget
+            lut._qwidget._layout.addWidget(widget)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
@@ -576,7 +595,8 @@ class QtArrayView(ArrayView):
             if old == InteractionMode.CREATE_ROI:
                 self._qwidget.add_roi_btn.setChecked(False)
         elif sig_name == "show_histogram_button":
-            self._qwidget.histogram_btn.setVisible(value)
+            for lut in self._luts.values():
+                lut._qwidget.histogram_btn.setVisible(value)
         elif sig_name == "show_roi_button":
             self._qwidget.add_roi_btn.setVisible(value)
         elif sig_name == "show_channel_mode_selector":
