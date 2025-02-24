@@ -70,8 +70,7 @@ pyside = [
     "qtpy >=2",
 ]
 wxpython = [
-    # Required for icons
-    "pyconify",
+    "pyconify>=0.2.1",
     "wxpython >=4.2.2",
 ]
 
