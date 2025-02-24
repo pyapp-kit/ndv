@@ -312,7 +312,7 @@ class _WxArrayViewer(wx.Frame):
         )
 
         # Reset zoom button
-        self.set_range_btn = wx.Button(self, label="Reset Zoom", size=(40, -1))
+        self.set_range_btn = wx.Button(self, label="Reset", size=(45, -1))
         self.set_range_btn.SetToolTip("Reset Zoom")
         _add_icon(self.set_range_btn, "fluent:full-screen-maximize-24-filled")
 
@@ -320,7 +320,7 @@ class _WxArrayViewer(wx.Frame):
         self.ndims_btn = wx.ToggleButton(self, label="3D", size=(40, -1))
 
         # Add ROI button
-        self.add_roi_btn = wx.ToggleButton(self, label="Add ROI", size=(40, -1))
+        self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
         # LUT layout (simple vertical grouping for LUT widgets)
