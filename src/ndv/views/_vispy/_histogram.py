@@ -307,6 +307,15 @@ class VispyHistogramCanvas(HistogramCanvas):
             self.plot.camera.interactive = False
         return False
 
+    def on_mouse_double_press(self, event: MousePressEvent) -> bool:
+        pos = event.x, event.y
+        # check whether the user grabbed a node
+        self._grabbed = self._find_nearby_node(pos)
+        if self._grabbed == Grabbable.GAMMA:
+            if self.model:
+                self.model.gamma = 1
+        return False
+
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
