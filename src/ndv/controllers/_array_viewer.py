@@ -549,7 +549,6 @@ class ArrayViewer:
                 # FIXME: currently this is updating the histogram on *any*
                 # channel index... so it doesn't work with composite mode
                 hist.set_data(counts, bin_edges)
-                hist.set_range()
 
         self._canvas.refresh()
 

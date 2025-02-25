@@ -158,6 +158,8 @@ class VispyHistogramCanvas(HistogramCanvas):
         """
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
+        camera_rect = self.plot.camera.rect
+        self._resize(x=(camera_rect.left, camera_rect.right))
 
     def set_range(
         self,
@@ -167,17 +169,15 @@ class VispyHistogramCanvas(HistogramCanvas):
         margin: float = 0,
     ) -> None:
         if x:
-            if x[0] > x[1]:
-                x = (x[1], x[0])
+            _x = (min(x), max(x))
         elif self._bin_edges is not None:
-            x = self._bin_edges[0], self._bin_edges[-1]
+            _x = self._bin_edges[0], self._bin_edges[-1]
         if y:
-            if y[0] > y[1]:
-                y = (y[1], y[0])
+            _y = (min(y), max(y))
         elif self._values is not None:
-            y = (0, np.max(self._values))
-        self._range = y
-        self._domain = x
+            _y = (0, np.max(self._values))
+        self._range = _y if y else None
+        self._domain = _x if x else None
         self._resize()
 
     def set_vertical(self, vertical: bool) -> None:
@@ -191,10 +191,17 @@ class VispyHistogramCanvas(HistogramCanvas):
 
     def set_log_base(self, base: float | None) -> None:
         if base != self._log_base:
-            self._log_base = base
+            if self._log_base is not None and self._range:
+                self._range = (self._log_base**x for x in self._range)
+            self._log_base = None if base is None else 2**base
+            if self._log_base is not None and self._range:
+                self._range = tuple(
+                    np.log(x) / np.log(self._log_base) for x in self._range
+                )
             self._update_histogram()
             self._update_lut_lines()
-            self._resize()
+            camera_rect = self.plot.camera.rect
+            self._resize(x=(camera_rect.left, camera_rect.right))
 
     def frontend_widget(self) -> Any:
         return self._canvas.native
@@ -222,9 +229,8 @@ class VispyHistogramCanvas(HistogramCanvas):
             return  # pragma: no cover
         values = self._values
         if self._log_base:
-            #  Replace zero values with 1
-            values = np.where(values == 0, 1, values)
-            values = np.log(values) / np.log(self._log_base)
+            # Use a count+1 histogram to gracefully handle 0, 1
+            values = np.log(values + 1) / np.log(self._log_base)
 
         verts, faces = _hist_counts_to_mesh(values, self._bin_edges, self._vertical)
         self._hist_mesh.set_data(vertices=verts, faces=faces)
@@ -380,10 +386,17 @@ class VispyHistogramCanvas(HistogramCanvas):
         x, y = self.node_tform.map(pos)[:2]
         return x, y
 
-    def _resize(self) -> None:
+    def _resize(
+        self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None
+    ) -> None:
+        if x is None:
+            x = self._range if self._vertical else self._domain
+        if y is None:
+            y = self._domain if self._vertical else self._range
+
         self.plot.camera.set_range(
-            x=self._range if self._vertical else self._domain,
-            y=self._domain if self._vertical else self._range,
+            x=x,
+            y=y,
             # FIXME: Bitten by https://github.com/vispy/vispy/issues/1483
             # It's pretty visible in logarithmic mode
             margin=1e-30,
