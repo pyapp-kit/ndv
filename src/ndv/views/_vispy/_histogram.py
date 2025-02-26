@@ -192,7 +192,7 @@ class VispyHistogramCanvas(HistogramCanvas):
     def set_log_base(self, base: float | None) -> None:
         if base != self._log_base:
             if self._log_base is not None and self._range:
-                self._range = (self._log_base**x for x in self._range)
+                self._range = tuple(self._log_base**x for x in self._range)
             self._log_base = None if base is None else 2**base
             if self._log_base is not None and self._range:
                 self._range = tuple(
@@ -202,6 +202,13 @@ class VispyHistogramCanvas(HistogramCanvas):
             self._update_lut_lines()
             camera_rect = self.plot.camera.rect
             self._resize(x=(camera_rect.left, camera_rect.right))
+        # HACK: Disable labels for log axis - there has to be a better way
+        self.plot.yaxis.axis.tick_color = (
+            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
+        )
+        self.plot.yaxis.axis.text_color = (
+            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
+        )
 
     def frontend_widget(self) -> Any:
         return self._canvas.native

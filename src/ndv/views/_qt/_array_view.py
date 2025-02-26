@@ -18,13 +18,14 @@ from qtpy.QtWidgets import (
     QLabel,
     QLayout,
     QPushButton,
+    QSizePolicy,
+    QSpacerItem,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
 from superqt import (
     QCollapsible,
-    QDoubleSlider,
     QElidingLabel,
     QLabeledRangeSlider,
     QLabeledSlider,
@@ -182,20 +183,23 @@ class _QLUTWidget(QWidget):
 
         # TODO: Consider a container for this...
         self._histogram_layout = QHBoxLayout()
-        self.log_slider = QDoubleSlider(Qt.Orientation.Vertical)
-        self.log_slider.setRange(1, 2)
-        self.log_slider.setVisible(False)
         self.histogram_reset = QPushButton()
         histogram_ctrls = QVBoxLayout()
+        # Add a vertical spacer that expands to take up available space
+        # This is the key component that pushes everything down
+        spacer = QSpacerItem(
+            0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding
+        )
+        histogram_ctrls.addItem(spacer)
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
         self.set_hist_range_btn = QPushButton(set_range_icon, "", self)
-        # log_icon = QIconifyIcon("mdi:math-log")
-        # self.log_btn = QPushButton(log_icon, "", self)
-        # self.set_hist_range_btn.setFixedSize(self.set_hist_range_btn.size())
         self.set_hist_range_btn.setVisible(False)
-        histogram_ctrls.addWidget(
-            self.log_slider,
-        )
+        log_icon = QIconifyIcon("mdi:math-log")
+        self.log_btn = QPushButton(log_icon, "", self)
+        self.log_btn.setToolTip("log (base 10, count+1)")
+        self.log_btn.setCheckable(True)
+        self.log_btn.setVisible(False)
+        histogram_ctrls.addWidget(self.log_btn)
         histogram_ctrls.addWidget(self.set_hist_range_btn)
         self.histogram: HistogramCanvas | None = None
         self._histogram_layout.addLayout(histogram_ctrls)
@@ -218,7 +222,7 @@ class QLutView(LutView):
         self._channel = channel
         # TODO: use emit_fast
         self._qwidget.histogram_btn.toggled.connect(self._on_q_histogram_toggled)
-        self._qwidget.log_slider.valueChanged.connect(self._on_log_slider_changed)
+        self._qwidget.log_btn.toggled.connect(self._on_log_btn_toggled)
         self._qwidget.set_hist_range_btn.clicked.connect(
             self._on_set_histogram_range_clicked
         )
@@ -290,15 +294,14 @@ class QLutView(LutView):
         if self._qwidget.histogram is None:
             self.histogramRequested.emit(self._channel)
 
-    def _on_log_slider_changed(self, value: int) -> None:
+    def _on_log_btn_toggled(self, toggled: bool) -> None:
         if hist := self._qwidget.histogram:
-            print(value)
-            base = None if value == 1 else float(value)
-            hist.set_log_base(base)
+            hist.set_log_base(10 if toggled else None)
 
     def _on_set_histogram_range_clicked(self) -> None:
-        self._qwidget.log_slider.setValue(1)
-        self._qwidget.histogram.set_range()
+        self._qwidget.log_btn.setChecked(False)
+        if hist := self._qwidget.histogram:
+            hist.set_range()
 
 
 class ROIButton(QPushButton):
