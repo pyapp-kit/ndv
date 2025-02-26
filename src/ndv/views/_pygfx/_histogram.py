@@ -302,9 +302,11 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         """
         # Convert values/bins to vertices/faces
         self._values, self._bin_edges = values, bin_edges
-        verts, faces = _hist_counts_to_mesh(
-            self._values, self._bin_edges, self._vertical
-        )
+        if self._log_base:
+            # use a count+1 histogram to gracefully handle 0, 1
+            values = np.log(values + 1) / np.log(self._log_base)
+
+        verts, faces = _hist_counts_to_mesh(values, self._bin_edges, self._vertical)
 
         # Number of bins unchanged - reuse existing geometry for performance
         if (

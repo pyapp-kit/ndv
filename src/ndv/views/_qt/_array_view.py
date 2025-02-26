@@ -6,23 +6,26 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
-from qtpy.QtCore import QSize, Qt, Signal
+from qtpy.QtCore import QPoint, QSize, Qt, Signal
 from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QLayout,
+    QMenu,
     QPushButton,
     QSizePolicy,
     QSpacerItem,
     QSplitter,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 from superqt import (
     QCollapsible,
@@ -36,7 +39,7 @@ from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
@@ -164,8 +167,17 @@ class _QLUTWidget(QWidget):
         self.clims.setRange(0, 2**16)  # TODO: expose
 
         self.auto_clim = QPushButton("Auto")
+        self.auto_clim.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.auto_clim.customContextMenuRequested.connect(self._show_auto_scale_menu)
         self.auto_clim.setMaximumWidth(42)
         self.auto_clim.setCheckable(True)
+
+        # Note - appears only in the auto context menu
+        self.auto_spinbox = QDoubleSpinBox()
+        self.auto_spinbox.setRange(0, 49.9)
+        self.auto_spinbox.setSingleStep(0.1)
+        self.auto_spinbox.setSuffix("%")
+        self.auto_spinbox.setValue(0)
 
         # TODO: Consider other options here
         add_histogram_icon = QIconifyIcon("foundation:graph-bar")
@@ -211,6 +223,20 @@ class _QLUTWidget(QWidget):
         self._layout.addLayout(top)
         self._layout.addLayout(self._histogram_layout)
 
+    def _show_auto_scale_menu(self, position: QPoint) -> None:
+        context_menu = QMenu(self)
+
+        # Create a widget action to hold the spinbox
+        spinbox_action = QWidgetAction(context_menu)
+        spinbox_action.setDefaultWidget(self.auto_spinbox)
+
+        # Add actions to the menu
+        context_menu.addAction("Ignore tails:")
+        context_menu.addAction(spinbox_action)
+
+        # Show the context menu
+        context_menu.exec_(self.auto_clim.mapToGlobal(position))
+
 
 class QLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
@@ -230,6 +256,7 @@ class QLutView(LutView):
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
         self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
+        self._qwidget.auto_spinbox.valueChanged.connect(self._on_q_auto_tails_changed)
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
@@ -275,10 +302,16 @@ class QLutView(LutView):
     def _on_q_auto_changed(self, autoscale: bool) -> None:
         if self._model:
             if autoscale:
-                self._model.clims = ClimsMinMax()
+                tail = self._qwidget.auto_spinbox.value()
+                self._model.clims = ClimsPercentile(
+                    min_percentile=tail, max_percentile=100 - tail
+                )
             else:
                 clims = self._qwidget.clims.value()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_q_auto_tails_changed(self, value: bool) -> None:
+        self._on_q_auto_changed(self._qwidget.auto_clim.isChecked())
 
     def _on_q_histogram_toggled(self, toggled: bool) -> None:
         def set_visible_in(layout: QLayout) -> None:
