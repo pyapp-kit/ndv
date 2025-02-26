@@ -29,7 +29,7 @@ class ArrayView(Viewable):
 
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
-    histogramRequested = Signal()
+    histogramRequested = Signal(int)
     visibleAxesChanged = Signal()
     channelModeChanged = Signal(ChannelMode)
 
@@ -69,7 +69,7 @@ class ArrayView(Viewable):
     @abstractmethod
     def remove_lut_view(self, view: LutView) -> None: ...
 
-    def add_histogram(self, widget: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
         raise NotImplementedError
 
     def remove_histogram(self, widget: Any) -> None:

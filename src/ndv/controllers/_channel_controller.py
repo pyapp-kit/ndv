@@ -66,9 +66,7 @@ class ChannelController:
         self.handles.append(handle)
         self.add_lut_view(handle)
 
-    def get_value_at_index(
-        self, idx: tuple[int, ...]
-    ) -> tuple[float, ...] | float | None:
+    def get_value_at_index(self, idx: tuple[int, ...]) -> np.ndarray | float | None:
         """Get the value of the data at the given index."""
         if not (handles := self.handles):
             return None

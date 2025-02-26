@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import ipywidgets as widgets
+import psygnal
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
@@ -41,7 +42,12 @@ def notifications_blocked(
 
 
 class JupyterLutView(LutView):
-    def __init__(self) -> None:
+    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    histogramRequested = psygnal.Signal(object)
+
+    def __init__(self, channel: ChannelKey = None) -> None:
+        self._channel = channel
+        self._histogram_wdg: widgets.Widget | None = None
         # WIDGETS
         self._visible = widgets.Checkbox(value=True, indent=False)
         self._visible.layout.width = "60px"
@@ -75,20 +81,31 @@ class JupyterLutView(LutView):
             description="Auto",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
-            layout=widgets.Layout(width="65px"),
+            layout=widgets.Layout(min_width="40px"),
+        )
+        self._histogram = widgets.ToggleButton(
+            value=False,
+            description="",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            icon="bar-chart",
+            tooltip="View Histogram",
+            layout=widgets.Layout(width="40px"),
         )
 
         # LAYOUT
 
-        self.layout = widgets.HBox(
-            [self._visible, self._cmap, self._clims, self._auto_clim]
+        lut_ctrls = widgets.HBox(
+            [self._visible, self._cmap, self._clims, self._auto_clim, self._histogram]
         )
+        self._histogram_container = widgets.HBox([])
+        self.layout = widgets.VBox([lut_ctrls, self._histogram_container])
 
         # CONNECTIONS
         self._visible.observe(self._on_visible_changed, names="value")
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
+        self._histogram.observe(self._on_histogram_requested, names="value")
 
     # ------------------ emit changes to the controller ------------------
 
@@ -112,6 +129,15 @@ class JupyterLutView(LutView):
             else:  # Manually scale
                 clims = self._clims.value
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_histogram_requested(self, change: dict[str, Any]) -> None:
+        if self._histogram_wdg:
+            # show or hide the actual widget itself
+            self._histogram_container.layout.display = (
+                "flex" if change["new"] else "none"
+            )
+        else:
+            self.histogramRequested.emit(self._channel)
 
     # ------------------ receive changes from the controller ---------------
 
@@ -171,6 +197,7 @@ class JupyterArrayView(ArrayView):
         self._data_model = data_model
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
+        self._luts: dict[ChannelKey, JupyterLutView] = {}
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
@@ -327,6 +354,9 @@ class JupyterArrayView(ArrayView):
         """Add a LUT view to the viewer."""
         wdg = JupyterRGBView() if channel == "RGB" else JupyterLutView()
         layout = self._luts_box
+        self._luts[channel] = wdg
+
+        wdg.histogramRequested.connect(self.histogramRequested)
         layout.children = (*layout.children, wdg.layout)
         return wdg
 
@@ -356,15 +386,22 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+        if lut := self._luts.get(channel, None):
+            # Resize widget to a respectable size
+            widget.set_trait("css_height", "100px")
+            # Add widget to view
+            lut._histogram_container.children = (
+                *lut._histogram_container.children,
+                widget,
+            )
+            lut._histogram_wdg = widget
+
     def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
         )
-
-    def add_histogram(self, widget: Any) -> None:
-        """Add a histogram widget to the viewer."""
-        warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
 
     def remove_histogram(self, widget: Any) -> None:
         """Remove a histogram widget from the viewer."""
@@ -423,7 +460,9 @@ class JupyterArrayView(ArrayView):
             if old == InteractionMode.CREATE_ROI:
                 self._add_roi_btn.value = False
         elif sig_name == "show_histogram_button":
-            ...
+            # Note that "block" displays the icon better than "flex"
+            for lut in self._luts.values():
+                lut._histogram.layout.display = "block" if value else "none"
         elif sig_name == "show_roi_button":
             self._add_roi_btn.layout.display = "flex" if value else "none"
         elif sig_name == "show_channel_mode_selector":

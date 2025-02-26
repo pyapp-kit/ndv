@@ -69,7 +69,10 @@ pyside = [
     "pyside6 >=6.6; python_version >= '3.12'",
     "qtpy >=2",
 ]
-wxpython = ["wxpython >=4.2.2"]
+wxpython = [
+    "pyconify>=0.2.1",
+    "wxpython >=4.2.2",
+]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
