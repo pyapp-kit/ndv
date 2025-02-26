@@ -210,8 +210,8 @@ class WxLutView(LutView):
 
 
 class WxRGBView(WxLutView):
-    def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent)
+    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
+        super().__init__(parent, channel)
         self._wxwidget.cmap.Hide()
         lbl = wx.StaticText(self._wxwidget, label="RGB")
         self._wxwidget._sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
@@ -431,7 +431,7 @@ class WxArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey = None) -> WxLutView:
         wdg = self.frontend_widget()
-        view = WxRGBView(wdg) if channel == "RGB" else WxLutView(wdg)
+        view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
         # TODO: Reusable synchronization with ViewerModel

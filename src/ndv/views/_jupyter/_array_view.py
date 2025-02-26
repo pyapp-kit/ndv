@@ -173,8 +173,8 @@ class JupyterLutView(LutView):
 
 
 class JupyterRGBView(JupyterLutView):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, channel: ChannelKey = None) -> None:
+        super().__init__(channel)
         self._cmap.layout.display = "none"
         children = list(self.layout.children)
         lbl = widgets.Label(value="RGB")
@@ -352,7 +352,7 @@ class JupyterArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey = None) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterRGBView() if channel == "RGB" else JupyterLutView()
+        wdg = JupyterRGBView(channel) if channel == "RGB" else JupyterLutView(channel)
         layout = self._luts_box
         self._luts[channel] = wdg
 
