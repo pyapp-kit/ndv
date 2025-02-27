@@ -37,8 +37,8 @@ class VispyHistogramCanvas(HistogramCanvas):
     def __init__(self, *, vertical: bool = False) -> None:
         # ------------ data and state ------------ #
 
-        self._values: Sequence[float] | np.ndarray | None = None
-        self._bin_edges: Sequence[float] | np.ndarray | None = None
+        self._values: np.ndarray | None = None
+        self._bin_edges: np.ndarray | None = None
         self._clims: tuple[float, float] | None = None
         self._gamma: float = 1
 
