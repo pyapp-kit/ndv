@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
     import cmap
     from psygnal import EmissionInfo
+    from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
@@ -195,7 +196,6 @@ class _QLUTWidget(QWidget):
 
         # TODO: Consider a container for this...
         self._histogram_layout = QHBoxLayout()
-        self.histogram_reset = QPushButton()
         histogram_ctrls = QVBoxLayout()
         # Add a vertical spacer that expands to take up available space
         # This is the key component that pushes everything down
