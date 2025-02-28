@@ -253,6 +253,13 @@ class QLutView(LutView):
             self.histogramRequested.emit(self._channel)
 
 
+class QRGBView(QLutView):
+    def __init__(self, channel: ChannelKey = None) -> None:
+        super().__init__(channel)
+        self._qwidget.cmap.setVisible(False)
+        self._qwidget._layout.insertWidget(1, QLabel("RGB"))
+
+
 class ROIButton(QPushButton):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -390,7 +397,11 @@ class _QArrayViewer(QWidget):
         # not using QEnumComboBox because we want to exclude some values for now
         self.channel_mode_combo = QComboBox(self)
         self.channel_mode_combo.addItems(
-            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+            [
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ]
         )
 
         # button to reset the zoom of the canvas
@@ -487,8 +498,8 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self, channel: ChannelKey) -> QLutView:
-        view = QLutView(channel)
+    def add_lut_view(self, channel: ChannelKey = None) -> QLutView:
+        view = QRGBView(channel) if channel == "RGB" else QLutView(channel)
         self._luts[channel] = view
 
         view.histogramRequested.connect(self.histogramRequested)
