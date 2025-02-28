@@ -62,12 +62,9 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
 
     icon_path = svg_path(icon)
     bitmap = wx.BitmapBundle.FromSVGFile(str(icon_path), wx.Size(16, 16))
-    # FIXME? Preserve button size - not guaranteed on MacOS
-    size = btn.GetSize()
     # Note - label must be cleared first so bitmap is center-aligned
     btn.SetLabel("")
     btn.SetBitmapLabel(bitmap)
-    btn.SetSize(size)
 
 
 # mostly copied from _qt.qt_view._QLUTWidget
