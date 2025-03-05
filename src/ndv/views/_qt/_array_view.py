@@ -7,22 +7,21 @@ from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
 from qtpy.QtCore import QPoint, QSize, Qt, Signal
-from qtpy.QtGui import QMovie
+from qtpy.QtGui import QCursor, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
-    QMenu,
     QPushButton,
     QSplitter,
     QVBoxLayout,
     QWidget,
-    QWidgetAction,
 )
 from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
 from superqt.cmap import QColormapComboBox
@@ -84,6 +83,29 @@ QRangeSlider { qproperty-barColor: qlineargradient(
 """
 
 
+class QtPopup(QDialog):
+    """A generic popup window."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setModal(False)  # if False, then clicking anywhere else closes it
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+
+        self.frame = QFrame(self)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.frame)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+    def show_above_mouse(self, *args: Any) -> None:
+        """Show popup dialog above the mouse cursor position."""
+        pos = QCursor().pos()  # mouse position
+        szhint = self.sizeHint()
+        pos -= QPoint(szhint.width() // 2, szhint.height() + 14)
+        self.move(pos)
+        self.resize(self.sizeHint())
+        self.show()
+
+
 class _CmapCombo(QColormapComboBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent, allow_user_colormaps=True, add_colormap_text="Add...")
@@ -139,6 +161,40 @@ class _DimToggleButton(QPushButton):
         self.setCheckable(True)
 
 
+class _AutoscaleButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__("Auto", parent)
+        self.setMaximumWidth(42)
+        self.setCheckable(True)
+
+        self.upper_box = QDoubleSpinBox()
+        self.upper_box.setRange(0, 49.9)
+        self.upper_box.setSingleStep(0.1)
+        self.upper_box.setSuffix("%")
+        self.upper_box.setValue(0)
+
+        self.lower_box = QDoubleSpinBox()
+        self.lower_box.setRange(0, 49.9)
+        self.lower_box.setSingleStep(0.1)
+        self.lower_box.setSuffix("%")
+        self.lower_box.setValue(0)
+
+        self._popup = QtPopup(self)
+        form = QFormLayout(self._popup.frame)
+        form.setContentsMargins(6, 6, 6, 6)
+        form.addRow("Ignore Lower Tail:", self.lower_box)
+        form.addRow("Ignore Upper Tail:", self.upper_box)
+
+    def mousePressEvent(self, e: QMouseEvent | None) -> None:
+        if e and e.button() == Qt.MouseButton.RightButton:
+            self._show_options_dialog()
+        else:
+            super().mousePressEvent(e)
+
+    def _show_options_dialog(self) -> None:
+        self._popup.show_above_mouse()
+
+
 class _QLUTWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -158,18 +214,7 @@ class _QLUTWidget(QWidget):
         self.clims.setEdgeLabelMode(QLabeledRangeSlider.EdgeLabelMode.NoLabel)
         self.clims.setRange(0, 2**16)  # TODO: expose
 
-        self.auto_clim = QPushButton("Auto")
-        self.auto_clim.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.auto_clim.customContextMenuRequested.connect(self._show_auto_scale_menu)
-        self.auto_clim.setMaximumWidth(42)
-        self.auto_clim.setCheckable(True)
-
-        # Note - appears only in the auto context menu
-        self.auto_spinbox = QDoubleSpinBox()
-        self.auto_spinbox.setRange(0, 49.9)
-        self.auto_spinbox.setSingleStep(0.1)
-        self.auto_spinbox.setSuffix("%")
-        self.auto_spinbox.setValue(0)
+        self.auto_clim = _AutoscaleButton()
 
         # TODO: Consider other options here
         add_histogram_icon = QIconifyIcon("foundation:graph-bar")
@@ -193,20 +238,6 @@ class _QLUTWidget(QWidget):
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.addLayout(top)
 
-    def _show_auto_scale_menu(self, position: QPoint) -> None:
-        context_menu = QMenu(self)
-
-        # Create a widget action to hold the spinbox
-        spinbox_action = QWidgetAction(context_menu)
-        spinbox_action.setDefaultWidget(self.auto_spinbox)
-
-        # Add actions to the menu
-        context_menu.addAction("Ignore tails:")
-        context_menu.addAction(spinbox_action)
-
-        # Show the context menu
-        context_menu.exec_(self.auto_clim.mapToGlobal(position))
-
 
 class QLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
@@ -222,7 +253,12 @@ class QLutView(LutView):
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
         self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
-        self._qwidget.auto_spinbox.valueChanged.connect(self._on_q_auto_tails_changed)
+        self._qwidget.auto_clim.upper_box.valueChanged.connect(
+            self._on_q_auto_tails_changed
+        )
+        self._qwidget.auto_clim.lower_box.valueChanged.connect(
+            self._on_q_auto_tails_changed
+        )
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
@@ -268,9 +304,10 @@ class QLutView(LutView):
     def _on_q_auto_changed(self, autoscale: bool) -> None:
         if self._model:
             if autoscale:
-                tail = self._qwidget.auto_spinbox.value()
+                lower_tail = self._qwidget.auto_clim.lower_box.value()
+                upper_tail = self._qwidget.auto_clim.upper_box.value()
                 self._model.clims = ClimsPercentile(
-                    min_percentile=tail, max_percentile=100 - tail
+                    min_percentile=lower_tail, max_percentile=100 - upper_tail
                 )
             else:
                 clims = self._qwidget.clims.value()
