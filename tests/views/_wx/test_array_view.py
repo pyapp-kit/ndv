@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
 from unittest.mock import MagicMock, Mock
 
 import wx
@@ -28,9 +27,9 @@ def test_array_options(viewer: WxArrayView) -> None:
     viewer._viewer_model.show_3d_button = False
     assert not wxwdg.ndims_btn.IsShown()
 
-    assert wxlut.histogram.IsShown()
+    assert wxlut.histogram_btn.IsShown()
     viewer._viewer_model.show_histogram_button = False
-    assert not wxlut.histogram.IsShown()
+    assert not wxlut.histogram_btn.IsShown()
 
     assert wxwdg.set_range_btn.IsShown()
     viewer._viewer_model.show_reset_zoom_button = False
@@ -57,7 +56,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
 
     channel = None
     lut = viewer._luts[channel]
-    btn = lut._wxwidget.histogram
+    btn = lut._wxwidget.histogram_btn
 
     # Ensure lut signal gets passed through the viewer with the channel as the arg
     histogram_mock = Mock()
@@ -67,8 +66,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
     histogram_mock.assert_called_once_with(channel)
 
     # Test adding the histogram widget puts it on the relevant lut
-    assert len(lut._wxwidget.sizer.GetChildren()) == 1
+    assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 1
     histogram = get_histogram_canvas_class()()  # will raise if not supported
-    histogram_wdg = cast(wx.Window, histogram.frontend_widget())
-    viewer.add_histogram(channel, histogram_wdg)
-    assert len(lut._wxwidget.sizer.GetChildren()) == 2
+    viewer.add_histogram(channel, histogram)
+    assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 2

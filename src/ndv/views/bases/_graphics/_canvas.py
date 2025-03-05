@@ -30,7 +30,20 @@ class GraphicsCanvas(Viewable, Mouseable):
         y: tuple[float, float] | None = None,
         z: tuple[float, float] | None = None,
         margin: float = ...,
-    ) -> None: ...
+    ) -> None:
+        """Sets the bounds of the camera."""
+        ...
+
+    @abstractmethod
+    def set_extent(
+        self,
+        x: tuple[float | None, float | None] | None = None,
+        y: tuple[float | None, float | None] | None = None,
+        z: tuple[float | None, float | None] | None = None,
+    ) -> None:
+        """Defines the bounds of the viewable area."""
+        ...
+
     @abstractmethod
     def canvas_to_world(
         self, pos_xy: tuple[float, float]

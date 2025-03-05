@@ -61,6 +61,39 @@ def get_canvas_class() -> WgpuCanvas:
     raise Exception(f"No canvas available for frontend {frontend}")
 
 
+class _OrthographicCamera(pygfx.OrthographicCamera):
+    # TODO: Make these configurable
+    xbounds: tuple[float | None, float | None] = (None, None)
+    ybounds: tuple[float | None, float | None] = (None, None)
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        """Set the state of the camera from a dict.
+
+        Accepted fields are the same as in ``get_state()``. In addition,
+        the fields ``x``, ``y``, and ``z`` are also accepted to set the
+        position along a singular dimension.
+
+        """
+        # Note that this code preserves camera width so long as the
+        # desired width is possible given the bounds. This is why
+        # width clamping must come before the checks against each bound.
+
+        # Ensure width constrained within xbounds
+        if self.xbounds[0] is not None and self.xbounds[1] is not None:
+            state["width"] = min(state["width"], self.xbounds[1] - self.xbounds[0])
+        # Ensure (x+/-width) constrained within xbounds
+        x = state["x"]
+        rad = state["width"] / 2
+        if self.xbounds[0] is not None:
+            if x - rad < self.xbounds[0]:
+                state["x"] = self.xbounds[0] + rad
+        if self.xbounds[1] is not None:
+            if x + rad > self.xbounds[1]:
+                state["x"] = self.xbounds[1] - rad
+
+        super().set_state(state)
+
+
 class PyGFXHistogramCanvas(HistogramCanvas):
     """A HistogramCanvas utilizing VisPy."""
 
@@ -85,9 +118,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # Canvas Margins, in pixels (around the data)
         # TODO: Computation might better support different displays
         self.margin_left = 50  # Provide room for y-axis ticks
-        self.margin_bottom = 20  # Provide room for x-axis ticks
+        self.margin_top = 20  # Provide room for x-axis ticks
         self.margin_right = 10
-        self.margin_top = 15
+        self.margin_bottom = 10
 
         # ------------ PyGFX Canvas ------------ #
         cls = get_canvas_class()
@@ -113,9 +146,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             self._renderer.blend_mode = "weighted_depth"
 
         self._scene = pygfx.Scene()
-        self._viewport = pygfx.Viewport(self._renderer)
-        self._camera: pygfx.OrthographicCamera = pygfx.OrthographicCamera()
-        self._camera.maintain_aspect = False
+        self._plot_view = pygfx.Viewport(self._renderer)
+        self._camera = _OrthographicCamera(maintain_aspect=False)
 
         self._histogram = pygfx.Mesh(
             geometry=pygfx.Geometry(
@@ -140,6 +172,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         )
         self._scene.add(self._clim_handles)
 
+        self._x_scene = pygfx.Scene()
         self._x = pygfx.Ruler(
             start_pos=(0, 0, 0),
             end_pos=(1, 0, 0),
@@ -147,18 +180,28 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             tick_format="",  # Avoid scientific notation
             tick_side="right",
         )
+        self._x_scene.add(self._x)
+        self._x_cam = _OrthographicCamera(maintain_aspect=False, width=1, height=1)
+
+        self._y_scene = pygfx.Scene()
         self._y = pygfx.Ruler(
             start_pos=(0, 0, 0),
             end_pos=(0, 1, 0),
             start_value=0,
             tick_side="left",
         )
-        self._scene.add(self._x, self._y)
+        self._y_scene.add(self._y)
 
-        # TODO: Re-implement pan/zoom?
-        controller = pygfx.PanZoomController(register_events=self._viewport)
+        self._y_cam = pygfx.OrthographicCamera(maintain_aspect=False, width=1, height=1)
+        self._y_cam.local.position = [0.5, 0.5, 0]
+
+        controller = pygfx.PanZoomController(register_events=self._plot_view)
         controller.add_camera(
             self._camera,
+            include_state={"x", "width"},
+        )
+        controller.add_camera(
+            self._x_cam,
             include_state={"x", "width"},
         )
         self._controller = controller
@@ -176,13 +219,17 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._disconnect_mouse_events()
         self._canvas.close()
 
-    def _resize(self) -> None:
+    def _resize(
+        self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None
+    ) -> None:
         # Construct the bounding box
         bb = np.zeros([2, 2])
         # Priority is given to user range specifications
         # If the user does not specify the data display range,
         # display the extent of the data if it exists
-        if self._domain:
+        if x:
+            bb[:, 0] = x
+        elif self._domain:
             # User-specified
             bb[:, 0] = self._domain
         elif self._bin_edges is not None:
@@ -191,7 +238,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         else:
             # Default
             bb[:, 0] = (0, 1)
-        if self._range:
+        if y:
+            bb[:, 1] = y
+        elif self._range:
             # User-specified
             bb[:, 1] = self._range
         else:
@@ -199,9 +248,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             bb[:, 1] = (0, self._clim_handles.local.scale_y)
 
         # Update camera
-        # NB this is tricky because the axis tick sizes are specified in pixels.
-        px_width, px_height = self._viewport.logical_size
-        world_width, world_height = np.ptp(bb, axis=0)
         # 2D Plot layout:
         #
         #         c0                c1               c2
@@ -213,44 +259,72 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         #  r2 |             | margin_bottom   |               |
         #     |-------------+-----------------+---------------+
         #
-        width_frac = px_width / (px_width - self.margin_left - self.margin_right)
-        self._camera.width = world_width * width_frac
+        self._x_cam.width = self._camera.width = bb[1, 0] - bb[0, 0]
+        self._camera.height = bb[1, 1] - bb[0, 1]
 
-        height_frac = px_height / (px_height - self.margin_top - self.margin_bottom)
-        self._camera.height = world_height * height_frac
+        self._x_cam.local.position = [(bb[0, 0] + bb[1, 0]) / 2, 0, 0]
 
         self._camera.local.position = [
-            world_width * (1 - (px_width / 2 / (px_width - self.margin_left))),
-            world_height * (1 - (px_height / 2 / (px_height - self.margin_bottom))),
+            (bb[0, 0] + bb[1, 0]) / 2,
+            (bb[0, 1] + bb[1, 1]) / 2,
             0,
         ]
 
-        # Update rulers
-        self._x.start_pos = [bb[0, 0], bb[0, 1], 0]
-        self._x.end_pos = [bb[1, 0], bb[0, 1], 0]
+        # NB: Prevent errors for invisible canvases
+        c_w = max(self._canvas.get_logical_size()[0], 1)
+        c_h = max(self._canvas.get_logical_size()[1], 1)
+        around_origin = [
+            self.margin_left / c_w,
+            self.margin_top / c_h,
+        ]
 
-        self._y.start_pos = [bb[0, 0], bb[0, 1], 0]
-        self._y.end_pos = [bb[0, 0], bb[1, 1], 0]
+        self._y.start_pos = [around_origin[0], around_origin[1], 0]
+        self._y.end_pos = [around_origin[0], (c_h - self.margin_bottom) / c_h, 0]
+
         # TODO For short canvases, pygfx has a tough time assigning ticks.
         # For lack of a more thorough dive/fix, just mark the maximum of the histogram
         if self._values is not None:
-            self._y.ticks = [int(self._values.max())]
+            self._y.ticks = {
+                self._y.end_pos[1] - around_origin[1]: float(self._values.max())
+            }
         else:
             self._y.ticks = bb[1, 1]
-        self._y.min_tick_distance = bb[1, 1]  # Prevents any other ticks
 
     def _animate(self) -> None:
         # Dynamically rescale the graph when canvas size changes
-        rect = self._viewport.logical_size
+        rect = self._canvas.get_logical_size()
         if rect != self._size:
+            # Update viewport
+            self._plot_view.rect = (
+                self.margin_left,
+                self.margin_bottom,
+                max(0, rect[0] - self.margin_left - self.margin_right),
+                max(0, rect[1] - self.margin_bottom - self.margin_top),
+            )
             self._size = rect
             self._resize()
 
-        self._x.update(self._camera, self._viewport.logical_size)
-        self._y.update(self._camera, self._viewport.logical_size)
+        self._x.update(self._x_cam, self._canvas.get_logical_size())
+        self._y.update(self._y_cam, self._canvas.get_logical_size())
 
-        # Update viewport
-        self._viewport.render(self._scene, self._camera, flush=True)
+        # Render the plot
+        self._plot_view.render(self._scene, self._camera, flush=False)
+        # Render the x-axis
+        self._renderer.render(
+            self._x_scene,
+            self._x_cam,
+            rect=(
+                self.margin_left,
+                self.margin_bottom + self._plot_view.rect[3] - self.margin_top,
+                self._plot_view.rect[2],
+                2 * self.margin_top,
+            ),
+            flush=False,
+        )
+        # Render the y-axis
+        self._renderer.render(self._y_scene, self._y_cam, flush=False)
+        # Flush all three onto the canvas
+        self._renderer.flush()
 
     def set_visible(self, visible: bool) -> None: ...
 
@@ -300,11 +374,27 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         These inputs follow the same format as the return value of numpy.histogram.
         """
-        # Convert values/bins to vertices/faces
+        # Update the histogram mesh
         self._values, self._bin_edges = values, bin_edges
-        verts, faces = _hist_counts_to_mesh(
-            self._values, self._bin_edges, self._vertical
-        )
+        self._update_histogram()
+        # Resize the y-axis against the new data
+        camera_x = self._camera.local.x
+        rad_x = self._camera.width / 2
+        self._resize(x=(camera_x - rad_x, camera_x + rad_x))
+
+    def _update_histogram(self) -> None:
+        """Set the histogram values and bin edges.
+
+        These inputs follow the same format as the return value of numpy.histogram.
+        """
+        if self._values is None or self._bin_edges is None:
+            return  # pragma: no cover
+        values = self._values
+        if self._log_base:
+            # use a count+1 histogram to gracefully handle 0, 1
+            values = np.log(values + 1) / np.log(self._log_base)
+
+        verts, faces = _hist_counts_to_mesh(values, self._bin_edges, self._vertical)
 
         # Number of bins unchanged - reuse existing geometry for performance
         if (
@@ -322,8 +412,26 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self._clim_handles.local.scale_y = values.max() / 0.98
 
-        self._resize()
         self.refresh()
+
+    def set_extent(
+        self,
+        x: tuple[float | None, float | None] | None = None,
+        y: tuple[float | None, float | None] | None = None,
+        z: tuple[float | None, float | None] | None = None,
+    ) -> None:
+        if x is not None:
+            self._x_cam.xbounds = x
+            self._camera.xbounds = x
+            # FIXME what to do if None?
+            self._x.start_pos = [x[0] if x[0] else 0, 0, 0]
+            self._x.end_pos = [x[1] if x[1] else 65535, 0, 0]
+        if y is not None:
+            self._x_cam.ybounds = y
+            self._camera.ybounds = y
+            # FIXME what to do if None?
+            self._y.start_pos = [0, y[0] if y[0] else 0, 0, 0]
+            self._y.end_pos = [0, y[1] if y[1] else 65535, 0, 0]
 
     def set_range(
         self,
@@ -352,8 +460,20 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         raise NotImplementedError()
 
     def set_log_base(self, base: float | None) -> None:
-        # TODO:
-        raise NotImplementedError()
+        if base != self._log_base:
+            if self._log_base is not None and self._range:
+                self._range = tuple(self._log_base**x for x in self._range)
+            self._log_base = None if base is None else 2**base
+            if self._log_base is not None and self._range:
+                self._range = tuple(
+                    np.log(x) / np.log(self._log_base) for x in self._range
+                )
+            self._update_histogram()
+
+            # Resize along the y dimension only
+            r = self._camera.width / 2
+            x = self._camera.local.position[0]
+            self._resize(x=(x - r, x + r))
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -406,7 +526,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         return color
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType:
-        pos = (mme.x, mme.y)
+        pos = mme.x - self.margin_left, mme.y - self.margin_bottom
         nearby = self._find_nearby_node(pos)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
@@ -415,14 +535,14 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             return CursorType.H_ARROW if self._vertical else CursorType.V_ARROW
         else:
             x, y = pos
-            x_max, y_max = self._viewport.logical_size
+            x_max, y_max = self._plot_view.logical_size
             if (0 < x <= x_max) and (0 <= y <= y_max):
                 return CursorType.ALL_ARROW
             else:
                 return CursorType.DEFAULT
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
-        pos = event.x, event.y
+        pos = event.x - self.margin_left, event.y - self.margin_bottom
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(pos)
         if self._grabbed != Grabbable.NONE:
@@ -501,7 +621,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR420
         screen_space = pygfx.utils.transform.AffineTransform()
         screen_space.position = (-1, 1, 0)
-        x_d, y_d = self._viewport.logical_size
+        x_d, y_d = self._plot_view.logical_size
         screen_space.scale = (2 / x_d, -2 / y_d, 1)
         ndc_to_screen = screen_space.inverse_matrix
         canvas_pos = la.vec_transform(
@@ -517,11 +637,11 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR395
         # Get position relative to viewport
         pos_rel = (
-            pos_xy[0] - self._viewport.rect[0],
-            pos_xy[1] - self._viewport.rect[1],
+            pos_xy[0] - self._plot_view.rect[0],
+            pos_xy[1] - self._plot_view.rect[1],
         )
 
-        vs = self._viewport.logical_size
+        vs = self._plot_view.logical_size
 
         # Convert position to NDC
         x = pos_rel[0] / vs[0] * 2 - 1

@@ -222,7 +222,7 @@ class ArrayViewer:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
         if ctrl := self._lut_controllers.get(channel, None):
-            self._view.add_histogram(channel, hist.frontend_widget())
+            self._view.add_histogram(channel, hist)
             ctrl.add_lut_view(hist)
             # FIXME: hack
             if handles := ctrl.handles:
@@ -248,7 +248,7 @@ class ArrayViewer:
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
             for hist in self._histograms.values():
-                hist.set_range(x=(iinfo.min, iinfo.max))
+                hist.set_extent(x=(iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -549,7 +549,6 @@ class ArrayViewer:
                 # FIXME: currently this is updating the histogram on *any*
                 # channel index... so it doesn't work with composite mode
                 hist.set_data(counts, bin_edges)
-                hist.set_range()
 
         self._canvas.refresh()
 
