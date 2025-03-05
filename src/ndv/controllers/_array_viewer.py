@@ -248,7 +248,7 @@ class ArrayViewer:
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
             for hist in self._histograms.values():
-                hist.set_range(x=(iinfo.min, iinfo.max))
+                hist.set_extent(x=(iinfo.min, iinfo.max))
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True

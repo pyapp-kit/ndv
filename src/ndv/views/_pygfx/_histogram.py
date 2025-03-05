@@ -61,6 +61,39 @@ def get_canvas_class() -> WgpuCanvas:
     raise Exception(f"No canvas available for frontend {frontend}")
 
 
+class _OrthographicCamera(pygfx.OrthographicCamera):
+    # TODO: Make these configurable
+    xbounds: tuple[float | None, float | None] = (None, None)
+    ybounds: tuple[float | None, float | None] = (None, None)
+
+    def set_state(self, state: dict[str, Any]) -> None:
+        """Set the state of the camera from a dict.
+
+        Accepted fields are the same as in ``get_state()``. In addition,
+        the fields ``x``, ``y``, and ``z`` are also accepted to set the
+        position along a singular dimension.
+
+        """
+        # Note that this code preserves camera width so long as the
+        # desired width is possible given the bounds. This is why
+        # width clamping must come before the checks against each bound.
+
+        # Ensure width constrained within xbounds
+        if self.xbounds[0] is not None and self.xbounds[1] is not None:
+            state["width"] = min(state["width"], self.xbounds[1] - self.xbounds[0])
+        # Ensure (x+/-width) constrained within xbounds
+        x = state["x"]
+        rad = state["width"] / 2
+        if self.xbounds[0] is not None:
+            if x - rad < self.xbounds[0]:
+                state["x"] = self.xbounds[0] + rad
+        if self.xbounds[1] is not None:
+            if x + rad > self.xbounds[1]:
+                state["x"] = self.xbounds[1] - rad
+
+        super().set_state(state)
+
+
 class PyGFXHistogramCanvas(HistogramCanvas):
     """A HistogramCanvas utilizing VisPy."""
 
@@ -114,7 +147,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self._scene = pygfx.Scene()
         self._plot_view = pygfx.Viewport(self._renderer)
-        self._camera = pygfx.OrthographicCamera(maintain_aspect=False)
+        self._camera = _OrthographicCamera(maintain_aspect=False)
 
         self._histogram = pygfx.Mesh(
             geometry=pygfx.Geometry(
@@ -148,7 +181,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             tick_side="right",
         )
         self._x_scene.add(self._x)
-        self._x_cam = pygfx.OrthographicCamera(maintain_aspect=False, width=1, height=1)
+        self._x_cam = _OrthographicCamera(maintain_aspect=False, width=1, height=1)
 
         self._y_scene = pygfx.Scene()
         self._y = pygfx.Ruler(
@@ -346,9 +379,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         camera_x = self._camera.local.x
         rad_x = self._camera.width / 2
         self._resize(x=(camera_x - rad_x, camera_x + rad_x))
-        # FIXME these would ideally be infinite or bounding the data type
-        self._x.start_pos = [0, 0, 0]
-        self._x.end_pos = [65535, 0, 0]
 
     def _update_histogram(self) -> None:
         """Set the histogram values and bin edges.
@@ -381,6 +411,25 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._clim_handles.local.scale_y = values.max() / 0.98
 
         self.refresh()
+
+    def set_extent(
+        self,
+        x: tuple[float | None, float | None] | None = None,
+        y: tuple[float | None, float | None] | None = None,
+        z: tuple[float | None, float | None] | None = None,
+    ) -> None:
+        if x is not None:
+            self._x_cam.xbounds = x
+            self._camera.xbounds = x
+            # FIXME what to do if None?
+            self._x.start_pos = [x[0] if x[0] else 0, 0, 0]
+            self._x.end_pos = [x[1] if x[1] else 65535, 0, 0]
+        if y is not None:
+            self._x_cam.ybounds = y
+            self._camera.ybounds = y
+            # FIXME what to do if None?
+            self._y.start_pos = [0, y[0] if y[0] else 0, 0, 0]
+            self._y.end_pos = [0, y[1] if y[1] else 65535, 0, 0]
 
     def set_range(
         self,
@@ -419,7 +468,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 )
             self._update_histogram()
 
-            self._resize(x=(self._x.start_pos[0], self._x.end_pos[0]))
+            # Resize along the y dimension only
+            r = self._camera.width / 2
+            x = self._camera.local.position[0]
+            self._resize(x=(x - r, x + r))
 
     def frontend_widget(self) -> Any:
         return self._canvas

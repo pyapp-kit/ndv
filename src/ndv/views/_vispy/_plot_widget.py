@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, cast
 
-from vispy import scene
+from vispy import geometry, scene
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -285,6 +285,9 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         self, axis: Literal["x", "y", None] = None, *args: Any, **kwargs: Any
     ) -> None:
         self._axis: Literal["x", "y", None] = axis
+        # Domain bounds - user can specify min/max for both axes
+        self.xbounds: tuple[float | None, float | None] = (None, None)
+        self.ybounds: tuple[float | None, float | None] = (None, None)
         super().__init__(*args, **kwargs)
 
     @property
@@ -295,6 +298,25 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         elif self._axis in ("y", 1):
             return 1
         return None
+
+    @scene.cameras.PanZoomCamera.rect.setter  # type:ignore[misc]
+    def rect(self, args: Any) -> None:
+        # 4-tuple: (x, y, w, h)
+        if isinstance(args, tuple):
+            args = geometry.Rect(*args)
+        if isinstance(args, geometry.Rect):
+            # Enforce bounds
+            # FIXME: Trying to pan past the bounds results in a zoom
+            if self.xbounds[0] is not None:
+                args.left = max(args.left, self.xbounds[0])
+            if self.xbounds[1] is not None:
+                args.right = min(args.right, self.xbounds[1])
+
+            if self.ybounds[0] is not None:
+                args.bottom = max(args.bottom, self.ybounds[0])
+            if self.ybounds[1] is not None:
+                args.top = min(args.top, self.ybounds[1])
+        super(PanZoom1DCamera, type(self)).rect.fset(self, args)
 
     def zoom(
         self,
@@ -330,3 +352,11 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     ) -> None:
         """Reset the camera view to the specified range."""
         super().set_range(x, y, z, margin)
+
+    # def _enforce_bounds(self) -> None:
+    #     if self.rect is None:
+    #         return
+    # if self.ybounds[0] is not None:
+    #     _pan[1] = max(_pan[1], self.ybounds[0] - rect.bottom)
+    # if self.ybounds[1] is not None:
+    #     _pan[1] = min(_pan[1], self.ybounds[1] - rect.top)

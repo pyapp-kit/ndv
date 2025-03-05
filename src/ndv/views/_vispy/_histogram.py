@@ -161,6 +161,17 @@ class VispyHistogramCanvas(HistogramCanvas):
         camera_rect = self.plot.camera.rect
         self._resize(x=(camera_rect.left, camera_rect.right))
 
+    def set_extent(
+        self,
+        x: tuple[float | None, float | None] | None = None,
+        y: tuple[float | None, float | None] | None = None,
+        z: tuple[float | None, float | None] | None = None,
+    ) -> None:
+        if x is not None:
+            self.plot.camera.xbounds = x
+        if y is not None:
+            self.plot.camera.ybounds = y
+
     def set_range(
         self,
         x: tuple[float, float] | None = None,
