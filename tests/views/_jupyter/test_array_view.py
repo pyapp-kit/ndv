@@ -50,7 +50,7 @@ def test_histogram(viewer: JupyterArrayView) -> None:
     # Ensure lut signal gets passed through the viewer with the channel as the arg
     histogram_mock = Mock()
     viewer.histogramRequested.connect(histogram_mock)
-    lut._histogram.value = True
+    lut._histogram_btn.value = True
     histogram_mock.assert_called_once_with(channel)
 
     # FIXME: Throws event loop errors
