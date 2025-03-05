@@ -270,7 +270,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             0,
         ]
 
-        c_w, c_h = self._canvas.get_logical_size()
+        # NB: Prevent errors for invisible canvases
+        c_w = max(self._canvas.get_logical_size()[0], 1)
+        c_h = max(self._canvas.get_logical_size()[1], 1)
         around_origin = [
             self.margin_left / c_w,
             self.margin_top / c_h,
