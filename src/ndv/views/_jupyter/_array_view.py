@@ -100,7 +100,6 @@ class JupyterLutView(LutView):
             layout=widgets.Layout(width="40px"),
         )
         self._reset_histogram = widgets.Button(
-            value=False,
             description="",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             icon="expand",
