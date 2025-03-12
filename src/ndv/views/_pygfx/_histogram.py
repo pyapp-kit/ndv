@@ -302,7 +302,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 max(0, rect[1] - self.margin_bottom - self.margin_top),
             )
             self._size = rect
-            self._resize()
 
         self._x.update(self._x_cam, self._canvas.get_logical_size())
         self._y.update(self._y_cam, self._canvas.get_logical_size())

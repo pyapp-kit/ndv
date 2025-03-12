@@ -249,6 +249,9 @@ class ArrayViewer:
             iinfo = np.iinfo(dtype)
             for hist in self._histograms.values():
                 hist.set_extent(x=(iinfo.min, iinfo.max))
+                # Recompute histogram range
+                # Note doing this here allows the resize to account for the data
+                hist.set_range()
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
