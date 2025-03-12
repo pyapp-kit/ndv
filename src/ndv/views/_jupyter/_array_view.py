@@ -92,19 +92,21 @@ class JupyterLutView(LutView):
             tooltip="View Histogram",
             layout=widgets.Layout(width="40px"),
         )
+
+        histogram_ctrl_width = 40
         self._log = widgets.ToggleButton(
             value=False,
             description="log",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Apply logarithm (base 10, count+1) to bins",
-            layout=widgets.Layout(width="40px"),
+            layout=widgets.Layout(width=f"{histogram_ctrl_width}px"),
         )
         self._reset_histogram = widgets.Button(
             description="",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             icon="expand",
             tooltip="Reset histogram view",
-            layout=widgets.Layout(width="40px"),
+            layout=widgets.Layout(width=f"{histogram_ctrl_width}px"),
         )
 
         # LAYOUT
@@ -118,29 +120,30 @@ class JupyterLutView(LutView):
                 self._histogram_btn,
             ]
         )
-        # FIXME:
-        self._histogram_btns = widgets.VBox(
+
+        histogram_ctrls = widgets.VBox(
             [self._log, self._reset_histogram],
             layout=widgets.Layout(
                 # Avoids scrollbar on buttons
-                # FIXME: Can this be programmatically computed?
-                min_width="50px",
+                min_width=f"{histogram_ctrl_width + 10}px",
                 # Floats buttons to the bottom
                 justify_content="flex-end",
             ),
         )
+
         self._histogram_container = widgets.HBox(
-            [self._histogram_btns],
+            # Note that we'll add a histogram here later
+            [histogram_ctrls],
             layout=widgets.Layout(
                 # Constrains histogram to 100px tall
                 max_height="100px",
-                # Avoids nearly-useless vertical scrollbar from
+                # Avoids vertical scrollbar from
                 # histogram being *just a bit* too tall
-                # FIXME: Is there a better way?
-                overflow="hidden",
+                overflow="visible",
+                # Hide histogram initially
+                display="none",
             ),
         )
-        self._histogram_container.layout.display = "none"
         self.layout = widgets.VBox([lut_ctrls, self._histogram_container])
 
         # CONNECTIONS
@@ -176,10 +179,11 @@ class JupyterLutView(LutView):
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_histogram_requested(self, change: dict[str, Any]) -> None:
-        # show or hide the actual widget itself
-        self._histogram_container.layout.display = "flex" if change["new"] else "none"
+        # Generate the histogram if we haven't done so yet
         if not self._histogram:
             self.histogramRequested.emit(self._channel)
+        # show or hide the histogram controls
+        self._histogram_container.layout.display = "flex" if change["new"] else "none"
 
     def _on_log_toggled(self, change: dict[str, Any]) -> None:
         if hist := self._histogram:
