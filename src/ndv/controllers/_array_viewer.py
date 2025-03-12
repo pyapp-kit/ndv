@@ -546,8 +546,6 @@ class ArrayViewer:
                 # TODO: once data comes in in chunks, we'll need a proper stateful
                 # stats object that calculates the histogram incrementally
                 counts, bin_edges = _calc_hist_bins(data)
-                # FIXME: currently this is updating the histogram on *any*
-                # channel index... so it doesn't work with composite mode
                 hist.set_data(counts, bin_edges)
 
         self._canvas.refresh()
