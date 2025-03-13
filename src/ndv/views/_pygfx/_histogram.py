@@ -62,7 +62,6 @@ def get_canvas_class() -> WgpuCanvas:
 
 
 class _OrthographicCamera(pygfx.OrthographicCamera):
-    # TODO: Make these configurable
     xbounds: tuple[float | None, float | None] = (None, None)
     ybounds: tuple[float | None, float | None] = (None, None)
 
@@ -145,9 +144,34 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             )
             self._renderer.blend_mode = "weighted_depth"
 
+        # Note that we split the view up into multiple scenes, each with their
+        # own camera and renderer.
+        #
+        # One scene handles all of the things in the plot, and is rendered
+        # to a rectangle contained within the margins defined above.
+        # This greatly simplifies the clipping of nodes on the plot.
         self._scene = pygfx.Scene()
         self._plot_view = pygfx.Viewport(self._renderer)
+        self._controller = pygfx.PanZoomController(register_events=self._plot_view)
+        # increase zoom wheel gain
+        self._controller.controls.update({"wheel": ("zoom_to_point", "push", -0.005)})
         self._camera = _OrthographicCamera(maintain_aspect=False)
+        self._controller.add_camera(self._camera, include_state={"x", "width"})
+
+        # A second scene handles the horizontal axis specifically. It still
+        # pans and zooms, but it renders to a different rectangle than the
+        # plot itself to avoid margin math.
+        self._x_scene = pygfx.Scene()
+        self._x_cam = _OrthographicCamera(maintain_aspect=False, width=1, height=1)
+        self._controller.add_camera(self._x_cam, include_state={"x", "width"})
+
+        # A third scene handles all static nodes (including the vertical axis).
+        # It renders to the entire canvas.
+        self._y_scene = pygfx.Scene()
+        self._y_cam = pygfx.OrthographicCamera(maintain_aspect=False, width=1, height=1)
+        self._y_cam.local.position = [0.5, 0.5, 0]
+
+        # ------------ Nodes ------------ #
 
         self._histogram = pygfx.Mesh(
             geometry=pygfx.Geometry(
@@ -157,7 +181,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             ),
             material=pygfx.MeshBasicMaterial(color=(1, 1, 1, 1)),
         )
-        self._scene.add(self._histogram)
 
         clim_npoints = 256
         self._clim_handles = pygfx.Line(
@@ -170,9 +193,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 color_mode="vertex",
             ),
         )
-        self._scene.add(self._clim_handles)
+        self._scene.add(self._histogram, self._clim_handles)
 
-        self._x_scene = pygfx.Scene()
         self._x = pygfx.Ruler(
             start_pos=(0, 0, 0),
             end_pos=(1, 0, 0),
@@ -181,9 +203,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             tick_side="right",
         )
         self._x_scene.add(self._x)
-        self._x_cam = _OrthographicCamera(maintain_aspect=False, width=1, height=1)
 
-        self._y_scene = pygfx.Scene()
         self._y = pygfx.Ruler(
             start_pos=(0, 0, 0),
             end_pos=(0, 1, 0),
@@ -191,22 +211,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             tick_side="left",
         )
         self._y_scene.add(self._y)
-
-        self._y_cam = pygfx.OrthographicCamera(maintain_aspect=False, width=1, height=1)
-        self._y_cam.local.position = [0.5, 0.5, 0]
-
-        controller = pygfx.PanZoomController(register_events=self._plot_view)
-        controller.add_camera(
-            self._camera,
-            include_state={"x", "width"},
-        )
-        controller.add_camera(
-            self._x_cam,
-            include_state={"x", "width"},
-        )
-        self._controller = controller
-        # increase zoom wheel gain
-        self._controller.controls.update({"wheel": ("zoom_to_point", "push", -0.005)})
 
         self.refresh()
 
@@ -247,7 +251,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             # Data-specified/default
             bb[:, 1] = (0, self._clim_handles.local.scale_y)
 
-        # Update camera
+        # Update cameras
         # 2D Plot layout:
         #
         #         c0                c1               c2
@@ -294,7 +298,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # Dynamically rescale the graph when canvas size changes
         rect = self._canvas.get_logical_size()
         if rect != self._size:
-            # Update viewport
+            # Update plot viewport
             self._plot_view.rect = (
                 self.margin_left,
                 self.margin_bottom,
@@ -313,10 +317,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             self._x_scene,
             self._x_cam,
             rect=(
-                self.margin_left,
-                self.margin_bottom + self._plot_view.rect[3] - self.margin_top,
-                self._plot_view.rect[2],
-                2 * self.margin_top,
+                self.margin_left,  # x
+                self.margin_bottom + self._plot_view.rect[3] - self.margin_top,  # y
+                self._plot_view.rect[2],  # w
+                2 * self.margin_top,  # h
             ),
             flush=False,
         )
@@ -413,24 +417,15 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self.refresh()
 
-    def set_extent(
+    def set_clim_bounds(
         self,
-        x: tuple[float | None, float | None] | None = None,
-        y: tuple[float | None, float | None] | None = None,
-        z: tuple[float | None, float | None] | None = None,
+        bounds: tuple[float | None, float | None] = (None, None),
     ) -> None:
-        if x is not None:
-            self._x_cam.xbounds = x
-            self._camera.xbounds = x
-            # FIXME what to do if None?
-            self._x.start_pos = [x[0] if x[0] else 0, 0, 0]
-            self._x.end_pos = [x[1] if x[1] else 65535, 0, 0]
-        if y is not None:
-            self._x_cam.ybounds = y
-            self._camera.ybounds = y
-            # FIXME what to do if None?
-            self._y.start_pos = [0, y[0] if y[0] else 0, 0, 0]
-            self._y.end_pos = [0, y[1] if y[1] else 65535, 0, 0]
+        self._x_cam.xbounds = bounds
+        self._camera.xbounds = bounds
+        # FIXME what to do if None?
+        self._x.start_pos = [0 if bounds[0] is None else int(bounds[0]), 0, 0]
+        self._x.end_pos = [65535 if bounds[1] is None else int(bounds[1]), 0, 0]
 
     def set_range(
         self,

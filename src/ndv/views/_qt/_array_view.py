@@ -248,6 +248,16 @@ class QLutView(LutView):
         with signals_blocked(self._qwidget.clims):
             self._qwidget.clims.setValue(clims)
 
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        # block self._qwidget._clims, otherwise autoscale will be forced off
+        mi = 0 if bounds[0] is None else int(bounds[0])
+        ma = 65535 if bounds[1] is None else int(bounds[1])
+        with signals_blocked(self._qwidget.clims):
+            self._qwidget.clims.setRange(mi, ma)
+
     def set_gamma(self, gamma: float) -> None:
         pass
 

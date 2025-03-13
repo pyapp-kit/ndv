@@ -35,16 +35,6 @@ class GraphicsCanvas(Viewable, Mouseable):
         ...
 
     @abstractmethod
-    def set_extent(
-        self,
-        x: tuple[float | None, float | None] | None = None,
-        y: tuple[float | None, float | None] | None = None,
-        z: tuple[float | None, float | None] | None = None,
-    ) -> None:
-        """Defines the bounds of the viewable area."""
-        ...
-
-    @abstractmethod
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:

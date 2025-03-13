@@ -399,15 +399,6 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created = ReferenceType(roi)
         return roi
 
-    def set_extent(
-        self,
-        x: tuple[float | None, float | None] | None = None,
-        y: tuple[float | None, float | None] | None = None,
-        z: tuple[float | None, float | None] | None = None,
-    ) -> None:
-        """Defines the bounds of the viewable area."""
-        raise NotImplementedError()
-
     def set_range(
         self,
         x: tuple[float, float] | None = None,

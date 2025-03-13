@@ -139,7 +139,7 @@ class JupyterLutView(LutView):
                 max_height="100px",
                 # Avoids vertical scrollbar from
                 # histogram being *just a bit* too tall
-                overflow="visible",
+                overflow="hidden",
                 # Hide histogram initially
                 display="none",
             ),
@@ -209,6 +209,19 @@ class JupyterLutView(LutView):
         # block self._clims.observe, otherwise autoscale will be forced off
         with notifications_blocked(self._clims):
             self._clims.value = clims
+
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        mi = 0 if bounds[0] is None else int(bounds[0])
+        ma = 65535 if bounds[1] is None else int(bounds[1])
+        # block self._clims.observe, otherwise autoscale will be forced off
+        with notifications_blocked(self._clims):
+            self._clims.min = mi
+            self._clims.max = ma
+            current_value = self._clims.value
+            self._clims.value = (max(current_value[0], mi), min(current_value[1], ma))
 
     def set_channel_visible(self, visible: bool) -> None:
         self._visible.value = visible

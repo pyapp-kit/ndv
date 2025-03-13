@@ -169,6 +169,8 @@ class LUTModel(NDVModel):
     clims : Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
         Method for determining the contrast limits for this channel.  If a 2-element
         `tuple` or `list` is provided, it is interpreted as a manual contrast limit.
+    bounds : tuple[float | None, float | None]
+        Optional extrema for limiting the range of the contrast limits
     gamma : float
         Gamma applied to the data before applying the colormap. By default, `1.0`.
     """
@@ -176,6 +178,7 @@ class LUTModel(NDVModel):
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
     clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
+    clim_bounds: tuple[float | None, float | None] = (None, None)
     gamma: float = 1.0
 
     @model_validator(mode="before")

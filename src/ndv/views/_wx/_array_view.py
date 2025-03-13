@@ -258,6 +258,19 @@ class WxLutView(LutView):
             self._wxwidget.clims.SetValue(*clims)
             wx.SafeYield()
 
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        mi = 0 if bounds[0] is None else int(bounds[0])
+        ma = 65535 if bounds[1] is None else int(bounds[1])
+        # block self._clims.observe, otherwise autoscale will be forced off
+        # Block signals from changing clims
+        with wx.EventBlocker(self._wxwidget.clims, wx.EVT_SLIDER.typeId):
+            self._wxwidget.clims.SetMin(mi)
+            self._wxwidget.clims.SetMax(ma)
+            wx.SafeYield()
+
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
 

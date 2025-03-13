@@ -161,16 +161,11 @@ class VispyHistogramCanvas(HistogramCanvas):
         camera_rect = self.plot.camera.rect
         self._resize(x=(camera_rect.left, camera_rect.right))
 
-    def set_extent(
+    def set_clim_bounds(
         self,
-        x: tuple[float | None, float | None] | None = None,
-        y: tuple[float | None, float | None] | None = None,
-        z: tuple[float | None, float | None] | None = None,
+        bounds: tuple[float | None, float | None] = (None, None),
     ) -> None:
-        if x is not None:
-            self.plot.camera.xbounds = x
-        if y is not None:
-            self.plot.camera.ybounds = y
+        self.plot.camera.xbounds = bounds
 
     def set_range(
         self,
@@ -350,12 +345,21 @@ class VispyHistogramCanvas(HistogramCanvas):
                 c = self._to_plot_coords(pos)[1]
             else:
                 c = self._to_plot_coords(pos)[0]
-            if self._grabbed is Grabbable.LEFT_CLIM:
-                newlims = (min(self._clims[1], c), self._clims[1])
-            elif self._grabbed is Grabbable.RIGHT_CLIM:
-                newlims = (self._clims[0], max(self._clims[0], c))
-            if self.model:
-                self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
+            if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
+                # determine new contrast limits
+                if self._grabbed is Grabbable.LEFT_CLIM:
+                    newlims = [min(self._clims[1], c), self._clims[1]]
+                else:  # RIGHT_CLIM
+                    newlims = [self._clims[0], max(self._clims[0], c)]
+                # Update model
+                if self.model:
+                    # The model may impose bounds on the contrast limits
+                    if min_bound := self.model.clim_bounds[0]:
+                        newlims[0] = max(newlims[0], min_bound)
+                    if max_bound := self.model.clim_bounds[1]:
+                        newlims[1] = min(newlims[1], max_bound)
+                    # Set clims
+                    self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
         if self._grabbed is Grabbable.GAMMA:
