@@ -178,7 +178,7 @@ class LUTModel(NDVModel):
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
     clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
-    clim_bounds: tuple[float | None, float | None] = (None, None)
+    clim_bounds: tuple[Optional[float], Optional[float]] = (None, None)
     gamma: float = 1.0
 
     @model_validator(mode="before")
