@@ -91,6 +91,17 @@ class JupyterAppWrap(NDVApp):
                 mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 intercepted |= receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
+            elif etype == "double_click":
+                # Step 1: Double Click
+                btn = JupyterAppWrap.mouse_btn(ev["button"])
+                mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=btn)
+                intercepted |= receiver.on_mouse_double_press(mpe)
+                receiver.mousePressed.emit(mpe)
+                # Step 2: Release (Jupyter doesn't emit a release after double-click)
+                # TODO: What about double-click + move?
+                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=btn)
+                intercepted |= receiver.on_mouse_release(mre)
+                receiver.mouseReleased.emit(mre)
             elif etype == "pointer_up":
                 mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 active_btn = MouseButton.NONE
