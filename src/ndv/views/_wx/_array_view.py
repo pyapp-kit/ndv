@@ -86,16 +86,18 @@ class _WxLUTWidget(wx.Panel):
 
         self.auto_clim = wx.ToggleButton(self, label="Auto", size=(50, -1))
 
+        self.histogram: HistogramCanvas | None = None
+        self._histogram_height = 100  # px
         self.histogram_btn = wx.ToggleButton(self, label="Hist", size=(40, -1))
         _add_icon(self.histogram_btn, "foundation:graph-bar")
 
         # Layout
-        widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        widget_sizer.Add(self.visible, 0, wx.ALL, 2)
-        widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
-        widget_sizer.Add(self.clims, 1, wx.ALL, 2)
-        widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
-        widget_sizer.Add(self.histogram_btn, 0, wx.ALL, 2)
+        self.lut_ctrls = wx.BoxSizer(wx.HORIZONTAL)
+        self.lut_ctrls.Add(self.visible, 0, wx.ALL, 2)
+        self.lut_ctrls.Add(self.cmap, 0, wx.ALL, 2)
+        self.lut_ctrls.Add(self.clims, 1, wx.ALL, 2)
+        self.lut_ctrls.Add(self.auto_clim, 0, wx.ALL, 2)
+        self.lut_ctrls.Add(self.histogram_btn, 0, wx.ALL, 2)
 
         # TODO: Consider a container for this...
         self._histogram_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -117,11 +119,10 @@ class _WxLUTWidget(wx.Panel):
         histogram_ctrls = wx.BoxSizer(wx.VERTICAL)
         histogram_ctrls.Add(self.log_btn, 0, wx.ALL, 2)
         histogram_ctrls.Add(self.set_hist_range_btn, 0, wx.ALL, 2)
-        self.histogram: HistogramCanvas | None = None
         self._histogram_sizer.Add(histogram_ctrls, 0, wx.EXPAND, 5)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(widget_sizer, 0, wx.EXPAND, 5)
+        self.sizer.Add(self.lut_ctrls, 0, wx.EXPAND, 5)
         self.sizer.Add(self._histogram_sizer, 0, wx.EXPAND, 5)
         self.sizer.SetSizeHints(self)
 
@@ -209,16 +210,11 @@ class WxLutView(LutView):
         # Setup references to the histogram
         self._histogram = widget
         self._wxwidget.histogram = histogram
-        self._wxwidget._histogram_sizer.Add(widget, 1, wx.ALIGN_CENTER, 5)
 
         # Assign a fixed size
-        # FIXME: This looks like a lot of extra space (on Windows)
-        hist_size = wx.Size(self._wxwidget.Size.width, 100)
-        widget.SetSize(hist_size)
+        hist_size = wx.Size(self._wxwidget.Size.width, self._wxwidget._histogram_height)
         widget.SetMinSize(hist_size)
-
-        # Show the histogram
-        self._show_histogram(True)
+        self._wxwidget._histogram_sizer.Add(widget, 0, wx.ALIGN_CENTER, 5)
 
     def _show_histogram(self, show: bool = True) -> None:
         def set_visible_in(sizer: wx.Sizer) -> None:
@@ -231,10 +227,9 @@ class WxLutView(LutView):
         set_visible_in(self._wxwidget._histogram_sizer)
 
         # Resize the widget around the histogram
-        # FIXME: Is all of this really necessary?
-        size = wx.Size(self._wxwidget.Size)
-        size.height += 100 if show else -100
-        self._wxwidget.SetSize(size)
+        size = wx.Size(self._wxwidget.lut_ctrls.MinSize)
+        if show:
+            size.height += self._wxwidget._histogram_height
         self._wxwidget.SetMinSize(size)
         self._wxwidget.GetParent().Layout()
 
@@ -264,12 +259,8 @@ class WxLutView(LutView):
     ) -> None:
         mi = 0 if bounds[0] is None else int(bounds[0])
         ma = 65535 if bounds[1] is None else int(bounds[1])
-        # block self._clims.observe, otherwise autoscale will be forced off
-        # Block signals from changing clims
-        with wx.EventBlocker(self._wxwidget.clims, wx.EVT_SLIDER.typeId):
-            self._wxwidget.clims.SetMin(mi)
-            self._wxwidget.clims.SetMax(ma)
-            wx.SafeYield()
+        self._wxwidget.clims.SetMin(mi)
+        self._wxwidget.clims.SetMax(ma)
 
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
@@ -510,6 +501,7 @@ class WxArrayView(ArrayView):
         if lut := self._luts.get(channel, None):
             # Add the histogram widget on the LUT
             lut._add_histogram(canvas)
+        self._wxwidget.Layout()
 
     def remove_lut_view(self, lut: LutView) -> None:
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
