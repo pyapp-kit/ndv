@@ -352,11 +352,3 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     ) -> None:
         """Reset the camera view to the specified range."""
         super().set_range(x, y, z, margin)
-
-    # def _enforce_bounds(self) -> None:
-    #     if self.rect is None:
-    #         return
-    # if self.ybounds[0] is not None:
-    #     _pan[1] = max(_pan[1], self.ybounds[0] - rect.bottom)
-    # if self.ybounds[1] is not None:
-    #     _pan[1] = min(_pan[1], self.ybounds[1] - rect.top)
