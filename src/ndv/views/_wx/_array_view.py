@@ -63,6 +63,8 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
 
     icon_path = svg_path(icon)
     bitmap = wx.BitmapBundle.FromSVGFile(str(icon_path), wx.Size(16, 16))
+    # Note - label must be cleared first so bitmap is center-aligned
+    btn.SetLabel("")
     btn.SetBitmapLabel(bitmap)
 
 
@@ -193,7 +195,7 @@ class WxLutView(LutView):
             hist.set_range()
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
-        widget = cast(wx.Window, histogram.frontend_widget())
+        widget = cast("wx.Window", histogram.frontend_widget())
         # FIXME: pygfx backend needs this to be widget._subwidget
         if hasattr(widget, "_subwidget"):
             widget = widget._subwidget

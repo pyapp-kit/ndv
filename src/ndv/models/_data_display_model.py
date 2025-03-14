@@ -264,7 +264,7 @@ class _ArrayDataDisplayModel(NDVModel):
             if i is None:
                 ch_data = data
             else:
-                ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
+                ch_keepdims = (slice(None),) * cast("int", ch_ax) + (i,) + (None,)
                 ch_data = data[ch_keepdims]
             data_response[i] = ch_data.transpose(*t_dims).squeeze()
 
