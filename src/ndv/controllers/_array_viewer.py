@@ -606,7 +606,7 @@ class ArrayViewer:
                     if value.shape[0] > 3:
                         values["A"] = value[3]
                 else:
-                    values[key] = cast(float, value)
+                    values[key] = cast("float", value)
 
         return values
 
