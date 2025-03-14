@@ -18,6 +18,7 @@ class Mouseable:
 
     mouseMoved = Signal(MouseMoveEvent)
     mousePressed = Signal(MousePressEvent)
+    mouseDoublePressed = Signal(MousePressEvent)
     mouseReleased = Signal(MouseReleaseEvent)
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:

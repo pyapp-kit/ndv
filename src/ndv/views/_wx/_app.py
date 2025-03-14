@@ -102,6 +102,7 @@ class WxAppWrap(NDVApp):
             active_button = MouseButton.LEFT
             mpe = MousePressEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
             if not receiver.on_mouse_double_press(mpe):
+                receiver.mouseDoublePressed.emit(mpe)
                 event.Skip()
 
         def on_mouse_release(event: MouseEvent) -> None:

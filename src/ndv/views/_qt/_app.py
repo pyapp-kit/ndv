@@ -143,7 +143,7 @@ class MouseEventFilter(QObject):
                     self.active_button = btn
                     mpe = MousePressEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
                     intercept |= receiver.on_mouse_double_press(mpe)
-                    receiver.mousePressed.emit(mpe)
+                    receiver.mouseDoublePressed.emit(mpe)
                 elif etype == QEvent.Type.MouseButtonPress:
                     self.active_button = btn
                     mpe = MousePressEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
