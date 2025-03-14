@@ -77,18 +77,19 @@ class _OrthographicCamera(pygfx.OrthographicCamera):
         # desired width is possible given the bounds. This is why
         # width clamping must come before the checks against each bound.
 
-        # Ensure width constrained within xbounds
-        if self.xbounds[0] is not None and self.xbounds[1] is not None:
-            state["width"] = min(state["width"], self.xbounds[1] - self.xbounds[0])
-        # Ensure (x+/-width) constrained within xbounds
+        # Constrain width within bounds
+        if None not in self.xbounds:
+            max_width = self.xbounds[1] - self.xbounds[0]  # type: ignore[operator]
+            state["width"] = min(state["width"], max_width)
+
+        # Constrain position+/-radius within bounds
         x = state["x"]
         rad = state["width"] / 2
         if self.xbounds[0] is not None:
-            if x - rad < self.xbounds[0]:
-                state["x"] = self.xbounds[0] + rad
+            x = max(x, self.xbounds[0] + rad)
         if self.xbounds[1] is not None:
-            if x + rad > self.xbounds[1]:
-                state["x"] = self.xbounds[1] - rad
+            x = min(x, self.xbounds[1] - rad)
+        state["x"] = x
 
         super().set_state(state)
 

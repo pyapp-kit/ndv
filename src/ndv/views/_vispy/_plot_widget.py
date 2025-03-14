@@ -301,21 +301,34 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
 
     @scene.cameras.PanZoomCamera.rect.setter  # type:ignore[misc]
     def rect(self, args: Any) -> None:
-        # 4-tuple: (x, y, w, h)
+        # Convert 4-tuple (x, y, w, h) to Rect
         if isinstance(args, tuple):
             args = geometry.Rect(*args)
         if isinstance(args, geometry.Rect):
-            # Enforce bounds
-            # FIXME: Trying to pan past the bounds results in a zoom
-            if self.xbounds[0] is not None:
-                args.left = max(args.left, self.xbounds[0])
-            if self.xbounds[1] is not None:
-                args.right = min(args.right, self.xbounds[1])
+            # Note that this code preserves camera width so long as the
+            # desired width is possible given the bounds. This is why
+            # width clamping must come before the checks against each bound.
 
+            # Constrain width and height within bounds
+            if None not in self.xbounds:
+                max_width = self.xbounds[1] - self.xbounds[0]  # type: ignore[operator]
+                args.width = min(args.width, max_width)
+            if None not in self.ybounds:
+                max_height = self.ybounds[1] - self.ybounds[0]  # type: ignore[operator]
+                args.height = min(args.height, max_height)
+
+            # Constrain position+/-radius within bounds
+            x, y = args.pos
+            if self.xbounds[0] is not None:
+                x = max(x, self.xbounds[0])
+            if self.xbounds[1] is not None:
+                x = min(x, self.xbounds[1] - args.width)
             if self.ybounds[0] is not None:
-                args.bottom = max(args.bottom, self.ybounds[0])
+                y = max(y, self.ybounds[0])
             if self.ybounds[1] is not None:
-                args.top = min(args.top, self.ybounds[1])
+                y = min(y, self.ybounds[1] - args.height)
+
+            args.pos = (x, y)
         super(PanZoom1DCamera, type(self)).rect.fset(self, args)
 
     def zoom(
