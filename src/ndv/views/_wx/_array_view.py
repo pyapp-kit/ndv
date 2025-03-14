@@ -71,6 +71,7 @@ class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
 
+        # -- WDIDGETS -- #
         self.visible = wx.CheckBox(self, label="Visible")
         self.visible.SetValue(True)
 
@@ -86,12 +87,22 @@ class _WxLUTWidget(wx.Panel):
 
         self.auto_clim = wx.ToggleButton(self, label="Auto", size=(50, -1))
 
-        self.histogram: HistogramCanvas | None = None
         self._histogram_height = 100  # px
         self.histogram_btn = wx.ToggleButton(self, label="Hist", size=(40, -1))
         _add_icon(self.histogram_btn, "foundation:graph-bar")
 
-        # Layout
+        self.set_hist_range_btn = wx.Button(self, label="Reset", size=(40, -1))
+        _add_icon(self.set_hist_range_btn, "fluent:full-screen-maximize-24-filled")
+        self.set_hist_range_btn.Show(False)
+
+        self.log_btn = wx.ToggleButton(self, label="Log", size=(40, -1))
+        self.log_btn.SetToolTip("log (base 10, count+1)")
+        _add_icon(self.log_btn, "mdi:math-log")
+        self.log_btn.Show(False)
+
+        # -- LAYOUT -- #
+
+        # "main" lut controls (always visible)
         self.lut_ctrls = wx.BoxSizer(wx.HORIZONTAL)
         self.lut_ctrls.Add(self.visible, 0, wx.ALL, 2)
         self.lut_ctrls.Add(self.cmap, 0, wx.ALL, 2)
@@ -99,28 +110,16 @@ class _WxLUTWidget(wx.Panel):
         self.lut_ctrls.Add(self.auto_clim, 0, wx.ALL, 2)
         self.lut_ctrls.Add(self.histogram_btn, 0, wx.ALL, 2)
 
-        # TODO: Consider a container for this...
-        self._histogram_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        # Add a vertical spacer that expands to take up available space
-        # This is the key component that pushes everything down
-        # spacer = QSpacerItem(
-        #     0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding
-        # )
-        # histogram_ctrls.addItem(spacer)
-        self.set_hist_range_btn = wx.Button(self, label="Reset", size=(40, -1))
-        _add_icon(self.set_hist_range_btn, "fluent:full-screen-maximize-24-filled")
-        self.set_hist_range_btn.Show(False)
-
-        self.log_btn = wx.ToggleButton(self, label="Log", size=(40, -1))
-        _add_icon(self.log_btn, "mdi:math-log")
-        self.log_btn.SetToolTip("log (base 10, count+1)")
-        self.log_btn.Show(False)
-
+        # histogram controls go in their own sizer
         histogram_ctrls = wx.BoxSizer(wx.VERTICAL)
         histogram_ctrls.Add(self.log_btn, 0, wx.ALL, 2)
         histogram_ctrls.Add(self.set_hist_range_btn, 0, wx.ALL, 2)
+
+        # histogram sizer contains controls + a histogram (which is added later)
+        self._histogram_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._histogram_sizer.Add(histogram_ctrls, 0, wx.EXPAND, 5)
 
+        # Overall layout
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.sizer.Add(self.lut_ctrls, 0, wx.EXPAND, 5)
         self.sizer.Add(self._histogram_sizer, 0, wx.EXPAND, 5)
@@ -138,8 +137,7 @@ class WxLutView(LutView):
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent)
         self._channel = channel
-        # TODO: Fix type
-        self._histogram: wx.Window | None = None
+        self.histogram: HistogramCanvas | None = None
         # TODO: use emit_fast
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
@@ -175,12 +173,12 @@ class WxLutView(LutView):
         toggled = self._wxwidget.histogram_btn.GetValue()
         self._show_histogram(toggled)
 
-        if self._wxwidget.histogram is None:
+        if self.histogram is None:
             self.histogramRequested.emit(self._channel)
 
     def _on_log_btn_toggled(self, event: wx.CommandEvent) -> None:
         toggled = self._wxwidget.log_btn.GetValue()
-        if hist := self._wxwidget.histogram:
+        if hist := self.histogram:
             hist.set_log_base(10 if toggled else None)
 
     def _on_set_histogram_range_clicked(self, event: wx.CommandEvent) -> None:
@@ -191,7 +189,7 @@ class WxLutView(LutView):
             event = wx.PyCommandEvent(wx.EVT_TOGGLEBUTTON.typeId, btn.GetId())
             event.SetEventObject(btn)
             wx.PostEvent(btn.GetEventHandler(), event)
-        if hist := self._wxwidget.histogram:
+        if hist := self.histogram:
             hist.set_range()
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
@@ -208,8 +206,7 @@ class WxLutView(LutView):
             widget.Show()
 
         # Setup references to the histogram
-        self._histogram = widget
-        self._wxwidget.histogram = histogram
+        self.histogram = histogram
 
         # Assign a fixed size
         hist_size = wx.Size(self._wxwidget.Size.width, self._wxwidget._histogram_height)
@@ -217,21 +214,21 @@ class WxLutView(LutView):
         self._wxwidget._histogram_sizer.Add(widget, 0, wx.ALIGN_CENTER, 5)
 
     def _show_histogram(self, show: bool = True) -> None:
-        def set_visible_in(sizer: wx.Sizer) -> None:
-            for child in sizer.GetChildren():
-                if child.IsSizer():
-                    set_visible_in(child.GetSizer())
-                elif child.IsWindow():
-                    child.GetWindow().Show(show)
-
-        set_visible_in(self._wxwidget._histogram_sizer)
-
-        # Resize the widget around the histogram
+        # Recursively show/hide _histograrm_sizer
+        self._set_sizer_visibility(show, self._wxwidget._histogram_sizer)
+        # Resize the widget
         size = wx.Size(self._wxwidget.lut_ctrls.MinSize)
         if show:
             size.height += self._wxwidget._histogram_height
         self._wxwidget.SetMinSize(size)
         self._wxwidget.GetParent().Layout()
+
+    def _set_sizer_visibility(self, show: bool, sizer: wx.Sizer) -> None:
+        for child in sizer.GetChildren():
+            if child.IsSizer():
+                self._set_sizer_visibility(show, child.GetSizer())
+            elif child.IsWindow():
+                child.GetWindow().Show(show)
 
     # Public Methods
     def frontend_widget(self) -> wx.Window:
