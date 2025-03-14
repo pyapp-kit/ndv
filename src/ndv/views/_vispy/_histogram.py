@@ -137,13 +137,13 @@ class VispyHistogramCanvas(HistogramCanvas):
         if gamma < 0:
             raise ValueError("gamma must be non-negative!")
         self._gamma = gamma
-        self._update_lut_lines()
+        self._update_lut_ctrls()
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         if clims[1] < clims[0]:
             clims = (clims[1], clims[0])
         self._clims = clims
-        self._update_lut_lines()
+        self._update_lut_ctrls()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         # Nothing to do (yet)
@@ -192,23 +192,19 @@ class VispyHistogramCanvas(HistogramCanvas):
         self.plot.lock_axis("x" if vertical else "y")
         # When vertical, smaller values should appear at the top of the canvas
         self.plot.camera.flip = [False, vertical, False]
-        self._update_lut_lines()
+        self._update_lut_ctrls()
         self._resize()
 
     def set_log_base(self, base: float | None) -> None:
         if base != self._log_base:
-            if self._log_base is not None and self._range:
-                self._range = tuple(self._log_base**x for x in self._range)
-            self._log_base = None if base is None else 2**base
-            if self._log_base is not None and self._range:
-                self._range = tuple(
-                    np.log(x) / np.log(self._log_base) for x in self._range
-                )
+            self._log_base = base
+            # Update histogram
             self._update_histogram()
-            self._update_lut_lines()
+            # Resize vertical axis
             camera_rect = self.plot.camera.rect
             self._resize(x=(camera_rect.left, camera_rect.right))
-        # HACK: Disable labels for log axis - there has to be a better way
+
+        # Disable labels for log axis
         self.plot.yaxis.axis.tick_color = (
             (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
         )
@@ -252,7 +248,12 @@ class VispyHistogramCanvas(HistogramCanvas):
         # Looks like https://github.com/vispy/vispy/issues/1899
         self._hist_mesh._bounds_changed()
 
-    def _update_lut_lines(self, npoints: int = 256) -> None:
+    def _update_lut_ctrls(self, npoints: int = 256) -> None:
+        """
+        Updates the DOMAIN of the lut controls.
+
+        Note that the RANGE is automatically scaled in _resize()
+        """
         if self._clims is None or self._gamma is None:
             return  # pragma: no cover
 
