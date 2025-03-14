@@ -62,6 +62,8 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
 
     icon_path = svg_path(icon)
     bitmap = wx.BitmapBundle.FromSVGFile(str(icon_path), wx.Size(16, 16))
+    # Note - label must be cleared first so bitmap is center-aligned
+    btn.SetLabel("")
     btn.SetBitmapLabel(bitmap)
 
 
@@ -164,7 +166,7 @@ class WxLutView(LutView):
         self._show_histogram(True)
 
     def _show_histogram(self, show: bool = True) -> None:
-        if hist := cast(wx.Window, self._histogram):
+        if hist := cast("wx.Window", self._histogram):
             # Display the histogram
             hist.Show(show)
 

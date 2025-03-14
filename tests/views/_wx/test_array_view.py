@@ -69,6 +69,6 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
     # Test adding the histogram widget puts it on the relevant lut
     assert len(lut._wxwidget.sizer.GetChildren()) == 1
     histogram = get_histogram_canvas_class()()  # will raise if not supported
-    histogram_wdg = cast(wx.Window, histogram.frontend_widget())
+    histogram_wdg = cast("wx.Window", histogram.frontend_widget())
     viewer.add_histogram(channel, histogram_wdg)
     assert len(lut._wxwidget.sizer.GetChildren()) == 2

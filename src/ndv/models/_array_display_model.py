@@ -193,7 +193,7 @@ class ArrayDisplayModel(NDVModel):
     @property
     def n_visible_axes(self) -> Literal[2, 3]:
         """Number of dims is derived from the length of `visible_axes`."""
-        return cast(Literal[2, 3], len(self.visible_axes))
+        return cast("Literal[2, 3]", len(self.visible_axes))
 
     @model_validator(mode="after")
     def _validate_model(self) -> "Self":

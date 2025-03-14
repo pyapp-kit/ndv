@@ -62,6 +62,6 @@ def test_histogram(viewer: QtArrayView) -> None:
     # Test adding the histogram widget puts it on the relevant lut
     assert lut._qwidget._histogram is None
     histogram = get_histogram_canvas_class()()  # will raise if not supported
-    histogram_wdg = cast(QWidget, histogram.frontend_widget())
+    histogram_wdg = cast("QWidget", histogram.frontend_widget())
     viewer.add_histogram(channel, histogram_wdg)
     assert lut._qwidget._histogram is not None

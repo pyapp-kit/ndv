@@ -30,7 +30,7 @@ class JupyterAppWrap(NDVApp):
     def create_app(self) -> Any:
         if not self.is_running() and not os.getenv("PYTEST_CURRENT_TEST"):
             # if we got here, it probably means that someone used
-            # NDV_GUI_FRONTEND=jupyter without actually being in a juptyer notebook
+            # NDV_GUI_FRONTEND=jupyter without actually being in a jupyter notebook
             # we allow it in tests, but not in normal usage.
             raise RuntimeError(  # pragma: no cover
                 "Jupyter is not running a notebook shell.  Cannot create app."

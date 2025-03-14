@@ -111,7 +111,7 @@ class _ArrayDataDisplayModel(NDVModel):
                     dims.remove(guess)
                     new_visible_axes = dims[-self.display.n_visible_axes :]
                     self.display.visible_axes = cast(
-                        TwoOrThreeAxisTuple, tuple(new_visible_axes)
+                        "TwoOrThreeAxisTuple", tuple(new_visible_axes)
                     )
 
     # Properties for normalized data access -----------------------------------------
@@ -283,7 +283,7 @@ class _ArrayDataDisplayModel(NDVModel):
         # For Composite and Color - slice along channel axis
         else:
             for i in range(data.shape[req.channel_axis]):
-                ch_keepdims = (slice(None),) * cast(int, ch_ax) + (i,) + (None,)
+                ch_keepdims = (slice(None),) * cast("int", ch_ax) + (i,) + (None,)
                 ch_data = data[ch_keepdims]
                 data_response[i] = ch_data.transpose(*t_dims).squeeze()
 

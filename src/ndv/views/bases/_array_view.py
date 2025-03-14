@@ -23,7 +23,7 @@ class ArrayView(Viewable):
     """ABC for ND Array viewers widget.
 
     Currently, this is the "main" widget that contains the array display and
-    all the controls for interacting with the array, includings sliders, LUTs,
+    all the controls for interacting with the array, including sliders, LUTs,
     and histograms.
     """
 

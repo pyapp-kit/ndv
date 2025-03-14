@@ -434,9 +434,9 @@ class VispyArrayCanvas(ArrayCanvas):
                         _z[0] = min(_z[0], v[2])
                         _z[1] = max(_z[1], v[2])
 
-        x = cast(tuple[float, float], _x) if x is None else x
-        y = cast(tuple[float, float], _y) if y is None else y
-        z = cast(tuple[float, float], _z) if z is None else z
+        x = cast("tuple[float, float]", _x) if x is None else x
+        y = cast("tuple[float, float]", _y) if y is None else y
+        z = cast("tuple[float, float]", _z) if z is None else z
 
         is_3d = isinstance(self._camera, scene.ArcballCamera)
         if is_3d:
