@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
 from pydantic import Field, computed_field, model_validator
 from typing_extensions import Self, TypeAlias
 
-from ndv._types import AxisKey, Slice
+from ndv._types import AxisKey, ChannelKey, Slice
 
 from ._base_model import NDVModel
 from ._lut_model import LUTModel
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 # map of axis to index/slice ... i.e. the current subset of data being displayed
 IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]
 # map of index along channel axis to LUTModel object
-LutMap: TypeAlias = ValidatedEventedDict[Union[int, None], LUTModel]
+LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[Union[AxisKey, None], ReducerType]
 # used for visible_axes

@@ -172,6 +172,15 @@ class JupyterLutView(LutView):
         return self.layout
 
 
+class JupyterRGBView(JupyterLutView):
+    def __init__(self, channel: ChannelKey = None) -> None:
+        super().__init__(channel)
+        self._cmap.layout.display = "none"
+        children = list(self.layout.children)
+        lbl = widgets.Label(value="RGB")
+        self.layout.children = (children[0], lbl, *children[1:])
+
+
 SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 
 
@@ -205,7 +214,7 @@ class JupyterArrayView(ArrayView):
 
         # the button that controls the display mode of the channels
         self._channel_mode_combo = widgets.Dropdown(
-            options=[ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE],
+            options=[ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE, ChannelMode.RGBA],
             value=str(ChannelMode.GRAYSCALE),
         )
         self._channel_mode_combo.layout.width = "120px"
@@ -343,7 +352,7 @@ class JupyterArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterLutView(channel)
+        wdg = JupyterRGBView(channel) if channel == "RGB" else JupyterLutView(channel)
         layout = self._luts_box
         self._luts[channel] = wdg
 
