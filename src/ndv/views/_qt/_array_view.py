@@ -578,7 +578,7 @@ class QtArrayView(ArrayView):
             )
             # Add widget to view
             lut.histogram = histogram
-            widget = cast(QWidget, histogram.frontend_widget())
+            widget = cast("QWidget", histogram.frontend_widget())
             widget.resize(QSize(lut._qwidget.width(), 100))
             lut._qwidget.hist_layout.addWidget(widget, 1)
 
