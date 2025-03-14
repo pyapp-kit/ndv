@@ -166,7 +166,7 @@ class WxLutView(LutView):
         self._show_histogram(True)
 
     def _show_histogram(self, show: bool = True) -> None:
-        if hist := cast(wx.Window, self._histogram):
+        if hist := cast("wx.Window", self._histogram):
             # Display the histogram
             hist.Show(show)
 
