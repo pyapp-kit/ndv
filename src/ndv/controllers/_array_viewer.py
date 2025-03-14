@@ -65,7 +65,8 @@ class ArrayViewer:
                 "When display_model is provided, kwargs are be ignored.",
                 stacklevel=2,
             )
-        data = DataWrapper.create(data)
+        if data is not None:
+            data = DataWrapper.create(data)
         self._data_model = _ArrayDataDisplayModel(
             data_wrapper=data,
             display=display_model or self._default_display_model(data, **kwargs),
@@ -222,24 +223,27 @@ class ArrayViewer:
 
     @staticmethod
     def _default_display_model(
-        data: DataWrapper, **kwargs: Unpack[ArrayDisplayModelKwargs]
+        data: None | DataWrapper, **kwargs: Unpack[ArrayDisplayModelKwargs]
     ) -> ArrayDisplayModel:
         """
         Creates a default ArrayDisplayModel when none is provided by the user.
 
         All magical setup goes here.
         """
+        # Can't do any magic with no data
+        if data is None:
+            return ArrayDisplayModel(**kwargs)
+
         # RGB images
         if "channel_mode" not in kwargs and "channel_axis" not in kwargs:
-            if data is not None:
-                rgb_channel_axis = data.dims[-1]
-                if data.sizes()[rgb_channel_axis] in {3, 4}:
-                    kwargs["channel_mode"] = "rgba"
-                    kwargs["channel_axis"] = -1
-                    # HACK - this gets around the warning conditional in
-                    # ArrayDisplayModel's validator. Ideally we wouldn't need to specify
-                    # this.
-                    kwargs["visible_axes"] = (-3, -2)
+            rgb_channel_axis = data.dims[-1]
+            if data.sizes()[rgb_channel_axis] in {3, 4}:
+                kwargs["channel_mode"] = "rgba"
+                kwargs["channel_axis"] = -1
+                # HACK - this gets around the warning conditional in
+                # ArrayDisplayModel's validator. Ideally we wouldn't need to specify
+                # this.
+                kwargs["visible_axes"] = (-3, -2)
 
         return ArrayDisplayModel(**kwargs)
 
