@@ -36,6 +36,7 @@ class DataRequest:
     index: Mapping[int, Union[int, slice]]
     visible_axes: tuple[int, ...]
     channel_axis: Optional[int]
+    channel_mode: ChannelMode
 
 
 @dataclass(frozen=True, **SLOTS)
@@ -240,6 +241,7 @@ class _ArrayDataDisplayModel(NDVModel):
             index=requested_slice,
             visible_axes=self.normed_visible_axes,
             channel_axis=c_ax,
+            channel_mode=self.display.channel_mode,
         )
         return [request]
 
@@ -262,7 +264,8 @@ class _ArrayDataDisplayModel(NDVModel):
             for request in requests:
                 yield _app.submit_task(self.process_request, request)
 
-    def process_request(self, req: DataRequest) -> DataResponse:
+    @staticmethod
+    def process_request(req: DataRequest) -> DataResponse:
         """Process a data request and return the sliced data as a DataResponse."""
         data = req.wrapper.isel(req.index)
 
@@ -273,7 +276,7 @@ class _ArrayDataDisplayModel(NDVModel):
         data_response: dict[ChannelKey, np.ndarray] = {}
         ch_ax = req.channel_axis
         # For RGB and Grayscale - keep the whole array together
-        if self.display.channel_mode == ChannelMode.RGBA:
+        if req.channel_mode == ChannelMode.RGBA:
             data_response["RGB"] = data.transpose(*t_dims).squeeze()
         elif req.channel_axis is None:
             data_response[None] = data.transpose(*t_dims).squeeze()
