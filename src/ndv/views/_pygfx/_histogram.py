@@ -456,13 +456,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def set_log_base(self, base: float | None) -> None:
         if base != self._log_base:
-            if self._log_base is not None and self._range:
-                self._range = tuple(self._log_base**x for x in self._range)
-            self._log_base = None if base is None else 2**base
-            if self._log_base is not None and self._range:
-                self._range = tuple(
-                    np.log(x) / np.log(self._log_base) for x in self._range
-                )
+            self._log_base = base
             self._update_histogram()
 
             # Resize along the y dimension only
