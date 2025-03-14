@@ -43,7 +43,7 @@ DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
 class VispyImageHandle(ImageHandle):
     def __init__(self, visual: scene.Image | scene.Volume) -> None:
         self._visual = visual
-        self._ndim = 2 if isinstance(visual, scene.visuals.Image) else 3
+        self._allowed_dims = {2, 3} if isinstance(visual, scene.visuals.Image) else {3}
 
     def data(self) -> np.ndarray:
         try:
@@ -52,7 +52,7 @@ class VispyImageHandle(ImageHandle):
             return self._visual._last_data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
-        if data.ndim not in {2, 3}:
+        if data.ndim not in self._allowed_dims:
             warnings.warn(
                 f"Got wrong number of dimensions ({data.ndim}) for vispy "
                 f"visual of type {type(self._visual)}.",
