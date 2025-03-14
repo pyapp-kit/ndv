@@ -350,7 +350,7 @@ class JupyterArrayView(ArrayView):
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self, channel: ChannelKey = None) -> JupyterLutView:
+    def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
         wdg = JupyterRGBView(channel) if channel == "RGB" else JupyterLutView(channel)
         layout = self._luts_box

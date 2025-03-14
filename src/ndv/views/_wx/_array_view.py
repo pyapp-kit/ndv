@@ -429,7 +429,7 @@ class WxArrayView(ArrayView):
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
 
-    def add_lut_view(self, channel: ChannelKey = None) -> WxLutView:
+    def add_lut_view(self, channel: ChannelKey) -> WxLutView:
         wdg = self.frontend_widget()
         view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)

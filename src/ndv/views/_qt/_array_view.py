@@ -498,7 +498,7 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self, channel: ChannelKey = None) -> QLutView:
+    def add_lut_view(self, channel: ChannelKey) -> QLutView:
         view = QRGBView(channel) if channel == "RGB" else QLutView(channel)
         self._luts[channel] = view
 
