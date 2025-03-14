@@ -118,9 +118,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # Canvas Margins, in pixels (around the data)
         # TODO: Computation might better support different displays
         self.margin_left = 50  # Provide room for y-axis ticks
-        self.margin_top = 20  # Provide room for x-axis ticks
+        self.margin_bottom = 20  # Provide room for x-axis ticks
         self.margin_right = 10
-        self.margin_bottom = 10
+        self.margin_top = 10
 
         # ------------ PyGFX Canvas ------------ #
         cls = get_canvas_class()
@@ -280,11 +280,11 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         c_h = max(self._canvas.get_logical_size()[1], 1)
         around_origin = [
             self.margin_left / c_w,
-            self.margin_top / c_h,
+            self.margin_bottom / c_h,
         ]
 
         self._y.start_pos = [around_origin[0], around_origin[1], 0]
-        self._y.end_pos = [around_origin[0], (c_h - self.margin_bottom) / c_h, 0]
+        self._y.end_pos = [around_origin[0], (c_h - self.margin_top) / c_h, 0]
 
         # TODO For short canvases, pygfx has a tough time assigning ticks.
         # For lack of a more thorough dive/fix, just mark the maximum of the histogram
@@ -302,9 +302,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             # Update plot viewport
             self._plot_view.rect = (
                 self.margin_left,
-                self.margin_bottom,
+                self.margin_top,
                 max(0, rect[0] - self.margin_left - self.margin_right),
-                max(0, rect[1] - self.margin_bottom - self.margin_top),
+                max(0, rect[1] - self.margin_top - self.margin_bottom),
             )
             self._size = rect
 
@@ -319,9 +319,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             self._x_cam,
             rect=(
                 self.margin_left,  # x
-                self.margin_bottom + self._plot_view.rect[3] - self.margin_top,  # y
+                self.margin_top + self._plot_view.rect[3] - self.margin_bottom,  # y
                 self._plot_view.rect[2],  # w
-                2 * self.margin_top,  # h
+                2 * self.margin_bottom,  # h
             ),
             flush=False,
         )
@@ -521,7 +521,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         return color
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType:
-        pos = mme.x - self.margin_left, mme.y - self.margin_bottom
+        pos = mme.x - self.margin_left, mme.y - self.margin_top
         nearby = self._find_nearby_node(pos)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
@@ -537,7 +537,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 return CursorType.DEFAULT
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
-        pos = event.x - self.margin_left, event.y - self.margin_bottom
+        pos = event.x - self.margin_left, event.y - self.margin_top
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(pos)
         if self._grabbed != Grabbable.NONE:
