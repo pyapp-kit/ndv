@@ -7,8 +7,6 @@ from enum import Enum
 from functools import cache, wraps
 from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
-from ndv.views.bases._app import NDVApp
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from concurrent.futures import Future
@@ -17,6 +15,7 @@ if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
+    from ndv.views.bases._app import NDVApp
     from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
@@ -169,7 +168,7 @@ def _running_apps() -> Iterator[GuiFrontend]:
 def _load_app(module: str, cls_name: str) -> NDVApp:
     mod = importlib.import_module(module)
     cls = getattr(mod, cls_name)
-    return cast(NDVApp, cls())
+    return cast("NDVApp", cls())
 
 
 @cache  # not allowed to change
