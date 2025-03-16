@@ -108,41 +108,13 @@ jobs:
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
-      - name: 🧪 Test (attempt 1)
-        id: test1
-        continue-on-error: true
+      - name: 🧪 Test
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
 
-      - name: 🧪 Test (attempt 2)
-        if: steps.test1.outcome == 'failure'
-        id: test2
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
-
-      - name: 🧪 Test (attempt 3)
-        if: steps.test2.outcome == 'failure'
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
-
-      - name: 🧪 Test min dependencies (attempt 1)
-        id: min1
-        continue-on-error: true
+      - name: 🧪 Test min dependencies
         shell: bash
         run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
-
-      - name: 🧪 Test min dependencies (attempt 2)
-        if: steps.min1.outcome == 'failure'
-        id: min2
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
-
-      - name: 🧪 Test min dependencies (attempt 3)
-        if: steps.min2.outcome == 'failure'
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
