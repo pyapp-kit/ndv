@@ -429,13 +429,7 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
     @property
     def dtype(self) -> np.dtype:
         """Return the dtype for the data."""
-        try:
-            return np.dtype(str(self._data.dtype.name))
-        except AttributeError as e:
-            raise NotImplementedError(
-                "`dtype` property not properly implemented for DataWrapper of type: "
-                f"{type(self)}"
-            ) from e
+        return np.dtype(str(self._data.dtype.name))
 
     @property
     def dims(self) -> tuple[Hashable, ...]:
