@@ -50,7 +50,7 @@ def nd_sine_wave(
                 # Assign to the output array
                 output[angle_idx, freq_idx, phase_idx] = sine_wave
 
-    return output
+    return output.astype(np.float32)
 
 
 def cells3d() -> np.ndarray:

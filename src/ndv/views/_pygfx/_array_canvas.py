@@ -22,6 +22,8 @@ from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
 
+from ._util import rendercanvas_class
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TypeAlias
@@ -363,32 +365,6 @@ class PyGFXRectangle(RectangularROIHandle):
             par.remove(self._container)
 
 
-def get_canvas_class() -> WgpuCanvas:
-    from ndv.views._app import GuiFrontend, gui_frontend
-
-    frontend = gui_frontend()
-    if frontend == GuiFrontend.QT:
-        from qtpy.QtCore import QSize
-        from wgpu.gui import qt
-
-        class QWgpuCanvas(qt.QWgpuCanvas):
-            def installEventFilter(self, filter: Any) -> None:
-                self._subwidget.installEventFilter(filter)
-
-            def sizeHint(self) -> QSize:
-                return QSize(self.width(), self.height())
-
-        return QWgpuCanvas
-    if frontend == GuiFrontend.JUPYTER:
-        from wgpu.gui.jupyter import JupyterWgpuCanvas
-
-        return JupyterWgpuCanvas
-    if frontend == GuiFrontend.WX:
-        from wgpu.gui.wx import WxWgpuCanvas
-
-        return WxWgpuCanvas
-
-
 class GfxArrayCanvas(ArrayCanvas):
     """pygfx-based canvas wrapper."""
 
@@ -398,14 +374,14 @@ class GfxArrayCanvas(ArrayCanvas):
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
-        cls = get_canvas_class()
+        cls = rendercanvas_class()
         self._canvas = cls(size=(600, 600))
+
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
         # the returned function can be called to remove the filter, (and it also
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
-
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
         try:
             # requires https://github.com/pygfx/pygfx/pull/752
