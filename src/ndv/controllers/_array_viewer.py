@@ -60,16 +60,17 @@ class ArrayViewer:
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
-        if display_model is not None and kwargs:
+        wrapper = None if data is None else DataWrapper.create(data)
+        if display_model is None:
+            display_model = self._default_display_model(wrapper, **kwargs)
+        elif kwargs:
             warnings.warn(
                 "When display_model is provided, kwargs are be ignored.",
                 stacklevel=2,
             )
-        if data is not None:
-            data = DataWrapper.create(data)
+
         self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=data,
-            display=display_model or self._default_display_model(data, **kwargs),
+            data_wrapper=wrapper, display=display_model
         )
         self._viewer_model = ArrayViewerModel()
         self._viewer_model.events.interaction_mode.connect(
@@ -234,17 +235,12 @@ class ArrayViewer:
         if data is None:
             return ArrayDisplayModel(**kwargs)
 
-        # RGB images
+        # cast 3d+ images with shape[-1] of {3,4} to RGB images
         if "channel_mode" not in kwargs and "channel_axis" not in kwargs:
-            rgb_channel_axis = data.dims[-1]
-            if data.sizes()[rgb_channel_axis] in {3, 4}:
-                kwargs["channel_mode"] = "rgba"
+            shape = tuple(data.sizes().values())
+            if len(shape) >= 3 and shape[-1] in {3, 4}:
                 kwargs["channel_axis"] = -1
-                # HACK - this gets around the warning conditional in
-                # ArrayDisplayModel's validator. Ideally we wouldn't need to specify
-                # this.
-                kwargs["visible_axes"] = (-3, -2)
-
+                kwargs["channel_mode"] = "rgba"
         return ArrayDisplayModel(**kwargs)
 
     def _add_histogram(self, channel: ChannelKey = None) -> None:

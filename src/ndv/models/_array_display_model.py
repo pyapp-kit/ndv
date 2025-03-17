@@ -172,7 +172,6 @@ class ArrayDisplayModel(NDVModel):
         `luts`.
     """
 
-    visible_axes: TwoOrThreeAxisTuple = (-2, -1)
     # NOTE: In terms of requesting data, there is a slight "delocalization" of state
     # here in that we probably also want to avoid requesting data for channel
     # positions that are not visible.
@@ -184,6 +183,10 @@ class ArrayDisplayModel(NDVModel):
 
     channel_mode: ChannelMode = ChannelMode.GRAYSCALE
     channel_axis: Optional[AxisKey] = None
+    # must come after channel_axis, since it is used to set default visible_axes
+    visible_axes: TwoOrThreeAxisTuple = Field(
+        default_factory=lambda k: (-3, -2) if k.get("channel_axis") == -1 else (-2, -1)
+    )
 
     # map of index along channel axis to LUTModel object
     luts: LutMap = Field(default_factory=_default_luts)
