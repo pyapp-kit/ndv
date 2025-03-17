@@ -118,7 +118,7 @@ class StreamingViewer(_BaseArrayViewer):
         self._shape = shape
         self._dtype = np.dtype(dtype)
         for key, model in channels.items():
-            lut_views = [self._view.add_lut_view()]
+            lut_views = [self._view.add_lut_view(key)]
             data = np.zeros(shape, dtype=dtype)
             self._handles[key] = handle = self._canvas.add_image(data)
             self._lut_controllers[key] = ctrl = ChannelController(

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self, TypeAlias
 
-    from ndv._types import MouseMoveEvent
+    from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.controllers._channel_controller import ChannelController
     from ndv.models import ChannelMode, DataWrapper
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
@@ -44,7 +44,7 @@ class _BaseArrayViewer:
         )
         # mapping of channel keys to their respective controllers
         # where None is the default channel
-        self._lut_controllers: dict[LutKey, ChannelController] = {}
+        self._lut_controllers: dict[ChannelKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
         self._app = _app.ndv_app()
@@ -52,7 +52,6 @@ class _BaseArrayViewer:
         ArrayCanvas = _app.get_array_canvas_class()
 
         self._viewer_model = ArrayViewerModel()
-
         self._canvas = ArrayCanvas(self._viewer_model)
         self._canvas.set_ndim(self._data_model.display.n_visible_axes)
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
@@ -138,14 +137,14 @@ class _BaseArrayViewer:
         text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
         self._view.set_hover_info(text)
 
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[LutKey, float]:
+    def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
         if (
             x < 0 or y < 0
         ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
             return {}
 
-        values: dict[LutKey, float] = {}
+        values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
                 values[key] = value

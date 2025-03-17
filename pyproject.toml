@@ -57,11 +57,11 @@ pyqt = [
     "pyqt6 >=6.4,!=6.6",
     "pyqt6 >=6.5.3; python_version >= '3.12'",
     "qtpy >=2",
-    "superqt[iconify] >=0.7.1",
+    "superqt[iconify] >=0.7.2",
 ]
 pyside = [
     # defer to superqt's pyside6 restrictions
-    "superqt[iconify,pyside6] >=0.7.1",
+    "superqt[iconify,pyside6] >=0.7.2",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
     "numpy >=1.23,<2; sys_platform == 'win32'",  # needed for pyside6.6
@@ -69,7 +69,10 @@ pyside = [
     "pyside6 >=6.6; python_version >= '3.12'",
     "qtpy >=2",
 ]
-wxpython = ["wxpython >=4.2.2"]
+wxpython = [
+    "pyconify>=0.2.1",
+    "wxpython >=4.2.2",
+]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]

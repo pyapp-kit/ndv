@@ -3186,10 +3186,12 @@ vispy = [
 ]
 wx = [
     { name = "imageio", extra = ["tifffile"] },
+    { name = "pyconify" },
     { name = "pygfx" },
     { name = "wxpython" },
 ]
 wxpython = [
+    { name = "pyconify" },
     { name = "wxpython" },
 ]
 
@@ -3268,6 +3270,8 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.23" },
     { name = "numpy", marker = "sys_platform == 'win32' and extra == 'pyside'", specifier = ">=1.23,<2" },
     { name = "psygnal", specifier = ">=0.10" },
+    { name = "pyconify", marker = "extra == 'wx'", specifier = ">=0.2.1" },
+    { name = "pyconify", marker = "extra == 'wxpython'", specifier = ">=0.2.1" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pygfx", marker = "extra == 'jup'", specifier = ">=0.6.0" },
     { name = "pygfx", marker = "extra == 'pygfx'", specifier = ">=0.6.0" },
@@ -3284,9 +3288,9 @@ requires-dist = [
     { name = "qtpy", marker = "extra == 'pyqt'", specifier = ">=2" },
     { name = "qtpy", marker = "extra == 'pyside'", specifier = ">=2" },
     { name = "qtpy", marker = "extra == 'qt'", specifier = ">=2" },
-    { name = "superqt", extras = ["iconify"], marker = "extra == 'pyqt'", specifier = ">=0.7.1" },
-    { name = "superqt", extras = ["iconify"], marker = "extra == 'qt'", specifier = ">=0.7.1" },
-    { name = "superqt", extras = ["iconify", "pyside6"], marker = "extra == 'pyside'", specifier = ">=0.7.1" },
+    { name = "superqt", extras = ["iconify"], marker = "extra == 'pyqt'", specifier = ">=0.7.2" },
+    { name = "superqt", extras = ["iconify"], marker = "extra == 'qt'", specifier = ">=0.7.2" },
+    { name = "superqt", extras = ["iconify", "pyside6"], marker = "extra == 'pyside'", specifier = ">=0.7.2" },
     { name = "typing-extensions", specifier = ">=4.0" },
     { name = "vispy", marker = "extra == 'vispy'", specifier = ">=0.14.3" },
     { name = "wxpython", marker = "extra == 'wx'", specifier = ">=4.2.2" },
@@ -5526,16 +5530,16 @@ wheels = [
 
 [[package]]
 name = "superqt"
-version = "0.7.1"
+version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pygments" },
     { name = "qtpy" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/28/3b3afeb6e1efd9095d18a43a60d851dede470e95297ff694d3d75e704926/superqt-0.7.1.tar.gz", hash = "sha256:dade2953916e9adff912e08a337e322b5f4603c780ed92505515489598d73960", size = 101188 }
+sdist = { url = "https://files.pythonhosted.org/packages/43/ba/2a99869363916a77eb97e0e8d2f4718e9c486e9799a2a86efffe4c7f44fb/superqt-0.7.2.tar.gz", hash = "sha256:b1407d1a36afbdc7cdbddc6e95cec2b7d9514145da12da29dddb81b45feb7827", size = 101375 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/43/4f2393a5203b53e94dfd9f7e408bc4caeed5ead51868b091578c6a5aaaf5/superqt-0.7.1-py3-none-any.whl", hash = "sha256:c40df8d63bc06e0b7a3ec01c2c41c901fee03e2177c17eafabd6cfd157aa99ed", size = 95107 },
+    { url = "https://files.pythonhosted.org/packages/55/ba/5aba8696d7168bfc565a5dcbc407aae1ec508059ef3a88836442f91fe194/superqt-0.7.2-py3-none-any.whl", hash = "sha256:c93c6a9f41ab81e61d61c7495541b15db7ce2b2fb1a0504658c1611317eddf19", size = 95175 },
 ]
 
 [package.optional-dependencies]

@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from sys import version_info
+from typing import TYPE_CHECKING, Any, cast
 
+import psygnal
 import wx
 import wx.adv
 import wx.lib.newevent
+import wx.svg
 from psygnal import EmissionInfo, Signal
+from pyconify import svg_path
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
@@ -22,7 +26,7 @@ if TYPE_CHECKING:
 
     import cmap
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 
@@ -51,6 +55,18 @@ class _WxSpinner(wx.Panel):
         self.SetSizer(sizer)
 
 
+def _add_icon(btn: wx.AnyButton, icon: str) -> None:
+    # Avoids https://github.com/urllib3/urllib3/issues/3020
+    if version_info.minor < 10:
+        return
+
+    icon_path = svg_path(icon)
+    bitmap = wx.BitmapBundle.FromSVGFile(str(icon_path), wx.Size(16, 16))
+    # Note - label must be cleared first so bitmap is center-aligned
+    btn.SetLabel("")
+    btn.SetBitmapLabel(bitmap)
+
+
 # mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
@@ -69,27 +85,43 @@ class _WxLUTWidget(wx.Panel):
         self.clims.SetMax(65000)
         self.clims.SetValue(0, 65000)
 
-        self.auto_clim = wx.ToggleButton(self, label="Auto")
+        self.auto_clim = wx.ToggleButton(self, label="Auto", size=(50, -1))
+
+        self.histogram = wx.ToggleButton(self, label="Hist", size=(40, -1))
+        _add_icon(self.histogram, "foundation:graph-bar")
 
         # Layout
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add(self.visible, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        sizer.Add(self.cmap, 0, wx.ALIGN_CENTER_VERTICAL, 5)
-        sizer.Add(self.clims, 1, wx.ALIGN_CENTER_VERTICAL, 5)
-        sizer.Add(self.auto_clim, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        widget_sizer.Add(self.visible, 0, wx.ALL, 2)
+        widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
+        widget_sizer.Add(self.clims, 1, wx.ALL, 2)
+        widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
+        widget_sizer.Add(self.histogram, 0, wx.ALL, 2)
+        widget_sizer.SetSizeHints(self)
 
-        self.SetSizer(sizer)
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer.Add(widget_sizer, 0, wx.EXPAND, 5)
+
+        self.SetSizer(self.sizer)
         self.Layout()
 
 
 class WxLutView(LutView):
-    def __init__(self, parent: wx.Window) -> None:
+    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    histogramRequested = psygnal.Signal(object)
+
+    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent)
+        self._channel = channel
+        # TODO: Fix type
+        self._histogram: Any | None = None
+        # TODO: use emit_fast
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
         wdg.clims.Bind(wx.EVT_SLIDER, self._on_clims_changed)
         wdg.auto_clim.Bind(wx.EVT_TOGGLEBUTTON, self._on_autoscale_changed)
+        wdg.histogram.Bind(wx.EVT_TOGGLEBUTTON, self._on_histogram_requested)
 
     # Event Handlers
     def _on_visible_changed(self, event: wx.CommandEvent) -> None:
@@ -113,6 +145,39 @@ class WxLutView(LutView):
                 clims = self._wxwidget.clims.GetValues()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
+    def _on_histogram_requested(self, event: wx.CommandEvent) -> None:
+        toggled = self._wxwidget.histogram.GetValue()
+        if self._histogram:
+            self._show_histogram(toggled)
+        elif toggled:
+            self.histogramRequested.emit(self._channel)
+
+    def _add_histogram(self, histogram: wx.Window) -> None:
+        # Setup references to the histogram
+        self._histogram = histogram
+        self._wxwidget.sizer.Add(histogram, 1, wx.ALIGN_CENTER, 5)
+
+        # Assign a fixed size
+        hist_size = wx.Size(self._wxwidget.Size.width, 100)
+        histogram.SetSize(hist_size)
+        histogram.SetMinSize(hist_size)
+
+        # Show the histogram
+        self._show_histogram(True)
+
+    def _show_histogram(self, show: bool = True) -> None:
+        if hist := cast("wx.Window", self._histogram):
+            # Display the histogram
+            hist.Show(show)
+
+            # Resize the widget around the histogram
+            # FIXME: Is all of this really necessary?
+            size = wx.Size(self._wxwidget.Size)
+            size.height += 100 if show else -100
+            self._wxwidget.SetSize(size)
+            self._wxwidget.SetMinSize(size)
+            self._wxwidget.GetParent().Layout()
+
     # Public Methods
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
@@ -128,12 +193,10 @@ class WxLutView(LutView):
         self._wxwidget.cmap.SetValue(name)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        self._wxwidget.clims.SetValue(*clims)
-        # FIXME: this is a hack.
-        # it's required to make `set_auto_scale_without_signal` work as intended
-        # But it's not a complete solution.  The general pattern of blocking signals
-        # in Wx needs to be re-evaluated.
-        wx.Yield()
+        # Block signals from changing clims
+        with wx.EventBlocker(self._wxwidget.clims, wx.EVT_SLIDER.typeId):
+            self._wxwidget.clims.SetValue(*clims)
+            wx.SafeYield()
 
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
@@ -251,23 +314,26 @@ class _WxArrayViewer(wx.Frame):
         )
 
         # Reset zoom button
-        self.set_range_btn = wx.Button(self, label="Reset Zoom")
+        self.set_range_btn = wx.Button(self, label="Reset", size=(45, -1))
+        self.set_range_btn.SetToolTip("Reset Zoom")
+        _add_icon(self.set_range_btn, "fluent:full-screen-maximize-24-filled")
 
         # 3d view button
-        self.ndims_btn = wx.ToggleButton(self, label="3D")
+        self.ndims_btn = wx.ToggleButton(self, label="3D", size=(40, -1))
 
         # Add ROI button
-        self.add_roi_btn = wx.ToggleButton(self, label="Add ROI")
+        self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
+        _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
 
         self._btns = wx.BoxSizer(wx.HORIZONTAL)
         self._btns.AddStretchSpacer()
-        self._btns.Add(self.channel_mode_combo, 0, wx.ALL, 5)
-        self._btns.Add(self.set_range_btn, 0, wx.ALL, 5)
-        self._btns.Add(self.ndims_btn, 0, wx.ALL, 5)
-        self._btns.Add(self.add_roi_btn, 0, wx.ALL, 5)
+        self._btns.Add(self.channel_mode_combo, 0, wx.ALL, 4)
+        self._btns.Add(self.set_range_btn, 0, wx.ALL, 4)
+        self._btns.Add(self.ndims_btn, 0, wx.ALL, 4)
+        self._btns.Add(self.add_roi_btn, 0, wx.ALL, 4)
 
         self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
         top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
@@ -301,6 +367,8 @@ class WxArrayView(ArrayView):
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
+        # Mapping of channel key to LutViews
+        self._luts: dict[ChannelKey, WxLutView] = {}
         self._visible_axes: Sequence[AxisKey] = []
 
         wdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -350,11 +418,36 @@ class WxArrayView(ArrayView):
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
 
-    def add_lut_view(self) -> WxLutView:
-        view = WxLutView(self.frontend_widget())
+    def add_lut_view(self, channel: ChannelKey) -> WxLutView:
+        view = WxLutView(self.frontend_widget(), channel)
+
+        # Add the LutView to the Viewer
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
+        self._luts[channel] = view
+        # TODO: Reusable synchronization with ViewerModel
+        view._wxwidget.histogram.Show(self._viewer_model.show_histogram_button)
+        view.histogramRequested.connect(self.histogramRequested)
+
+        # Update the layout to reflect above changes
         self._wxwidget.Layout()
         return view
+
+    # TODO: Fix type
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+        if lut := self._luts.get(channel, None):
+            # FIXME: pygfx backend needs this to be widget._subwidget
+            if hasattr(widget, "_subwidget"):
+                widget = widget._subwidget
+
+            # FIXME: Rendercanvas may make this unnecessary
+            if (parent := widget.GetParent()) and parent is not self:
+                widget.Reparent(lut._wxwidget)  # Reparent widget to this frame
+                if parent:
+                    parent.Destroy()
+                widget.Show()
+
+            # Add the histogram widget on the LUT
+            lut._add_histogram(widget)
 
     def remove_lut_view(self, lut: LutView) -> None:
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
@@ -408,8 +501,9 @@ class WxArrayView(ArrayView):
             if old == InteractionMode.CREATE_ROI:
                 self._wxwidget.add_roi_btn.SetValue(False)
         elif sig_name == "show_histogram_button":
-            # _set_visible(self._wxwidget.histogram_btn, value)
-            ...
+            for lut in self._luts.values():
+                lut._wxwidget.histogram.Show(value)
+                lut._wxwidget.Layout()
         elif sig_name == "show_roi_button":
             self._wxwidget.add_roi_btn.Show(value)
             self._wxwidget._btns.Layout()

@@ -168,9 +168,9 @@ def test_histogram_controller() -> None:
     ctrl.data = np.zeros((10, 4, 10, 10)).astype(np.uint8)
 
     # adding a histogram tells the view to add a histogram, and updates the data
-    ctrl._add_histogram()
+    ctrl._add_histogram(None)
     mock_view.add_histogram.assert_called_once()
-    mock_histogram = ctrl._histogram
+    mock_histogram = ctrl._histograms[None]
     mock_histogram.set_data.assert_called_once()
 
     # changing the index updates the histogram
@@ -181,7 +181,7 @@ def test_histogram_controller() -> None:
     # switching to composite mode puts the histogram view in the
     # lut controller for all channels (this may change)
     ctrl.display_model.channel_mode = ChannelMode.COMPOSITE
-    assert mock_histogram in ctrl._lut_controllers[0].lut_views
+    assert mock_histogram in ctrl._lut_controllers[None].lut_views
 
 
 @pytest.mark.usefixtures("any_app")
@@ -255,19 +255,17 @@ def test_channel_autoscale() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_array_viewer_histogram() -> None:
     """Mostly a smoke test for basic functionality of histogram backends."""
-    if _app.gui_frontend() != _app.GuiFrontend.QT:
-        pytest.skip("histograms only implemented in Qt.")
-        return
 
     viewer = ArrayViewer()
     viewer.show()
-    viewer._add_histogram()
-    assert viewer._histogram is not None
+    viewer._add_histogram(None)
+    histogram = viewer._histograms.get(None, None)
+    assert histogram is not None
 
     # change views
-    if "pygfx" not in type(viewer._histogram).__name__.lower():
-        viewer._histogram.set_vertical(True)
-        viewer._histogram.set_log_base(10)
+    if "pygfx" not in type(histogram).__name__.lower():
+        histogram.set_vertical(True)
+        histogram.set_log_base(10)
 
     # update data
     np.random.seed(0)
@@ -275,7 +273,9 @@ def test_array_viewer_histogram() -> None:
     data = np.random.randint(0, maxval, (1000,), dtype="uint16")
     counts = np.bincount(data.flatten(), minlength=maxval + 1)
     bin_edges = np.arange(maxval + 2) - 0.5
-    viewer._histogram.set_data(counts, bin_edges)
+    histogram.set_data(counts, bin_edges)
+
+    histogram.close()
 
 
 @no_type_check
