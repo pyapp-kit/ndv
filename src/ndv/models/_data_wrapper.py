@@ -427,6 +427,11 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
         }
 
     @property
+    def dtype(self) -> np.dtype:
+        """Return the dtype for the data."""
+        return np.dtype(str(self._data.dtype.name))
+
+    @property
     def dims(self) -> tuple[Hashable, ...]:
         """Return the dimension labels for the data."""
         return self._dims
