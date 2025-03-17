@@ -7,10 +7,6 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 source = "vcs"
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
-
 # read more about configuring hatch at:
 # https://hatch.pypa.io/latest/config/build/
 [tool.hatch.build.targets.wheel]
@@ -61,11 +57,11 @@ pyqt = [
     "pyqt6 >=6.4,!=6.6",
     "pyqt6 >=6.5.3; python_version >= '3.12'",
     "qtpy >=2",
-    "superqt[iconify] @ git+https://github.com/tlambert03/superqt@less-rename",
+    "superqt[iconify] >=0.7.1",
 ]
 pyside = [
     # defer to superqt's pyside6 restrictions
-    "superqt[iconify,pyside6] @ git+https://github.com/tlambert03/superqt@less-rename",
+    "superqt[iconify,pyside6] >=0.7.1",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
     "numpy >=1.23,<2; sys_platform == 'win32'",  # needed for pyside6.6

@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.13' and sys_platform == 'win32'",
@@ -3288,15 +3287,14 @@ requires-dist = [
     { name = "qtpy", marker = "extra == 'pyqt'", specifier = ">=2" },
     { name = "qtpy", marker = "extra == 'pyside'", specifier = ">=2" },
     { name = "qtpy", marker = "extra == 'qt'", specifier = ">=2" },
-    { name = "superqt", extras = ["iconify"], marker = "extra == 'pyqt'", git = "https://github.com/tlambert03/superqt?rev=less-rename" },
-    { name = "superqt", extras = ["iconify"], marker = "extra == 'qt'", git = "https://github.com/tlambert03/superqt?rev=less-rename" },
-    { name = "superqt", extras = ["iconify", "pyside6"], marker = "extra == 'pyside'", git = "https://github.com/tlambert03/superqt?rev=less-rename" },
+    { name = "superqt", extras = ["iconify"], marker = "extra == 'pyqt'", specifier = ">=0.7.1" },
+    { name = "superqt", extras = ["iconify"], marker = "extra == 'qt'", specifier = ">=0.7.1" },
+    { name = "superqt", extras = ["iconify", "pyside6"], marker = "extra == 'pyside'", specifier = ">=0.7.1" },
     { name = "typing-extensions", specifier = ">=4.0" },
     { name = "vispy", marker = "extra == 'vispy'", specifier = ">=0.14.3" },
     { name = "wxpython", marker = "extra == 'wx'", specifier = ">=4.2.2" },
     { name = "wxpython", marker = "extra == 'wxpython'", specifier = ">=4.2.2" },
 ]
-provides-extras = ["jup", "jupyter", "pygfx", "pyqt", "pyside", "qt", "vispy", "wx", "wxpython"]
 
 [package.metadata.requires-dev]
 array-libs = [
@@ -5531,12 +5529,16 @@ wheels = [
 
 [[package]]
 name = "superqt"
-version = "0.7.1.dev17+g5acc3bf"
-source = { git = "https://github.com/tlambert03/superqt?rev=less-rename#5acc3bf170ff1d717850014941a79979859a604d" }
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pygments" },
     { name = "qtpy" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/52/28/3b3afeb6e1efd9095d18a43a60d851dede470e95297ff694d3d75e704926/superqt-0.7.1.tar.gz", hash = "sha256:dade2953916e9adff912e08a337e322b5f4603c780ed92505515489598d73960", size = 101188 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/43/4f2393a5203b53e94dfd9f7e408bc4caeed5ead51868b091578c6a5aaaf5/superqt-0.7.1-py3-none-any.whl", hash = "sha256:c40df8d63bc06e0b7a3ec01c2c41c901fee03e2177c17eafabd6cfd157aa99ed", size = 95107 },
 ]
 
 [package.optional-dependencies]
