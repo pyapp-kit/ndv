@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import ipywidgets as widgets
+import psygnal
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
@@ -16,10 +17,11 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
     import cmap
+    from psygnal import EmissionInfo
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -40,7 +42,12 @@ def notifications_blocked(
 
 
 class JupyterLutView(LutView):
-    def __init__(self) -> None:
+    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    histogramRequested = psygnal.Signal(object)
+
+    def __init__(self, channel: ChannelKey = None) -> None:
+        self._channel = channel
+        self._histogram_wdg: widgets.Widget | None = None
         # WIDGETS
         self._visible = widgets.Checkbox(value=True, indent=False)
         self._visible.layout.width = "60px"
@@ -74,20 +81,31 @@ class JupyterLutView(LutView):
             description="Auto",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
-            layout=widgets.Layout(width="65px"),
+            layout=widgets.Layout(min_width="40px"),
+        )
+        self._histogram = widgets.ToggleButton(
+            value=False,
+            description="",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            icon="bar-chart",
+            tooltip="View Histogram",
+            layout=widgets.Layout(width="40px"),
         )
 
         # LAYOUT
 
-        self.layout = widgets.HBox(
-            [self._visible, self._cmap, self._clims, self._auto_clim]
+        lut_ctrls = widgets.HBox(
+            [self._visible, self._cmap, self._clims, self._auto_clim, self._histogram]
         )
+        self._histogram_container = widgets.HBox([])
+        self.layout = widgets.VBox([lut_ctrls, self._histogram_container])
 
         # CONNECTIONS
         self._visible.observe(self._on_visible_changed, names="value")
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
+        self._histogram.observe(self._on_histogram_requested, names="value")
 
     # ------------------ emit changes to the controller ------------------
 
@@ -111,6 +129,15 @@ class JupyterLutView(LutView):
             else:  # Manually scale
                 clims = self._clims.value
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_histogram_requested(self, change: dict[str, Any]) -> None:
+        if self._histogram_wdg:
+            # show or hide the actual widget itself
+            self._histogram_container.layout.display = (
+                "flex" if change["new"] else "none"
+            )
+        else:
+            self.histogramRequested.emit(self._channel)
 
     # ------------------ receive changes from the controller ---------------
 
@@ -156,11 +183,12 @@ class JupyterArrayView(ArrayView):
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
-        self._viewer_model.events.interaction_mode.connect(self._on_model_mode_changed)
+        self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
         self._data_model = data_model
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
+        self._luts: dict[ChannelKey, JupyterLutView] = {}
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
@@ -313,10 +341,13 @@ class JupyterArrayView(ArrayView):
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self) -> JupyterLutView:
+    def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterLutView()
+        wdg = JupyterLutView(channel)
         layout = self._luts_box
+        self._luts[channel] = wdg
+
+        wdg.histogramRequested.connect(self.histogramRequested)
         layout.children = (*layout.children, wdg.layout)
         return wdg
 
@@ -346,22 +377,22 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+        if lut := self._luts.get(channel, None):
+            # Resize widget to a respectable size
+            widget.set_trait("css_height", "100px")
+            # Add widget to view
+            lut._histogram_container.children = (
+                *lut._histogram_container.children,
+                widget,
+            )
+            lut._histogram_wdg = widget
+
     def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
         )
-
-    def _on_model_mode_changed(
-        self, new: InteractionMode, old: InteractionMode
-    ) -> None:
-        # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-        if old == InteractionMode.CREATE_ROI:
-            self._add_roi_btn.value = False
-
-    def add_histogram(self, widget: Any) -> None:
-        """Add a histogram widget to the viewer."""
-        warnings.warn("Histograms are not supported in Jupyter frontend", stacklevel=2)
 
     def remove_histogram(self, widget: Any) -> None:
         """Remove a histogram widget from the viewer."""
@@ -409,5 +440,25 @@ class JupyterArrayView(ArrayView):
     def close(self) -> None:
         self.layout.close()
 
-    def set_progress_spinner_visible(self, visible: bool) -> None:
-        self._progress_spinner.layout.display = "flex" if visible else "none"
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "show_progress_spinner":
+            self._progress_spinner.layout.display = "flex" if value else "none"
+        elif sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._add_roi_btn.value = False
+        elif sig_name == "show_histogram_button":
+            # Note that "block" displays the icon better than "flex"
+            for lut in self._luts.values():
+                lut._histogram.layout.display = "block" if value else "none"
+        elif sig_name == "show_roi_button":
+            self._add_roi_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_channel_mode_selector":
+            self._channel_mode_combo.layout.display = "flex" if value else "none"
+        elif sig_name == "show_reset_zoom_button":
+            self._reset_zoom_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_3d_button":
+            self._ndims_btn.layout.display = "flex" if value else "none"

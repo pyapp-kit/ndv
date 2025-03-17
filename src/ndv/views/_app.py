@@ -7,8 +7,6 @@ from enum import Enum
 from functools import cache, wraps
 from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
-from ndv.views.bases._app import NDVApp
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from concurrent.futures import Future
@@ -17,6 +15,7 @@ if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
+    from ndv.views.bases._app import NDVApp
     from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
@@ -169,7 +168,7 @@ def _running_apps() -> Iterator[GuiFrontend]:
 def _load_app(module: str, cls_name: str) -> NDVApp:
     mod = importlib.import_module(module)
     cls = getattr(mod, cls_name)
-    return cast(NDVApp, cls())
+    return cast("NDVApp", cls())
 
 
 @cache  # not allowed to change
@@ -291,6 +290,23 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         A function that can be called to remove the event filter.
     """
     return ndv_app().filter_mouse_events(canvas, receiver)
+
+
+def call_later(msec: int, func: Callable[[], None]) -> None:
+    """Call `func` after `msec` milliseconds.
+
+    This can be used to enqueue a function to be called after the current event loop
+    iteration.  For example, before calling `run_app()`, to ensure that the event
+    loop is running before the function is called.
+
+    Parameters
+    ----------
+    msec : int
+        The number of milliseconds to wait before calling `func`.
+    func : Callable[[], None]
+        The function to call.
+    """
+    ndv_app().call_later(msec, func)
 
 
 def run_app() -> None:

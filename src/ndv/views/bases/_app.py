@@ -89,6 +89,18 @@ class NDVApp:
         sys._original_excepthook_ = sys.excepthook  # type: ignore
         sys.excepthook = ndv_excepthook
 
+    def process_events(self) -> None:
+        """Process events for the application."""
+        pass
+
+    def call_later(self, msec: int, func: Callable[[], None]) -> None:
+        """Call `func` after `msec` milliseconds."""
+        # generic implementation using python threading
+
+        from threading import Timer
+
+        Timer(msec / 1000, func).start()
+
 
 @cache
 def _thread_pool_executor() -> ThreadPoolExecutor:

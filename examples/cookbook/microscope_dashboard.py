@@ -111,10 +111,10 @@ class StageWidget(QtW.QGroupBox):
             layout.addLayout(row)
 
     def _move_stage(self) -> None:
-        button = cast(QtW.QPushButton, self.sender())
+        button = cast("QtW.QPushButton", self.sender())
         ax, spin = button.property(self._data_key)
         step = 1 if button.text() == "+" else -1
-        cast(QtW.QDoubleSpinBox, spin).stepBy(step)
+        cast("QtW.QDoubleSpinBox", spin).stepBy(step)
         self.stageMoved.emit(ax, step)
 
 
