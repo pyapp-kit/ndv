@@ -103,12 +103,10 @@ class PyGFXImageHandle(ImageHandle):
         return self._cmap
 
     def set_colormap(self, cmap: _cmap.Colormap) -> None:
-        # RGB (i.e. 3D) images should not have a colormap
-        if self._is_rgb():
-            warnings.warn("Cannot set colormap on an RGB image", stacklevel=2)
-            return
         self._cmap = cmap
-        self._material.map = cmap.to_pygfx()
+        # RGB (i.e. 3D) images should not have a colormap
+        if not self._is_rgb():
+            self._material.map = cmap.to_pygfx()
         self._render()
 
     def start_move(self, pos: Sequence[float]) -> None:
