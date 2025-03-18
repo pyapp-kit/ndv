@@ -24,6 +24,8 @@ if TYPE_CHECKING:
     from ndv.views.bases._app import P, T
     from ndv.views.bases._graphics._mouseable import Mouseable
 
+_app = None
+
 
 class WxAppWrap(NDVApp):
     """Provider for wxPython."""
@@ -31,8 +33,9 @@ class WxAppWrap(NDVApp):
     IPY_MAGIC_KEY = "wx"
 
     def create_app(self) -> Any:
+        global _app
         if (wxapp := wx.App.Get()) is None:
-            wxapp = wx.App()
+            _app = wxapp = wx.App()
 
         self._maybe_enable_ipython_gui()
         self._install_excepthook()

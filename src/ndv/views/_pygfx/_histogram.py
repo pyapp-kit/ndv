@@ -14,6 +14,8 @@ from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
+from ._util import rendercanvas_class
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TypeAlias
@@ -31,34 +33,6 @@ class Grabbable(Enum):
     LEFT_CLIM = auto()
     RIGHT_CLIM = auto()
     GAMMA = auto()
-
-
-def get_canvas_class() -> WgpuCanvas:
-    from ndv.views._app import GuiFrontend, gui_frontend
-
-    frontend = gui_frontend()
-    if frontend == GuiFrontend.QT:
-        from qtpy.QtCore import QSize
-        from wgpu.gui import qt
-
-        class QWgpuCanvas(qt.QWgpuCanvas):
-            def installEventFilter(self, filter: Any) -> None:
-                self._subwidget.installEventFilter(filter)
-
-            def sizeHint(self) -> QSize:
-                return QSize(self.width(), self.height())
-
-        return QWgpuCanvas
-    if frontend == GuiFrontend.JUPYTER:
-        from wgpu.gui.jupyter import JupyterWgpuCanvas
-
-        return JupyterWgpuCanvas
-    if frontend == GuiFrontend.WX:
-        from wgpu.gui.wx import WxWgpuCanvas
-
-        return WxWgpuCanvas
-
-    raise Exception(f"No canvas available for frontend {frontend}")
 
 
 class _OrthographicCamera(pygfx.OrthographicCamera):
@@ -123,7 +97,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self.margin_top = 10
 
         # ------------ PyGFX Canvas ------------ #
-        cls = get_canvas_class()
+        cls = rendercanvas_class()
         self._size = (600, 600)
         self._canvas = cls(size=self._size)
 
