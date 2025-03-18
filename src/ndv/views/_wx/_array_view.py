@@ -91,16 +91,16 @@ class _WxLUTWidget(wx.Panel):
         _add_icon(self.histogram, "foundation:graph-bar")
 
         # Layout
-        widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        widget_sizer.Add(self.visible, 0, wx.ALL, 2)
-        widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
-        widget_sizer.Add(self.clims, 1, wx.ALL, 2)
-        widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
-        widget_sizer.Add(self.histogram, 0, wx.ALL, 2)
-        widget_sizer.SetSizeHints(self)
+        self._widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._widget_sizer.Add(self.visible, 0, wx.ALL, 2)
+        self._widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
+        self._widget_sizer.Add(self.clims, 1, wx.ALL, 2)
+        self._widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
+        self._widget_sizer.Add(self.histogram, 0, wx.ALL, 2)
+        self._widget_sizer.SetSizeHints(self)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(widget_sizer, 0, wx.EXPAND, 5)
+        self.sizer.Add(self._widget_sizer, 0, wx.EXPAND, 5)
 
         self.SetSizer(self.sizer)
         self.Layout()
@@ -216,7 +216,7 @@ class WxRGBView(WxLutView):
         super().__init__(parent, channel)
         self._wxwidget.cmap.Hide()
         lbl = wx.StaticText(self._wxwidget, label="RGB")
-        self._wxwidget._sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._wxwidget._widget_sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
         self._wxwidget.Layout()
 
 

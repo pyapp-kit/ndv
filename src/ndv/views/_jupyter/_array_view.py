@@ -176,9 +176,6 @@ class JupyterRGBView(JupyterLutView):
     def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__(channel)
         self._cmap.layout.display = "none"
-        children = list(self.layout.children)
-        lbl = widgets.Label(value="RGB")
-        self.layout.children = (children[0], lbl, *children[1:])
 
 
 SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
