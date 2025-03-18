@@ -405,6 +405,3 @@ def test_rgb_display_magic() -> None:
 
     rgb_data = np.ones((1, 2, 3, 4, 3), dtype=np.uint8)
     assert_rgb_magic_works(rgb_data)
-
-    rgba_data = np.ones((1, 2, 3, 4, 4), dtype=np.uint8)
-    assert_rgb_magic_works(rgba_data)

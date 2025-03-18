@@ -258,10 +258,9 @@ class QRGBView(QLutView):
         super().__init__(channel)
         # Hide the cmap selector
         self._qwidget.cmap.setVisible(False)
-        # Avoid leaking subwidgets
-        self._qwidget.cmap.clear()
         # Insert a new label
-        self._qwidget._lut_layout.insertWidget(1, QLabel("RGB"))
+        self._label = QLabel("RGB")
+        self._qwidget._lut_layout.insertWidget(1, self._label)
 
 
 class ROIButton(QPushButton):
