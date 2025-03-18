@@ -164,14 +164,14 @@ class _QLUTWidget(QWidget):
         self.histogram_btn = QPushButton(add_histogram_icon, "")
         self.histogram_btn.setCheckable(True)
 
-        top = QHBoxLayout()
-        top.setSpacing(5)
-        top.setContentsMargins(0, 0, 0, 0)
-        top.addWidget(self.visible)
-        top.addWidget(self.cmap)
-        top.addWidget(self.clims)
-        top.addWidget(self.auto_clim)
-        top.addWidget(self.histogram_btn)
+        self._lut_layout = QHBoxLayout()
+        self._lut_layout.setSpacing(5)
+        self._lut_layout.setContentsMargins(0, 0, 0, 0)
+        self._lut_layout.addWidget(self.visible)
+        self._lut_layout.addWidget(self.cmap)
+        self._lut_layout.addWidget(self.clims)
+        self._lut_layout.addWidget(self.auto_clim)
+        self._lut_layout.addWidget(self.histogram_btn)
 
         self._histogram: QWidget | None = None
 
@@ -179,7 +179,7 @@ class _QLUTWidget(QWidget):
         self._layout = QVBoxLayout(self)
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.addLayout(top)
+        self._layout.addLayout(self._lut_layout)
 
 
 class QLutView(LutView):
@@ -256,8 +256,12 @@ class QLutView(LutView):
 class QRGBView(QLutView):
     def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__(channel)
+        # Hide the cmap selector
         self._qwidget.cmap.setVisible(False)
-        self._qwidget._layout.insertWidget(1, QLabel("RGB"))
+        # Avoid leaking subwidgets
+        self._qwidget.cmap.clear()
+        # Insert a new label
+        self._qwidget._lut_layout.insertWidget(1, QLabel("RGB"))
 
 
 class ROIButton(QPushButton):

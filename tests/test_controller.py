@@ -399,9 +399,9 @@ def test_rgb_display_magic() -> None:
         viewer = ArrayViewer(rgb_data)
         assert viewer.display_model.channel_mode == ChannelMode.RGBA
         # Note Multiple correct answers here - modulus covers both cases
-        assert int(viewer.display_model.channel_axis) % rgb_data.ndim == 4
-        assert int(viewer.display_model.visible_axes[0]) % rgb_data.ndim == 2
-        assert int(viewer.display_model.visible_axes[1]) % rgb_data.ndim == 3
+        assert cast("int", viewer.display_model.channel_axis) % rgb_data.ndim == 4
+        assert cast("int", viewer.display_model.visible_axes[0]) % rgb_data.ndim == 2
+        assert cast("int", viewer.display_model.visible_axes[1]) % rgb_data.ndim == 3
 
     rgb_data = np.ones((1, 2, 3, 4, 3), dtype=np.uint8)
     assert_rgb_magic_works(rgb_data)
