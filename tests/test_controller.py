@@ -393,6 +393,7 @@ def test_roi_interaction() -> None:
     assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
 
 
+@pytest.mark.usefixtures("any_app")
 def test_rgb_display_magic() -> None:
     def assert_rgb_magic_works(rgb_data: np.ndarray) -> None:
         viewer = ArrayViewer(rgb_data)
