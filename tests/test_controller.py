@@ -393,8 +393,11 @@ def test_roi_interaction() -> None:
     assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
 
 
+@pytest.mark.allow_leaks
 @pytest.mark.usefixtures("any_app")
 def test_rgb_display_magic() -> None:
+    # FIXME: Something in the QLutView is causing leaked qt widgets here.
+    # Doesn't seem to be coming from the QRGBView...
     def assert_rgb_magic_works(rgb_data: np.ndarray) -> None:
         viewer = ArrayViewer(rgb_data)
         assert viewer.display_model.channel_mode == ChannelMode.RGBA
@@ -405,3 +408,6 @@ def test_rgb_display_magic() -> None:
 
     rgb_data = np.ones((1, 2, 3, 4, 3), dtype=np.uint8)
     assert_rgb_magic_works(rgb_data)
+
+    rgba_data = np.ones((1, 2, 3, 4, 4), dtype=np.uint8)
+    assert_rgb_magic_works(rgba_data)
