@@ -239,6 +239,19 @@ class JupyterLutView(LutView):
     def frontend_widget(self) -> Any:
         return self.layout
 
+    # ------------------ private methods ---------------
+
+    def add_histogram(self, histogram: HistogramCanvas) -> None:
+        widget = histogram.frontend_widget()
+        # Resize widget to a respectable size
+        widget.set_trait("css_height", "auto")
+        # Add widget to view
+        self._histogram_container.children = (
+            *self._histogram_container.children,
+            widget,
+        )
+        self._histogram = histogram
+
 
 class JupyterRGBView(JupyterLutView):
     def __init__(self, channel: ChannelKey = None) -> None:
@@ -453,15 +466,7 @@ class JupyterArrayView(ArrayView):
 
     def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
-            widget = histogram.frontend_widget()
-            # Resize widget to a respectable size
-            widget.set_trait("css_height", "auto")
-            # Add widget to view
-            lut._histogram_container.children = (
-                *lut._histogram_container.children,
-                widget,
-            )
-            lut._histogram = histogram
+            lut.add_histogram(histogram)
 
     def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""

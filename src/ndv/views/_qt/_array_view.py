@@ -321,6 +321,15 @@ class QLutView(LutView):
         if hist := self.histogram:
             hist.set_range()
 
+    def _add_histogram(self, histogram: HistogramCanvas) -> None:
+        # Resize widget to a respectable size
+        self._qwidget.resize(QSize(self._qwidget.width(), self._qwidget.height() + 100))
+        # Add widget to view
+        self.histogram = histogram
+        widget = cast("QWidget", histogram.frontend_widget())
+        widget.resize(QSize(self._qwidget.width(), 100))
+        self._qwidget.hist_layout.addWidget(widget, 1)
+
 
 class QRGBView(QLutView):
     def __init__(self, channel: ChannelKey = None) -> None:
@@ -586,15 +595,7 @@ class QtArrayView(ArrayView):
 
     def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
-            # Resize widget to a respectable size
-            lut._qwidget.resize(
-                QSize(lut._qwidget.width(), lut._qwidget.height() + 100)
-            )
-            # Add widget to view
-            lut.histogram = histogram
-            widget = cast("QWidget", histogram.frontend_widget())
-            widget.resize(QSize(lut._qwidget.width(), 100))
-            lut._qwidget.hist_layout.addWidget(widget, 1)
+            lut._add_histogram(histogram)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)

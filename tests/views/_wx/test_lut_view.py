@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import cmap
 import wx
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views._wx._array_view import WxLutView
+from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
 @fixture
@@ -86,4 +89,64 @@ def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) 
     clim_wdg = view._wxwidget.clims
     clim_wdg.SetValue(0, 1)
     processEvent(wx.EVT_SLIDER, clim_wdg)
-    assert model.clims == ClimsManual(min=0, max=1)  # type:ignore
+    assert model.clims == ClimsManual(min=0, max=1)
+
+
+def test_WxLutView_histogram_controls(wxapp: wx.App, view: WxLutView) -> None:
+    def processEvent(evt: wx.PyEventBinder, wdg: wx.Control) -> None:
+        ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
+        wx.PostEvent(wdg.GetEventHandler(), ev)
+        # Borrowed from:
+        # https://github.com/wxWidgets/Phoenix/blob/master/unittests/wtc.py#L41
+        evtLoop = wxapp.GetTraits().CreateEventLoop()
+        wx.EventLoopActivator(evtLoop)
+        evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
+
+    # Mock up a histogram
+    hist_mock = MagicMock(spec=HistogramCanvas)
+    hist_frontend = wx.Window()
+    hist_mock.frontend_widget.return_value = hist_frontend
+
+    # Add the histogram and assert it was correctly added
+    view._add_histogram(hist_mock)
+    assert view.histogram is hist_mock
+
+    # Assert histogram button toggles visibility
+    hist_btn = view._wxwidget.histogram_btn
+    log_wdg = view._wxwidget.log_btn
+    reset_wdg = view._wxwidget.set_hist_range_btn
+
+    hist_btn.SetValue(True)
+    processEvent(wx.EVT_TOGGLEBUTTON, hist_btn)
+    assert log_wdg.IsShown()
+    assert reset_wdg.IsShown()
+    assert hist_frontend.IsShown()
+
+    hist_btn.SetValue(False)
+    processEvent(wx.EVT_TOGGLEBUTTON, hist_btn)
+    assert not log_wdg.IsShown()
+    assert not reset_wdg.IsShown()
+    assert not hist_frontend.IsShown()
+
+    # Assert toggling the log button alters the logarithmic base
+    log_wdg.SetValue(True)
+    processEvent(wx.EVT_TOGGLEBUTTON, log_wdg)
+    hist_mock.set_log_base.assert_called_once_with(10)
+    hist_mock.reset_mock()
+
+    log_wdg.SetValue(False)
+    processEvent(wx.EVT_TOGGLEBUTTON, log_wdg)
+    hist_mock.set_log_base.assert_called_once_with(None)
+    hist_mock.reset_mock()
+
+    # Assert pressing the reset view button sets the histogram range
+    processEvent(wx.EVT_BUTTON, reset_wdg)
+    hist_mock.set_range.assert_called_once_with()
+    hist_mock.reset_mock()
+
+    # Assert pressing the reset view button turns off log mode
+    log_wdg.SetValue(True)
+    processEvent(wx.EVT_TOGGLEBUTTON, log_wdg)
+    processEvent(wx.EVT_BUTTON, reset_wdg)
+    assert not log_wdg.GetValue()
+    hist_mock.reset_mock()
