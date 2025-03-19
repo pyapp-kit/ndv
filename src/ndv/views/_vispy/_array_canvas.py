@@ -44,6 +44,7 @@ class VispyImageHandle(ImageHandle):
     def __init__(self, visual: scene.Image | scene.Volume) -> None:
         self._visual = visual
         self._allowed_dims = {2, 3} if isinstance(visual, scene.visuals.Image) else {3}
+        self._ndim = 2 if isinstance(visual, scene.visuals.Image) else 3
 
     def data(self) -> np.ndarray:
         try:

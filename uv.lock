@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.13' and sys_platform == 'win32'",
@@ -3134,7 +3135,6 @@ wheels = [
 
 [[package]]
 name = "ndv"
-version = "0.2.3.dev7+g0ea22af"
 source = { editable = "." }
 dependencies = [
     { name = "cmap" },
@@ -3296,6 +3296,7 @@ requires-dist = [
     { name = "wxpython", marker = "extra == 'wx'", specifier = ">=4.2.2" },
     { name = "wxpython", marker = "extra == 'wxpython'", specifier = ">=4.2.2" },
 ]
+provides-extras = ["jup", "jupyter", "pygfx", "pyqt", "pyside", "qt", "vispy", "wx", "wxpython"]
 
 [package.metadata.requires-dev]
 array-libs = [
