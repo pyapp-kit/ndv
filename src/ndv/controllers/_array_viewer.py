@@ -194,6 +194,7 @@ class ArrayViewer(_BaseArrayViewer):
 
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
+            (model.events.channel_axis, self._on_model_channel_axis_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
@@ -262,21 +263,30 @@ class ArrayViewer(_BaseArrayViewer):
         self._canvas.set_ndim(self.display_model.n_visible_axes)
         self._request_data()
 
+    def _on_model_channel_axis_changed(self) -> None:
+        self._request_data()
+
     def _on_model_current_index_changed(self) -> None:
         value = self._data_model.display.current_index
         self._view.set_current_index(value)
         self._request_data()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
+        # When the channel view changes, two things must be done:
         self._view.set_channel_mode(mode)
+        # 1. A slider must be shown for each axis that is not a:
+        # (a) channel axis
+        # (b) visible axis
         self._update_visible_sliders()
-        show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
+        # 2. LutViews must be updated:
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
                 if lut_ctrl.key is None:
-                    view.set_visible(not show_channel_luts)
+                    view.set_visible(mode == ChannelMode.GRAYSCALE)
+                elif lut_ctrl.key == "RGB":
+                    view.set_visible(mode == ChannelMode.RGBA)
                 else:
-                    view.set_visible(show_channel_luts)
+                    view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
         # redraw
         self._clear_canvas()
         self._request_data()

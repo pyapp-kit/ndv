@@ -6,7 +6,7 @@ from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
 from functools import cache
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, Optional, cast
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from pydantic import PlainSerializer, PlainValidator
 from typing_extensions import TypeAlias
@@ -65,9 +65,12 @@ Slice = Annotated[slice, PlainValidator(_to_slice)]
 AxisKey: TypeAlias = Annotated[
     Hashable, PlainValidator(_maybe_int), PlainSerializer(str, return_type=str)
 ]
-
-# A channel key is a value that can be used to identify a channel.
-ChannelKey: TypeAlias = Optional[int]
+# An channel key is any hashable object that can be used to describe a position along
+# an axis. In many cases it will be an integer, but it might also provide a contextual
+# label for one or more positions.
+ChannelKey: TypeAlias = Annotated[
+    Hashable, PlainValidator(_maybe_int), PlainSerializer(str, return_type=str)
+]
 
 
 class MouseButton(IntFlag):

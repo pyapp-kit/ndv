@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
+
+import numpy as np
 
 from ndv.models import ArrayDisplayModel, DataWrapper
 from ndv.models._data_display_model import _ArrayDataDisplayModel
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.controllers._channel_controller import ChannelController
-    from ndv.models import ChannelMode, DataWrapper
+    from ndv.models import ChannelMode
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
 
     LutKey: TypeAlias = Hashable | None
@@ -34,14 +36,20 @@ class _BaseArrayViewer:
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ):
-        if display_model is not None and kwargs:
+        wrapper = None if data is None else DataWrapper.create(data)
+        if display_model is None:
+            display_model = self._default_display_model(wrapper, **kwargs)
+        elif kwargs:
             warnings.warn(
                 "When display_model is provided, kwargs are be ignored.",
                 stacklevel=2,
             )
+
         self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
+            data_wrapper=wrapper, display=display_model
         )
+        self._viewer_model = ArrayViewerModel()
+
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[ChannelKey, ChannelController] = {}
@@ -50,8 +58,6 @@ class _BaseArrayViewer:
         self._app = _app.ndv_app()
         ArrayView = _app.get_array_view_class()
         ArrayCanvas = _app.get_array_canvas_class()
-
-        self._viewer_model = ArrayViewerModel()
         self._canvas = ArrayCanvas(self._viewer_model)
         self._canvas.set_ndim(self._data_model.display.n_visible_axes)
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
@@ -147,6 +153,35 @@ class _BaseArrayViewer:
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
-                values[key] = value
+                # Handle RGB
+                if key == "RGB" and isinstance(value, np.ndarray):
+                    values["R"] = value[0]
+                    values["G"] = value[1]
+                    values["B"] = value[2]
+                    if value.shape[0] > 3:
+                        values["A"] = value[3]
+                else:
+                    values[key] = cast("float", value)
 
         return values
+
+    @staticmethod
+    def _default_display_model(
+        data: None | DataWrapper, **kwargs: Unpack[ArrayDisplayModelKwargs]
+    ) -> ArrayDisplayModel:
+        """
+        Creates a default ArrayDisplayModel when none is provided by the user.
+
+        All magical setup goes here.
+        """
+        # Can't do any magic with no data
+        if data is None:
+            return ArrayDisplayModel(**kwargs)
+
+        # cast 3d+ images with shape[-1] of {3,4} to RGB images
+        if "channel_mode" not in kwargs and "channel_axis" not in kwargs:
+            shape = tuple(data.sizes().values())
+            if len(shape) >= 3 and shape[-1] in {3, 4}:
+                kwargs["channel_axis"] = -1
+                kwargs["channel_mode"] = "rgba"
+        return ArrayDisplayModel(**kwargs)

@@ -91,16 +91,16 @@ class _WxLUTWidget(wx.Panel):
         _add_icon(self.histogram, "foundation:graph-bar")
 
         # Layout
-        widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        widget_sizer.Add(self.visible, 0, wx.ALL, 2)
-        widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
-        widget_sizer.Add(self.clims, 1, wx.ALL, 2)
-        widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
-        widget_sizer.Add(self.histogram, 0, wx.ALL, 2)
-        widget_sizer.SetSizeHints(self)
+        self._widget_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._widget_sizer.Add(self.visible, 0, wx.ALL, 2)
+        self._widget_sizer.Add(self.cmap, 0, wx.ALL, 2)
+        self._widget_sizer.Add(self.clims, 1, wx.ALL, 2)
+        self._widget_sizer.Add(self.auto_clim, 0, wx.ALL, 2)
+        self._widget_sizer.Add(self.histogram, 0, wx.ALL, 2)
+        self._widget_sizer.SetSizeHints(self)
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(widget_sizer, 0, wx.EXPAND, 5)
+        self.sizer.Add(self._widget_sizer, 0, wx.EXPAND, 5)
 
         self.SetSizer(self.sizer)
         self.Layout()
@@ -211,6 +211,15 @@ class WxLutView(LutView):
         self._wxwidget.Close()
 
 
+class WxRGBView(WxLutView):
+    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
+        super().__init__(parent, channel)
+        self._wxwidget.cmap.Hide()
+        lbl = wx.StaticText(self._wxwidget, label="RGB")
+        self._wxwidget._widget_sizer.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._wxwidget.Layout()
+
+
 # mostly copied from _qt.qt_view._QDimsSliders
 class _WxDimsSliders(wx.Panel):
     currentIndexChanged = Signal()
@@ -309,7 +318,11 @@ class _WxArrayViewer(wx.Frame):
         # Channel mode combo box
         self.channel_mode_combo = wx.ComboBox(
             self,
-            choices=[ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value],
+            choices=[
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ],
             style=wx.CB_DROPDOWN,
         )
 
@@ -419,9 +432,8 @@ class WxArrayView(ArrayView):
         return self._wxwidget
 
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
-        view = WxLutView(self.frontend_widget(), channel)
-
-        # Add the LutView to the Viewer
+        wdg = self.frontend_widget()
+        view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
         # TODO: Reusable synchronization with ViewerModel
