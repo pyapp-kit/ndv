@@ -57,8 +57,17 @@ class PyGFXImageHandle(ImageHandle):
         return self._grid.data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
-        self._grid.data[:] = data
-        self._grid.update_range((0, 0, 0), self._grid.size)
+        # If dimensions are unchanged, reuse the buffer
+        if data.shape == self._grid.data.shape:
+            self._grid.data[:] = data
+            self._grid.update_range((0, 0, 0), self._grid.size)
+        # Otherwise, the size (and maybe number of dimensions) changed
+        # - we need a new buffer
+        else:
+            self._grid = pygfx.Texture(data, dim=2)
+            self._image.geometry = pygfx.Geometry(grid=self._grid)
+            # RGB images (i.e. 3D datasets) cannot have a colormap
+            self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
 
     def visible(self) -> bool:
         return bool(self._image.visible)
@@ -95,7 +104,9 @@ class PyGFXImageHandle(ImageHandle):
 
     def set_colormap(self, cmap: _cmap.Colormap) -> None:
         self._cmap = cmap
-        self._material.map = cmap.to_pygfx()
+        # RGB (i.e. 3D) images should not have a colormap
+        if not self._is_rgb():
+            self._material.map = cmap.to_pygfx()
         self._render()
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -110,6 +121,9 @@ class PyGFXImageHandle(ImageHandle):
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
+
+    def _is_rgb(self) -> bool:
+        return self.data().ndim == 3 and isinstance(self._image, pygfx.Image)
 
 
 class PyGFXRectangle(RectangularROIHandle):

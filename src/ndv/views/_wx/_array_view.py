@@ -96,6 +96,7 @@ class _WxLUTWidget(wx.Panel):
         self.set_hist_range_btn = wx.Button(self, label="Reset", size=(40, -1))
         _add_icon(self.set_hist_range_btn, "fluent:full-screen-maximize-24-filled")
         self.set_hist_range_btn.Show(False)
+        # Layout
 
         self.log_btn = wx.ToggleButton(self, label="Log", size=(40, -1))
         self.log_btn.SetToolTip("log (base 10, count+1)")
@@ -274,6 +275,15 @@ class WxLutView(LutView):
         self._wxwidget.Close()
 
 
+class WxRGBView(WxLutView):
+    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
+        super().__init__(parent, channel)
+        self._wxwidget.cmap.Hide()
+        lbl = wx.StaticText(self._wxwidget, label="RGB")
+        self._wxwidget.lut_ctrls.Insert(1, lbl, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        self._wxwidget.Layout()
+
+
 # mostly copied from _qt.qt_view._QDimsSliders
 class _WxDimsSliders(wx.Panel):
     currentIndexChanged = Signal()
@@ -372,7 +382,11 @@ class _WxArrayViewer(wx.Frame):
         # Channel mode combo box
         self.channel_mode_combo = wx.ComboBox(
             self,
-            choices=[ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value],
+            choices=[
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ],
             style=wx.CB_DROPDOWN,
         )
 
@@ -482,9 +496,8 @@ class WxArrayView(ArrayView):
         return self._wxwidget
 
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
-        view = WxLutView(self.frontend_widget(), channel)
-
-        # Add the LutView to the Viewer
+        wdg = self.frontend_widget()
+        view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
         # TODO: Reusable synchronization with ViewerModel
