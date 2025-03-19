@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -60,13 +60,17 @@ class ArrayViewer:
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
-        if display_model is not None and kwargs:
+        wrapper = None if data is None else DataWrapper.create(data)
+        if display_model is None:
+            display_model = self._default_display_model(wrapper, **kwargs)
+        elif kwargs:
             warnings.warn(
                 "When display_model is provided, kwargs are be ignored.",
                 stacklevel=2,
             )
+
         self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=data, display=display_model or ArrayDisplayModel(**kwargs)
+            data_wrapper=wrapper, display=display_model
         )
         self._viewer_model = ArrayViewerModel()
         self._viewer_model.events.interaction_mode.connect(
@@ -218,6 +222,27 @@ class ArrayViewer:
 
     # --------------------- PRIVATE ------------------------------------------
 
+    @staticmethod
+    def _default_display_model(
+        data: None | DataWrapper, **kwargs: Unpack[ArrayDisplayModelKwargs]
+    ) -> ArrayDisplayModel:
+        """
+        Creates a default ArrayDisplayModel when none is provided by the user.
+
+        All magical setup goes here.
+        """
+        # Can't do any magic with no data
+        if data is None:
+            return ArrayDisplayModel(**kwargs)
+
+        # cast 3d+ images with shape[-1] of {3,4} to RGB images
+        if "channel_mode" not in kwargs and "channel_axis" not in kwargs:
+            shape = tuple(data.sizes().values())
+            if len(shape) >= 3 and shape[-1] in {3, 4}:
+                kwargs["channel_axis"] = -1
+                kwargs["channel_mode"] = "rgba"
+        return ArrayDisplayModel(**kwargs)
+
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
@@ -262,6 +287,7 @@ class ArrayViewer:
 
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
+            (model.events.channel_axis, self._on_model_channel_axis_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
@@ -330,21 +356,30 @@ class ArrayViewer:
         self._canvas.set_ndim(self.display_model.n_visible_axes)
         self._request_data()
 
+    def _on_model_channel_axis_changed(self) -> None:
+        self._request_data()
+
     def _on_model_current_index_changed(self) -> None:
         value = self._data_model.display.current_index
         self._view.set_current_index(value)
         self._request_data()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
+        # When the channel view changes, two things must be done:
         self._view.set_channel_mode(mode)
+        # 1. A slider must be shown for each axis that is not a:
+        # (a) channel axis
+        # (b) visible axis
         self._update_visible_sliders()
-        show_channel_luts = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
+        # 2. LutViews must be updated:
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
                 if lut_ctrl.key is None:
-                    view.set_visible(not show_channel_luts)
+                    view.set_visible(mode == ChannelMode.GRAYSCALE)
+                elif lut_ctrl.key == "RGB":
+                    view.set_visible(mode == ChannelMode.RGBA)
                 else:
-                    view.set_visible(show_channel_luts)
+                    view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
         # redraw
         self._clear_canvas()
         self._request_data()
@@ -563,7 +598,15 @@ class ArrayViewer:
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
-                values[key] = value
+                # Handle RGB
+                if key == "RGB" and isinstance(value, np.ndarray):
+                    values["R"] = value[0]
+                    values["G"] = value[1]
+                    values["B"] = value[2]
+                    if value.shape[0] > 3:
+                        values["A"] = value[3]
+                else:
+                    values[key] = cast("float", value)
 
         return values
 

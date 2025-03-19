@@ -144,3 +144,22 @@ def cosem_dataset(
     ).result()
     ts_array = ts_array[ts.d[:].label["z", "y", "x"]]
     return ts_array[ts.d[("y", "x", "z")].transpose[:]]
+
+
+def rgba() -> np.ndarray:
+    """3D RGBA dataset: `(256, 256, 256, 4)`, uint8."""
+    img = np.zeros((256, 256, 256, 4), dtype=np.uint8)
+
+    # R,G,B are simple
+    for i in range(256):
+        img[:, i, :, 0] = i  # Red
+        img[:, i, :, 2] = 255 - i  # Blue
+    for j in range(256):
+        img[:, :, j, 1] = j  # Green
+
+    # Alpha is a bit trickier - requires a meshgrid for efficient computation
+    x, y, z = np.meshgrid(np.arange(256), np.arange(256), np.arange(256), indexing="ij")
+    alpha = np.sqrt((x - 128) ** 2 + (y - 128) ** 2 + (z - 128) ** 2)
+    img[:, :, :, 3] = np.clip(alpha, 0, 255)
+
+    return img
