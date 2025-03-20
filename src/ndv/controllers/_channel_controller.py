@@ -39,6 +39,7 @@ class ChannelController:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
+        view.set_channel_name(name=str(self.key) if self.key is not None else "")
         # TODO: Could probably reuse cached clims
         self._auto_scale()
 
@@ -50,7 +51,7 @@ class ChannelController:
             view.synchronize()
             view.set_channel_name(name)
 
-    def update_texture_data(self, data: np.ndarray) -> None:
+    def update_texture_data(self, data: np.ndarray, direct: bool = False) -> None:
         """Update the data in the image handle."""
         # WIP:
         # until we have a more sophisticated way to handle updating data
@@ -58,8 +59,11 @@ class ChannelController:
         if not (handles := self.handles):
             return
         handle = handles[0]
-        handle.set_data(data)
-        self._auto_scale()
+        if direct:
+            handle.directly_set_texture_data(data)
+        else:
+            handle.set_data(data)
+            self._auto_scale()
 
     def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""
@@ -80,7 +84,7 @@ class ChannelController:
             # texture has already been reduced to RGB/RGBA/2D). But a more complete
             # implementation would gather the full current nD index and query
             # the data source directly.
-            return handle.data()[idx]  # type: ignore [no-any-return]
+            return float(handle.data()[idx].item())
         return None
 
     def _auto_scale(self) -> None:
