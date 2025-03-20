@@ -6,14 +6,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
-from qtpy.QtCore import QSize, Qt, Signal
-from qtpy.QtGui import QMovie
+from qtpy.QtCore import QObject, QPoint, QPointF, QSize, Qt, Signal
+from qtpy.QtGui import QCursor, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QFrame,
     QGraphicsOpacityEffect,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -126,6 +129,65 @@ class _QSpinner(QLabel):
         effect = QGraphicsOpacityEffect(self)
         effect.setOpacity(0.6)
         self.setGraphicsEffect(effect)
+
+
+class QtPopup(QDialog):
+    """A generic popup window."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setModal(False)  # if False, then clicking anywhere else closes it
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+
+        self.frame = QFrame(self)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.frame)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+    def show_above_mouse(self, *args: Any) -> None:
+        """Show popup dialog above the mouse cursor position."""
+        pos = QCursor().pos()  # mouse position
+        szhint = self.sizeHint()
+        pos -= QPoint(szhint.width() // 2, szhint.height() + 14)
+        self.move(pos)
+        self.resize(self.sizeHint())
+        self.show()
+
+
+class PlayButton(QPushButton):
+    """Just a styled QPushButton that toggles between play and pause icons."""
+
+    fpsChanged = Signal(float)
+
+    PLAY_ICON = "bi:play-fill"
+    PAUSE_ICON = "bi:pause-fill"
+
+    def __init__(self, fps: float = 20, parent: QWidget | None = None) -> None:
+        icn = QIconifyIcon(self.PLAY_ICON, color="#888888")
+        icn.addKey(self.PAUSE_ICON, state=QIconifyIcon.State.On, color="#4580DD")
+        super().__init__(icn, "", parent)
+        self.spin = QDoubleSpinBox(self)
+        self.spin.setRange(0.5, 100)
+        self.spin.setValue(fps)
+        self.spin.valueChanged.connect(self.fpsChanged)
+        self.setCheckable(True)
+        self.setFixedSize(14, 18)
+        self.setIconSize(QSize(16, 16))
+        self.setStyleSheet("border: none; padding: 0; margin: 0;")
+
+        self._popup = QtPopup(self)
+        form = QFormLayout(self._popup.frame)
+        form.setContentsMargins(6, 6, 6, 6)
+        form.addRow("FPS", self.spin)
+
+    def mousePressEvent(self, e: QMouseEvent | None) -> None:
+        if e and e.button() == Qt.MouseButton.RightButton:
+            self._show_fps_dialog(e.globalPosition())
+        else:
+            super().mousePressEvent(e)
+
+    def _show_fps_dialog(self, pos: QPointF) -> None:
+        self._popup.show_above_mouse()
 
 
 class _DimToggleButton(QPushButton):
@@ -271,29 +333,82 @@ class ROIButton(QPushButton):
         self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
 
 
+class DimRow(QObject):
+    def __init__(self, axis: AxisKey, _coords: Sequence) -> None:
+        self.slider = QLabeledSlider(Qt.Orientation.Horizontal)
+        self.index_label = self.slider._label
+        self.play_btn = PlayButton()
+        self.play_btn.fpsChanged.connect(self.set_fps)
+        self.play_btn.toggled.connect(self._toggle_animation)
+        self.label = QLabel(str(axis))
+        self.out_of = QLabel(f"/ {len(_coords)}")
+
+        self._timer_id: int | None = None
+
+    def set_fps(self, fps: float) -> None:
+        self.play_btn.spin.setValue(fps)
+        self._toggle_animation(self.play_btn.isChecked())
+
+    def _toggle_animation(self, checked: bool) -> None:
+        print("toggle animation", checked)
+        if checked:
+            if self._timer_id is not None:
+                self.killTimer(self._timer_id)
+            interval = int(1000 / self.play_btn.spin.value())
+            self._timer_id = self.startTimer(interval)
+        elif self._timer_id is not None:
+            self.killTimer(self._timer_id)
+            self._timer_id = None
+
+    def timerEvent(self, event: Any) -> None:
+        """Handle timer event for play button, move to the next frame."""
+        # TODO
+        # for now just increment the value by 1, but we should be able to
+        # take FPS into account better and skip additional frames if the timerEvent
+        # is delayed for some reason.
+        inc = 1
+        print("timer event")
+        ival = self.slider.value()
+        ival = (ival + inc) % (self.slider.maximum() + 1)
+        self.slider.setValue(ival)
+
+
 class _QDimsSliders(QWidget):
     currentIndexChanged = Signal()
+
+    _rBTN = 0
+    _rLABEL = 1
+    _rSLIDER = 2
+    _rINDEX = 3
+    _rTOT = 4
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._sliders: dict[Hashable, QLabeledSlider] = {}
         self.setStyleSheet(SLIDER_STYLE)
 
-        layout = QFormLayout(self)
-        layout.setSpacing(2)
-        layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        layout.setContentsMargins(0, 0, 0, 0)
+        self._layout = QGridLayout(self)
+        self._layout.setSpacing(2)
+        self._layout.setContentsMargins(0, 0, 0, 0)
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
-        layout = cast("QFormLayout", self.layout())
         for axis, _coords in coords.items():
             # Create a slider for axis if necessary
             if axis not in self._sliders:
-                sld = QLabeledSlider(Qt.Orientation.Horizontal)
-                sld.valueChanged.connect(self.currentIndexChanged)
-                layout.addRow(str(axis), sld)
-                self._sliders[axis] = sld
+                row = self._layout.rowCount()
+                dim_row = DimRow(axis, _coords)
+                dim_row.slider.valueChanged.connect(self.currentIndexChanged)
+                self._layout.addWidget(dim_row.play_btn, row, self._rBTN)
+                self._layout.addWidget(dim_row.label, row, self._rLABEL)
+                self._layout.addWidget(dim_row.slider, row, self._rSLIDER)
+                self._layout.addWidget(
+                    dim_row.index_label, row, self._rINDEX, Qt.AlignmentFlag.AlignRight
+                )
+                self._layout.addWidget(
+                    dim_row.out_of, row, self._rTOT, Qt.AlignmentFlag.AlignLeft
+                )
+                self._sliders[axis] = dim_row.slider
 
             # Update axis slider with coordinates
             sld = self._sliders[axis]
@@ -307,12 +422,24 @@ class _QDimsSliders(QWidget):
     def hide_dimensions(
         self, axes_to_hide: Container[Hashable], show_remainder: bool = True
     ) -> None:
-        layout = cast("QFormLayout", self.layout())
         for ax, slider in self._sliders.items():
             if ax in axes_to_hide:
-                layout.setRowVisible(slider, False)
+                self.setRowVisible(slider, False)
             elif show_remainder:
-                layout.setRowVisible(slider, True)
+                self.setRowVisible(slider, True)
+
+    def setRowVisible(self, slider: QWidget, visible: bool) -> None:
+        # Find the row of the given slider
+        nrows, ncols = self._layout.rowCount(), self._layout.columnCount()
+        for r in range(nrows):
+            if (
+                item := self._layout.itemAtPosition(r, self._rSLIDER)
+            ) and item.widget() is slider:
+                # Toggle visibility of all widgets in the found row
+                for c in range(ncols):
+                    item = self._layout.itemAtPosition(r, c)
+                    item.widget().setVisible(visible)  # type: ignore
+                continue
 
     def current_index(self) -> Mapping[AxisKey, int | slice]:
         """Return the current value of the sliders."""
