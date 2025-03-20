@@ -204,8 +204,7 @@ class WxLutView(LutView):
         # FIXME: Rendercanvas may make this unnecessary
         if (parent := widget.GetParent()) and parent is not self:
             widget.Reparent(self._wxwidget)  # Reparent widget to this frame
-            # if parent:
-            #     parent.Destroy()
+            wx.CallAfter(parent.Destroy)
             widget.Show()
 
         # Setup references to the histogram
