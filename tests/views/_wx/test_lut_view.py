@@ -104,7 +104,7 @@ def test_WxLutView_histogram_controls(wxapp: wx.App, view: WxLutView) -> None:
 
     # Mock up a histogram
     hist_mock = MagicMock(spec=HistogramCanvas)
-    hist_frontend = wx.Window()
+    hist_frontend = wx.Window(view._wxwidget)
     hist_mock.frontend_widget.return_value = hist_frontend
 
     # Add the histogram and assert it was correctly added
