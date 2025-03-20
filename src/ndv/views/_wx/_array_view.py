@@ -114,13 +114,13 @@ class _WxLUTWidget(wx.Panel):
         self.lut_ctrls.Add(self.histogram_btn, 0, wx.ALL, 2)
 
         # histogram controls go in their own sizer
-        histogram_ctrls = wx.BoxSizer(wx.VERTICAL)
-        histogram_ctrls.Add(self.log_btn, 0, wx.ALL, 2)
-        histogram_ctrls.Add(self.set_hist_range_btn, 0, wx.ALL, 2)
+        self.histogram_ctrls = wx.BoxSizer(wx.VERTICAL)
+        self.histogram_ctrls.Add(self.log_btn, 0, wx.ALL, 2)
+        self.histogram_ctrls.Add(self.set_hist_range_btn, 0, wx.ALL, 2)
 
         # histogram sizer contains controls + a histogram (which is added later)
         self._histogram_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self._histogram_sizer.Add(histogram_ctrls, 0, wx.EXPAND, 5)
+        self._histogram_sizer.Add(self.histogram_ctrls, 0, wx.EXPAND, 5)
 
         # Overall layout
         self.sizer = wx.BoxSizer(wx.VERTICAL)
