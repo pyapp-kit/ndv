@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from contextlib import suppress
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
@@ -26,6 +25,8 @@ if TYPE_CHECKING:
     from wgpu.gui.qt import QWgpuCanvas
 
     WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas
+
+MIN_GAMMA: np.float64 = np.float64(1e-6)
 
 
 class Grabbable(Enum):
@@ -109,15 +110,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
 
-        try:
-            # requires https://github.com/pygfx/pygfx/pull/752
-            self._renderer.blend_mode = "additive"
-        except ValueError:
-            warnings.warn(
-                "This version of pygfx does not yet support additive blending.",
-                stacklevel=3,
-            )
-            self._renderer.blend_mode = "weighted_depth"
+        self._renderer.blend_mode = "ordered1"
 
         # Note that we split the view up into multiple scenes, each with their
         # own camera and renderer.
@@ -167,8 +160,20 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 color=(1.0, 0.0, 0.0),
                 color_mode="vertex",
             ),
+            render_order=-9,
         )
-        self._scene.add(self._histogram, self._clim_handles)
+        self._gamma_handle = pygfx.Points(
+            geometry=pygfx.Geometry(
+                positions=np.array([[0.5, 0.5, 0]], dtype=np.float32),
+            ),
+            material=pygfx.PointsMaterial(
+                size=6,
+                color=(1, 1, 1),
+                color_mode="uniform",
+            ),
+            render_order=-10,
+        )
+        self._scene.add(self._histogram, self._clim_handles, self._gamma_handle)
 
         self._x = pygfx.Ruler(
             start_pos=(0, 0, 0),
@@ -311,6 +316,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def set_channel_visible(self, visible: bool) -> None:
         self._clim_handles.visible = visible
+        self._gamma_handle.visible = visible
         self.refresh()
 
     def set_colormap(self, lut: cmap.Colormap) -> None:
@@ -318,9 +324,16 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self.refresh()
 
     def set_gamma(self, gamma: float) -> None:
-        # TODO: Support gamma
-        if gamma != 1:
-            raise NotImplementedError("Setting gamma in PyGFX not yet supported")
+        if gamma < 0:
+            raise ValueError("gamma must be non-negative!")
+        self._gamma = gamma
+        self._gamma_handle.geometry.positions.data[0, 1] = 2**-gamma
+        self._gamma_handle.geometry.positions.update_range()
+        self._clim_handles.geometry.positions.data[:, :] = (
+            self._generate_clim_positions()
+        )
+        self._clim_handles.geometry.positions.update_range()
+        self.refresh()
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         self._clims = clims
@@ -329,10 +342,12 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # Translate by minimum
         _, off_y, off_z = self._clim_handles.local.position
         self._clim_handles.local.position = clims[0], off_y, off_z
+        self._gamma_handle.local.position = clims[0], off_y, off_z
         # Scale by (maximum - minimum)
         diff = clims[1] - clims[0]
         diff = diff if abs(diff) > 1e-6 else 1e-6
         self._clim_handles.local.scale_x = diff
+        self._gamma_handle.local.scale_x = diff
 
         # Redraw
         self.refresh()
@@ -387,6 +402,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             self._histogram.geometry = pygfx.Geometry(positions=verts, indices=faces)
 
         self._clim_handles.local.scale_y = values.max() / 0.98
+        self._gamma_handle.local.scale_y = values.max() / 0.98
 
         self.refresh()
 
@@ -544,6 +560,22 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
+        if self._grabbed is Grabbable.GAMMA:
+            y0 = 0
+            rect = self._viewport.logical_size
+            y1 = (
+                rect[0] - self.margin_right
+                if self._vertical
+                else rect[1] - self.margin_top
+            )
+            y = self.canvas_to_world(pos)[0 if self._vertical else 1]
+            if y < np.maximum(y0, 0) or y > y1:
+                return False
+            if self.model:
+                gamma = -np.log2(y / self._gamma_handle.local.scale_y)
+                self.model.gamma = max(MIN_GAMMA, gamma)
+            return False
+
         self.get_cursor(event).apply_to(self)
         return False
 
@@ -573,6 +605,19 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 return Grabbable.RIGHT_CLIM
             if bool(abs(left - click) < tolerance):
                 return Grabbable.LEFT_CLIM
+
+            gamma_pos = self._gamma_handle.geometry.positions.data[
+                0, 0 if self._vertical else 1
+            ]
+            if self._vertical:
+                gx = gamma_pos * self._gamma_handle.local.scale_x
+                gy = (self._clims[0] + self._clims[1]) / 2
+            else:
+                gx = (self._clims[0] + self._clims[1]) / 2
+                gy = gamma_pos * self._gamma_handle.local.scale_y
+            gx, gy, *_ = plot_to_canvas((gx, gy, 0))
+            if bool(abs(gx - click_x) < tolerance and abs(gy - click_y) < tolerance):
+                return Grabbable.GAMMA
 
         return Grabbable.NONE
 
