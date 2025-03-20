@@ -150,14 +150,13 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             material=pygfx.MeshBasicMaterial(color=(1, 1, 1, 1)),
         )
 
-        clim_npoints = 256
         self._clim_handles = pygfx.Line(
             geometry=pygfx.Geometry(
-                positions=self._generate_clim_positions(clim_npoints),
-                colors=self._generate_clim_colors(clim_npoints),
+                # Note that these are placeholders soon to be overwritten
+                positions=np.ndarray((1, 3), dtype=np.float32),
+                colors=np.ndarray((1, 4), dtype=np.float32),
             ),
             material=pygfx.LineMaterial(
-                color=(1.0, 0.0, 0.0),
                 color_mode="vertex",
             ),
             render_order=-9,
@@ -173,6 +172,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             ),
             render_order=-10,
         )
+        self._update_clims()
         self._scene.add(self._histogram, self._clim_handles, self._gamma_handle)
 
         self._x = pygfx.Ruler(
@@ -327,12 +327,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         if gamma < 0:
             raise ValueError("gamma must be non-negative!")
         self._gamma = gamma
-        self._gamma_handle.geometry.positions.data[0, 1] = 2**-gamma
-        self._gamma_handle.geometry.positions.update_range()
-        self._clim_handles.geometry.positions.data[:, :] = (
-            self._generate_clim_positions()
-        )
-        self._clim_handles.geometry.positions.update_range()
+        self._update_clims()
         self.refresh()
 
     def set_clims(self, clims: tuple[float, float]) -> None:
@@ -460,7 +455,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     # ------------- Private methods ------------- #
 
-    def _generate_clim_positions(self, npoints: int = 256) -> np.ndarray:
+    def _update_clims(self, npoints: int = 256) -> None:
         clims = [0, 1]
 
         # 2 additional points for each of the two vertical clims lines
@@ -484,7 +479,18 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             Y[2:-2] = np.linspace(0, 1, npoints) ** self._gamma
             np.array([(np.mean(clims), 2**-self._gamma)])
 
-        return np.vstack((X, Y, Z)).astype(np.float32).transpose()
+        self._gamma_handle.geometry.positions.data[0, 1] = 2**-self._gamma
+        self._gamma_handle.geometry.positions.update_range()
+
+        clim_positions = np.vstack((X, Y, Z)).astype(np.float32).transpose()
+        positions = self._clim_handles.geometry.positions
+        if clim_positions.shape == positions.data.shape:
+            positions.data[:, :] = clim_positions
+            positions.update_range()
+        else:
+            self._clim_handles.geometry = pygfx.Geometry(
+                positions=clim_positions, colors=self._generate_clim_colors(npoints)
+            )
 
     def _generate_clim_colors(self, npoints: int) -> np.ndarray:
         # Gamma curve intensity between 0.2 and 0.8
