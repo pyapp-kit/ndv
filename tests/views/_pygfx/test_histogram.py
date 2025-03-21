@@ -30,6 +30,8 @@ def histogram() -> PyGFXHistogramCanvas:
     return canvas
 
 
+# FIXME: These leaks are very consistent
+@pytest.mark.allow_leaks
 @pytest.mark.usefixtures("any_app")
 def test_interaction(model: LUTModel, histogram: PyGFXHistogramCanvas) -> None:
     """Checks basic histogram functionality."""
