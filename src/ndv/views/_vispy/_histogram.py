@@ -146,8 +146,10 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._update_lut_ctrls()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        # Nothing to do (yet)
-        pass
+        if isinstance(policy, ClimsManual):
+            self.set_clims((policy.min, policy.max))
+        # Otherwise, nothing to do (yet)
+        return
 
     # ------------- HistogramView Protocol methods ------------- #
 
@@ -219,7 +221,7 @@ class VispyHistogramCanvas(HistogramCanvas):
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
-        raise NotImplementedError
+        return self.plot._view.scene.transform.imap(pos_xy)[:3]  # type: ignore [no-any-return]
 
     def elements_at(self, pos_xy: tuple[float, float]) -> list:
         raise NotImplementedError
