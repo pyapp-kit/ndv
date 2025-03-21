@@ -67,8 +67,8 @@ class ClimsManual(ClimPolicy):
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, ClimsManual)
-            and self.min == other.min
-            and self.max == other.max
+            and abs(self.min - other.min) < 1e-6
+            and abs(self.max - other.max) < 1e-6
         )
 
 

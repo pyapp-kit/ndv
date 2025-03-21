@@ -262,12 +262,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         # TODO For short canvases, pygfx has a tough time assigning ticks.
         # For lack of a more thorough dive/fix, just mark the maximum of the histogram
-        if self._values is not None:
-            self._y.ticks = {
-                self._y.end_pos[1] - around_origin[1]: float(self._values.max())
-            }
-        else:
-            self._y.ticks = bb[1, 1]
+        max_val = bb[1, 1] if self._values is None else float(self._values.max())
+        self._y.ticks = {self._y.end_pos[1] - around_origin[1]: max_val}
 
     def _animate(self) -> None:
         # Dynamically rescale the graph when canvas size changes
@@ -342,6 +338,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self.refresh()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
+        if isinstance(policy, ClimsManual):
+            self.set_clims((policy.min, policy.max))
         # Nothing to do (yet)
         pass
 
@@ -489,7 +487,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         return color
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType:
-        pos = mme.x - self.margin_left, mme.y - self.margin_top
+        pos = mme.x, mme.y
         nearby = self._find_nearby_node(pos)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
@@ -505,7 +503,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 return CursorType.DEFAULT
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
-        pos = event.x - self.margin_left, event.y - self.margin_top
+        pos = event.x, event.y
+        # pos = event.x - self.margin_left, event.y - self.margin_top
         # check whether the user grabbed a node
         self._grabbed = self._find_nearby_node(pos)
         if self._grabbed != Grabbable.NONE:
@@ -521,6 +520,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         """Called whenever mouse moves over canvas."""
         pos = event.x, event.y
+        # pos = event.x - self.margin_left, event.y - self.margin_top
         if self._clims is None:
             return False  # pragma: no cover
 
@@ -590,7 +590,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         canvas_pos = la.vec_transform(
             pos_xyz, ndc_to_screen @ self._camera.camera_matrix
         )
-        return (canvas_pos[0], canvas_pos[1])
+        return (
+            canvas_pos[0] + self._plot_view.rect[0],
+            canvas_pos[1] + self._plot_view.rect[1],
+        )
 
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
@@ -617,9 +620,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             )
             pos_world = la.vec_unproject(pos_ndc[:2], self._camera.camera_matrix)
 
-            # NB In vispy, (0.5,0.5) is a center of an image pixel, while in pygfx
-            # (0,0) is the center. We conform to vispy's standard.
-            return (pos_world[0] + 0.5, pos_world[1] + 0.5, pos_world[2] + 0.5)
+            return (pos_world[0], pos_world[1], pos_world[2])
         else:
             return (-1, -1, -1)
 
