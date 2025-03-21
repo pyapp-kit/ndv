@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from pytest import fixture
 
 from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
@@ -23,6 +24,7 @@ def histogram() -> VispyHistogramCanvas:
     return canvas
 
 
+@pytest.mark.usefixtures("any_app")
 def test_interaction(model: LUTModel, histogram: VispyHistogramCanvas) -> None:
     """Checks basic histogram functionality."""
     # Setup
