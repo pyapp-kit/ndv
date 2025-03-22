@@ -458,6 +458,12 @@ class ArrayViewer:
         text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
         self._view.set_hover_info(text)
 
+        # Update highlight on histograms
+        # FIXME: Moving the mouse quickly off the canvas (on VisPy, at least)
+        # can prevent an update.
+        for ch, hist in self._histograms.items():
+            hist.highlight(channel_values.get(ch, None))
+
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
 

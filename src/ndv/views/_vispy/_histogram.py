@@ -92,10 +92,26 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._gamma_handle.visible = False
         self._gamma_handle.order = -2
 
+        # The highlight draws attention to a particular domain value.
+        # TODO: Can we make this easier on the eyes? MMStudio uses cmap color, dashed
+        self._highlight = scene.Line(
+            pos=np.array([[0, 0], [0, 1]]),
+            color="blue",
+            connect="strip",
+            width=1.5,
+        )
+        self._highlight_tform = scene.transforms.STTransform()
+        self._highlight.visible = False
+        self._highlight.order = -2
+
         # One transform to rule them all!
         self._handle_transform = scene.transforms.STTransform()
         self._lut_line.transform = self._handle_transform
         self._gamma_handle.transform = self._handle_transform
+        self._highlight.transform = self._highlight_tform
+        self._highlight.transform = scene.transforms.ChainTransform(
+            self._handle_transform, self._highlight_tform
+        )
 
         ## -- Plot -- ##
         self.plot = PlotWidget()
@@ -106,6 +122,7 @@ class VispyHistogramCanvas(HistogramCanvas):
         self.plot._view.add(self._hist_mesh)
         self.plot._view.add(self._lut_line)
         self.plot._view.add(self._gamma_handle)
+        self.plot._view.add(self._highlight)
 
         self.set_vertical(vertical)
 
@@ -207,6 +224,12 @@ class VispyHistogramCanvas(HistogramCanvas):
 
     def elements_at(self, pos_xy: tuple[float, float]) -> list:
         raise NotImplementedError
+
+    def highlight(self, value: float | None) -> None:
+        self._highlight.visible = value is not None
+        self._highlight_tform.translate = (value,)
+
+        return super().highlight(value)
 
     # ------------- Private methods ------------- #
 
