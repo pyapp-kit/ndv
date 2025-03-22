@@ -322,11 +322,10 @@ class QLutView(LutView):
             hist.set_range()
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
-        # Resize widget to a respectable size
-        self._qwidget.resize(QSize(self._qwidget.width(), self._qwidget.height() + 100))
         # Add widget to view
         self.histogram = histogram
         widget = cast("QWidget", histogram.frontend_widget())
+        # Resize widget to a respectable size
         widget.resize(QSize(self._qwidget.width(), 100))
         self._qwidget.hist_layout.addWidget(widget, 1)
 
