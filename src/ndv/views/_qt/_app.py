@@ -128,6 +128,11 @@ class MouseEventFilter(QObject):
 
         intercept = False
         receiver = self.receiver
+        if (
+            qevent.type() == qevent.Type.ContextMenu
+            and type(obj).__name__ == "CanvasBackendDesktop"
+        ):
+            return False
         if obj is self.canvas or obj in children:
             if isinstance(qevent, QMouseEvent):
                 pos = qevent.pos()
