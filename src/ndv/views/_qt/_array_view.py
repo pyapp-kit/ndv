@@ -174,7 +174,6 @@ class PlayButton(QPushButton):
         self.setFixedSize(14, 18)
         self.setIconSize(QSize(16, 16))
         self.setStyleSheet("border: none; padding: 0; margin: 0;")
-
         self._popup = QtPopup(self)
         form = QFormLayout(self._popup.frame)
         form.setContentsMargins(6, 6, 6, 6)
@@ -334,7 +333,10 @@ class ROIButton(QPushButton):
 
 
 class DimRow(QObject):
-    def __init__(self, axis: AxisKey, _coords: Sequence) -> None:
+    def __init__(
+        self, axis: AxisKey, _coords: Sequence, parent: QObject | None
+    ) -> None:
+        super().__init__(parent)
         self.slider = QLabeledSlider(Qt.Orientation.Horizontal)
         self.index_label = self.slider._label
         self.play_btn = PlayButton()
@@ -350,7 +352,6 @@ class DimRow(QObject):
         self._toggle_animation(self.play_btn.isChecked())
 
     def _toggle_animation(self, checked: bool) -> None:
-        print("toggle animation", checked)
         if checked:
             if self._timer_id is not None:
                 self.killTimer(self._timer_id)
@@ -367,7 +368,6 @@ class DimRow(QObject):
         # take FPS into account better and skip additional frames if the timerEvent
         # is delayed for some reason.
         inc = 1
-        print("timer event")
         ival = self.slider.value()
         ival = (ival + inc) % (self.slider.maximum() + 1)
         self.slider.setValue(ival)
@@ -393,20 +393,21 @@ class _QDimsSliders(QWidget):
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
+        grid = self._layout
         for axis, _coords in coords.items():
             # Create a slider for axis if necessary
             if axis not in self._sliders:
-                row = self._layout.rowCount()
-                dim_row = DimRow(axis, _coords)
+                row = grid.rowCount()
+                dim_row = DimRow(axis, _coords, self)
                 dim_row.slider.valueChanged.connect(self.currentIndexChanged)
-                self._layout.addWidget(dim_row.play_btn, row, self._rBTN)
-                self._layout.addWidget(dim_row.label, row, self._rLABEL)
-                self._layout.addWidget(dim_row.slider, row, self._rSLIDER)
-                self._layout.addWidget(
+                grid.addWidget(dim_row.play_btn, row, self._rBTN)
+                grid.addWidget(dim_row.label, row, self._rLABEL)
+                grid.addWidget(dim_row.slider, row, self._rSLIDER)
+                grid.addWidget(
                     dim_row.index_label, row, self._rINDEX, Qt.AlignmentFlag.AlignRight
                 )
-                self._layout.addWidget(
-                    dim_row.out_of, row, self._rTOT, Qt.AlignmentFlag.AlignLeft
+                grid.addWidget(
+                    dim_row.out_of, row, self._rTOT, Qt.AlignmentFlag.AlignCenter
                 )
                 self._sliders[axis] = dim_row.slider
 
@@ -438,7 +439,7 @@ class _QDimsSliders(QWidget):
                 # Toggle visibility of all widgets in the found row
                 for c in range(ncols):
                     item = self._layout.itemAtPosition(r, c)
-                    item.widget().setVisible(visible)  # type: ignore
+                    item.widget().setVisible(visible)
                 continue
 
     def current_index(self) -> Mapping[AxisKey, int | slice]:
