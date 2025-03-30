@@ -288,7 +288,6 @@ class ArrayViewer:
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
             (model.events.scale, self._on_model_transform_changed),
-            (model.events.translate, self._on_model_transform_changed),
             (model.events.channel_axis, self._on_model_channel_axis_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
