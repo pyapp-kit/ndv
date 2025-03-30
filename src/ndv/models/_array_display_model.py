@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from typing import Callable  # noqa: F401
 
     import cmap
-    import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
+    import numpy.typing as npt  # used for mkdocstrings
 
     from ._lut_model import AutoscaleType
 
@@ -43,6 +43,9 @@ if TYPE_CHECKING:
         reducers: Mapping[AxisKey | None, ReducerType]
         luts: Mapping[int | None, LUTModel | LutModelKwargs]
         default_lut: LUTModel | LutModelKwargs
+
+        scale: tuple[float, float, float] | npt.ArrayLike
+        # translate: tuple[float, float, float] | npt.ArrayLike
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
@@ -189,7 +192,9 @@ class ArrayDisplayModel(NDVModel):
         default_factory=lambda k: (-3, -2) if k.get("channel_axis") == -1 else (-2, -1)
     )
 
+    # z, y, x scale and translation
     scale: tuple[float, float, float] = Field(default=(1, 1, 1))
+    # translate: tuple[float, float, float] = Field(default=(0, 0, 0))
 
     # map of index along channel axis to LUTModel object
     luts: LutMap = Field(default_factory=_default_luts)
@@ -201,26 +206,25 @@ class ArrayDisplayModel(NDVModel):
         """Number of dims is derived from the length of `visible_axes`."""
         return cast("Literal[2, 3]", len(self.visible_axes))
 
-    @computed_field  # type: ignore [prop-decorator]
     @property
     def transform(self) -> np.ndarray:
-        t = np.eye(4)  # default to identity
-        # apply scaling to the transform
-        t = np.diag(
-            [
-                self.scale[0] if self.n_visible_axes == 2 else self.scale[0],
-                self.scale[1],
-                self.scale[2] if self.n_visible_axes == 3 else 1,
-                1,  # homogeneous coordinate
-            ]
-        )
-        # return the transform matrix
-        # this is a simple scaling matrix for now, but in the future
-        # this could be more complex (e.g., rotation, translation)
-        # Note: this is a placeholder for now, as the actual transform
-        # would depend on the actual data and how it is being displayed
-        # in the visualization context.
-        return t
+        """Return the current transformation matrix."""
+        tform = np.diag(self.scale[::-1] + (1,))
+        # tform[:3, 3] = self.translate[::-1]  # Set the translation part of the matrix
+        return tform
+
+    @transform.setter
+    def transform(self, matrix: np.ndarray) -> None:
+        ary = np.asarray(matrix)
+        if ary.shape != (4, 4):
+            raise ValueError("Transform matrix must be 4x4.")
+        if not np.all(np.isfinite(ary)):
+            raise ValueError("Transform matrix must be finite.")
+        # Decompose the matrix into scale and translation
+        # Note: this assumes a proper affine transformation matrix
+        self.scale = tuple(np.sqrt(np.sum(ary[:3, i] ** 2)) for i in range(3))[::-1]
+        # Extract translation
+        # self.translate = tuple(ary[:3, 3])
 
     @model_validator(mode="after")
     def _validate_model(self) -> "Self":

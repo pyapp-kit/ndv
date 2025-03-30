@@ -287,6 +287,8 @@ class ArrayViewer:
 
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
+            (model.events.scale, self._on_model_transform_changed),
+            (model.events.translate, self._on_model_transform_changed),
             (model.events.channel_axis, self._on_model_channel_axis_changed),
             # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
@@ -355,6 +357,15 @@ class ArrayViewer:
         self._clear_canvas()
         self._canvas.set_ndim(self.display_model.n_visible_axes)
         self._request_data()
+
+    def _on_model_transform_changed(self) -> None:
+        """Handle changes to the model's transform.
+
+        This will update the view's transform and request new data.
+        """
+        for lut_ctrl in self._lut_controllers.values():
+            for handle in lut_ctrl.handles:
+                handle.set_transform(self._data_model.display.transform)
 
     def _on_model_channel_axis_changed(self) -> None:
         self._request_data()
@@ -566,12 +577,13 @@ class ArrayViewer:
                 )
 
             if not lut_ctrl.handles:
-                # we don't yet have any handles for this channel
                 if response.n_visible_axes == 2:
                     handle = self._canvas.add_image(data)
+                    handle.set_transform(display_model.transform)
                     lut_ctrl.add_handle(handle)
                 elif response.n_visible_axes == 3:
                     handle = self._canvas.add_volume(data)
+                    handle.set_transform(display_model.transform)
                     lut_ctrl.add_handle(handle)
 
             else:

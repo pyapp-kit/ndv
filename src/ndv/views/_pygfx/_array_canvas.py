@@ -109,6 +109,12 @@ class PyGFXImageHandle(ImageHandle):
             self._material.map = cmap.to_pygfx()
         self._render()
 
+    def transform(self) -> np.ndarray:
+        return self._image.world.matrix  # type: ignore [no-any-return]
+
+    def set_transform(self, transform: np.ndarray) -> None:
+        self._image.world.matrix = transform
+
     def start_move(self, pos: Sequence[float]) -> None:
         pass
 

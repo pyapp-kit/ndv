@@ -14,6 +14,7 @@ import vispy.scene
 import vispy.visuals
 from vispy import scene
 from vispy.util.quaternion import Quaternion
+from vispy.visuals.transforms import MatrixTransform
 
 from ndv._types import (
     CursorType,
@@ -98,10 +99,10 @@ class VispyImageHandle(ImageHandle):
         self._visual.cmap = cmap.to_vispy()
 
     def transform(self) -> np.ndarray:
-        raise NotImplementedError
+        return self._visual.transform  # type: ignore [no-any-return]
 
     def set_transform(self, transform: np.ndarray) -> None:
-        raise NotImplementedError
+        self._visual.transform = MatrixTransform(transform.T)
 
     def start_move(self, pos: Sequence[float]) -> None:
         pass
