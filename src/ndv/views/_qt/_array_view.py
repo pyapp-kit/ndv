@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
-from qtpy.QtCore import QObject, QPoint, QPointF, QSize, Qt, Signal
+from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal
 from qtpy.QtGui import QCursor, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -181,11 +181,11 @@ class PlayButton(QPushButton):
 
     def mousePressEvent(self, e: QMouseEvent | None) -> None:
         if e and e.button() == Qt.MouseButton.RightButton:
-            self._show_fps_dialog(e.globalPosition())
+            self._show_fps_dialog()
         else:
             super().mousePressEvent(e)
 
-    def _show_fps_dialog(self, pos: QPointF) -> None:
+    def _show_fps_dialog(self) -> None:
         self._popup.show_above_mouse()
 
 
@@ -343,7 +343,8 @@ class DimRow(QObject):
         self.play_btn.fpsChanged.connect(self.set_fps)
         self.play_btn.toggled.connect(self._toggle_animation)
         self.label = QLabel(str(axis))
-        self.out_of = QLabel(f"/ {len(_coords)}")
+        self.out_of = QLabel(f"/ {len(_coords) - 1}")
+        self.out_of.setStyleSheet("margin-bottom: 2px;")  # hack
 
         self._timer_id: int | None = None
 
@@ -407,7 +408,7 @@ class _QDimsSliders(QWidget):
                     dim_row.index_label, row, self._rINDEX, Qt.AlignmentFlag.AlignRight
                 )
                 grid.addWidget(
-                    dim_row.out_of, row, self._rTOT, Qt.AlignmentFlag.AlignCenter
+                    dim_row.out_of, row, self._rTOT, Qt.AlignmentFlag.AlignLeft
                 )
                 self._sliders[axis] = dim_row.slider
 

@@ -9,7 +9,7 @@ from qtpy.QtWidgets import QWidget
 from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
-from ndv.views._qt._array_view import QtArrayView
+from ndv.views._qt._array_view import PlayButton, QtArrayView
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -65,3 +65,17 @@ def test_histogram(viewer: QtArrayView) -> None:
     histogram_wdg = cast("QWidget", histogram.frontend_widget())
     viewer.add_histogram(channel, histogram_wdg)
     assert lut._qwidget._histogram is not None
+
+
+def test_play_btn(viewer: QtArrayView, qtbot: QtBot) -> None:
+    """Test the play button functionality on the array view."""
+    dims_wdg = viewer._qwidget.dims_sliders
+    viewer.create_sliders({0: range(10), 1: range(64), 2: range(128)})
+    assert dims_wdg._sliders
+    play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rBTN).widget()  # type: ignore
+    assert isinstance(play_btn, PlayButton)
+    play_btn._show_fps_dialog()
+    play_btn._popup.accept()
+    with qtbot.waitSignal(dims_wdg.currentIndexChanged, timeout=1000):
+        play_btn.click()
+    play_btn.click()  # stop it
