@@ -2,9 +2,10 @@
 
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, Union, cast
 
-from pydantic import Field, computed_field, model_validator
+import numpy as np
+from pydantic import Field, computed_field, field_validator, model_validator
 from typing_extensions import Self, TypeAlias
 
 from ndv._types import AxisKey, ChannelKey, Slice
@@ -188,6 +189,8 @@ class ArrayDisplayModel(NDVModel):
         default_factory=lambda k: (-3, -2) if k.get("channel_axis") == -1 else (-2, -1)
     )
 
+    scale: tuple[float, float, float] = Field(default=(1, 1, 1))
+
     # map of index along channel axis to LUTModel object
     luts: LutMap = Field(default_factory=_default_luts)
     default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
@@ -197,6 +200,27 @@ class ArrayDisplayModel(NDVModel):
     def n_visible_axes(self) -> Literal[2, 3]:
         """Number of dims is derived from the length of `visible_axes`."""
         return cast("Literal[2, 3]", len(self.visible_axes))
+
+    @computed_field  # type: ignore [prop-decorator]
+    @property
+    def transform(self) -> np.ndarray:
+        t = np.eye(4)  # default to identity
+        # apply scaling to the transform
+        t = np.diag(
+            [
+                self.scale[0] if self.n_visible_axes == 2 else self.scale[0],
+                self.scale[1],
+                self.scale[2] if self.n_visible_axes == 3 else 1,
+                1,  # homogeneous coordinate
+            ]
+        )
+        # return the transform matrix
+        # this is a simple scaling matrix for now, but in the future
+        # this could be more complex (e.g., rotation, translation)
+        # Note: this is a placeholder for now, as the actual transform
+        # would depend on the actual data and how it is being displayed
+        # in the visualization context.
+        return t
 
     @model_validator(mode="after")
     def _validate_model(self) -> "Self":
@@ -209,3 +233,11 @@ class ArrayDisplayModel(NDVModel):
             )
             self.channel_axis = None
         return self
+
+    @field_validator("scale", mode="before")
+    @classmethod
+    def _validate_scale(cls, v: Any) -> Any:
+        v = tuple(v) if not isinstance(v, tuple) else v
+        if len(v) == 2:
+            v = (1, *v)  # assume z scale of 1 if only 2 provided
+        return v
