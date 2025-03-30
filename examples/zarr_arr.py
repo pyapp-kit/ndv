@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "zarr",
+#     "fsspec",
+#     "aiohttp",
+# ]
+# ///
 from __future__ import annotations
 
 import ndv
@@ -5,11 +13,11 @@ import ndv
 try:
     import zarr
     import zarr.storage
+
+    URL = "https://janelia-cosem-datasets.s3.amazonaws.com/jrc_hela-3/jrc_hela-3.zarr/recon-1/em/fibsem-uint8"
+
+    zarr_arr = zarr.open(URL, mode="r")
 except ImportError:
     raise ImportError("Please `pip install zarr aiohttp` to run this example")
 
-# url = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0062A/6001240.zarr"
-URL = "https://s3.embl.de/i2k-2020/ngff-example-data/v0.4/tczyx.ome.zarr"
-zarr_arr = zarr.open(URL, mode="r")
-
-ndv.imshow(zarr_arr["s0"].astype("uint16"))
+ndv.imshow(zarr_arr["s4"].astype("uint16"), current_index={1: 30}, visible_axes=(0, 2))

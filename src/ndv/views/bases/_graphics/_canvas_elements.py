@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any
+from enum import Enum, auto
+from typing import TYPE_CHECKING
+
+from psygnal import Signal
+
+from ndv.views.bases._lut_view import LutView
 
 from ._mouseable import Mouseable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from typing import Any
 
     import cmap as _cmap
     import numpy as np
 
-    from ndv._types import CursorType
+    from ndv.models._lut_model import ClimPolicy
 
 
 class CanvasElement(Mouseable):
@@ -37,30 +42,11 @@ class CanvasElement(Mouseable):
     def set_selected(self, selected: bool) -> None:
         """Sets element selection status."""
 
-    def cursor_at(self, pos: Sequence[float]) -> CursorType | None:
-        """Returns the element's cursor preference at the provided position."""
-
-    def start_move(self, pos: Sequence[float]) -> None:
-        """
-        Behavior executed at the beginning of a "move" operation.
-
-        In layman's terms, this is the behavior executed during the the "click"
-        of a "click-and-drag".
-        """
-
-    def move(self, pos: Sequence[float]) -> None:
-        """
-        Behavior executed throughout a "move" operation.
-
-        In layman's terms, this is the behavior executed during the "drag"
-        of a "click-and-drag".
-        """
-
     def remove(self) -> None:
         """Removes the element from the canvas."""
 
 
-class ImageHandle(CanvasElement):
+class ImageHandle(CanvasElement, LutView):
     @abstractmethod
     def data(self) -> np.ndarray: ...
     @abstractmethod
@@ -74,21 +60,49 @@ class ImageHandle(CanvasElement):
     @abstractmethod
     def set_gamma(self, gamma: float) -> None: ...
     @abstractmethod
-    def cmap(self) -> _cmap.Colormap: ...
+    def colormap(self) -> _cmap.Colormap: ...
     @abstractmethod
-    def set_cmap(self, cmap: _cmap.Colormap) -> None: ...
+    def set_colormap(self, cmap: _cmap.Colormap) -> None: ...
+
+    # -- LutView methods -- #
+    def close(self) -> None:
+        self.remove()
+
+    def frontend_widget(self) -> Any:
+        return None
+
+    def set_channel_name(self, name: str) -> None:
+        pass
+
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        pass
+
+    def set_channel_visible(self, visible: bool) -> None:
+        self.set_visible(visible)
 
 
-class RoiHandle(CanvasElement):
-    @abstractmethod
-    def vertices(self) -> Sequence[Sequence[float]]: ...
-    @abstractmethod
-    def set_vertices(self, data: Sequence[Sequence[float]]) -> None: ...
-    @abstractmethod
-    def color(self) -> Any: ...
-    @abstractmethod
-    def set_color(self, color: _cmap.Color | None) -> None: ...
-    @abstractmethod
-    def border_color(self) -> Any: ...
-    @abstractmethod
-    def set_border_color(self, color: _cmap.Color | None) -> None: ...
+class ROIMoveMode(Enum):
+    """Describes graphical mechanisms for ROI translation."""
+
+    HANDLE = auto()  # Moving one handle (but not all)
+    TRANSLATE = auto()  # Translating everything
+
+
+class RectangularROIHandle(CanvasElement):
+    """An axis-aligned rectanglular ROI."""
+
+    boundingBoxChanged = Signal(tuple[tuple[float, float], tuple[float, float]])
+
+    def set_bounding_box(
+        self, minimum: tuple[float, float], maximum: tuple[float, float]
+    ) -> None:
+        """Sets the bounding box."""
+
+    def set_fill(self, color: _cmap.Color) -> None:
+        """Sets the fill color."""
+
+    def set_border(self, color: _cmap.Color) -> None:
+        """Sets the border color."""
+
+    def set_handles(self, color: _cmap.Color) -> None:
+        """Sets the handle face color."""

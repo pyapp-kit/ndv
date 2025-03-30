@@ -17,7 +17,7 @@ sources = ["src"]
 [project]
 name = "ndv"
 dynamic = ["version"]
-description = "simple nd image viewer"
+description = "Simple, fast-loading, n-dimensional array viewer, with minimal dependencies."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
@@ -33,15 +33,15 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 dependencies = [
-    "qtpy",
-    "numpy",
-    "superqt[cmap,iconify]",
-    "pydantic",
-    "psygnal",
-    "typing_extensions",
+    "cmap >=0.3",
+    "numpy >=1.23",
+    "psygnal >=0.10",
+    "pydantic >=2.9",
+    "typing_extensions >= 4.0",
 ]
 
 [project.scripts]
@@ -50,19 +50,38 @@ ndv = "ndv.cli:main"
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
-jupyter = ["ipywidgets", "jupyter", "jupyter_rfb", "glfw"]
-pyqt = ["pyqt6"]
-pyside = ["pyside6<6.8"]
-wxpython = ["wxpython"]
+jupyter = [
+    "ipywidgets >=8.0.5",
+    "jupyter >=1.1",
+    "jupyter_rfb >=0.3.3",
+    "glfw >=2.4",
+]
+pyqt = [
+    "pyqt6 >=6.4,!=6.6",
+    "pyqt6 >=6.5.3; python_version >= '3.12'",
+    "qtpy >=2",
+    "superqt[iconify] >=0.7.2",
+]
+pyside = [
+    # defer to superqt's pyside6 restrictions
+    "superqt[iconify,pyside6] >=0.7.2",
+    # https://github.com/pyapp-kit/ndv/issues/59
+    "pyside6 ==6.6.3; sys_platform == 'win32'",
+    "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
+    "pyside6 >=6.4",
+    "pyside6 >=6.6; python_version >= '3.12'",
+    "qtpy >=2",
+]
+wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
-vispy = ["vispy>=0.14.3", "pyopengl"]
+vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
 pygfx = ["pygfx>=0.6.0"]
 
-# ready to go bundles with vispy
-qt = ["ndv[vispy,pyqt]", "imageio[tifffile]"]
-jup = ["ndv[vispy,jupyter]", "imageio[tifffile]"]
-wx = ["ndv[vispy,wxpython]", "imageio[tifffile]"]
+# ready to go bundles with pygfx
+qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
+jup = ["ndv[pygfx,jupyter]", "imageio[tifffile] >=2.20"]
+wx = ["ndv[pygfx,wxpython]", "imageio[tifffile] >=2.20"]
 
 # full support for reading files
 io = [
@@ -76,47 +95,57 @@ io = [
     "zarr",
 ]
 
-test = ["imageio[tifffile]", "pytest-cov", "pytest"]
-docs = [
-    "mkdocs-gen-files==0.5.0",
-    "mkdocs-literate-nav==0.6.1",
-    "mkdocs-material==9.5.49",
-    "mkdocs-minify-plugin==0.8.0",
-    "mkdocs==1.6.1",
-    "mkdocstrings-python==1.13.0",
-    "mkdocs-spellcheck[codespell]==1.1.0",
-    "mike==2.1.3",
-    "ruff",
-]
-dev = [
-    "ndv[test,vispy,pygfx,pyqt,jupyter]",
-    "pytest-qt",
-    "ipython",
-    "mypy",
-    "pdbpp",
-    "pre-commit",
-    "rich",
-    "ruff",
-    "ipykernel",
-]
-
-third_party_arrays = [
-    "aiohttp",                                 # for zarr example
-    "jax[cpu]",
-    "pooch",                                   # for xarray example
-    "pyopencl[pocl]; sys_platform == 'linux'",
-    "sparse",
-    "tensorstore",
-    "numpy<2.0",                               # for tensorstore (at least)
-    "torch",
-    "xarray",
-    "zarr<3",
-    "dask[array]",
-]
-
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"
 repository = "https://github.com/pyapp-kit/ndv"
+
+[dependency-groups]
+array-libs = [
+    "aiohttp>=3.11.11",
+    "dask[array]>=2024.8.0",
+    "jax[cpu]>=0.4.30",
+    "numpy>=1.23",
+    "pooch>=1.8.2",
+    "pyopencl>=2025.1",
+    "pyopencl[pocl]>=2025.1 ; sys_platform == 'linux'",
+    "sparse>=0.15.5",
+    "tensorstore>=0.1.69",
+    "torch>=2.6.0",
+    "xarray>=2024.7.0",
+    "zarr >2,<3",
+]
+test = ["pytest >=8", "pytest-cov >=6"]
+testqt = [{ include-group = "test" }, "pytest-qt >=4.4"]
+dev = [
+    { include-group = "testqt" },
+    # omitting wxpython from dev env for now
+    # because `uv sync && pytest hangs` on a wx test in the "full" env
+    # use `make test extras=wx,[pygfx|vispy] isolated=1` to test
+    "ndv[vispy,pygfx,pyqt,jupyter]",
+    "imageio[tifffile] >=2.20",
+    "ipykernel>=6.29.5",
+    "ipython>=8.18.1",
+    "mypy>=1.14.1",
+    "pdbpp>=0.10.3 ; sys_platform != 'win32'",
+    "pre-commit>=4.1.0",
+    "rich>=13.9.4",
+    "ruff>=0.9.4",
+]
+docs = [
+    "mkdocs >=1.6.1",
+    "mkdocs-api-autonav >=0.1.2",
+    "mkdocs-material >=9.5.49",
+    "mkdocs-minify-plugin >=0.8.0",
+    "mkdocs-spellcheck[codespell] >=1.1.0",
+    "mkdocstrings-python >=1.13.0",
+    "mike >=2.1.3",
+    "ruff>=0.9.4",
+    # EXAMPLES
+    "ndv[vispy,qt]",
+    "openwfs >=1.0.0",
+]
+[tool.uv.sources]
+ndv = { workspace = true }
 
 # https://docs.astral.sh/ruff
 [tool.ruff]
@@ -159,7 +188,7 @@ skip-magic-trailing-comma = false # default is false
 
 # https://mypy.readthedocs.io/en/stable/config_file.html
 [tool.mypy]
-files = "src/**/"
+files = "src/**/*.py"
 strict = true
 disallow_any_generics = false
 disallow_subclassing_any = false
@@ -184,6 +213,9 @@ filterwarnings = [
     "ignore:Unable to import recommended hash",
     # CI-only error on jupyter, vispy, macos
     "ignore:.*Failed to find a suitable pixel format",
+    # unsolved python 3.10 warning on shutdown, either xarray or dask
+    "ignore:unclosed transport:ResourceWarning",
+    "ignore:Jupyter is migrating its paths",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 

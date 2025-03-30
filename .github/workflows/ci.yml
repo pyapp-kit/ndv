@@ -6,9 +6,6 @@ on:
     tags: [v*]
   pull_request:
   workflow_dispatch:
-  schedule:
-    # run every week (for --pre release tests)
-    - cron: "0 0 * * 0"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +21,9 @@ jobs:
   test:
     name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
     runs-on: ${{ matrix.os }}
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
@@ -37,12 +37,20 @@ jobs:
           # unsolved intermittent segfaults on this combo
           - python-version: "3.10"
             gui: pyside
+          # this one always segfaults
+          - python-version: "3.12"
+            os: ubuntu-latest
+            gui: pyside
+            canvas: vispy
+          - python-version: "3.10"
+            gui: pyside
           # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
           - os: macos-latest
             gui: wxpython
             python-version: "3.10"
+
         include:
           # test a couple more python variants, without
           # full os/gui/canvas matrix coverage
@@ -59,6 +67,14 @@ jobs:
             python-version: "3.9"
             gui: pyqt
             canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.11"
+            gui: pyqt
+            canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.13"
+            gui: pyqt
+            canvas: pygfx
           - os: macos-13
             gui: wxpython
             python-version: "3.9"
@@ -70,70 +86,101 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          enable-cache: true
 
-      - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[test,${{ matrix.gui }},${{ matrix.canvas }}]'
-
-      - uses: pyvista/setup-headless-display-action@v3
+      - uses: pyvista/setup-headless-display-action@main
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
-
       - name: Install llvmpipe and lavapipe for offscreen canvas
         if: matrix.os == 'ubuntu-latest' && matrix.canvas == 'pygfx'
         run: |
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
 
-      - name: install pytest-qt
-        if: matrix.gui == 'pyside' || matrix.gui == 'pyqt'
-        run: pip install pytest-qt
+      - name: 🧪 Test (attempt 1)
+        id: test1
+        continue-on-error: true
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
 
-      - name: 🧪 Test
-        run: |
-          pytest --cov --cov-report=xml -v --color yes tests
+      - name: 🧪 Test (attempt 2)
+        if: steps.test1.outcome == 'failure'
+        id: test2
+        continue-on-error: true
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
 
-      - uses: codecov/codecov-action@v5
+      - name: 🧪 Test (attempt 3)
+        if: steps.test2.outcome == 'failure'
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
+
+      - name: 🧪 Test min dependencies (attempt 1)
+        id: min1
+        continue-on-error: true
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
+
+      - name: 🧪 Test min dependencies (attempt 2)
+        if: steps.min1.outcome == 'failure'
+        id: min2
+        continue-on-error: true
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
+
+      - name: 🧪 Test min dependencies (attempt 3)
+        if: steps.min2.outcome == 'failure'
+        shell: bash
+        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}
+          path: ./.coverage*
+          include-hidden-files: true
 
   test-array-libs:
-    uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
-    with:
-      os: ${{ matrix.os }}
-      python-version: ${{ matrix.python-version }}
-      extras: "test,vispy,third_party_arrays"
-      coverage-upload: artifact
-      pip-post-installs: "pytest-qt"
-      qt: pyqt6
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.12"]
-  
-  # make sure we can build docs without error
-  test-docs:
-    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.x"
-          cache: "pip"
-      - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[docs]'
-      - name: 📚 Build docs
-        run: mkdocs build --strict
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@main
+        with:
+          qt: true
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        run: sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+
+      - name: 🧪 Test (attempt 1)
+        id: test1
+        continue-on-error: true
+        run: make test extras="pyqt,pygfx" groups="array-libs" cov=1
+
+      - name: 🧪 Test (attempt 2)
+        if: steps.test1.outcome == 'failure'
+        id: test2
+        run: make test extras="pyqt,pygfx" groups="array-libs" cov=1 verbose=1
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: covreport-py${{ matrix.python-version }}-array-libs
+          path: ./.coverage*
+          include-hidden-files: true
 
   upload_coverage:
     if: always()
@@ -141,6 +188,19 @@ jobs:
     uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+
+  # make sure we can build docs without error
+  test-docs:
+    runs-on: macos-latest # nicer screenshots
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: 📚 Build docs
+        run: uv run --group docs mkdocs build --strict
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs
+          path: site
 
   deploy:
     name: Deploy

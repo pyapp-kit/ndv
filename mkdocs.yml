@@ -18,8 +18,11 @@ nav:
   - Home: index.md
   - install.md
   - motivation.md
-  # This is populated by scripts/gen_ref_nav.py
-  - API reference: reference/
+  - env_var.md
+  - Cookbook:
+      - cookbook/embedding.md
+  # This is populated by api-autonav plugin
+  # - API reference: reference/
 
 theme:
   name: material
@@ -69,9 +72,13 @@ extra_javascript:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.details
   - pymdownx.keys
   - pymdownx.tilde
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -88,27 +95,26 @@ markdown_extensions:
       permalink: "#"
 
 plugins:
-  - autorefs
+  - autorefs:
+      resolve_closest: true
   - search
   - minify:
       minify_html: true
       minify_js: true
       minify_css: true
       cache_safe: true
-  - gen-files:
-      scripts:
-        - scripts/gen_ref_nav.py
-  - literate-nav:
-      nav_file: SUMMARY.md
   - spellcheck:
       backends:
         - codespell:
             dictionaries: [clear]
+  - api-autonav:
+      modules: [src/ndv]
   - mkdocstrings:
       handlers:
         python:
-          import:
+          inventories:
             - https://docs.python.org/3/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
             - https://docs.pydantic.dev/latest/objects.inv
             - https://cmap-docs.readthedocs.io/objects.inv
             - https://psygnal.readthedocs.io/en/latest/objects.inv

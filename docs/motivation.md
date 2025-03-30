@@ -22,14 +22,15 @@ display data.
     amount of time. "Reasonable" is of course relative and subjective, but we
     aim for less than 1 second on a modern laptop (currently at <100ms).
 - [x] **Broad GUI Compatibility**: A common feature request for `napari` is to support
-    Jupyter notebooks. `ndv` [can work with](./install.md#framework-selection) Qt,
+    Jupyter notebooks. `ndv` [can work with](./install.md) Qt,
     wxPython, *and* Jupyter.
 - [x] **Flexible Graphics Providers**: `ndv` works with VisPy in a classical OpenGL
     context, but has an abstracting layer that allows for other graphics engines.
     We currently also support `pygfx`, a WGPU-based graphics engine.
 - [x] **Model/View architecture**: `ndv` should have a clear separation between the
     data model and the view. The model should be serializable and easily
-    transferable between different views.
+    transferable between different views. (The primary model is currently
+    [`ArrayDisplayModel`][ndv.models.ArrayDisplayModel])
 - [x] **Asynchronous first**: `ndv` should be asynchronous by default: meaning
     that the data request/response process happens in the background, and the
     GUI remains responsive. (Optimization of remote, multi-resolution data is on
@@ -47,14 +48,17 @@ We *do* want to support the following features:
     data, to allow for fast rendering of large datasets based on the current view.
 - [ ] **Frustum culling**: We would like to support frustum culling to allow for
     efficient rendering of large datasets.
-- [ ] **Ortho-viewer**: `ndv`'s good model/view separation should allow for
-    easy creation of an orth viewer (e.g. synchronized `XY`, `XZ`, `YZ` views).
+- [ ] **Ortho-viewer**: `ndv`'s clean model/view separation should allow for
+    easy creation of an ortho-viewer (e.g. synchronized `XY`, `XZ`, `YZ` views).
 
 ## Non-Goals
 
 We *do not* plan to support the following features in the near future
 (if ever):
 
+- **Oblique Slicing**: While not an explicit non-goal, oblique slicing (à la
+    [Big Data Viewer](https://imagej.net/plugins/bdv/)) is different enough
+    that it won't realistically be implemented in the near future.
 - **Image Processing**: General image processing is out of scope. We aim to
     provide a viewer, not a full image processing library.
 - **Interactive segmentation and painting**: While extensible mouse event handling

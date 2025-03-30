@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from ndv.views import gui_frontend
-from ndv.views._app import GuiFrontend
+from ndv.views._app import GUI_ENV_VAR, GuiFrontend
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -33,13 +33,13 @@ def asyncio_app() -> Iterator[AbstractEventLoop]:
     loop.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def wxapp() -> Iterator[wx.App]:
     import wx
 
-    app = wx.App()
-    yield app
-    # app.ExitMainLoop()
+    if (_wxapp := wx.App.Get()) is None:
+        _wxapp = wx.App()
+    yield _wxapp
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
         # if we don't find any frontend, and jupyter is available, use that
         # since it requires very little setup
         if importlib.util.find_spec("jupyter"):
-            os.environ["NDV_GUI_FRONTEND"] = "jupyter"
+            os.environ[GUI_ENV_VAR] = "jupyter"
             gui_frontend.cache_clear()
 
         frontend = gui_frontend()
@@ -61,7 +61,7 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     if frontend == GuiFrontend.QT:
         app = request.getfixturevalue("qapp")
         qtbot = request.getfixturevalue("qtbot")
-        with patch.object(app, "exec", lambda *_: None):
+        with patch.object(app, "exec", lambda *_: app.processEvents()):
             with _catch_qt_leaks(request, app):
                 yield app, qtbot
     elif frontend == GuiFrontend.JUPYTER:

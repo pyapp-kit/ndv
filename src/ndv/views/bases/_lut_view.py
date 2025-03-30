@@ -1,34 +1,41 @@
-from abc import abstractmethod
-from typing import final
+from __future__ import annotations
 
-import cmap
-from psygnal import Signal
+from abc import abstractmethod
+from typing import TYPE_CHECKING
 
 from ._view_base import Viewable
+
+if TYPE_CHECKING:
+    import cmap
+
+    from ndv.models._lut_model import ClimPolicy, LUTModel
 
 
 class LutView(Viewable):
     """Manages LUT properties (contrast, colormap, etc...) in a view object."""
 
-    visibilityChanged = Signal(bool)
-    autoscaleChanged = Signal(bool)
-    cmapChanged = Signal(cmap.Colormap)
-    climsChanged = Signal(tuple)
-    gammaChanged = Signal(float)
+    _model: LUTModel | None = None
 
     @abstractmethod
     def set_channel_name(self, name: str) -> None:
         """Set the name of the channel to `name`."""
 
     @abstractmethod
-    def set_auto_scale(self, checked: bool) -> None:
-        """Set the autoscale button to checked if `checked` is True."""
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        """Set the clim policy to `policy`.
+
+        Usually corresponds to an "autoscale" checkbox.
+
+        Note that this method must not modify the backing LUTModel.
+        """
 
     @abstractmethod
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         """Set the colormap to `cmap`.
 
         Usually corresponds to a dropdown menu.
+
+        Note that this method must not modify the backing LUTModel.
         """
 
     @abstractmethod
@@ -36,6 +43,8 @@ class LutView(Viewable):
         """Set the (low, high) contrast limits to `clims`.
 
         Usually this will be a range slider or two text boxes.
+
+        Note that this method must not modify the backing LUTModel.
         """
 
     @abstractmethod
@@ -43,35 +52,44 @@ class LutView(Viewable):
         """Check or uncheck the visibility indicator of the LUT.
 
         Usually corresponds to a checkbox.
+
+        Note that this method must not modify the backing LUTModel.
         """
 
     def set_gamma(self, gamma: float) -> None:
-        """Set the gamma value of the LUT."""
+        """Set the gamma value of the LUT.
+
+        Note that this method must not modify the backing LUTModel.
+        """
         return None
 
-    # These methods apply a value to the view without re-emitting the signal.
+    @property
+    def model(self) -> LUTModel | None:
+        return self._model
 
-    @final
-    def set_auto_scale_without_signal(self, auto: bool) -> None:
-        with self.autoscaleChanged.blocked():
-            self.set_auto_scale(auto)
+    @model.setter
+    def model(self, model: LUTModel | None) -> None:
+        # Disconnect old model
+        if self._model is not None:
+            self._model.events.clims.disconnect(self.set_clim_policy)
+            self._model.events.cmap.disconnect(self.set_colormap)
+            self._model.events.gamma.disconnect(self.set_gamma)
+            self._model.events.visible.disconnect(self.set_channel_visible)
 
-    @final
-    def set_colormap_without_signal(self, cmap: cmap.Colormap) -> None:
-        with self.cmapChanged.blocked():
-            self.set_colormap(cmap)
+        # Connect new model
+        self._model = model
+        if self._model is not None:
+            self._model.events.clims.connect(self.set_clim_policy)
+            self._model.events.cmap.connect(self.set_colormap)
+            self._model.events.gamma.connect(self.set_gamma)
+            self._model.events.visible.connect(self.set_channel_visible)
 
-    @final
-    def set_clims_without_signal(self, clims: tuple[float, float]) -> None:
-        with self.climsChanged.blocked():
-            self.set_clims(clims)
+        self.synchronize()
 
-    @final
-    def set_gamma_without_signal(self, gamma: float) -> None:
-        with self.gammaChanged.blocked():
-            self.set_gamma(gamma)
-
-    @final
-    def set_channel_visible_without_signal(self, visible: bool) -> None:
-        with self.visibilityChanged.blocked():
-            self.set_channel_visible(visible)
+    def synchronize(self) -> None:
+        """Aligns the view against the backing model."""
+        if model := self._model:
+            self.set_clim_policy(model.clims)
+            self.set_colormap(model.cmap)
+            self.set_gamma(model.gamma)
+            self.set_channel_visible(model.visible)

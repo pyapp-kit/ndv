@@ -28,7 +28,10 @@ def imshow(
     display_model: ArrayDisplayModel | None = None,
     **kwargs: Unpack[ArrayDisplayModelKwargs],
 ) -> ArrayViewer:
-    """Display an array or DataWrapper in a new NDViewer window.
+    """Display an array or DataWrapper in a new `ArrayViewer` window.
+
+    This convenience function creates an `ArrayViewer` instance populated with `data`,
+    calls `show()` on it, and then runs the application.
 
     Parameters
     ----------
@@ -37,12 +40,13 @@ def imshow(
     display_model: ArrayDisplayModel, optional
         The display model to use. If not provided, a new one will be created.
     kwargs : Unpack[ArrayDisplayModelKwargs]
-        Additional keyword arguments to pass to the NDViewer
+        Additional keyword arguments used to create the
+        [`ArrayDisplayModel`][ndv.models.ArrayDisplayModel].
 
     Returns
     -------
     ArrayViewer
-        The viewer window.
+        The `ArrayViewer` instance.
     """
     viewer = ArrayViewer(data, display_model, **kwargs)
     viewer.show()

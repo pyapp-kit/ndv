@@ -7,6 +7,7 @@ import numpy as np
 from vispy import scene
 
 from ndv._types import CursorType
+from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from ndv._types import MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+
+MIN_GAMMA: np.float64 = np.float64(1e-6)
 
 
 class Grabbable(Enum):
@@ -142,7 +145,7 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._clims = clims
         self._update_lut_lines()
 
-    def set_auto_scale(self, autoscale: bool) -> None:
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
         # Nothing to do (yet)
         pass
 
@@ -272,7 +275,8 @@ class VispyHistogramCanvas(HistogramCanvas):
             v._bounds_changed()
         self._gamma_handle._bounds_changed()
 
-    def get_cursor(self, pos: tuple[float, float]) -> CursorType:
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType:
+        pos = (event.x, event.y)
         nearby = self._find_nearby_node(pos)
 
         if nearby in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
@@ -317,7 +321,8 @@ class VispyHistogramCanvas(HistogramCanvas):
                 newlims = (min(self._clims[1], c), self._clims[1])
             elif self._grabbed is Grabbable.RIGHT_CLIM:
                 newlims = (self._clims[0], max(self._clims[0], c))
-            self.climsChanged.emit(newlims)
+            if self.model:
+                self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
         if self._grabbed is Grabbable.GAMMA:
@@ -329,10 +334,11 @@ class VispyHistogramCanvas(HistogramCanvas):
             y = self._to_plot_coords(pos)[0 if self._vertical else 1]
             if y < np.maximum(y0, 0) or y > y1:
                 return False
-            self.gammaChanged.emit(-np.log2(y / y1))
+            if self.model:
+                self.model.gamma = max(MIN_GAMMA, -np.log2(y / y1))
             return False
 
-        self.get_cursor(pos).apply_to(self)
+        self.get_cursor(event).apply_to(self)
         return False
 
     def _find_nearby_node(

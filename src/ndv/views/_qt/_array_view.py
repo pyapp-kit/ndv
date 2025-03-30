@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, cast
+from contextlib import suppress
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
-from qtpy.QtCore import Qt, Signal
+import psygnal
+from qtpy.QtCore import QSize, Qt, Signal
+from qtpy.QtGui import QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QSplitter,
     QVBoxLayout,
@@ -20,17 +26,25 @@ from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
 
+from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     import cmap
+    from psygnal import EmissionInfo
     from qtpy.QtGui import QIcon
 
-    from ndv._types import AxisKey
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._graphics._canvas_elements import (
+        CanvasElement,
+        RectangularROIHandle,
+    )
 
 SLIDER_STYLE = """
 QSlider::groove:horizontal {
@@ -85,9 +99,33 @@ class _CmapCombo(QColormapComboBox):
         for idx in range(self.count()):
             if item := self.itemColormap(idx):
                 if item.name == cmap_.name:
+                    # cmap_ is already here - just select it
                     self.setCurrentIndex(idx)
-        else:
-            self.addColormap(cmap_)
+                    return
+
+        # cmap_ not in the combo box - add it!
+        self.addColormap(cmap_)
+        # then, select it!
+        # NB: "Add..." was at idx, now it's at idx+1 and cmap_ is at idx
+        self.setCurrentIndex(idx)
+
+
+class _QSpinner(QLabel):
+    SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        size = QSize(18, 18)
+        mov = QMovie(self.SPIN_GIF, parent=self)
+        self.setFixedSize(size)
+        mov.setSpeed(150)
+        mov.start()
+        self.setMovie(mov)
+
+        # make semi-transparent
+        effect = QGraphicsOpacityEffect(self)
+        effect.setOpacity(0.6)
+        self.setGraphicsEffect(effect)
 
 
 class _DimToggleButton(QPushButton):
@@ -121,24 +159,43 @@ class _QLUTWidget(QWidget):
         self.auto_clim.setMaximumWidth(42)
         self.auto_clim.setCheckable(True)
 
-        layout = QHBoxLayout(self)
-        layout.setSpacing(5)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.visible)
-        layout.addWidget(self.cmap)
-        layout.addWidget(self.clims)
-        layout.addWidget(self.auto_clim)
+        # TODO: Consider other options here
+        add_histogram_icon = QIconifyIcon("foundation:graph-bar")
+        self.histogram_btn = QPushButton(add_histogram_icon, "")
+        self.histogram_btn.setCheckable(True)
+
+        self._lut_layout = QHBoxLayout()
+        self._lut_layout.setSpacing(5)
+        self._lut_layout.setContentsMargins(0, 0, 0, 0)
+        self._lut_layout.addWidget(self.visible)
+        self._lut_layout.addWidget(self.cmap)
+        self._lut_layout.addWidget(self.clims)
+        self._lut_layout.addWidget(self.auto_clim)
+        self._lut_layout.addWidget(self.histogram_btn)
+
+        self._histogram: QWidget | None = None
+
+        # Retain a reference to this layout so we can add self._histogram later
+        self._layout = QVBoxLayout(self)
+        self._layout.setSpacing(0)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.addLayout(self._lut_layout)
 
 
 class QLutView(LutView):
-    def __init__(self) -> None:
+    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    histogramRequested = psygnal.Signal(object)
+
+    def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__()
         self._qwidget = _QLUTWidget()
+        self._channel = channel
         # TODO: use emit_fast
-        self._qwidget.visible.toggled.connect(self.visibilityChanged.emit)
-        self._qwidget.cmap.currentColormapChanged.connect(self.cmapChanged.emit)
-        self._qwidget.clims.valueChanged.connect(self.climsChanged.emit)
-        self._qwidget.auto_clim.toggled.connect(self.autoscaleChanged.emit)
+        self._qwidget.histogram_btn.toggled.connect(self._on_q_histogram_toggled)
+        self._qwidget.visible.toggled.connect(self._on_q_visibility_changed)
+        self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
+        self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
+        self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
@@ -146,16 +203,16 @@ class QLutView(LutView):
     def set_channel_name(self, name: str) -> None:
         self._qwidget.visible.setText(name)
 
-    def set_auto_scale(self, auto: bool) -> None:
-        self._qwidget.auto_clim.setChecked(auto)
+    def set_clim_policy(self, policy: ClimPolicy) -> None:
+        self._qwidget.auto_clim.setChecked(not policy.is_manual)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._qwidget.cmap.setCurrentColormap(cmap)
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        if not isinstance(clims, tuple):
-            breakpoint()
-        self._qwidget.clims.setValue(clims)
+        # block self._qwidget._clims, otherwise autoscale will be forced off
+        with signals_blocked(self._qwidget.clims):
+            self._qwidget.clims.setValue(clims)
 
     def set_gamma(self, gamma: float) -> None:
         pass
@@ -168,6 +225,50 @@ class QLutView(LutView):
 
     def close(self) -> None:
         self._qwidget.close()
+
+    def _on_q_visibility_changed(self, visible: bool) -> None:
+        if self._model:
+            self._model.visible = visible
+
+    def _on_q_cmap_changed(self, cmap: cmap.Colormap) -> None:
+        if self._model:
+            self._model.cmap = cmap
+
+    def _on_q_clims_changed(self, clims: tuple[float, float]) -> None:
+        if self._model:
+            self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_q_auto_changed(self, autoscale: bool) -> None:
+        if self._model:
+            if autoscale:
+                self._model.clims = ClimsMinMax()
+            else:
+                clims = self._qwidget.clims.value()
+                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_q_histogram_toggled(self, toggled: bool) -> None:
+        if hist := self._qwidget._histogram:
+            hist.setVisible(toggled)
+        elif toggled:
+            self.histogramRequested.emit(self._channel)
+
+
+class QRGBView(QLutView):
+    def __init__(self, channel: ChannelKey = None) -> None:
+        super().__init__(channel)
+        # Hide the cmap selector
+        self._qwidget.cmap.setVisible(False)
+        # Insert a new label
+        self._label = QLabel("RGB")
+        self._qwidget._lut_layout.insertWidget(1, self._label)
+
+
+class ROIButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setToolTip("Add ROI")
+        self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
 
 
 class _QDimsSliders(QWidget):
@@ -183,19 +284,24 @@ class _QDimsSliders(QWidget):
         layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         layout = cast("QFormLayout", self.layout())
         for axis, _coords in coords.items():
-            sld = QLabeledSlider(Qt.Orientation.Horizontal)
-            sld.valueChanged.connect(self.currentIndexChanged)
+            # Create a slider for axis if necessary
+            if axis not in self._sliders:
+                sld = QLabeledSlider(Qt.Orientation.Horizontal)
+                sld.valueChanged.connect(self.currentIndexChanged)
+                layout.addRow(str(axis), sld)
+                self._sliders[axis] = sld
+
+            # Update axis slider with coordinates
+            sld = self._sliders[axis]
             if isinstance(_coords, range):
                 sld.setRange(_coords.start, _coords.stop - 1)
                 sld.setSingleStep(_coords.step)
             else:
                 sld.setRange(0, len(_coords) - 1)
-            layout.addRow(str(axis), sld)
-            self._sliders[axis] = sld
         self.currentIndexChanged.emit()
 
     def hide_dimensions(
@@ -278,6 +384,7 @@ class _QArrayViewer(QWidget):
     def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
         super().__init__(parent)
 
+        self._canvas_widget = canvas_widget
         self.dims_sliders = _QDimsSliders(self)
 
         # place to display dataset summary
@@ -285,11 +392,19 @@ class _QArrayViewer(QWidget):
         # place to display arbitrary text
         self.hover_info_label = QElidingLabel("", self)
 
+        # spinner to indicate progress
+        self._progress_spinner = _QSpinner(canvas_widget)
+        self._progress_spinner.hide()
+
         # the button that controls the display mode of the channels
         # not using QEnumComboBox because we want to exclude some values for now
         self.channel_mode_combo = QComboBox(self)
         self.channel_mode_combo.addItems(
-            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+            [
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ]
         )
 
         # button to reset the zoom of the canvas
@@ -297,9 +412,10 @@ class _QArrayViewer(QWidget):
         set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
         self.set_range_btn = QPushButton(set_range_icon, "", self)
 
-        # button to add a histogram
-        add_histogram_icon = QIconifyIcon("foundation:graph-bar")
-        self.histogram_btn = QPushButton(add_histogram_icon, "", self)
+        # button to draw ROIs
+        self._roi_handle: RectangularROIHandle | None = None
+        self._selection: CanvasElement | None = None
+        self.add_roi_btn = ROIButton()
 
         self.luts = _UpCollapsible(
             "LUTs",
@@ -316,9 +432,8 @@ class _QArrayViewer(QWidget):
 
         self._btn_layout.addWidget(self.channel_mode_combo)
         self._btn_layout.addWidget(self.ndims_btn)
-        self._btn_layout.addWidget(self.histogram_btn)
+        self._btn_layout.addWidget(self.add_roi_btn)
         self._btn_layout.addWidget(self.set_range_btn)
-        # self._btns.addWidget(self._add_roi_btn)
 
         # above the canvas
         info_widget = QWidget()
@@ -347,14 +462,34 @@ class _QArrayViewer(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(self.splitter)
 
+    def resizeEvent(self, a0: Any) -> None:
+        # position at spinner the top right of the canvas_widget:
+        canv, spinner = self._canvas_widget, self._progress_spinner
+        pad = 4
+        spinner.move(canv.width() - spinner.width() - pad, pad)
+        super().resizeEvent(a0)
+
+    def closeEvent(self, a0: Any) -> None:
+        with suppress(AttributeError):
+            del self._canvas_widget
+        super().closeEvent(a0)
+
 
 class QtArrayView(ArrayView):
     def __init__(
-        self, canvas_widget: QWidget, data_model: _ArrayDataDisplayModel
+        self,
+        canvas_widget: QWidget,
+        data_model: _ArrayDataDisplayModel,
+        viewer_model: ArrayViewerModel,
     ) -> None:
         self._data_model = data_model
+        self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
-        qwdg.histogram_btn.clicked.connect(self._on_add_histogram_clicked)
+        # Mapping of channel key to LutViews
+        self._luts: dict[ChannelKey, QLutView] = {}
+        qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
+
+        self._viewer_model.events.connect(self._on_viewer_model_event)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -366,8 +501,11 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self) -> QLutView:
-        view = QLutView()
+    def add_lut_view(self, channel: ChannelKey) -> QLutView:
+        view = QRGBView(channel) if channel == "RGB" else QLutView(channel)
+        self._luts[channel] = view
+
+        view.histogramRequested.connect(self.histogramRequested)
         self._qwidget.luts.addWidget(view.frontend_widget())
         return view
 
@@ -377,28 +515,22 @@ class QtArrayView(ArrayView):
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
 
-    def _on_add_histogram_clicked(self) -> None:
-        splitter = self._qwidget.splitter
-        if hasattr(self, "_hist"):
-            if not (sizes := splitter.sizes())[-1]:
-                splitter.setSizes([self._qwidget.height() - 100, 100])
-            else:
-                splitter.setSizes([sum(sizes), 0])
-        else:
-            self.histogramRequested.emit()
-
-    def add_histogram(self, widget: QWidget) -> None:
-        if hasattr(self, "_hist"):
-            raise RuntimeError("Only one histogram can be added at a time")
-        self._hist = widget
-        self._qwidget.splitter.addWidget(widget)
-        self._qwidget.splitter.setSizes([self._qwidget.height() - 100, 100])
+    def add_histogram(self, channel: ChannelKey, widget: QWidget) -> None:
+        if lut := self._luts.get(channel, None):
+            # Resize widget to a respectable size
+            lut._qwidget.resize(
+                QSize(lut._qwidget.width(), lut._qwidget.height() + 100)
+            )
+            # Add widget to view
+            widget.resize(QSize(lut._qwidget.width(), 100))
+            lut._qwidget._histogram = widget
+            lut._qwidget._layout.addWidget(widget)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
         widget.deleteLater()
 
-    def create_sliders(self, coords: Mapping[int, Sequence]) -> None:
+    def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
         self._qwidget.dims_sliders.create_sliders(coords)
 
@@ -460,3 +592,30 @@ class QtArrayView(ArrayView):
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
+
+    def _on_add_roi_clicked(self, checked: bool) -> None:
+        self._viewer_model.interaction_mode = (
+            InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
+        )
+
+    def _on_viewer_model_event(self, info: EmissionInfo) -> None:
+        sig_name = info.signal.name
+        value = info.args[0]
+        if sig_name == "show_progress_spinner":
+            self._qwidget._progress_spinner.setVisible(value)
+        if sig_name == "interaction_mode":
+            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
+            new, old = info.args
+            if old == InteractionMode.CREATE_ROI:
+                self._qwidget.add_roi_btn.setChecked(False)
+        elif sig_name == "show_histogram_button":
+            for lut in self._luts.values():
+                lut._qwidget.histogram_btn.setVisible(value)
+        elif sig_name == "show_roi_button":
+            self._qwidget.add_roi_btn.setVisible(value)
+        elif sig_name == "show_channel_mode_selector":
+            self._qwidget.channel_mode_combo.setVisible(value)
+        elif sig_name == "show_reset_zoom_button":
+            self._qwidget.set_range_btn.setVisible(value)
+        elif sig_name == "show_3d_button":
+            self._qwidget.ndims_btn.setVisible(value)

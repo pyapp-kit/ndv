@@ -64,6 +64,13 @@ class ClimsManual(ClimPolicy):
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return self.min, self.max
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ClimsManual)
+            and self.min == other.min
+            and self.max == other.max
+        )
+
 
 class ClimsMinMax(ClimPolicy):
     """Autoscale contrast limits based on the minimum and maximum values in the data."""
@@ -72,6 +79,9 @@ class ClimsMinMax(ClimPolicy):
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return (np.nanmin(data), np.nanmax(data))
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, ClimsMinMax)
 
 
 class ClimsPercentile(ClimPolicy):
@@ -91,6 +101,13 @@ class ClimsPercentile(ClimPolicy):
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         return tuple(np.nanpercentile(data, [self.min_percentile, self.max_percentile]))
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ClimsPercentile)
+            and self.min_percentile == other.min_percentile
+            and self.max_percentile == other.max_percentile
+        )
 
 
 class ClimsStdDev(ClimPolicy):
@@ -114,6 +131,13 @@ class ClimsStdDev(ClimPolicy):
         diff = self.n_stdev * np.nanstd(data)
         return center - diff, center + diff
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ClimsStdDev)
+            and self.n_stdev == other.n_stdev
+            and self.center == other.center
+        )
+
 
 # we can add this, but it needs to have a proper pydantic serialization method
 # similar to ReducerType
@@ -136,13 +160,17 @@ class LUTModel(NDVModel):
     visible : bool
         Whether to display this channel.
         NOTE: This has implications for data retrieval, as we may not want to request
-        channels that are not visible.  See current_index above.
+        channels that are not visible.
+        See [`ArrayDisplayModel.current_index`][ndv.models.ArrayDisplayModel].
     cmap : cmap.Colormap
-        Colormap to use for this channel.
-    clims : Union[ManualClims, PercentileClims, StdDevClims, MinMaxClims]
-        Method for determining the contrast limits for this channel.
+        [`cmap.Colormap`](https://cmap-docs.readthedocs.io/colormaps/) to use for this
+        channel.  This can be expressed as any channel.  This can be expressed as any
+        ["colormap like" object](https://cmap-docs.readthedocs.io/en/latest/colormaps/#colormaplike-objects)
+    clims : Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
+        Method for determining the contrast limits for this channel.  If a 2-element
+        `tuple` or `list` is provided, it is interpreted as a manual contrast limit.
     gamma : float
-        Gamma correction for this channel. By default, 1.0.
+        Gamma applied to the data before applying the colormap. By default, `1.0`.
     """
 
     visible: bool = True
