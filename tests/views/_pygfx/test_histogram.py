@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from pytest import fixture
 
 from ndv._types import (
     CursorType,
@@ -14,27 +13,16 @@ from ndv.models._lut_model import ClimsManual, LUTModel
 from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
 
 
-@fixture
-def model() -> LUTModel:
-    return LUTModel(
+@pytest.mark.usefixtures("any_app")
+def test_interaction() -> None:
+    """Checks basic histogram functionality."""
+    model = LUTModel(
         visible=True,
         cmap="red",
         # gamma=2,
     )
-
-
-@fixture
-def histogram() -> PyGFXHistogramCanvas:
-    canvas = PyGFXHistogramCanvas()
-    canvas.set_range(x=(0, 10), y=(0, 1))
-    return canvas
-
-
-# FIXME: These leaks are very consistent
-@pytest.mark.allow_leaks
-@pytest.mark.usefixtures("any_app")
-def test_interaction(model: LUTModel, histogram: PyGFXHistogramCanvas) -> None:
-    """Checks basic histogram functionality."""
+    histogram = PyGFXHistogramCanvas()
+    histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10
     histogram.set_clims((left, right))
@@ -108,3 +96,5 @@ def test_interaction(model: LUTModel, histogram: PyGFXHistogramCanvas) -> None:
     histogram.on_mouse_move(MouseMoveEvent(x=x, y=y, btn=MouseButton.LEFT))
     histogram.on_mouse_release(MouseReleaseEvent(x=x, y=y, btn=MouseButton.LEFT))
     assert model.clims == ClimsManual(min=left, max=right)
+
+    histogram.close()
