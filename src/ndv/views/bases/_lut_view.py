@@ -47,6 +47,12 @@ class LutView(Viewable):
         Note that this method must not modify the backing LUTModel.
         """
 
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        """Defines the minimum and maximum possible values for the clims."""
+
     @abstractmethod
     def set_channel_visible(self, visible: bool) -> None:
         """Check or uncheck the visibility indicator of the LUT.
@@ -72,6 +78,7 @@ class LutView(Viewable):
         # Disconnect old model
         if self._model is not None:
             self._model.events.clims.disconnect(self.set_clim_policy)
+            self._model.events.clim_bounds.disconnect(self.set_clim_bounds)
             self._model.events.cmap.disconnect(self.set_colormap)
             self._model.events.gamma.disconnect(self.set_gamma)
             self._model.events.visible.disconnect(self.set_channel_visible)
@@ -80,6 +87,7 @@ class LutView(Viewable):
         self._model = model
         if self._model is not None:
             self._model.events.clims.connect(self.set_clim_policy)
+            self._model.events.clim_bounds.connect(self.set_clim_bounds)
             self._model.events.cmap.connect(self.set_colormap)
             self._model.events.gamma.connect(self.set_gamma)
             self._model.events.visible.connect(self.set_channel_visible)
@@ -90,6 +98,7 @@ class LutView(Viewable):
         """Aligns the view against the backing model."""
         if model := self._model:
             self.set_clim_policy(model.clims)
+            self.set_clim_bounds(model.clim_bounds)
             self.set_colormap(model.cmap)
             self.set_gamma(model.gamma)
             self.set_channel_visible(model.visible)

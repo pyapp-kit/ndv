@@ -247,22 +247,25 @@ class ArrayViewer:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
         if ctrl := self._lut_controllers.get(channel, None):
-            self._view.add_histogram(channel, hist.frontend_widget())
+            # Add histogram to ArrayView for display
+            self._view.add_histogram(channel, hist)
+            # Add histogram to channel controller for updates
             ctrl.add_lut_view(hist)
-            # FIXME: hack
+            # Compute histogram from the (first) image handle.
+            # TODO: Compute histogram from all image handles
             if handles := ctrl.handles:
                 data = handles[0].data()
                 counts, edges = _calc_hist_bins(data)
                 hist.set_data(counts, edges)
+            # Reset camera view (accounting for data)
+            hist.set_range()
 
         self._histograms[channel] = hist
-        if self.data is not None:
-            self._update_hist_domain_for_dtype()
 
-    def _update_hist_domain_for_dtype(
-        self, dtype: np.typing.DTypeLike | None = None
+    def _update_channel_dtype(
+        self, channel: ChannelKey, dtype: np.typing.DTypeLike | None = None
     ) -> None:
-        if len(self._histograms) == 0:
+        if not (ctrl := self._lut_controllers.get(channel, None)):
             return
         if dtype is None:
             if (wrapper := self._data_model.data_wrapper) is None:
@@ -272,8 +275,7 @@ class ArrayViewer:
             dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
-            for hist in self._histograms.values():
-                hist.set_range(x=(iinfo.min, iinfo.max))
+            ctrl.lut_model.clim_bounds = (iinfo.min, iinfo.max)
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -340,7 +342,6 @@ class ArrayViewer:
             self._request_data()
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
-            self._update_hist_domain_for_dtype()
         self._synchronize_roi()
 
     def _synchronize_roi(self) -> None:
@@ -564,6 +565,7 @@ class ArrayViewer:
                     lut_model=model,
                     views=lut_views,
                 )
+                self._update_channel_dtype(key)
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
@@ -581,10 +583,7 @@ class ArrayViewer:
                 # TODO: once data comes in in chunks, we'll need a proper stateful
                 # stats object that calculates the histogram incrementally
                 counts, bin_edges = _calc_hist_bins(data)
-                # FIXME: currently this is updating the histogram on *any*
-                # channel index... so it doesn't work with composite mode
                 hist.set_data(counts, bin_edges)
-                hist.set_range()
 
         self._canvas.refresh()
 

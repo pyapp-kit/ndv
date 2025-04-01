@@ -117,6 +117,8 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
             referrers = gc.get_referrers(widget)
             msg += "\n  Referrers:"
             for ref in referrers:
+                if ref is remaining:
+                    continue
                 msg += f"\n  -   {ref}, {id(ref):#x}"
 
         raise AssertionError(msg)
