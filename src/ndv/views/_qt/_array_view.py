@@ -326,7 +326,8 @@ class QLutView(LutView):
         self.histogram = histogram
         widget = cast("QWidget", histogram.frontend_widget())
         # Resize widget to a respectable size
-        widget.resize(QSize(self._qwidget.width(), 100))
+        widget.setFixedHeight(100)
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._qwidget.hist_layout.addWidget(widget, 1)
 
 
