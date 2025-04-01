@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.3.1](https://github.com/pyapp-kit/ndv/tree/v0.3.1) (2025-03-26)
+
+[Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.3.0...v0.3.1)
+
+**Implemented enhancements:**
+
+- feat: rgb, v2 [\#141](https://github.com/pyapp-kit/ndv/pull/141) ([gselzer](https://github.com/gselzer))
+
+**Fixed bugs:**
+
+- fix: block ContextMenu events on vispy [\#161](https://github.com/pyapp-kit/ndv/pull/161) ([tlambert03](https://github.com/tlambert03))
+- fix: add tensorstore dtype property to tensorstore  DataWrapper [\#156](https://github.com/pyapp-kit/ndv/pull/156) ([fdrgsp](https://github.com/fdrgsp))
+- fix: Properly remove wx buttons labels [\#145](https://github.com/pyapp-kit/ndv/pull/145) ([gselzer](https://github.com/gselzer))
+
+**Tests & CI:**
+
+- tests: update superqt to reduce segfaults [\#155](https://github.com/pyapp-kit/ndv/pull/155) ([tlambert03](https://github.com/tlambert03))
+
+**Documentation:**
+
+- docs: clarify no pyqt6 on conda [\#162](https://github.com/pyapp-kit/ndv/pull/162) ([tlambert03](https://github.com/tlambert03))
+
+**Merged pull requests:**
+
+- ci\(pre-commit.ci\): autoupdate [\#148](https://github.com/pyapp-kit/ndv/pull/148) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- refactor: use rendercanvas instead of wgpu.gui [\#140](https://github.com/pyapp-kit/ndv/pull/140) ([tlambert03](https://github.com/tlambert03))
+
 ## [v0.3.0](https://github.com/pyapp-kit/ndv/tree/v0.3.0) (2025-02-24)
 
 [Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.2.2...v0.3.0)

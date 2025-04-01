@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "PyPI,Pygfx,PySide6": `${pipCommand} "ndv[pygfx,pyside]"`,
     "PyPI,Pygfx,wxPython": `${pipCommand} "ndv[pygfx,wxpython]"`,
     "PyPI,Pygfx,Jupyter": `${pipCommand} "ndv[pygfx,jupyter]"`,
-    "Conda,VisPy,PyQt6": `${condaCommand} ndv ${condaVispy} qt6-main`,
+    "Conda,VisPy,PyQt6": `pyqt6 is not available in conda-forge, use PySide6`,
     "Conda,VisPy,PySide6": `${condaCommand} ndv ${condaVispy} 'pyside6<6.8'`,
     "Conda,VisPy,wxPython": `${condaCommand} ndv ${condaVispy} wxpython`,
     "Conda,VisPy,Jupyter": `${condaCommand} ndv ${condaVispy} ${condaJupyter}`,
