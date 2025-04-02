@@ -62,23 +62,35 @@ class RightClickButton(widgets.Button):
             max=100.0,
             step=0.1,
             description="Ignore Lower Tail:",
+            style={"description_width": "initial"},
         )
-        self.lower_tail.add_class(f"ipywidget-popup{channel}")
-        self.lower_tail.layout.display = "none"
-        display(self.lower_tail)  # type: ignore [no-untyped-call]
+        self.upper_tail = widgets.BoundedFloatText(
+            value=0.0,
+            min=0.0,
+            max=100.0,
+            step=0.1,
+            description="Ignore Upper Tail:",
+            style={"description_width": "initial"},
+        )
+        self.popup_content = widgets.VBox(
+            [self.lower_tail, self.upper_tail],
+            layout=widgets.Layout(
+                display="none",
+            ),
+        )
+        self.popup_content.add_class(f"ipywidget-popup{channel}")
+        display(self.popup_content)  # type: ignore [no-untyped-call]
 
     def add_right_click_handler(self) -> None:
         # FIXME: This function was mostly generated via LLM and likely
         # contains unnecessary code. It should be reviewed.
-        js_code = (
-            """
+        # fmt: off
+        js_code = ( """
         (function() {
             function setup_rightclick() {
                 // Get all buttons with the right-click-button class
                 var buttons = document.getElementsByClassName(
-                    'right-click-button"""
-            + f"{self._channel}"
-            + """'
+                    'right-click-button""" + f"{self._channel}" + """'
                 );
 
                 for (var i = 0; i < buttons.length; i++) {
@@ -105,9 +117,7 @@ class RightClickButton(widgets.Button):
                         }
 
                         var popup = document.getElementsByClassName(
-                            'ipywidget-popup"""
-            + f"{self._channel}"
-            + """'
+                            'ipywidget-popup""" + f"{self._channel}" + """'
                         )[0];
                         popup.style.display = '';
                         popup.style.position = 'absolute';
@@ -132,9 +142,7 @@ class RightClickButton(widgets.Button):
                         // Close popup when clicking elsewhere
                         document.addEventListener('click', function closePopup(event) {
                             var popup = document.getElementsByClassName(
-                                'ipywidget-popup"""
-            + f"{self._channel}"
-            + """'
+                                'ipywidget-popup""" + f"{self._channel}" + """'
                             )[0];
                             if (popup && !popup.contains(event.target)) {
                                 popup.style.display = 'none';
@@ -184,8 +192,8 @@ class RightClickButton(widgets.Button):
             // Make sure it works even after widget is redrawn/updated
             setTimeout(setup_rightclick, 1000);
         })();
-        """
-        )
+        """)
+        # fmt: on
         display(Javascript(js_code))  # type: ignore [no-untyped-call]
 
     # TODO: This code was also provided by the LLM.
