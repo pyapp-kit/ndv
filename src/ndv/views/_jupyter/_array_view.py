@@ -50,19 +50,36 @@ class RightClickButton(widgets.Button):
     # _right_click_triggered = Bool(False).tag(sync=True)
     # popup_content = Unicode("Right-click menu").tag(sync=True)
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, channel: ChannelKey, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.add_class("right-click-button")
+        self._channel = channel
+        self.add_class(f"right-click-button{channel}")
         self.add_right_click_handler()
+
+        self.lower_tail = widgets.BoundedFloatText(
+            value=0.0,
+            min=0.0,
+            max=100.0,
+            step=0.1,
+            description="Ignore Lower Tail:",
+        )
+        self.lower_tail.add_class(f"ipywidget-popup{channel}")
+        self.lower_tail.layout.display = "none"
+        display(self.lower_tail)  # type: ignore [no-untyped-call]
 
     def add_right_click_handler(self) -> None:
         # FIXME: This function was mostly generated via LLM and likely
         # contains unnecessary code. It should be reviewed.
-        js_code = """
+        js_code = (
+            """
         (function() {
             function setup_rightclick() {
                 // Get all buttons with the right-click-button class
-                var buttons = document.getElementsByClassName('right-click-button');
+                var buttons = document.getElementsByClassName(
+                    'right-click-button"""
+            + f"{self._channel}"
+            + """'
+                );
 
                 for (var i = 0; i < buttons.length; i++) {
                     // For each button, add a contextmenu listener
@@ -87,23 +104,12 @@ class RightClickButton(widgets.Button):
                             }
                         }
 
-                        // Remove existing popup if any
-                        var existingPopup = document.querySelector('.ipywidget-popup');
-                        if (existingPopup) {
-                            existingPopup.parentNode.removeChild(existingPopup);
-                        }
-
-                        // Get popup content from model
-                        var popup_content = 'Right-click menu';
-                        var modelName = 'IPY_MODEL_' + modelId;
-                        if (window[modelName]) {
-                            popup_content = window[modelName].get('popup_content');
-                        }
-
-                        // Create popup
-                        var popup = document.createElement('div');
-                        popup.className = 'ipywidget-popup';
-                        popup.innerHTML = popup_content;
+                        var popup = document.getElementsByClassName(
+                            'ipywidget-popup"""
+            + f"{self._channel}"
+            + """'
+                        )[0];
+                        popup.style.display = '';
                         popup.style.position = 'absolute';
                         popup.style.top = (rect.bottom + scrollTop) + 'px';
                         popup.style.left = (rect.left + scrollLeft) + 'px';
@@ -125,10 +131,14 @@ class RightClickButton(widgets.Button):
 
                         // Close popup when clicking elsewhere
                         document.addEventListener('click', function closePopup(event) {
-                            var popup = document.querySelector('.ipywidget-popup');
+                            var popup = document.getElementsByClassName(
+                                'ipywidget-popup"""
+            + f"{self._channel}"
+            + """'
+                            )[0];
                             if (popup && !popup.contains(event.target)) {
-                                popup.parentNode.removeChild(popup);
-                            document.removeEventListener('click', closePopup);
+                                popup.style.display = 'none';
+                                document.removeEventListener('click', closePopup);
                             }
                         });
 
@@ -175,6 +185,7 @@ class RightClickButton(widgets.Button):
             setTimeout(setup_rightclick, 1000);
         })();
         """
+        )
         display(Javascript(js_code))  # type: ignore [no-untyped-call]
 
     # TODO: This code was also provided by the LLM.
@@ -239,6 +250,7 @@ class JupyterLutView(LutView):
             layout=widgets.Layout(min_width="40px"),
         )
         self._a = RightClickButton(
+            channel=channel,
             description="AAAAAAAAA",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
