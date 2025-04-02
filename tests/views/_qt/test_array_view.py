@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 from pytest import fixture
@@ -60,8 +60,7 @@ def test_histogram(viewer: QtArrayView) -> None:
     histogram_mock.assert_called_once_with(channel)
 
     # Test adding the histogram widget puts it on the relevant lut
-    assert lut._qwidget._histogram is None
+    assert lut.histogram is None
     histogram = get_histogram_canvas_class()()  # will raise if not supported
-    histogram_wdg = cast(QWidget, histogram.frontend_widget())
-    viewer.add_histogram(channel, histogram_wdg)
-    assert lut._qwidget._histogram is not None
+    viewer.add_histogram(channel, histogram)
+    assert lut.histogram is not None

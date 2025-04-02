@@ -23,7 +23,7 @@ class ArrayView(Viewable):
     """ABC for ND Array viewers widget.
 
     Currently, this is the "main" widget that contains the array display and
-    all the controls for interacting with the array, includings sliders, LUTs,
+    all the controls for interacting with the array, including sliders, LUTs,
     and histograms.
     """
 
@@ -65,7 +65,7 @@ class ArrayView(Viewable):
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = ...
     ) -> None: ...
     @abstractmethod
-    def add_lut_view(self, channel: ChannelKey) -> LutView: ...
+    def add_lut_view(self, key: ChannelKey) -> LutView: ...
     @abstractmethod
     def remove_lut_view(self, view: LutView) -> None: ...
 

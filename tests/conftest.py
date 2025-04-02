@@ -61,7 +61,7 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
     if frontend == GuiFrontend.QT:
         app = request.getfixturevalue("qapp")
         qtbot = request.getfixturevalue("qtbot")
-        with patch.object(app, "exec", lambda *_: None):
+        with patch.object(app, "exec", lambda *_: app.processEvents()):
             with _catch_qt_leaks(request, app):
                 yield app, qtbot
     elif frontend == GuiFrontend.JUPYTER:
@@ -117,6 +117,8 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
             referrers = gc.get_referrers(widget)
             msg += "\n  Referrers:"
             for ref in referrers:
+                if ref is remaining:
+                    continue
                 msg += f"\n  -   {ref}, {id(ref):#x}"
 
         raise AssertionError(msg)

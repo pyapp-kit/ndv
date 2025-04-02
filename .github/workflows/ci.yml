@@ -91,15 +91,7 @@ jobs:
         with:
           enable-cache: true
 
-      # https://github.com/pyvista/setup-headless-display-action/pull/26
-      - name: Configure curl to disable revocation checks and add retries
-        if: matrix.os == 'windows-latest'
-        run: |
-          echo --ssl-no-revoke > C:\Users\runneradmin\_curlrc
-          echo '--retry 5' >> C:\Users\runneradmin\_curlrc
-          type C:\Users\runneradmin\_curlrc
-
-      - uses: pyvista/setup-headless-display-action@v3
+      - uses: pyvista/setup-headless-display-action@main
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
       - name: Install llvmpipe and lavapipe for offscreen canvas
@@ -167,7 +159,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - uses: pyvista/setup-headless-display-action@v3
+      - uses: pyvista/setup-headless-display-action@main
         with:
           qt: true
       - name: Install llvmpipe and lavapipe for offscreen canvas

@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, cast
 
-from vispy import scene
+from vispy import geometry, scene
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -285,6 +285,9 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         self, axis: Literal["x", "y", None] = None, *args: Any, **kwargs: Any
     ) -> None:
         self._axis: Literal["x", "y", None] = axis
+        # Domain bounds - user can specify min/max for both axes
+        self.xbounds: tuple[float | None, float | None] = (None, None)
+        self.ybounds: tuple[float | None, float | None] = (None, None)
         super().__init__(*args, **kwargs)
 
     @property
@@ -295,6 +298,38 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         elif self._axis in ("y", 1):
             return 1
         return None
+
+    @scene.cameras.PanZoomCamera.rect.setter  # type:ignore[misc]
+    def rect(self, args: Any) -> None:
+        # Convert 4-tuple (x, y, w, h) to Rect
+        if isinstance(args, tuple):
+            args = geometry.Rect(*args)
+        if isinstance(args, geometry.Rect):
+            # Note that this code preserves camera width so long as the
+            # desired width is possible given the bounds. This is why
+            # width clamping must come before the checks against each bound.
+
+            # Constrain width and height within bounds
+            if None not in self.xbounds:
+                max_width = self.xbounds[1] - self.xbounds[0]  # type: ignore[operator]
+                args.width = min(args.width, max_width)
+            if None not in self.ybounds:
+                max_height = self.ybounds[1] - self.ybounds[0]  # type: ignore[operator]
+                args.height = min(args.height, max_height)
+
+            # Constrain position+/-radius within bounds
+            x, y = args.pos
+            if self.xbounds[0] is not None:
+                x = max(x, self.xbounds[0])
+            if self.xbounds[1] is not None:
+                x = min(x, self.xbounds[1] - args.width)
+            if self.ybounds[0] is not None:
+                y = max(y, self.ybounds[0])
+            if self.ybounds[1] is not None:
+                y = min(y, self.ybounds[1] - args.height)
+
+            args.pos = (x, y)
+        super(PanZoom1DCamera, type(self)).rect.fset(self, args)
 
     def zoom(
         self,

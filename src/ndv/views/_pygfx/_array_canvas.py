@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
@@ -21,6 +20,8 @@ from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
+
+from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -55,8 +56,17 @@ class PyGFXImageHandle(ImageHandle):
         return self._grid.data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
-        self._grid.data[:] = data
-        self._grid.update_range((0, 0, 0), self._grid.size)
+        # If dimensions are unchanged, reuse the buffer
+        if data.shape == self._grid.data.shape:
+            self._grid.data[:] = data
+            self._grid.update_range((0, 0, 0), self._grid.size)
+        # Otherwise, the size (and maybe number of dimensions) changed
+        # - we need a new buffer
+        else:
+            self._grid = pygfx.Texture(data, dim=2)
+            self._image.geometry = pygfx.Geometry(grid=self._grid)
+            # RGB images (i.e. 3D datasets) cannot have a colormap
+            self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
 
     def visible(self) -> bool:
         return bool(self._image.visible)
@@ -82,18 +92,20 @@ class PyGFXImageHandle(ImageHandle):
         self._render()
 
     def gamma(self) -> float:
-        return 1
+        return float(self._material.gamma)
 
     def set_gamma(self, gamma: float) -> None:
-        if gamma != 1:
-            warnings.warn("Gamma correction is not supported in pygfx", stacklevel=2)
+        self._material.gamma = gamma
+        self._render()
 
     def colormap(self) -> _cmap.Colormap:
         return self._cmap
 
     def set_colormap(self, cmap: _cmap.Colormap) -> None:
         self._cmap = cmap
-        self._material.map = cmap.to_pygfx()
+        # RGB (i.e. 3D) images should not have a colormap
+        if not self._is_rgb():
+            self._material.map = cmap.to_pygfx()
         self._render()
 
     def start_move(self, pos: Sequence[float]) -> None:
@@ -108,6 +120,9 @@ class PyGFXImageHandle(ImageHandle):
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
+
+    def _is_rgb(self) -> bool:
+        return self.data().ndim == 3 and isinstance(self._image, pygfx.Image)
 
 
 class PyGFXRectangle(RectangularROIHandle):
@@ -227,7 +242,7 @@ class PyGFXRectangle(RectangularROIHandle):
 
             return new_get_bb
 
-        geometry.get_bounding_box = get_handle_bb(geometry.get_bounding_box)
+        handles.get_bounding_box = get_handle_bb(handles.get_bounding_box)
         return handles
 
     def can_select(self) -> bool:
@@ -337,7 +352,7 @@ class PyGFXRectangle(RectangularROIHandle):
             return CursorType.BDIAG_ARROW
         # Step 2: Entire ROI
         if self._outline:
-            roi_bb = self._outline.geometry.get_bounding_box()
+            roi_bb = self._outline.get_bounding_box()
             if _is_inside(roi_bb, world_pos):
                 return CursorType.ALL_ARROW
         return None
@@ -345,32 +360,6 @@ class PyGFXRectangle(RectangularROIHandle):
     def remove(self) -> None:
         if (par := self._container.parent) is not None:
             par.remove(self._container)
-
-
-def get_canvas_class() -> WgpuCanvas:
-    from ndv.views._app import GuiFrontend, gui_frontend
-
-    frontend = gui_frontend()
-    if frontend == GuiFrontend.QT:
-        from qtpy.QtCore import QSize
-        from wgpu.gui import qt
-
-        class QWgpuCanvas(qt.QWgpuCanvas):
-            def installEventFilter(self, filter: Any) -> None:
-                self._subwidget.installEventFilter(filter)
-
-            def sizeHint(self) -> QSize:
-                return QSize(self.width(), self.height())
-
-        return QWgpuCanvas
-    if frontend == GuiFrontend.JUPYTER:
-        from wgpu.gui.jupyter import JupyterWgpuCanvas
-
-        return JupyterWgpuCanvas
-    if frontend == GuiFrontend.WX:
-        from wgpu.gui.wx import WxWgpuCanvas
-
-        return WxWgpuCanvas
 
 
 class GfxArrayCanvas(ArrayCanvas):
@@ -382,8 +371,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
-        cls = get_canvas_class()
+        cls = rendercanvas_class()
         self._canvas = cls(size=(600, 600))
+
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
         # the returned function can be called to remove the filter, (and it also
@@ -391,15 +381,7 @@ class GfxArrayCanvas(ArrayCanvas):
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        try:
-            # requires https://github.com/pygfx/pygfx/pull/752
-            self._renderer.blend_mode = "additive"
-        except ValueError:
-            warnings.warn(
-                "This version of pygfx does not yet support additive blending.",
-                stacklevel=3,
-            )
-            self._renderer.blend_mode = "weighted_depth"
+        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None

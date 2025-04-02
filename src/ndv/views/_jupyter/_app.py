@@ -30,7 +30,7 @@ class JupyterAppWrap(NDVApp):
     def create_app(self) -> Any:
         if not self.is_running() and not os.getenv("PYTEST_CURRENT_TEST"):
             # if we got here, it probably means that someone used
-            # NDV_GUI_FRONTEND=jupyter without actually being in a juptyer notebook
+            # NDV_GUI_FRONTEND=jupyter without actually being in a jupyter notebook
             # we allow it in tests, but not in normal usage.
             raise RuntimeError(  # pragma: no cover
                 "Jupyter is not running a notebook shell.  Cannot create app."
@@ -91,6 +91,18 @@ class JupyterAppWrap(NDVApp):
                 mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 intercepted |= receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
+            elif etype == "double_click":
+                # Note that in Jupyter, a double_click event is not a pointer event
+                # and as such, we need to handle both press and release. See
+                # https://github.com/vispy/jupyter_rfb/blob/62831dd5a87bc19b4fd5f921d802ed21141e61ec/js/lib/widget.js#L270
+                btn = JupyterAppWrap.mouse_btn(ev["button"])
+                mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=btn)
+                intercepted |= receiver.on_mouse_double_press(mpe)
+                receiver.mouseDoublePressed.emit(mpe)
+                # Release
+                mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=btn)
+                intercepted |= receiver.on_mouse_release(mre)
+                receiver.mouseReleased.emit(mre)
             elif etype == "pointer_up":
                 mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=active_btn)
                 active_btn = MouseButton.NONE

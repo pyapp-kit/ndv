@@ -18,12 +18,20 @@ from qtpy.QtWidgets import (
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QPushButton,
+    QSizePolicy,
+    QSpacerItem,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
-from superqt import QCollapsible, QElidingLabel, QLabeledRangeSlider, QLabeledSlider
+from superqt import (
+    QCollapsible,
+    QElidingLabel,
+    QLabeledRangeSlider,
+    QLabeledSlider,
+)
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
 from superqt.utils import signals_blocked
@@ -43,6 +51,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._graphics._canvas import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         RectangularROIHandle,
@@ -198,6 +207,8 @@ class _AutoscaleButton(QPushButton):
 class _QLUTWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+
+        # -- WIDGETS -- #
         self.visible = QCheckBox()
 
         self.cmap = _CmapCombo()
@@ -212,31 +223,56 @@ class _QLUTWidget(QWidget):
             QLabeledRangeSlider.LabelPosition.LabelsOnHandle
         )
         self.clims.setEdgeLabelMode(QLabeledRangeSlider.EdgeLabelMode.NoLabel)
-        self.clims.setRange(0, 2**16)  # TODO: expose
+        self.clims.setRange(0, 2**16)
 
         self.auto_clim = _AutoscaleButton()
 
-        # TODO: Consider other options here
         add_histogram_icon = QIconifyIcon("foundation:graph-bar")
         self.histogram_btn = QPushButton(add_histogram_icon, "")
         self.histogram_btn.setCheckable(True)
 
-        top = QHBoxLayout()
-        top.setSpacing(5)
-        top.setContentsMargins(0, 0, 0, 0)
-        top.addWidget(self.visible)
-        top.addWidget(self.cmap)
-        top.addWidget(self.clims)
-        top.addWidget(self.auto_clim)
-        top.addWidget(self.histogram_btn)
+        set_range_icon = QIconifyIcon("fluent:full-screen-maximize-24-filled")
+        self.hist_range = QPushButton(set_range_icon, "", self)
+        self.hist_range.setVisible(False)
 
-        self._histogram: QWidget | None = None
+        log_icon = QIconifyIcon("mdi:math-log")
+        self.hist_log = QPushButton(log_icon, "", self)
+        self.hist_log.setToolTip("log (base 10, count+1)")
+        self.hist_log.setCheckable(True)
+        self.hist_log.setVisible(False)
 
-        # Retain a reference to this layout so we can add self._histogram later
+        # -- LAYOUT -- #
+
+        # "main" lut controls (always visible)
+        self._lut_layout = QHBoxLayout()
+        self._lut_layout.setSpacing(5)
+        self._lut_layout.setContentsMargins(0, 0, 0, 0)
+        self._lut_layout.addWidget(self.visible)
+        self._lut_layout.addWidget(self.cmap)
+        self._lut_layout.addWidget(self.clims)
+        self._lut_layout.addWidget(self.auto_clim)
+        self._lut_layout.addWidget(self.histogram_btn)
+
+        # histogram controls go in their own layout
+        hist_ctrls_layout = QVBoxLayout()
+        # Add a vertical spacer that expands to take up available space
+        # This is the key component that pushes everything down
+        hist_ctrls_layout.addItem(
+            QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        )
+        hist_ctrls_layout.addWidget(self.hist_log)
+        hist_ctrls_layout.addWidget(self.hist_range)
+
+        # histogram layout contains controls + a histogram (which is added later)
+        self.hist_layout = QHBoxLayout()
+        self.hist_layout.addLayout(hist_ctrls_layout)
+
+        # Overall layout
         self._layout = QVBoxLayout(self)
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.addLayout(top)
+        self._layout.addLayout(self._lut_layout)
+        self._layout.addLayout(self.hist_layout)
 
 
 class QLutView(LutView):
@@ -247,8 +283,11 @@ class QLutView(LutView):
         super().__init__()
         self._qwidget = _QLUTWidget()
         self._channel = channel
+        self.histogram: HistogramCanvas | None = None
         # TODO: use emit_fast
         self._qwidget.histogram_btn.toggled.connect(self._on_q_histogram_toggled)
+        self._qwidget.hist_log.toggled.connect(self._on_log_btn_toggled)
+        self._qwidget.hist_range.clicked.connect(self._on_set_histogram_range_clicked)
         self._qwidget.visible.toggled.connect(self._on_q_visibility_changed)
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
@@ -276,6 +315,16 @@ class QLutView(LutView):
         # block self._qwidget._clims, otherwise autoscale will be forced off
         with signals_blocked(self._qwidget.clims):
             self._qwidget.clims.setValue(clims)
+
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        # block self._qwidget._clims, otherwise autoscale will be forced off
+        mi = 0 if bounds[0] is None else int(bounds[0])
+        ma = 65535 if bounds[1] is None else int(bounds[1])
+        with signals_blocked(self._qwidget.clims):
+            self._qwidget.clims.setRange(mi, ma)
 
     def set_gamma(self, gamma: float) -> None:
         pass
@@ -317,10 +366,49 @@ class QLutView(LutView):
         self._on_q_auto_changed(self._qwidget.auto_clim.isChecked())
 
     def _on_q_histogram_toggled(self, toggled: bool) -> None:
-        if hist := self._qwidget._histogram:
-            hist.setVisible(toggled)
-        elif toggled:
+        # Recursively show/hide hist_layout
+        self._set_layout_visibility(toggled, self._qwidget.hist_layout)
+        # Request histogram if not created yet
+        if self.histogram is None:
             self.histogramRequested.emit(self._channel)
+
+    def _set_layout_visibility(self, toggled: bool, layout: QLayout) -> None:
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item is None:
+                continue
+            if wdg := item.widget():
+                wdg.setVisible(toggled)
+            elif child_layout := item.layout():
+                self._set_layout_visibility(toggled, child_layout)
+
+    def _on_log_btn_toggled(self, toggled: bool) -> None:
+        if hist := self.histogram:
+            hist.set_log_base(10 if toggled else None)
+
+    def _on_set_histogram_range_clicked(self) -> None:
+        self._qwidget.hist_log.setChecked(False)
+        if hist := self.histogram:
+            hist.set_range()
+
+    def _add_histogram(self, histogram: HistogramCanvas) -> None:
+        # Add widget to view
+        self.histogram = histogram
+        widget = cast("QWidget", histogram.frontend_widget())
+        # Resize widget to a respectable size
+        widget.setFixedHeight(100)
+        widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._qwidget.hist_layout.addWidget(widget, 1)
+
+
+class QRGBView(QLutView):
+    def __init__(self, channel: ChannelKey = None) -> None:
+        super().__init__(channel)
+        # Hide the cmap selector
+        self._qwidget.cmap.setVisible(False)
+        # Insert a new label
+        self._label = QLabel("RGB")
+        self._qwidget._lut_layout.insertWidget(1, self._label)
 
 
 class ROIButton(QPushButton):
@@ -460,7 +548,11 @@ class _QArrayViewer(QWidget):
         # not using QEnumComboBox because we want to exclude some values for now
         self.channel_mode_combo = QComboBox(self)
         self.channel_mode_combo.addItems(
-            [ChannelMode.GRAYSCALE.value, ChannelMode.COMPOSITE.value]
+            [
+                ChannelMode.GRAYSCALE.value,
+                ChannelMode.COMPOSITE.value,
+                ChannelMode.RGBA.value,
+            ]
         )
 
         # button to reset the zoom of the canvas
@@ -558,7 +650,7 @@ class QtArrayView(ArrayView):
         self._visible_axes: Sequence[AxisKey] = []
 
     def add_lut_view(self, channel: ChannelKey) -> QLutView:
-        view = QLutView(channel)
+        view = QRGBView(channel) if channel == "RGB" else QLutView(channel)
         self._luts[channel] = view
 
         view.histogramRequested.connect(self.histogramRequested)
@@ -571,16 +663,9 @@ class QtArrayView(ArrayView):
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
 
-    def add_histogram(self, channel: ChannelKey, widget: QWidget) -> None:
+    def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
-            # Resize widget to a respectable size
-            lut._qwidget.resize(
-                QSize(lut._qwidget.width(), lut._qwidget.height() + 100)
-            )
-            # Add widget to view
-            widget.resize(QSize(lut._qwidget.width(), 100))
-            lut._qwidget._histogram = widget
-            lut._qwidget._layout.addWidget(widget)
+            lut._add_histogram(histogram)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
