@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
@@ -380,16 +379,9 @@ class GfxArrayCanvas(ArrayCanvas):
         # the returned function can be called to remove the filter, (and it also
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
+
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        try:
-            # requires https://github.com/pygfx/pygfx/pull/752
-            self._renderer.blend_mode = "additive"
-        except ValueError:
-            warnings.warn(
-                "This version of pygfx does not yet support additive blending.",
-                stacklevel=3,
-            )
-            self._renderer.blend_mode = "weighted_depth"
+        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None
