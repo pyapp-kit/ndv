@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import ipywidgets as widgets
 import psygnal
+from IPython.display import Javascript, display
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
@@ -40,6 +41,159 @@ def notifications_blocked(
     finally:
         if notifiers is not None:
             obj._trait_notifiers[name][type] = notifiers
+
+
+class RightClickButton(widgets.Button):
+    """Custom Button widget that shows a popup on right-click."""
+
+    # TODO: These are likely unnecessary
+    # _right_click_triggered = Bool(False).tag(sync=True)
+    # popup_content = Unicode("Right-click menu").tag(sync=True)
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.add_class("right-click-button")
+        self.add_right_click_handler()
+
+    def add_right_click_handler(self) -> None:
+        # FIXME: This function was mostly generated via LLM and likely
+        # contains unnecessary code. It should be reviewed.
+        js_code = """
+        (function() {
+            function setup_rightclick() {
+                // Get all buttons with the right-click-button class
+                var buttons = document.getElementsByClassName('right-click-button');
+
+                for (var i = 0; i < buttons.length; i++) {
+                    // For each button, add a contextmenu listener
+                    buttons[i].addEventListener('contextmenu', function(e) {
+                        // Prevent default context menu
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // Get button position
+                        var rect = this.getBoundingClientRect();
+                        var scrollLeft = window.pageXOffset ||
+                            document.documentElement.scrollLeft;
+                        var scrollTop = window.pageYOffset ||
+                            document.documentElement.scrollTop;
+
+                        // Get the widget model id from data attributes
+                        var modelId = '';
+                        for (var key in this.dataset) {
+                            if (key.startsWith('modelId')) {
+                                modelId = this.dataset[key];
+                                break;
+                            }
+                        }
+
+                        // Remove existing popup if any
+                        var existingPopup = document.querySelector('.ipywidget-popup');
+                        if (existingPopup) {
+                            existingPopup.parentNode.removeChild(existingPopup);
+                        }
+
+                        // Get popup content from model
+                        var popup_content = 'Right-click menu';
+                        var modelName = 'IPY_MODEL_' + modelId;
+                        if (window[modelName]) {
+                            popup_content = window[modelName].get('popup_content');
+                        }
+
+                        // Create popup
+                        var popup = document.createElement('div');
+                        popup.className = 'ipywidget-popup';
+                        popup.innerHTML = popup_content;
+                        popup.style.position = 'absolute';
+                        popup.style.top = (rect.bottom + scrollTop) + 'px';
+                        popup.style.left = (rect.left + scrollLeft) + 'px';
+                        popup.style.background = 'white';
+                        popup.style.border = '1px solid #ccc';
+                        popup.style.borderRadius = '3px';
+                        popup.style.padding = '8px';
+                        popup.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                        popup.style.zIndex = '1000';
+
+                        // Add to body
+                        document.body.appendChild(popup);
+
+                        // Set model value to indicate right click happened
+                        if (window[modelName]) {
+                            window[modelName].set('_right_click_triggered', true);
+                            window[modelName].save_changes();
+                        }
+
+                        // Close popup when clicking elsewhere
+                        document.addEventListener('click', function closePopup(event) {
+                            var popup = document.querySelector('.ipywidget-popup');
+                            if (popup && !popup.contains(event.target)) {
+                                popup.parentNode.removeChild(popup);
+                            document.removeEventListener('click', closePopup);
+                            }
+                        });
+
+                        return false;
+                    });
+
+                    // Set up content updating
+                    var button = buttons[i];
+                    var modelId = '';
+                    for (var key in button.dataset) {
+                        if (key.startsWith('modelId')) {
+                            modelId = button.dataset[key];
+                            break;
+                        }
+                    }
+
+                    var modelName = 'IPY_MODEL_' + modelId;
+                    if (window[modelName]) {
+                        button.setAttribute(
+                            'data-popup-content',
+                            window[modelName].get('popup_content')
+                        );
+
+                        // This part is tricky without jQuery, but we can use a polling
+                        // approach to check for content changes
+                        (function(btn, model) {
+                            var lastContent = window[model].get('popup_content');
+                            setInterval(function() {
+                                var newContent = window[model].get('popup_content');
+                                if (newContent !== lastContent) {
+                                    btn.setAttribute('data-popup-content', newContent);
+                                    lastContent = newContent;
+                                }
+                            }, 500);
+                        })(button, modelName);
+                    }
+                }
+            }
+
+            // Set up for current elements
+            setup_rightclick();
+
+            // Make sure it works even after widget is redrawn/updated
+            setTimeout(setup_rightclick, 1000);
+        })();
+        """
+        display(Javascript(js_code))  # type: ignore [no-untyped-call]
+
+    # TODO: This code was also provided by the LLM.
+    # Delete once sure it is not needed.
+    # def on_right_click(self, callback: Any) -> None:
+    #     """Register a callback to be called when the button is right-clicked."""
+
+    #     def _handle_right_click_event(change: Any) -> None:
+    #         if change["new"]:
+    #             # Reset the flag
+    #             self._right_click_triggered = False
+    #             # Call the callback
+    #             callback(self)
+
+    #     self.observe(_handle_right_click_event, names="_right_click_triggered")
+
+    # def set_popup_content(self, content: Any) -> None:
+    #     """Update the content shown in the popup."""
+    #     self.popup_content = content
 
 
 class JupyterLutView(LutView):
@@ -84,6 +238,12 @@ class JupyterLutView(LutView):
             tooltip="Auto scale",
             layout=widgets.Layout(min_width="40px"),
         )
+        self._a = RightClickButton(
+            description="AAAAAAAAA",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="Auto scale",
+            layout=widgets.Layout(min_width="40px"),
+        )
         self._histogram_btn = widgets.ToggleButton(
             value=False,
             description="",
@@ -118,6 +278,7 @@ class JupyterLutView(LutView):
                 self._clims,
                 self._auto_clim,
                 self._histogram_btn,
+                self._a,
             ]
         )
 
