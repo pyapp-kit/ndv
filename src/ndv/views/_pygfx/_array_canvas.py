@@ -243,7 +243,7 @@ class PyGFXRectangle(RectangularROIHandle):
 
             return new_get_bb
 
-        geometry.get_bounding_box = get_handle_bb(geometry.get_bounding_box)
+        handles.get_bounding_box = get_handle_bb(handles.get_bounding_box)
         return handles
 
     def can_select(self) -> bool:
@@ -353,7 +353,7 @@ class PyGFXRectangle(RectangularROIHandle):
             return CursorType.BDIAG_ARROW
         # Step 2: Entire ROI
         if self._outline:
-            roi_bb = self._outline.geometry.get_bounding_box()
+            roi_bb = self._outline.get_bounding_box()
             if _is_inside(roi_bb, world_pos):
                 return CursorType.ALL_ARROW
         return None
