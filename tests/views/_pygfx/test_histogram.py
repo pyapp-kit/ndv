@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from ndv._types import (
@@ -30,13 +31,12 @@ def test_interaction() -> None:
     def world_to_canvas(x: float, y: float) -> tuple[float, float]:
         return histogram.world_to_canvas((x, y, 0))
 
-    # TODO: Uncomment code with https://github.com/pyapp-kit/ndv/pull/158
     # Test cursors
-    # x, y = world_to_canvas((left + right) / 2, 0.5)
-    # assert (
-    #     histogram.get_cursor(MouseMoveEvent(x=x, y=y, btn=MouseButton.NONE))
-    #     == CursorType.V_ARROW
-    # )
+    x, y = world_to_canvas((left + right) / 2, 0.5)
+    assert (
+        histogram.get_cursor(MouseMoveEvent(x=x, y=y, btn=MouseButton.NONE))
+        == CursorType.V_ARROW
+    )
     x, y = world_to_canvas(left, 0)
     assert (
         histogram.get_cursor(MouseMoveEvent(x=x, y=y, btn=MouseButton.NONE))
@@ -49,17 +49,17 @@ def test_interaction() -> None:
     )
 
     # Select and move gamma
-    # x, y = world_to_canvas((left + right) / 2, 0.5)
-    # histogram.on_mouse_press(MousePressEvent(x=x, y=y, btn=MouseButton.LEFT))
-    # x, y = world_to_canvas((left + right) / 2, 0.75)
-    # histogram.on_mouse_move(MouseMoveEvent(x=x, y=y, btn=MouseButton.LEFT))
-    # histogram.on_mouse_release(MouseReleaseEvent(x=x, y=y, btn=MouseButton.LEFT))
-    # assert model.gamma == -np.log2(0.75)
+    x, y = world_to_canvas((left + right) / 2, 0.5)
+    histogram.on_mouse_press(MousePressEvent(x=x, y=y, btn=MouseButton.LEFT))
+    x, y = world_to_canvas((left + right) / 2, 0.75)
+    histogram.on_mouse_move(MouseMoveEvent(x=x, y=y, btn=MouseButton.LEFT))
+    histogram.on_mouse_release(MouseReleaseEvent(x=x, y=y, btn=MouseButton.LEFT))
+    assert model.gamma == -np.log2(0.75)
 
     # Double clicking gamma resets to 1.
-    # x, y = world_to_canvas((left + right) / 2, 0.75)
-    # histogram.on_mouse_double_press(MousePressEvent(x=x, y=y, btn=MouseButton.LEFT))
-    # assert model.gamma == 1
+    x, y = world_to_canvas((left + right) / 2, 0.75)
+    histogram.on_mouse_double_press(MousePressEvent(x=x, y=y, btn=MouseButton.LEFT))
+    assert model.gamma == 1
 
     # Select and move the left clim
     x, y = world_to_canvas(left, 0)

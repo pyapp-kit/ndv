@@ -534,6 +534,15 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             self._controller.enabled = False
         return False
 
+    def on_mouse_double_press(self, event: MousePressEvent) -> bool:
+        pos = event.x, event.y
+        # check whether the user grabbed a node
+        self._grabbed = self._find_nearby_node(pos)
+        if self._grabbed == Grabbable.GAMMA:
+            if self.model:
+                self.model.gamma = 1
+        return False
+
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
         self._controller.enabled = True
@@ -568,7 +577,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         if self._grabbed is Grabbable.GAMMA:
             y0 = 0
-            rect = self._viewport.logical_size
+            rect = self._plot_view.logical_size
             y1 = (
                 rect[0] - self.margin_right
                 if self._vertical
