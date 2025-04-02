@@ -99,7 +99,7 @@ class VispyImageHandle(ImageHandle):
         self._visual.cmap = cmap.to_vispy()
 
     def transform(self) -> np.ndarray:
-        return self._visual.transform  # type: ignore [no-any-return]
+        return self._visual.transform.matrix  # type: ignore [no-any-return]
 
     def set_transform(self, transform: np.ndarray) -> None:
         self._visual.transform = MatrixTransform(transform.T)

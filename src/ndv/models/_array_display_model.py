@@ -218,8 +218,6 @@ class ArrayDisplayModel(NDVModel):
         ary = np.asarray(matrix)
         if ary.shape != (4, 4):
             raise ValueError("Transform matrix must be 4x4.")
-        if not np.all(np.isfinite(ary)):
-            raise ValueError("Transform matrix must be finite.")
         # Decompose the matrix into scale and translation
         # Note: this assumes a proper affine transformation matrix
         self.scale = tuple(np.sqrt(np.sum(ary[:3, i] ** 2)) for i in range(3))[::-1]
