@@ -173,7 +173,7 @@ class PlayButton(QPushButton):
         self.setCheckable(True)
         self.setFixedSize(14, 18)
         self.setIconSize(QSize(16, 16))
-        self.setStyleSheet("border: none; padding: 0; margin: 0;")
+        self.setStyleSheet(r"QPushButton {border: none; padding: 0; margin: 0;}")
         self._popup = QtPopup(self)
         form = QFormLayout(self._popup.frame)
         form.setContentsMargins(6, 6, 6, 6)
@@ -341,7 +341,7 @@ class DimRow(QObject):
         self.index_label = self.slider._label
         self.play_btn = PlayButton()
         self.play_btn.fpsChanged.connect(self.set_fps)
-        self.play_btn.toggled.connect(self._toggle_animation)
+        self.play_btn.toggled.connect(self.set_animated)
         self.label = QLabel(str(axis))
         self.out_of = QLabel(f"/ {len(_coords) - 1}")
         self.out_of.setStyleSheet("margin-bottom: 2px;")  # hack
@@ -350,10 +350,10 @@ class DimRow(QObject):
 
     def set_fps(self, fps: float) -> None:
         self.play_btn.spin.setValue(fps)
-        self._toggle_animation(self.play_btn.isChecked())
+        self.set_animated(self.play_btn.isChecked())
 
-    def _toggle_animation(self, checked: bool) -> None:
-        if checked:
+    def set_animated(self, animate: bool) -> None:
+        if animate:
             if self._timer_id is not None:
                 self.killTimer(self._timer_id)
             interval = int(1000 / self.play_btn.spin.value())
@@ -377,7 +377,7 @@ class DimRow(QObject):
 class _QDimsSliders(QWidget):
     currentIndexChanged = Signal()
 
-    _rBTN = 0
+    _rPLAY_BTN = 0
     _rLABEL = 1
     _rSLIDER = 2
     _rINDEX = 3
@@ -386,6 +386,7 @@ class _QDimsSliders(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._sliders: dict[Hashable, QLabeledSlider] = {}
+        self._play_btn_visible: bool = True
         self.setStyleSheet(SLIDER_STYLE)
 
         self._layout = QGridLayout(self)
@@ -401,7 +402,9 @@ class _QDimsSliders(QWidget):
                 row = grid.rowCount()
                 dim_row = DimRow(axis, _coords, self)
                 dim_row.slider.valueChanged.connect(self.currentIndexChanged)
-                grid.addWidget(dim_row.play_btn, row, self._rBTN)
+                if not self._play_btn_visible:
+                    dim_row.play_btn.setVisible(False)
+                grid.addWidget(dim_row.play_btn, row, self._rPLAY_BTN)
                 grid.addWidget(dim_row.label, row, self._rLABEL)
                 grid.addWidget(dim_row.slider, row, self._rSLIDER)
                 grid.addWidget(
@@ -439,6 +442,9 @@ class _QDimsSliders(QWidget):
             ) and item.widget() is slider:
                 # Toggle visibility of all widgets in the found row
                 for c in range(ncols):
+                    if not self._play_btn_visible and c == self._rPLAY_BTN:
+                        # don't show play button when not visible
+                        continue
                     item = self._layout.itemAtPosition(r, c)
                     item.widget().setVisible(visible)
                 continue
@@ -466,6 +472,22 @@ class _QDimsSliders(QWidget):
                     warnings.warn(f"Axis {axis} not found in sliders", stacklevel=2)
         if changed:
             self.currentIndexChanged.emit()
+
+    def set_play_button_visible(self, visible: bool) -> None:
+        """Set the visibility of the play button on all rows."""
+        self._play_btn_visible = visible
+        for row in range(self._layout.rowCount()):
+            item = self._layout.itemAtPosition(row, self._rSLIDER)
+            if item and (wdg := item.widget()) and not wdg.isVisible():
+                continue  # pragma: no cover, skip if the row is hidden
+            item = self._layout.itemAtPosition(row, self._rPLAY_BTN)
+            if item and (btn := item.widget()):
+                btn.setVisible(visible)
+
+    def stop_animations(self) -> None:
+        """Stop all animations on the play buttons."""
+        for child in self.findChildren(DimRow):
+            child.set_animated(False)
 
 
 class _UpCollapsible(QCollapsible):
@@ -692,6 +714,7 @@ class QtArrayView(ArrayView):
             self._visible_axes = (z_ax, *self._visible_axes)
         # TODO: a future PR may decide to set this on the model directly...
         # since we now have access to it.
+        self._qwidget.dims_sliders.stop_animations()
         self.visibleAxesChanged.emit()
 
     def visible_axes(self) -> Sequence[AxisKey]:
@@ -748,3 +771,5 @@ class QtArrayView(ArrayView):
             self._qwidget.set_range_btn.setVisible(value)
         elif sig_name == "show_3d_button":
             self._qwidget.ndims_btn.setVisible(value)
+        elif sig_name == "show_play_button":
+            self._qwidget.dims_sliders.set_play_button_visible(value)
