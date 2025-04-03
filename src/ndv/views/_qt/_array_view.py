@@ -206,40 +206,6 @@ class _DimToggleButton(QPushButton):
         self.setCheckable(True)
 
 
-class _AutoscaleButton(QPushButton):
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__("Auto", parent)
-        self.setMaximumWidth(42)
-        self.setCheckable(True)
-
-        self.upper_box = QDoubleSpinBox()
-        self.upper_box.setRange(0, 49.9)
-        self.upper_box.setSingleStep(0.1)
-        self.upper_box.setSuffix("%")
-        self.upper_box.setValue(0)
-
-        self.lower_box = QDoubleSpinBox()
-        self.lower_box.setRange(0, 49.9)
-        self.lower_box.setSingleStep(0.1)
-        self.lower_box.setSuffix("%")
-        self.lower_box.setValue(0)
-
-        self._popup = QtPopup(self)
-        form = QFormLayout(self._popup.frame)
-        form.setContentsMargins(6, 6, 6, 6)
-        form.addRow("Ignore Lower Tail:", self.lower_box)
-        form.addRow("Ignore Upper Tail:", self.upper_box)
-
-    def mousePressEvent(self, e: QMouseEvent | None) -> None:
-        if e and e.button() == Qt.MouseButton.RightButton:
-            self._show_options_dialog()
-        else:
-            super().mousePressEvent(e)
-
-    def _show_options_dialog(self) -> None:
-        self._popup.show_above_mouse()
-
-
 class _QLUTWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -261,7 +227,9 @@ class _QLUTWidget(QWidget):
         self.clims.setEdgeLabelMode(QLabeledRangeSlider.EdgeLabelMode.NoLabel)
         self.clims.setRange(0, 2**16)
 
-        self.auto_clim = _AutoscaleButton()
+        self.auto_clim = QPushButton("Auto")
+        self.auto_clim.setMaximumWidth(42)
+        self.auto_clim.setCheckable(True)
 
         add_histogram_icon = QIconifyIcon("foundation:graph-bar")
         self.histogram_btn = QPushButton(add_histogram_icon, "")
@@ -276,6 +244,24 @@ class _QLUTWidget(QWidget):
         self.hist_log.setToolTip("log (base 10, count+1)")
         self.hist_log.setCheckable(True)
         self.hist_log.setVisible(False)
+
+        self.upper_tail = QDoubleSpinBox()
+        self.upper_tail.setRange(0, 49.9)
+        self.upper_tail.setSingleStep(0.1)
+        self.upper_tail.setSuffix("%")
+        self.upper_tail.setValue(0)
+
+        self.lower_tail = QDoubleSpinBox()
+        self.lower_tail.setRange(0, 49.9)
+        self.lower_tail.setSingleStep(0.1)
+        self.lower_tail.setSuffix("%")
+        self.lower_tail.setValue(0)
+
+        self.auto_popup = QtPopup(self)
+        form = QFormLayout(self.auto_popup.frame)
+        form.setContentsMargins(6, 6, 6, 6)
+        form.addRow("Ignore Lower Tail:", self.lower_tail)
+        form.addRow("Ignore Upper Tail:", self.upper_tail)
 
         # -- LAYOUT -- #
 
@@ -328,11 +314,14 @@ class QLutView(LutView):
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
         self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
-        self._qwidget.auto_clim.upper_box.valueChanged.connect(
-            self._on_q_auto_tails_changed
+        self._qwidget.lower_tail.valueChanged.connect(self._on_q_tails_changed)
+        self._qwidget.upper_tail.valueChanged.connect(self._on_q_tails_changed)
+
+        self._qwidget.auto_clim.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
         )
-        self._qwidget.auto_clim.lower_box.valueChanged.connect(
-            self._on_q_auto_tails_changed
+        self._qwidget.auto_clim.customContextMenuRequested.connect(
+            self._show_autoscale_popup
         )
 
     def frontend_widget(self) -> QWidget:
@@ -344,8 +333,8 @@ class QLutView(LutView):
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         self._qwidget.auto_clim.setChecked(not policy.is_manual)
         if isinstance(policy, ClimsPercentile):
-            self._qwidget.auto_clim.lower_box.setValue(policy.min_percentile)
-            self._qwidget.auto_clim.upper_box.setValue(100 - policy.max_percentile)
+            self._qwidget.lower_tail.setValue(policy.min_percentile)
+            self._qwidget.upper_tail.setValue(100 - policy.max_percentile)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._qwidget.cmap.setCurrentColormap(cmap)
@@ -392,8 +381,8 @@ class QLutView(LutView):
     def _on_q_auto_changed(self, autoscale: bool) -> None:
         if self._model:
             if autoscale:
-                lower_tail = self._qwidget.auto_clim.lower_box.value()
-                upper_tail = self._qwidget.auto_clim.upper_box.value()
+                lower_tail = self._qwidget.lower_tail.value()
+                upper_tail = self._qwidget.upper_tail.value()
                 self._model.clims = ClimsPercentile(
                     min_percentile=lower_tail, max_percentile=100 - upper_tail
                 )
@@ -401,7 +390,7 @@ class QLutView(LutView):
                 clims = self._qwidget.clims.value()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
-    def _on_q_auto_tails_changed(self, value: float) -> None:
+    def _on_q_tails_changed(self, value: float) -> None:
         self._on_q_auto_changed(self._qwidget.auto_clim.isChecked())
 
     def _on_q_histogram_toggled(self, toggled: bool) -> None:
@@ -438,6 +427,9 @@ class QLutView(LutView):
         widget.setFixedHeight(100)
         widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._qwidget.hist_layout.addWidget(widget, 1)
+
+    def _show_autoscale_popup(self) -> None:
+        self._qwidget.auto_popup.show_above_mouse()
 
 
 class QRGBView(QLutView):

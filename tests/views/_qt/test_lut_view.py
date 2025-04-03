@@ -41,8 +41,8 @@ def test_QLutView_update_model(model: LUTModel, view: QLutView) -> None:
     model.clims = ClimsPercentile(min_percentile=0, max_percentile=100)
     assert view._qwidget.auto_clim.isChecked()
     model.clims = ClimsPercentile(min_percentile=1, max_percentile=99)
-    assert view._qwidget.auto_clim.lower_box.value() == 1
-    assert view._qwidget.auto_clim.upper_box.value() == 1
+    assert view._qwidget.lower_tail.value() == 1
+    assert view._qwidget.upper_tail.value() == 1
 
     # Test modifying model.visible
     assert view._qwidget.visible.isChecked()
@@ -80,9 +80,9 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
 
     # Test modifying tails changes percentiles
-    view._qwidget.auto_clim.lower_box.setValue(0.1)
+    view._qwidget.lower_tail.setValue(0.1)
     assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=100)
-    view._qwidget.auto_clim.upper_box.setValue(0.2)
+    view._qwidget.upper_tail.setValue(0.2)
     assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=99.8)
 
     # When gui clims change, autoscale should be disabled
