@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 def viewer(qtbot: QtBot) -> QtArrayView:
     viewer = QtArrayView(QWidget(), _ArrayDataDisplayModel(), ArrayViewerModel())
     viewer.add_lut_view(None)
+    viewer.create_sliders({0: range(10), 1: range(64), 2: range(128)})
     qtbot.addWidget(viewer.frontend_widget())
     return viewer
 
@@ -27,6 +28,9 @@ def test_array_options(viewer: QtArrayView) -> None:
     qwdg = viewer._qwidget
     qwdg.show()
     qlut = viewer._luts[None]._qwidget
+    dims_wdg = viewer._qwidget.dims_sliders
+    assert dims_wdg._sliders
+    play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rPLAY_BTN).widget()  # type: ignore
 
     assert qwdg.ndims_btn.isVisible()
     viewer._viewer_model.show_3d_button = False
@@ -47,6 +51,11 @@ def test_array_options(viewer: QtArrayView) -> None:
     assert qwdg.add_roi_btn.isVisible()
     viewer._viewer_model.show_roi_button = False
     assert not qwdg.add_roi_btn.isVisible()
+
+    assert isinstance(play_btn, PlayButton)
+    assert play_btn.isVisible()
+    viewer._viewer_model.show_play_button = False
+    assert not play_btn.isVisible()
 
 
 def test_histogram(viewer: QtArrayView) -> None:
@@ -69,7 +78,6 @@ def test_histogram(viewer: QtArrayView) -> None:
 def test_play_btn(viewer: QtArrayView, qtbot: QtBot) -> None:
     """Test the play button functionality on the array view."""
     dims_wdg = viewer._qwidget.dims_sliders
-    viewer.create_sliders({0: range(10), 1: range(64), 2: range(128)})
     assert dims_wdg._sliders
     play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rPLAY_BTN).widget()  # type: ignore
     assert isinstance(play_btn, PlayButton)
