@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import cmap
 from pytest import fixture
+from qtpy.QtWidgets import QWidget
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.views._qt._array_view import QLutView
+from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -72,3 +75,50 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     model.clims = ClimsMinMax()
     view._qwidget.clims.setValue((0, 1))
     assert model.clims == ClimsManual(min=0, max=1)  #  type:ignore
+
+
+def test_QLutView_histogram_controls(model: LUTModel, view: QLutView) -> None:
+    # Mock up a histogram
+    hist_mock = MagicMock(spec=HistogramCanvas)
+    hist_frontend = QWidget()
+    hist_mock.frontend_widget.return_value = hist_frontend
+
+    # Add the histogram and assert it was correctly added
+    view._add_histogram(hist_mock)
+    assert view.histogram is hist_mock
+
+    # Assert histogram button toggles visibility
+    # Note that the parent must be visible for child visibility to change
+    old_visibility = view._qwidget.histogram_btn.isChecked()
+    view._qwidget.setVisible(True)
+    assert not view._qwidget.histogram_btn.isChecked()
+
+    view._qwidget.histogram_btn.setChecked(True)
+    assert view._qwidget.hist_log.isVisible()
+    assert view._qwidget.hist_range.isVisible()
+    assert hist_frontend.isVisible()
+
+    view._qwidget.histogram_btn.setChecked(False)
+    assert not view._qwidget.hist_log.isVisible()
+    assert not view._qwidget.hist_range.isVisible()
+    assert not hist_frontend.isVisible()
+    view._qwidget.setVisible(old_visibility)
+
+    # Assert toggling the log button alters the logarithmic base
+    view._qwidget.hist_log.setChecked(True)
+    hist_mock.set_log_base.assert_called_once_with(10)
+    hist_mock.reset_mock()
+    view._qwidget.hist_log.setChecked(False)
+    hist_mock.set_log_base.assert_called_once_with(None)
+    hist_mock.reset_mock()
+
+    # Assert pressing the reset view button sets the histogram range
+    view._qwidget.hist_range.click()
+    hist_mock.set_range.assert_called_once_with()
+    hist_mock.reset_mock()
+
+    # Assert pressing the reset view button turns off log mode
+    view._qwidget.hist_log.setChecked(True)
+    view._qwidget.hist_range.click()
+    assert not view._qwidget.hist_log.isChecked()
+    hist_mock.reset_mock()
