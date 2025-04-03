@@ -522,11 +522,14 @@ class _QDimsSliders(QWidget):
             ) and item.widget() is slider:
                 # Toggle visibility of all widgets in the found row
                 for c in range(ncols):
-                    if not self._play_btn_visible and c == self._rPLAY_BTN:
+                    if c == self._rPLAY_BTN and not self._play_btn_visible:
                         # don't show play button when not visible
                         continue
                     item = self._layout.itemAtPosition(r, c)
-                    item.widget().setVisible(visible)
+                    if item and (widget := item.widget()):
+                        widget.setVisible(visible)
+                        if isinstance(widget, PlayButton) and not visible:
+                            widget.setChecked(False)
                 continue
 
     def current_index(self) -> Mapping[AxisKey, int | slice]:
