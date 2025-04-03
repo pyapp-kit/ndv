@@ -10,7 +10,7 @@ import psygnal
 from IPython.display import Javascript, display
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
@@ -43,7 +43,7 @@ def notifications_blocked(
             obj._trait_notifiers[name][type] = notifiers
 
 
-class RightClickButton(widgets.Button):
+class RightClickButton(widgets.ToggleButton):
     """Custom Button widget that shows a popup on right-click."""
 
     # TODO: These are likely unnecessary
@@ -89,105 +89,105 @@ class RightClickButton(widgets.Button):
         (function() {
             function setup_rightclick() {
                 // Get all buttons with the right-click-button class
-                var buttons = document.getElementsByClassName(
+                var button = document.getElementsByClassName(
                     'right-click-button""" + f"{self._channel}" + """'
-                );
+                )[0];
+                if (!button) {
+                    return;
+                }
 
-                for (var i = 0; i < buttons.length; i++) {
-                    // For each button, add a contextmenu listener
-                    buttons[i].addEventListener('contextmenu', function(e) {
-                        // Prevent default context menu
-                        e.preventDefault();
-                        e.stopPropagation();
+                // For each button, add a contextmenu listener
+                button.addEventListener('contextmenu', function(e) {
+                    // Prevent default context menu
+                    e.preventDefault();
+                    e.stopPropagation();
 
-                        // Get button position
-                        var rect = this.getBoundingClientRect();
-                        var scrollLeft = window.pageXOffset ||
-                            document.documentElement.scrollLeft;
-                        var scrollTop = window.pageYOffset ||
-                            document.documentElement.scrollTop;
+                    // Get button position
+                    var rect = this.getBoundingClientRect();
+                    var scrollLeft = window.pageXOffset ||
+                        document.documentElement.scrollLeft;
+                    var scrollTop = window.pageYOffset ||
+                        document.documentElement.scrollTop;
 
-                        // Get the widget model id from data attributes
-                        var modelId = '';
-                        for (var key in this.dataset) {
-                            if (key.startsWith('modelId')) {
-                                modelId = this.dataset[key];
-                                break;
-                            }
-                        }
-
-                        var popup = document.getElementsByClassName(
-                            'ipywidget-popup""" + f"{self._channel}" + """'
-                        )[0];
-                        popup.style.display = '';
-                        popup.style.position = 'absolute';
-                        popup.style.top = (rect.bottom + scrollTop) + 'px';
-                        popup.style.left = (rect.left + scrollLeft) + 'px';
-                        popup.style.background = 'white';
-                        popup.style.border = '1px solid #ccc';
-                        popup.style.borderRadius = '3px';
-                        popup.style.padding = '8px';
-                        popup.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-                        popup.style.zIndex = '1000';
-
-                        // Add to body
-                        document.body.appendChild(popup);
-
-                        // Set model value to indicate right click happened
-                        if (window[modelName]) {
-                            window[modelName].set('_right_click_triggered', true);
-                            window[modelName].save_changes();
-                        }
-
-                        // Close popup when clicking elsewhere
-                        document.addEventListener('click', function closePopup(event) {
-                            var popup = document.getElementsByClassName(
-                                'ipywidget-popup""" + f"{self._channel}" + """'
-                            )[0];
-                            if (popup && !popup.contains(event.target)) {
-                                popup.style.display = 'none';
-                                document.removeEventListener('click', closePopup);
-                            }
-                        });
-
-                        return false;
-                    });
-
-                    // Set up content updating
-                    var button = buttons[i];
+                    // Get the widget model id from data attributes
                     var modelId = '';
-                    for (var key in button.dataset) {
+                    for (var key in this.dataset) {
                         if (key.startsWith('modelId')) {
-                            modelId = button.dataset[key];
+                            modelId = this.dataset[key];
                             break;
                         }
                     }
 
-                    var modelName = 'IPY_MODEL_' + modelId;
-                    if (window[modelName]) {
-                        button.setAttribute(
-                            'data-popup-content',
-                            window[modelName].get('popup_content')
-                        );
+                    var popup = document.getElementsByClassName(
+                        'ipywidget-popup""" + f"{self._channel}" + """'
+                    )[0];
+                    popup.style.display = '';
+                    popup.style.position = 'absolute';
+                    popup.style.top = (rect.bottom + scrollTop) + 'px';
+                    popup.style.left = (rect.left + scrollLeft) + 'px';
+                    popup.style.background = 'white';
+                    popup.style.border = '1px solid #ccc';
+                    popup.style.borderRadius = '3px';
+                    popup.style.padding = '8px';
+                    popup.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                    popup.style.zIndex = '1000';
 
-                        // This part is tricky without jQuery, but we can use a polling
-                        // approach to check for content changes
-                        (function(btn, model) {
-                            var lastContent = window[model].get('popup_content');
-                            setInterval(function() {
-                                var newContent = window[model].get('popup_content');
-                                if (newContent !== lastContent) {
-                                    btn.setAttribute('data-popup-content', newContent);
-                                    lastContent = newContent;
-                                }
-                            }, 500);
-                        })(button, modelName);
+                    // Add to body
+                    document.body.appendChild(popup);
+
+                    // Set model value to indicate right click happened
+                    if (window[modelName]) {
+                        window[modelName].set('_right_click_triggered', true);
+                        window[modelName].save_changes();
                     }
+
+                    // Close popup when clicking elsewhere
+                    document.addEventListener('click', function closePopup(event) {
+                        var popup = document.getElementsByClassName(
+                            'ipywidget-popup""" + f"{self._channel}" + """'
+                        )[0];
+                        if (popup && !popup.contains(event.target)) {
+                            popup.style.display = 'none';
+                            document.removeEventListener('click', closePopup);
+                        }
+                    });
+
+                    return false;
+                });
+
+                // Set up content updating
+                var modelId = '';
+                for (var key in button.dataset) {
+                    if (key.startsWith('modelId')) {
+                        modelId = button.dataset[key];
+                        break;
+                    }
+                }
+
+                var modelName = 'IPY_MODEL_' + modelId;
+                if (window[modelName]) {
+                    button.setAttribute(
+                        'data-popup-content',
+                        window[modelName].get('popup_content')
+                    );
+
+                    // This part is tricky without jQuery, but we can use a polling
+                    // approach to check for content changes
+                    (function(btn, model) {
+                        var lastContent = window[model].get('popup_content');
+                        setInterval(function() {
+                            var newContent = window[model].get('popup_content');
+                            if (newContent !== lastContent) {
+                                btn.setAttribute('data-popup-content', newContent);
+                                lastContent = newContent;
+                            }
+                        }, 500);
+                    })(button, modelName);
                 }
             }
 
             // Set up for current elements
-            setup_rightclick();
+            // setup_rightclick();
 
             // Make sure it works even after widget is redrawn/updated
             setTimeout(setup_rightclick, 1000);
@@ -250,16 +250,10 @@ class JupyterLutView(LutView):
             readout_format=".0f",
         )
         self._clims.layout.width = "100%"
-        self._auto_clim = widgets.ToggleButton(
+        self._auto_clim = RightClickButton(
+            channel=channel,
             value=True,
             description="Auto",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="Auto scale",
-            layout=widgets.Layout(min_width="40px"),
-        )
-        self._a = RightClickButton(
-            channel=channel,
-            description="AAAAAAAAA",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
             layout=widgets.Layout(min_width="40px"),
@@ -298,7 +292,6 @@ class JupyterLutView(LutView):
                 self._clims,
                 self._auto_clim,
                 self._histogram_btn,
-                self._a,
             ]
         )
 
@@ -332,6 +325,8 @@ class JupyterLutView(LutView):
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
+        self._auto_clim.lower_tail.observe(self._on_auto_tails_changed, names="value")
+        self._auto_clim.upper_tail.observe(self._on_auto_tails_changed, names="value")
         self._histogram_btn.observe(self._on_histogram_requested, names="value")
         self._log.observe(self._on_log_toggled, names="value")
         self._reset_histogram.on_click(self._on_reset_histogram_clicked)
@@ -354,10 +349,18 @@ class JupyterLutView(LutView):
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
         if self._model:
             if change["new"]:  # Autoscale
-                self._model.clims = ClimsMinMax()
+                lower_tail = self._auto_clim.lower_tail.value
+                upper_tail = self._auto_clim.upper_tail.value
+                self._model.clims = ClimsManual(min=lower_tail, max=100 - upper_tail)
+                # self._model.clims = ClimsPercentile(
+                #     min_percentile=lower_tail, max_percentile=100 - upper_tail
+                # )
             else:  # Manually scale
                 clims = self._clims.value
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_auto_tails_changed(self, change: dict[str, Any]) -> None:
+        self._on_autoscale_changed(self._auto_clim.value)
 
     def _on_histogram_requested(self, change: dict[str, Any]) -> None:
         # Generate the histogram if we haven't done so yet
