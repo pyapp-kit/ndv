@@ -93,29 +93,6 @@ QRangeSlider { qproperty-barColor: qlineargradient(
 """
 
 
-class QtPopup(QDialog):
-    """A generic popup window."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setModal(False)  # if False, then clicking anywhere else closes it
-        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
-
-        self.frame = QFrame(self)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.frame)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-    def show_above_mouse(self, *args: Any) -> None:
-        """Show popup dialog above the mouse cursor position."""
-        pos = QCursor().pos()  # mouse position
-        szhint = self.sizeHint()
-        pos -= QPoint(szhint.width() // 2, szhint.height() + 14)
-        self.move(pos)
-        self.resize(self.sizeHint())
-        self.show()
-
-
 class _CmapCombo(QColormapComboBox):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent, allow_user_colormaps=True, add_colormap_text="Add...")
@@ -161,6 +138,29 @@ class _QSpinner(QLabel):
         effect = QGraphicsOpacityEffect(self)
         effect.setOpacity(0.6)
         self.setGraphicsEffect(effect)
+
+
+class QtPopup(QDialog):
+    """A generic popup window."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setModal(False)  # if False, then clicking anywhere else closes it
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+
+        self.frame = QFrame(self)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.frame)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+    def show_above_mouse(self, *args: Any) -> None:
+        """Show popup dialog above the mouse cursor position."""
+        pos = QCursor().pos()  # mouse position
+        szhint = self.sizeHint()
+        pos -= QPoint(szhint.width() // 2, szhint.height() + 14)
+        self.move(pos)
+        self.resize(self.sizeHint())
+        self.show()
 
 
 class PlayButton(QPushButton):
