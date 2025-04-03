@@ -344,7 +344,7 @@ class DimRow(QObject):
         self.play_btn.toggled.connect(self.set_animated)
         self.label = QLabel(str(axis))
         self.out_of = QLabel(f"/ {len(_coords) - 1}")
-        self.out_of.setStyleSheet("margin-bottom: 2px;")  # hack
+        self.out_of.setStyleSheet("margin: 0 0 2px 0;")  # hack
 
         self._timer_id: int | None = None
 
@@ -358,9 +358,11 @@ class DimRow(QObject):
                 self.killTimer(self._timer_id)
             interval = int(1000 / self.play_btn.spin.value())
             self._timer_id = self.startTimer(interval)
+            self.play_btn.setChecked(True)
         elif self._timer_id is not None:
             self.killTimer(self._timer_id)
             self._timer_id = None
+            self.play_btn.setChecked(False)
 
     def timerEvent(self, event: Any) -> None:
         """Handle timer event for play button, move to the next frame."""
@@ -390,7 +392,7 @@ class _QDimsSliders(QWidget):
         self.setStyleSheet(SLIDER_STYLE)
 
         self._layout = QGridLayout(self)
-        self._layout.setSpacing(2)
+        self._layout.setSpacing(1)
         self._layout.setContentsMargins(0, 0, 0, 0)
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
