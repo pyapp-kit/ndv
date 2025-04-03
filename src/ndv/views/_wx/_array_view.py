@@ -68,11 +68,6 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
     btn.SetBitmapLabel(bitmap)
 
 
-class _WxPopup(wx.PopupTransientWindow):
-    def __init__(self, parent: wx.Window, flags: int = wx.SIMPLE_BORDER) -> None:
-        super().__init__(parent, flags)
-
-
 # mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
@@ -94,12 +89,14 @@ class _WxLUTWidget(wx.Panel):
 
         self.auto_clim = wx.ToggleButton(self, label="Auto", size=(50, -1))
 
-        self.auto_popup = _WxPopup(self)
-        self.lower_tail = wx.SpinCtrlDouble(self.auto_popup, name="Ignore Lower Tail:")
+        self.auto_popup = wx.PopupTransientWindow(self, flags=wx.SIMPLE_BORDER)
+        # FIXME: These TextCtrls do not seem to be editable
+        # May have something to do with encapsulation in the popup window
+        self.lower_tail = wx.SpinCtrlDouble(self.auto_popup)
         self.lower_tail.SetLabel("Ignore Lower Tail:")
         self.lower_tail.SetRange(0, 100)
         self.lower_tail.SetIncrement(0.1)
-        self.upper_tail = wx.SpinCtrlDouble(self.auto_popup, name="Ignore Upper Tail:")
+        self.upper_tail = wx.SpinCtrlDouble(self.auto_popup)
         self.upper_tail.SetRange(0, 100)
         self.upper_tail.SetIncrement(0.1)
 
@@ -199,7 +196,7 @@ class WxLutView(LutView):
         pos = btn.ClientToScreen((0, 0))
         sz = btn.GetSize()
         self._wxwidget.auto_popup.Position(pos, (0, sz[1]))
-        self._wxwidget.auto_popup.Show(True)
+        self._wxwidget.auto_popup.Popup()
 
     def _on_autoscale_tail_changed(self, event: wx.CommandEvent) -> None:
         self._on_autoscale_changed(event)
