@@ -307,6 +307,9 @@ class QLutView(LutView):
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         self._qwidget.auto_clim.setChecked(not policy.is_manual)
+        if isinstance(policy, ClimsPercentile):
+            self._qwidget.auto_clim.lower_box.setValue(policy.min_percentile)
+            self._qwidget.auto_clim.upper_box.setValue(100 - policy.max_percentile)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._qwidget.cmap.setCurrentColormap(cmap)

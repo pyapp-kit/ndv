@@ -14,7 +14,7 @@ from psygnal import EmissionInfo, Signal
 from pyconify import svg_path
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
 from ndv.views.bases import ArrayView, LutView
@@ -68,6 +68,11 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
     btn.SetBitmapLabel(bitmap)
 
 
+class _WxPopup(wx.PopupTransientWindow):
+    def __init__(self, parent: wx.Window, flags: int = wx.SIMPLE_BORDER) -> None:
+        super().__init__(parent, flags)
+
+
 # mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
@@ -88,6 +93,15 @@ class _WxLUTWidget(wx.Panel):
         self.clims.SetValue(0, 65000)
 
         self.auto_clim = wx.ToggleButton(self, label="Auto", size=(50, -1))
+
+        self.auto_popup = _WxPopup(self)
+        self.lower_tail = wx.SpinCtrlDouble(self.auto_popup, name="Ignore Lower Tail:")
+        self.lower_tail.SetLabel("Ignore Lower Tail:")
+        self.lower_tail.SetRange(0, 100)
+        self.lower_tail.SetIncrement(0.1)
+        self.upper_tail = wx.SpinCtrlDouble(self.auto_popup, name="Ignore Upper Tail:")
+        self.upper_tail.SetRange(0, 100)
+        self.upper_tail.SetIncrement(0.1)
 
         self._histogram_height = 100  # px
         self.histogram_btn = wx.ToggleButton(self, label="Hist", size=(40, -1))
@@ -112,6 +126,19 @@ class _WxLUTWidget(wx.Panel):
         self.lut_ctrls.Add(self.clims, 1, wx.ALL, 2)
         self.lut_ctrls.Add(self.auto_clim, 0, wx.ALL, 2)
         self.lut_ctrls.Add(self.histogram_btn, 0, wx.ALL, 2)
+
+        # Autoscale popup
+        self.autoscale_ctrls = wx.FlexGridSizer(rows=2, cols=2, hgap=0, vgap=0)
+        lower_label = wx.StaticText(self.auto_popup, label="Ignore Lower Tail:")
+        self.autoscale_ctrls.Add(lower_label, 0, wx.ALL, 2)
+        self.autoscale_ctrls.Add(self.lower_tail, 0, wx.ALL, 2)
+        upper_label = wx.StaticText(self.auto_popup, label="Ignore Upper Tail:")
+        self.autoscale_ctrls.Add(upper_label, 0, wx.ALL, 2)
+        self.autoscale_ctrls.Add(self.upper_tail, 0, wx.ALL, 2)
+
+        self.auto_popup.SetSizer(self.autoscale_ctrls)
+        self.auto_popup.Layout()
+        self.autoscale_ctrls.Fit(self.auto_popup)
 
         # histogram controls go in their own sizer
         self.histogram_ctrls = wx.BoxSizer(wx.VERTICAL)
@@ -146,6 +173,9 @@ class WxLutView(LutView):
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
         wdg.clims.Bind(wx.EVT_SLIDER, self._on_clims_changed)
         wdg.auto_clim.Bind(wx.EVT_TOGGLEBUTTON, self._on_autoscale_changed)
+        wdg.auto_clim.Bind(wx.EVT_RIGHT_DOWN, self._on_autoscale_rclick)
+        wdg.lower_tail.Bind(wx.EVT_SPINCTRLDOUBLE, self._on_autoscale_tail_changed)
+        wdg.upper_tail.Bind(wx.EVT_SPINCTRLDOUBLE, self._on_autoscale_tail_changed)
         wdg.histogram_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_histogram_requested)
         wdg.log_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_log_btn_toggled)
         wdg.set_hist_range_btn.Bind(wx.EVT_BUTTON, self._on_set_histogram_range_clicked)
@@ -164,10 +194,24 @@ class WxLutView(LutView):
             clims = self._wxwidget.clims.GetValues()
             self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
+    def _on_autoscale_rclick(self, event: wx.CommandEvent) -> None:
+        btn = event.GetEventObject()
+        pos = btn.ClientToScreen((0, 0))
+        sz = btn.GetSize()
+        self._wxwidget.auto_popup.Position(pos, (0, sz[1]))
+        self._wxwidget.auto_popup.Show(True)
+
+    def _on_autoscale_tail_changed(self, event: wx.CommandEvent) -> None:
+        self._on_autoscale_changed(event)
+
     def _on_autoscale_changed(self, event: wx.CommandEvent) -> None:
         if self._model:
             if self._wxwidget.auto_clim.GetValue():
-                self._model.clims = ClimsMinMax()
+                lower = self._wxwidget.lower_tail.GetValue()
+                upper = self._wxwidget.upper_tail.GetValue()
+                self._model.clims = ClimsPercentile(
+                    min_percentile=lower, max_percentile=100 - upper
+                )
             else:  # Manually scale
                 clims = self._wxwidget.clims.GetValues()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
@@ -241,6 +285,9 @@ class WxLutView(LutView):
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         self._wxwidget.auto_clim.SetValue(not policy.is_manual)
+        if isinstance(policy, ClimsPercentile):
+            self._wxwidget.lower_tail.SetValue(policy.min_percentile)
+            self._wxwidget.upper_tail.SetValue(100 - policy.max_percentile)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         name = cmap.name.split(":")[-1]  # FIXME: this is a hack
