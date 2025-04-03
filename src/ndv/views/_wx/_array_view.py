@@ -91,7 +91,8 @@ class _WxLUTWidget(wx.Panel):
 
         self.auto_popup = wx.PopupTransientWindow(self, flags=wx.SIMPLE_BORDER)
         # FIXME: These TextCtrls do not seem to be editable
-        # May have something to do with encapsulation in the popup window
+        # Seems related to its encapsulation in the popup window i.e. editable
+        # when appended to e.g. self.lut_ctrls
         self.lower_tail = wx.SpinCtrlDouble(self.auto_popup)
         self.lower_tail.SetLabel("Ignore Lower Tail:")
         self.lower_tail.SetRange(0, 100)
