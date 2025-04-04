@@ -669,6 +669,9 @@ class _QArrayViewer(QWidget):
         self._btn_layout.addWidget(self.add_roi_btn)
         self._btn_layout.addWidget(self.set_range_btn)
 
+        self._btns = QWidget()
+        self._btns.setLayout(self._btn_layout)
+
         # above the canvas
         info_widget = QWidget()
         info = QHBoxLayout(info_widget)
@@ -686,7 +689,7 @@ class _QArrayViewer(QWidget):
         left_layout.addWidget(self.hover_info_label)
         left_layout.addWidget(self.dims_sliders)
         left_layout.addWidget(self.luts)
-        left_layout.addLayout(self._btn_layout)
+        left_layout.addWidget(self._btns)
 
         self.splitter = QSplitter(Qt.Orientation.Vertical, self)
         self.splitter.addWidget(left)
@@ -849,3 +852,8 @@ class QtArrayView(ArrayView):
             self._qwidget.ndims_btn.setVisible(value)
         elif sig_name == "show_play_button":
             self._qwidget.dims_sliders.set_play_button_visible(value)
+        elif sig_name == "show_controls":
+            # Show or hide the entire controls area (dims sliders + LUTs)
+            self._qwidget.luts.setVisible(value)
+            self._qwidget.dims_sliders.setVisible(value)
+            self._qwidget._btns.setVisible(value)
