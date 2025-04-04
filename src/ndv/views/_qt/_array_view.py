@@ -39,7 +39,7 @@ from superqt.utils import signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
@@ -245,6 +245,24 @@ class _QLUTWidget(QWidget):
         self.hist_log.setCheckable(True)
         self.hist_log.setVisible(False)
 
+        self.upper_tail = QDoubleSpinBox()
+        self.upper_tail.setRange(0, 49.9)
+        self.upper_tail.setSingleStep(0.1)
+        self.upper_tail.setSuffix("%")
+        self.upper_tail.setValue(0)
+
+        self.lower_tail = QDoubleSpinBox()
+        self.lower_tail.setRange(0, 49.9)
+        self.lower_tail.setSingleStep(0.1)
+        self.lower_tail.setSuffix("%")
+        self.lower_tail.setValue(0)
+
+        self.auto_popup = QtPopup(self)
+        form = QFormLayout(self.auto_popup.frame)
+        form.setContentsMargins(6, 6, 6, 6)
+        form.addRow("Exclude Darkest:", self.lower_tail)
+        form.addRow("Exclude Brightest:", self.upper_tail)
+
         # -- LAYOUT -- #
 
         # "main" lut controls (always visible)
@@ -296,6 +314,15 @@ class QLutView(LutView):
         self._qwidget.cmap.currentColormapChanged.connect(self._on_q_cmap_changed)
         self._qwidget.clims.valueChanged.connect(self._on_q_clims_changed)
         self._qwidget.auto_clim.toggled.connect(self._on_q_auto_changed)
+        self._qwidget.lower_tail.valueChanged.connect(self._on_q_tails_changed)
+        self._qwidget.upper_tail.valueChanged.connect(self._on_q_tails_changed)
+
+        self._qwidget.auto_clim.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self._qwidget.auto_clim.customContextMenuRequested.connect(
+            self._show_autoscale_popup
+        )
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
@@ -305,6 +332,9 @@ class QLutView(LutView):
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         self._qwidget.auto_clim.setChecked(not policy.is_manual)
+        if isinstance(policy, ClimsPercentile):
+            self._qwidget.lower_tail.setValue(policy.min_percentile)
+            self._qwidget.upper_tail.setValue(100 - policy.max_percentile)
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._qwidget.cmap.setCurrentColormap(cmap)
@@ -351,10 +381,17 @@ class QLutView(LutView):
     def _on_q_auto_changed(self, autoscale: bool) -> None:
         if self._model:
             if autoscale:
-                self._model.clims = ClimsMinMax()
+                lower_tail = self._qwidget.lower_tail.value()
+                upper_tail = self._qwidget.upper_tail.value()
+                self._model.clims = ClimsPercentile(
+                    min_percentile=lower_tail, max_percentile=100 - upper_tail
+                )
             else:
                 clims = self._qwidget.clims.value()
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_q_tails_changed(self, value: float) -> None:
+        self._on_q_auto_changed(self._qwidget.auto_clim.isChecked())
 
     def _on_q_histogram_toggled(self, toggled: bool) -> None:
         # Recursively show/hide hist_layout
@@ -390,6 +427,9 @@ class QLutView(LutView):
         widget.setFixedHeight(100)
         widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._qwidget.hist_layout.addWidget(widget, 1)
+
+    def _show_autoscale_popup(self) -> None:
+        self._qwidget.auto_popup.show_above_mouse()
 
 
 class QRGBView(QLutView):
