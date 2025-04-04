@@ -94,7 +94,6 @@ class _WxLUTWidget(wx.Panel):
         # Seems related to its encapsulation in the popup window i.e. editable
         # when appended to e.g. self.lut_ctrls
         self.lower_tail = wx.SpinCtrlDouble(self.auto_popup)
-        self.lower_tail.SetLabel("Ignore Lower Tail:")
         self.lower_tail.SetRange(0, 100)
         self.lower_tail.SetIncrement(0.1)
         self.upper_tail = wx.SpinCtrlDouble(self.auto_popup)
@@ -127,10 +126,10 @@ class _WxLUTWidget(wx.Panel):
 
         # Autoscale popup
         self.autoscale_ctrls = wx.FlexGridSizer(rows=2, cols=2, hgap=0, vgap=0)
-        lower_label = wx.StaticText(self.auto_popup, label="Ignore Lower Tail:")
+        lower_label = wx.StaticText(self.auto_popup, label="Exclude Darkest %")
         self.autoscale_ctrls.Add(lower_label, 0, wx.ALL, 2)
         self.autoscale_ctrls.Add(self.lower_tail, 0, wx.ALL, 2)
-        upper_label = wx.StaticText(self.auto_popup, label="Ignore Upper Tail:")
+        upper_label = wx.StaticText(self.auto_popup, label="Exclude Brightest %")
         self.autoscale_ctrls.Add(upper_label, 0, wx.ALL, 2)
         self.autoscale_ctrls.Add(self.upper_tail, 0, wx.ALL, 2)
 

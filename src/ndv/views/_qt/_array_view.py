@@ -260,8 +260,8 @@ class _QLUTWidget(QWidget):
         self.auto_popup = QtPopup(self)
         form = QFormLayout(self.auto_popup.frame)
         form.setContentsMargins(6, 6, 6, 6)
-        form.addRow("Ignore Lower Tail:", self.lower_tail)
-        form.addRow("Ignore Upper Tail:", self.upper_tail)
+        form.addRow("Exclude Darkest:", self.lower_tail)
+        form.addRow("Exclude Brightest:", self.upper_tail)
 
         # -- LAYOUT -- #
 
