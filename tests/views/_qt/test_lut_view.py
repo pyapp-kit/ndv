@@ -7,7 +7,7 @@ import cmap
 from pytest import fixture
 from qtpy.QtWidgets import QWidget
 
-from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
 from ndv.views._qt._array_view import QLutView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
@@ -34,15 +34,24 @@ def view(model: LUTModel, qtbot: QtBot) -> QLutView:
 def test_QLutView_update_model(model: LUTModel, view: QLutView) -> None:
     """Ensures the view updates when the model is changed."""
 
-    auto_scale = not model.clims.is_manual
-    assert view._qwidget.auto_clim.isChecked() == auto_scale
-    model.clims = ClimsManual(min=0, max=1) if auto_scale else ClimsMinMax()
-    assert view._qwidget.auto_clim.isChecked() != auto_scale
+    # Test modifying model.clims
+    assert view._qwidget.auto_clim.isChecked()
+    model.clims = ClimsManual(min=0, max=1)
+    assert not view._qwidget.auto_clim.isChecked()
+    model.clims = ClimsPercentile(min_percentile=0, max_percentile=100)
+    assert view._qwidget.auto_clim.isChecked()
+    model.clims = ClimsPercentile(min_percentile=1, max_percentile=99)
+    assert view._qwidget.lower_tail.value() == 1
+    assert view._qwidget.upper_tail.value() == 1
 
-    new_visible = not model.visible
-    model.visible = new_visible
-    assert view._qwidget.visible.isChecked() == new_visible
+    # Test modifying model.visible
+    assert view._qwidget.visible.isChecked()
+    model.visible = False
+    assert not view._qwidget.visible.isChecked()
+    model.visible = True
+    assert view._qwidget.visible.isChecked()
 
+    # Test modifying model.cmap
     new_cmap = cmap.Colormap("red")
     assert view._qwidget.cmap.currentColormap() != new_cmap
     model.cmap = new_cmap
@@ -62,14 +71,19 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     view._qwidget.cmap.setCurrentIndex(1)
     assert model.cmap == new_cmap
 
+    # Test toggling auto_clim
+    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+    view._qwidget.auto_clim.setChecked(False)
     mi, ma = view._qwidget.clims.value()
-    new_clims = (
-        ClimsManual(min=mi, max=ma)
-        if view._qwidget.auto_clim.isChecked()
-        else ClimsMinMax()
-    )
-    view._qwidget.auto_clim.setChecked(not new_clims.is_manual)
-    assert model.clims == new_clims
+    assert model.clims == ClimsManual(min=mi, max=ma)
+    view._qwidget.auto_clim.setChecked(True)
+    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+
+    # Test modifying tails changes percentiles
+    view._qwidget.lower_tail.setValue(0.1)
+    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=100)
+    view._qwidget.upper_tail.setValue(0.2)
+    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=99.8)
 
     # When gui clims change, autoscale should be disabled
     model.clims = ClimsMinMax()

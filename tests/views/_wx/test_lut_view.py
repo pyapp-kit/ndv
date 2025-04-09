@@ -6,7 +6,7 @@ import cmap
 import wx
 from pytest import fixture
 
-from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
 from ndv.views._wx._array_view import WxLutView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
@@ -30,15 +30,24 @@ def view(wxapp: wx.App, model: LUTModel) -> WxLutView:
 def test_WxLutView_update_model(model: LUTModel, view: WxLutView) -> None:
     """Ensures the view updates when the model is changed."""
 
-    auto_scale = not model.clims.is_manual
-    assert view._wxwidget.auto_clim.GetValue() == auto_scale
-    model.clims = ClimsManual(min=0, max=1) if auto_scale else ClimsMinMax()
-    assert view._wxwidget.auto_clim.GetValue != auto_scale
+    # Test modifying model.clims
+    assert view._wxwidget.auto_clim.GetValue()
+    model.clims = ClimsManual(min=0, max=1)
+    assert not view._wxwidget.auto_clim.GetValue()
+    model.clims = ClimsPercentile(min_percentile=0, max_percentile=100)
+    assert view._wxwidget.auto_clim.GetValue()
+    model.clims = ClimsPercentile(min_percentile=1, max_percentile=99)
+    assert view._wxwidget.lower_tail.GetValue() == 1
+    assert view._wxwidget.upper_tail.GetValue() == 1
 
-    new_visible = not model.visible
-    model.visible = new_visible
-    assert view._wxwidget.visible.GetValue() == new_visible
+    # Test modifying model.visible
+    assert view._wxwidget.visible.GetValue()
+    model.visible = False
+    assert not view._wxwidget.visible.GetValue()
+    model.visible = True
+    assert view._wxwidget.visible.GetValue()
 
+    # Test modifying model.cmap
     new_cmap = cmap.Colormap("red")
     assert view._wxwidget.cmap.GetValue() != new_cmap
     model.cmap = new_cmap
@@ -77,12 +86,28 @@ def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) 
     processEvent(wx.EVT_COMBOBOX, cmap_wdg)
     assert model.cmap == new_cmap
 
-    mi, ma = view._wxwidget.clims.GetValues()
+    # Test toggling auto_clim
     auto_wdg = view._wxwidget.auto_clim
-    new_clims = ClimsManual(min=mi, max=ma) if auto_wdg.GetValue() else ClimsMinMax()
-    view._wxwidget.auto_clim.SetValue(not new_clims.is_manual)
+    auto_wdg.SetValue(True)
     processEvent(wx.EVT_TOGGLEBUTTON, auto_wdg)
-    assert model.clims == new_clims
+    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+    auto_wdg.SetValue(False)
+    processEvent(wx.EVT_TOGGLEBUTTON, auto_wdg)
+    mi, ma = view._wxwidget.clims.GetValues()
+    assert model.clims == ClimsManual(min=mi, max=ma)
+
+    # Test modifying tails changes percentiles
+    auto_wdg.SetValue(True)
+    processEvent(wx.EVT_TOGGLEBUTTON, auto_wdg)
+    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+    lower_wdg = view._wxwidget.lower_tail
+    lower_wdg.SetValue(0.1)
+    processEvent(wx.EVT_SPINCTRLDOUBLE, lower_wdg)
+    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=100)
+    upper_wdg = view._wxwidget.upper_tail
+    upper_wdg.SetValue(0.2)
+    processEvent(wx.EVT_SPINCTRLDOUBLE, upper_wdg)
+    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=99.8)
 
     # When gui clims change, autoscale should be disabled
     model.clims = ClimsMinMax()
