@@ -7,6 +7,7 @@ from typing import Any, Callable, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
+import numpy.testing as npt
 import pytest
 
 from ndv._types import (
@@ -411,3 +412,17 @@ def test_rgb_display_magic() -> None:
 
     rgba_data = np.ones((1, 2, 3, 4, 4), dtype=np.uint8)
     assert_rgb_magic_works(rgba_data)
+
+
+@pytest.mark.usefixtures("any_app")
+def test_scale() -> None:
+    data = np.empty((8, 64, 64))
+    viewer = ArrayViewer(data, scale=(3, 1, 1))
+    viewer._request_data()
+    viewer._request_data()
+    viewer._request_data()
+    assert viewer.display_model.scale == (3, 1, 1)
+    handles = viewer._lut_controllers[None].handles
+    viewer._join()
+    tform = handles[0].transform()
+    npt.assert_array_equal(tform, np.diag((1.0, 1, 3, 1)))
