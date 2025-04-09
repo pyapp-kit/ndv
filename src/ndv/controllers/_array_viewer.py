@@ -450,6 +450,10 @@ class ArrayViewer:
 
         # collect and format intensity values at the current mouse position
         channel_values = self._get_values_at_world_point(int(x), int(y))
+        if not channel_values:
+            # clear hover info if no values found
+            self._view.set_hover_info("")
+            return
         vals = []
         for ch, value in channel_values.items():
             # restrict to 2 decimal places, but remove trailing zeros

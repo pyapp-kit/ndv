@@ -42,6 +42,8 @@ class ArrayViewerModel(NDVModel):
         Whether to show the play button, by default True.
     show_progress_spinner : bool, optional
         Whether to show the progress spinner, by default
+    show_data_info : bool, optional
+        Whether to show shape, dtype, size, etc. about the array
     """
 
     interaction_mode: InteractionMode = InteractionMode.PAN_ZOOM
@@ -52,6 +54,7 @@ class ArrayViewerModel(NDVModel):
     show_roi_button: bool = True
     show_channel_mode_selector: bool = True
     show_play_button: bool = True
+    show_data_info: bool = True
     show_progress_spinner: bool = False
 
     if TYPE_CHECKING:
@@ -68,6 +71,7 @@ class ArrayViewerModel(NDVModel):
             show_roi_button = Signal(bool, bool)
             show_channel_mode_selector = Signal(bool, bool)
             show_play_button = Signal(bool, bool)
+            show_data_info = Signal(bool, bool)
             show_progress_spinner = Signal(bool, bool)
 
         events: ArrayViewerModelEvents = ArrayViewerModelEvents()  # type: ignore
