@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from pygfx.objects import WheelEvent
 
 from ndv._types import (
     CursorType,
@@ -12,6 +13,38 @@ from ndv._types import (
 )
 from ndv.models._lut_model import ClimsManual, LUTModel
 from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
+
+
+@pytest.mark.usefixtures("any_app")
+def test_hscroll() -> None:
+    model = LUTModel(
+        visible=True,
+        cmap="red",
+        # gamma=2,
+    )
+    histogram = PyGFXHistogramCanvas()
+    histogram.set_range(x=(0, 10), y=(0, 1))
+    histogram.model = model
+    left, right = 0, 10
+    histogram.set_clims((left, right))
+
+    old_x = histogram._camera.local.position[0]
+    old_width = histogram._camera.width
+    evt = WheelEvent(type="wheel", x=5, y=5, dx=-120, dy=0)
+    histogram._controller.handle_event(evt, histogram._plot_view)
+    new_x = histogram._camera.local.position[0]
+    new_width = histogram._camera.width
+    assert new_x < old_x
+    assert abs(new_width - old_width) <= 1e-6
+
+    evt = WheelEvent(type="wheel", x=5, y=5, dx=120, dy=0)
+    histogram._controller.handle_event(evt, histogram._plot_view)
+    new_x = histogram._camera.local.position[0]
+    new_width = histogram._camera.width
+    assert abs(new_x - old_x) <= 1e-6
+    assert abs(new_width - old_width) <= 1e-6
+
+    histogram.close()
 
 
 @pytest.mark.usefixtures("any_app")

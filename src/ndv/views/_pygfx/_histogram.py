@@ -59,7 +59,7 @@ class _OrthographicCamera(pygfx.OrthographicCamera):
 
         # Constrain position+/-radius within bounds
         x = state["x"]
-        rad = state["width"] / 2
+        rad = state.get("width", 0) / 2
         if self.xbounds[0] is not None:
             x = max(x, self.xbounds[0] + rad)
         if self.xbounds[1] is not None:
