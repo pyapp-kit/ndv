@@ -69,6 +69,22 @@ class _OrthographicCamera(pygfx.OrthographicCamera):
         super().set_state(state)
 
 
+class _Controller(pygfx.PanZoomController):
+    def handle_event(
+        self, event: pygfx.objects.Event, viewport: pygfx.Viewport
+    ) -> None:
+        # Replace horizontal mouse scroll with panning
+        if isinstance(event, pygfx.objects.WheelEvent):
+            if abs(event.dx) > abs(event.dy):
+                # FIXME: 5000 is a magic number
+                pan_dist = -event.dx / 5000 * viewport.rect[2]
+                self.pan((pan_dist, 0), viewport.rect)
+                viewport.renderer.request_draw()
+                return
+        super().handle_event(event, viewport)
+        return None
+
+
 class PyGFXHistogramCanvas(HistogramCanvas):
     """A HistogramCanvas utilizing VisPy."""
 
@@ -120,7 +136,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # This greatly simplifies the clipping of nodes on the plot.
         self._scene = pygfx.Scene()
         self._plot_view = pygfx.Viewport(self._renderer)
-        self._controller = pygfx.PanZoomController(register_events=self._plot_view)
+        self._controller = _Controller(register_events=self._plot_view)
         # increase zoom wheel gain
         self._controller.controls.update({"wheel": ("zoom_to_point", "push", -0.005)})
         self._camera = _OrthographicCamera(maintain_aspect=False)
