@@ -29,7 +29,6 @@ from qtpy.QtWidgets import (
 )
 from superqt import (
     QCollapsible,
-    QElidingLabel,
     QLabeledRangeSlider,
     QLabeledSlider,
 )
@@ -662,9 +661,9 @@ class _QArrayViewer(QWidget):
         self.dims_sliders = _QDimsSliders(self)
 
         # place to display dataset summary
-        self.data_info_label = QElidingLabel("", parent=self)
+        self.data_info_label = QLabel("", parent=self)
         # place to display arbitrary text
-        self.hover_info_label = QElidingLabel("", self)
+        self.hover_info_label = QLabel("", self)
 
         # spinner to indicate progress
         self._progress_spinner = _QSpinner(canvas_widget)
@@ -709,24 +708,29 @@ class _QArrayViewer(QWidget):
         self._btn_layout.addWidget(self.add_roi_btn)
         self._btn_layout.addWidget(self.set_range_btn)
 
+        self._btns = QWidget()
+        self._btns.setLayout(self._btn_layout)
+
         # above the canvas
-        info_widget = QWidget()
-        info = QHBoxLayout(info_widget)
-        info.setContentsMargins(0, 0, 0, 2)
+        self._info_widget = QWidget()
+        self._info_widget.setFixedHeight(16)
+        info = QHBoxLayout(self._info_widget)
+        self.data_info_label.setMaximumWidth(400)
+        info.setContentsMargins(0, 0, 0, 0)
         info.setSpacing(0)
         info.addWidget(self.data_info_label)
-        info_widget.setFixedHeight(16)
+        info.addStretch()
+        info.addWidget(self.hover_info_label)
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setSpacing(2)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(info_widget)
+        left_layout.addWidget(self._info_widget)
         left_layout.addWidget(canvas_widget, 1)
-        left_layout.addWidget(self.hover_info_label)
         left_layout.addWidget(self.dims_sliders)
         left_layout.addWidget(self.luts)
-        left_layout.addLayout(self._btn_layout)
+        left_layout.addWidget(self._btns)
 
         self.splitter = QSplitter(Qt.Orientation.Vertical, self)
         self.splitter.addWidget(left)
@@ -889,3 +893,10 @@ class QtArrayView(ArrayView):
             self._qwidget.ndims_btn.setVisible(value)
         elif sig_name == "show_play_button":
             self._qwidget.dims_sliders.set_play_button_visible(value)
+        elif sig_name == "show_data_info":
+            self._qwidget._info_widget.setVisible(value)
+        elif sig_name == "show_controls":
+            # Show or hide the entire controls area (dims sliders + LUTs)
+            self._qwidget.luts.setVisible(value)
+            self._qwidget.dims_sliders.setVisible(value)
+            self._qwidget._btns.setVisible(value)
