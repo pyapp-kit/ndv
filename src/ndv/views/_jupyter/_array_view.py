@@ -345,7 +345,7 @@ class JupyterArrayView(ArrayView):
         except Exception:
             width = "604px"
 
-        btns = widgets.HBox(
+        self._btns_box = widgets.HBox(
             [
                 self._channel_mode_combo,
                 self._ndims_btn,
@@ -361,7 +361,7 @@ class JupyterArrayView(ArrayView):
                 self._hover_info_label,
                 self._slider_box,
                 self._luts_box,
-                btns,
+                self._btns_box,
             ],
             layout=widgets.Layout(width=width),
         )
@@ -542,3 +542,14 @@ class JupyterArrayView(ArrayView):
             self._reset_zoom_btn.layout.display = "flex" if value else "none"
         elif sig_name == "show_3d_button":
             self._ndims_btn.layout.display = "flex" if value else "none"
+        # elif sig_name == "show_play_button":
+        #     ...
+        elif sig_name == "show_data_info":
+            self._data_info_label.display = "flex" if value else None
+            self._hover_info_label.display = "flex" if value else None
+        elif sig_name == "show_controls":
+            # Show or hide the entire controls area (dims sliders + LUTs + btns)
+            self._slider_box.display = "flex" if value else None
+            self._btns_box.display = "flex" if value else None
+            self._luts_box.display = "flex" if value else None
+            print("controls", value)
