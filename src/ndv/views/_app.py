@@ -231,7 +231,7 @@ def set_canvas_backend(backend: Literal["pygfx", "vispy"] | None = None) -> None
     if backend is None:
         os.environ.pop(CANVAS_ENV_VAR)
     else:
-        os.environ[CANVAS_ENV_VAR] = str(backend)
+        os.environ[CANVAS_ENV_VAR] = CanvasBackend(backend).value  # validate
 
 
 def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None = None) -> None:
@@ -241,7 +241,7 @@ def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None = None) -> No
     if backend is None:
         os.environ.pop(GUI_ENV_VAR)
     else:
-        os.environ[GUI_ENV_VAR] = str(backend)
+        os.environ[GUI_ENV_VAR] = GuiFrontend(backend).value  # validate
 
 
 def gui_frontend() -> GuiFrontend:
