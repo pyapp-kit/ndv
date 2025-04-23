@@ -224,18 +224,24 @@ def ndv_app() -> NDVApp:
     )
 
 
-def set_canvas_backend(backend: Literal["pygfx", "vispy"] | None) -> None:
+def set_canvas_backend(backend: Literal["pygfx", "vispy"] | None = None) -> None:
     """Sets the preferred canvas backend. Cannot be set after the GUI is running."""
     if _APP:
         raise RuntimeError("Cannot change the backend once the app is running")
-    os.environ["NDV_CANVAS_BACKEND"] = str(backend)
+    if backend is None:
+        os.environ.pop(CANVAS_ENV_VAR)
+    else:
+        os.environ[CANVAS_ENV_VAR] = str(backend)
 
 
-def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None) -> None:
+def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None = None) -> None:
     """Sets the preferred GUI backend. Cannot be set after the GUI is running."""
     if _APP:
         raise RuntimeError("Cannot change the backend once the app is running")
-    os.environ["NDV_GUI_FRONTEND"] = str(backend)
+    if backend is None:
+        os.environ.pop(GUI_ENV_VAR)
+    else:
+        os.environ[GUI_ENV_VAR] = str(backend)
 
 
 def gui_frontend() -> GuiFrontend:
