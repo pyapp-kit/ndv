@@ -241,7 +241,7 @@ def gui_frontend() -> GuiFrontend:
     return MOD_TO_KEY[ndv_app().__module__]
 
 
-def canvas_backend(requested: str | None) -> CanvasBackend:
+def canvas_backend(requested: str | None = None) -> CanvasBackend:
     """Return the preferred canvas backend.
 
     This is determined first by the NDV_CANVAS_BACKEND environment variable, after which
