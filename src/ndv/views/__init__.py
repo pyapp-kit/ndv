@@ -13,6 +13,8 @@ from ._app import (
     get_histogram_canvas_class,
     gui_frontend,
     run_app,
+    set_canvas_backend,
+    set_gui_backend,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "get_histogram_canvas_class",
     "gui_frontend",
     "run_app",
+    "set_canvas_backend",
+    "set_gui_backend",
 ]

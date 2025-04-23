@@ -4,12 +4,13 @@ import importlib.util
 import os
 import sys
 from enum import Enum
-from functools import cache, wraps
+from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from concurrent.futures import Future
+    from typing import Literal
 
     from IPython.core.interactiveshell import InteractiveShell
     from typing_extensions import ParamSpec, TypeVar
@@ -26,6 +27,9 @@ GUI_ENV_VAR = "NDV_GUI_FRONTEND"
 
 CANVAS_ENV_VAR = "NDV_CANVAS_BACKEND"
 """Preferred canvas backend. If not set, the first available canvas backend is used."""
+
+_APP: NDVApp | None = None
+"""Singleton instance of the current (GUI) application. Once set it shouldn't change."""
 
 
 class GuiFrontend(str, Enum):
@@ -171,7 +175,6 @@ def _load_app(module: str, cls_name: str) -> NDVApp:
     return cast("NDVApp", cls())
 
 
-@cache  # not allowed to change
 def ndv_app() -> NDVApp:
     """Return the active [`GuiFrontend`][ndv.views.GuiFrontend].
 
@@ -179,8 +182,13 @@ def ndv_app() -> NDVApp:
     known GUI providers are tried in order until one is found that is either already
     running, or available.
     """
+    global _APP
+    if _APP is not None:
+        return _APP
+
     running = list(_running_apps())
 
+    # Try 1: Load a frontend explicitly requested by the user
     requested = os.getenv(GUI_ENV_VAR, "").lower()
     valid = {x.value for x in GuiFrontend}
     if requested:
@@ -189,22 +197,24 @@ def ndv_app() -> NDVApp:
                 f"Invalid GUI frontend: {requested!r}. Valid options: {valid}"
             )
         # ensure the app is created for explicitly requested frontends
-        app = _load_app(*GUI_PROVIDERS[GuiFrontend(requested)])
-        app.create_app()
-        return app
+        _APP = _load_app(*GUI_PROVIDERS[GuiFrontend(requested)])
+        _APP.create_app()
+        return _APP
 
+    # Try 2: Utilize an existing, running app
     for key, provider in GUI_PROVIDERS.items():
         if key in running:
-            app = _load_app(*provider)
-            app.create_app()
-            return app
+            _APP = _load_app(*provider)
+            _APP.create_app()
+            return _APP
 
+    # Try 3: Load an existing app
     errors: list[tuple[str, BaseException]] = []
     for key, provider in GUI_PROVIDERS.items():
         try:
-            app = _load_app(*provider)
-            app.create_app()
-            return app
+            _APP = _load_app(*provider)
+            _APP.create_app()
+            return _APP
         except Exception as e:
             errors.append((key, e))
 
@@ -212,6 +222,18 @@ def ndv_app() -> NDVApp:
         f"Could not find an appropriate GUI frontend: {valid!r}. Tried:\n\n"
         + "\n".join(f"- {key}: {err}" for key, err in errors)
     )
+
+
+def set_canvas_backend(backend: Literal["pygfx", "vispy"]) -> None:
+    if _APP:
+        raise RuntimeError("Cannot change the backend once the app is running")
+    os.environ["NDV_CANVAS_BACKEND"] = str(backend)
+
+
+def set_gui_backend(backend: Literal["jupyter", "qt", "wx"]) -> None:
+    if _APP:
+        raise RuntimeError("Cannot change the backend once the app is running")
+    os.environ["NDV_GUI_FRONTEND"] = str(backend)
 
 
 def gui_frontend() -> GuiFrontend:
