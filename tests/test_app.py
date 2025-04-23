@@ -18,6 +18,7 @@ def test_set_gui_backend() -> None:
 
             mock_load.reset_mock()
             ndv.views._app._APP = None
+    ndv.set_gui_backend()
 
 
 def test_set_canvas_backend() -> None:
@@ -28,3 +29,4 @@ def test_set_canvas_backend() -> None:
     for backend in backends:
         ndv.set_canvas_backend(backend.value)  # type: ignore
         assert ndv.views._app.canvas_backend() == backend
+    ndv.set_canvas_backend()
