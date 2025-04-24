@@ -537,10 +537,15 @@ class _QDimsSliders(QWidget):
             # Update axis slider with coordinates
             sld = self._sliders[axis]
             if isinstance(_coords, range):
-                sld.setRange(_coords.start, _coords.stop - 1)
-                sld.setSingleStep(_coords.step)
+                step = _coords.step
+                start, stop = _coords.start, (_coords.stop - 1)
             else:
-                sld.setRange(0, len(_coords) - 1)
+                step = 1
+                start, stop = 0, len(_coords) - 1
+            sld.setSingleStep(step)
+            sld.setRange(start, stop)
+            self.setRowTotal(sld, stop)
+
         self.currentIndexChanged.emit()
 
     def hide_dimensions(
@@ -552,24 +557,37 @@ class _QDimsSliders(QWidget):
             elif show_remainder:
                 self.setRowVisible(slider, True)
 
-    def setRowVisible(self, slider: QWidget, visible: bool) -> None:
+    def _getSliderRow(self, slider: QWidget) -> int | None:
         # Find the row of the given slider
-        nrows, ncols = self._layout.rowCount(), self._layout.columnCount()
-        for r in range(nrows):
-            if (
-                item := self._layout.itemAtPosition(r, self._rSLIDER)
-            ) and item.widget() is slider:
-                # Toggle visibility of all widgets in the found row
-                for c in range(ncols):
-                    if c == self._rPLAY_BTN and not self._play_btn_visible:
-                        # don't show play button when not visible
-                        continue
-                    item = self._layout.itemAtPosition(r, c)
-                    if item and (widget := item.widget()):
-                        widget.setVisible(visible)
-                        if isinstance(widget, PlayButton) and not visible:
-                            widget.setChecked(False)
+        for r in range(self._layout.rowCount()):
+            if item := self._layout.itemAtPosition(r, self._rSLIDER):
+                if item.widget() is slider:
+                    return r
+        return None
+
+    def setRowTotal(self, slider: QWidget, total: int) -> None:
+        if (sr := self._getSliderRow(slider)) is None:
+            return
+
+        # Update the total label for the given row
+        item = self._layout.itemAtPosition(sr, self._rTOT)
+        if item and (label := item.widget()):
+            cast("QLabel", label).setText(f"/ {total}")
+
+    def setRowVisible(self, slider: QWidget, visible: bool) -> None:
+        if (sr := self._getSliderRow(slider)) is None:
+            return
+
+        # Toggle visibility of all widgets in the found row
+        for c in range(self._layout.columnCount()):
+            if c == self._rPLAY_BTN and not self._play_btn_visible:
+                # don't show play button when not visible
                 continue
+            item = self._layout.itemAtPosition(sr, c)
+            if item and (widget := item.widget()):
+                widget.setVisible(visible)
+                if isinstance(widget, PlayButton) and not visible:
+                    widget.setChecked(False)
 
     def current_index(self) -> Mapping[AxisKey, int | slice]:
         """Return the current value of the sliders."""

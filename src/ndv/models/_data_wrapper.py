@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
 
 import numpy as np
 import numpy.typing as npt
+from psygnal import Signal
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
@@ -78,6 +79,20 @@ class DataWrapper(Generic[ArrayT], ABC):
     # Maximum dimension size consider when guessing the channel axis
     MAX_CHANNELS: ClassVar[int] = 16
 
+    dims_changed = Signal()
+    """Signal to emit when the dimensions of the data change.
+
+    NOTE: It is up to data wrappers, or even end-users to emit this signal when the
+    dimensions/shape of the wrapped _data object changes.
+    """
+    data_changed = Signal()
+    """Signal emitted when the data changes.
+
+    NOTE: It is up to data wrappers, or even end-users to emit this signal when the
+    data object changes.  We do not currently use object proxies to spy on mutation
+    of the underlying data.
+    """
+
     def __init__(self, data: ArrayT) -> None:
         self._data = data
         if not hasattr(self._data, "__getitem__") and "isel" not in type(self).__dict__:
@@ -94,6 +109,7 @@ class DataWrapper(Generic[ArrayT], ABC):
                 " if data does not have a `shape` attribute or if the shape is not "
                 "a tuple."
             )
+        self.dims_changed.connect(self.clear_cache)
 
     # ----------------------------- Mandatory methods -----------------------------
 
@@ -261,7 +277,6 @@ class DataWrapper(Generic[ArrayT], ABC):
             info += f", {_human_readable_size(nbytes)}"
         return info
 
-    # TODO: this needs to be cleared when data.dims changes
     @cached_property
     def axis_map(self) -> Mapping[Hashable, int]:
         """Mapping of ALL valid axis keys to normalized, positive integer keys."""
