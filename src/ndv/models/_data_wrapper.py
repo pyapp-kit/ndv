@@ -8,8 +8,16 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Hashable, Mapping, Sequence
+from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Protocol,
+    TypeVar,
+)
 
 import numpy as np
 import numpy.typing as npt
@@ -29,6 +37,9 @@ if TYPE_CHECKING:
     import xarray as xr
     from pydantic import GetCoreSchemaHandler
 
+    from ndv._types import ChannelKey
+    from ndv.models._array_display_model import ChannelMode
+
     Index: TypeAlias = int | slice
 
 
@@ -42,11 +53,37 @@ ArrayT = TypeVar("ArrayT")
 NPArrayLike = TypeVar("NPArrayLike", bound=SupportsIndexing)
 _T = TypeVar("_T", bound=type)
 
+SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
+
 
 def _recurse_subclasses(cls: _T) -> Iterator[_T]:
     for subclass in cls.__subclasses__():
         yield subclass
         yield from _recurse_subclasses(subclass)
+
+
+@dataclass(frozen=True, **SLOTS)
+class DataRequest:
+    """Request object for data slicing."""
+
+    wrapper: DataWrapper = field(repr=False)
+    index: Mapping[int, int | slice]
+    visible_axes: tuple[int, ...]
+    channel_axis: int | None
+    channel_mode: ChannelMode
+
+
+@dataclass(frozen=True, **SLOTS)
+class DataResponse:
+    """Response object for data requests.
+
+    In the response, the data is broken up according to channel keys.
+    """
+
+    # mapping of channel_key -> data
+    n_visible_axes: int
+    data: Mapping[ChannelKey, np.ndarray] = field(repr=False)
+    request: DataRequest | None = None
 
 
 class DataWrapper(Generic[ArrayT], ABC):

@@ -1,13 +1,25 @@
 """General model for ndv."""
 
+import logging
 import warnings
+from collections.abc import Iterator, Mapping, MutableMapping, Sequence
+from concurrent.futures import Future
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+    Optional,
+    TypedDict,
+    Union,
+    cast,
+)
 
 from pydantic import Field, computed_field, model_validator
 from typing_extensions import Self, TypeAlias
 
 from ndv._types import AxisKey, ChannelKey, Slice
+from ndv.models._data_wrapper import DataRequest, DataResponse, DataWrapper
+from ndv.views import _app
 
 from ._base_model import NDVModel
 from ._lut_model import LUTModel
@@ -15,10 +27,11 @@ from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping  # noqa: F401
+    from collections.abc import Hashable
     from typing import Callable  # noqa: F401
 
     import cmap
+    import numpy as np
     import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
 
     from ._lut_model import AutoscaleType
@@ -43,6 +56,8 @@ if TYPE_CHECKING:
         luts: Mapping[int | None, LUTModel | LutModelKwargs]
         default_lut: LUTModel | LutModelKwargs
 
+
+logger = logging.getLogger(__name__)
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
 IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]
@@ -209,3 +224,160 @@ class ArrayDisplayModel(NDVModel):
             )
             self.channel_axis = None
         return self
+
+    # Indexing and Data Slicing -----------------------------------------------------
+
+    def slice_wrapper(
+        self, wrapper: DataWrapper, asynchronous: bool = True
+    ) -> Iterator[Future[DataResponse]]:
+        """Return the slice of data requested by the current index (synchronous)."""
+        if not (requests := self._generate_requests(wrapper)):
+            return
+
+        if not asynchronous:
+            for request in requests:
+                future: Future[DataResponse] = Future()
+                future.set_result(self.process_request(request))
+                yield future
+        else:
+            for request in requests:
+                yield _app.submit_task(self.process_request, request)
+
+    def _generate_requests(self, wrapper: DataWrapper) -> list[DataRequest]:
+        """Return the current index request for the data.
+
+        This reconciles the `current_index` and `visible_axes` attributes of the display
+        with the available dimensions of the data to return a valid index request.
+        In the returned mapping, the keys are the normalized (non-negative integer)
+        axis indices and the values are either integers or slices (where axes present
+        in `visible_axes` are guaranteed to be slices rather than integers).
+        """
+        wrapper_visible_axes = self._normed_visible_axes(wrapper)
+        requested_slice = dict(self._normed_current_index(wrapper))
+        for ax in wrapper_visible_axes:
+            if not isinstance(requested_slice.get(ax), slice):
+                requested_slice[ax] = slice(None)
+
+        # if we need to request multiple channels (composite mode or RGB),
+        # ensure that the channel axis is also sliced
+        if (c_ax := self._normed_channel_axis(wrapper)) is not None:
+            if self.channel_mode.is_multichannel():
+                if not isinstance(requested_slice.get(c_ax), slice):
+                    requested_slice[c_ax] = slice(None)
+            else:
+                # somewhat of a hack.
+                # we heed DataRequest.channel_axis to be None if we want the view
+                # to use the default_lut
+                c_ax = None
+
+        # ensure that all axes are slices, so that we don't lose any dimensions.
+        # data will be squeezed to remove singleton dimensions later after
+        # transposing according to the order of visible axes
+        # (this operation happens below in `current_data_slice`)
+        for ax, val in requested_slice.items():
+            if isinstance(val, int):
+                requested_slice[ax] = slice(val, val + 1)
+
+        request = DataRequest(
+            wrapper=wrapper,
+            index=requested_slice,
+            visible_axes=wrapper_visible_axes,
+            channel_axis=c_ax,
+            channel_mode=self.channel_mode,
+        )
+        return [request]
+
+    def _normed_visible_axes(
+        self, wrapper: DataWrapper
+    ) -> "tuple[int, int, int] | tuple[int, int]":
+        """Return the visible axes as positive integers."""
+        return tuple(  # type: ignore [return-value]
+            wrapper.normalize_axis_key(ax) for ax in self.visible_axes
+        )
+
+    def _normed_channel_axis(self, wrapper: DataWrapper) -> "int | None":
+        """Return the channel axis as positive integers."""
+        if self.channel_axis is None:
+            return None
+        return wrapper.normalize_axis_key(self.channel_axis)
+
+    def _normed_current_index(
+        self, wrapper: DataWrapper
+    ) -> Mapping[int, Union[int, slice]]:
+        """Return the current index with positive integer axis keys.
+
+        This method has to handle cases where the the model current index is expressed
+        in a non-normalized way (e.g. with string labels for axes), AND it has to handle
+        cases where a non-normalized key resolves a normalized key that may *also* be in
+        the set: in that cases, priority is given to the non-normalized key and a
+        warning is issued.
+
+        For example, if current_index is {'Z': 0, 0: 10}, and the data has a 'Z'
+        dimension label, but Z is also the 0th axis, then the output normed index will
+        be {0: 0} (the string key is prioritized over the integer key), a warning
+        is issued, and the 0 key is removed from the current_index.
+        """
+        output: MutableMapping[int, Union[int, slice]] = {}
+        rev_map: dict[Hashable, Hashable] = {}
+        to_remove: list[Hashable] = []
+
+        for key, val in self.current_index.items():
+            normed_key = wrapper.normalize_axis_key(key)
+            if normed_key in output:
+                to_remove.append(key)
+                was_already_normed = normed_key == key
+                if was_already_normed:
+                    original_key = rev_map[normed_key]
+                else:
+                    original_key = key
+
+                logger.warning(
+                    "Axis key %r normalized to %r, which is also in current_index. "
+                    "Using %r value.",
+                    original_key,
+                    normed_key,
+                    original_key,
+                )
+                if was_already_normed:
+                    # in the case of duplication, we give priority to NON-normed keys
+                    # (e.g. "Z" over 0)
+                    continue
+
+            output[normed_key] = val
+            rev_map[normed_key] = key
+
+        # cleanup the model so it doesn't have to be done again
+        for key in to_remove:
+            del self.current_index[key]
+
+        return output
+
+    # TODO: Move to DataWrapper?
+    def _normed_data_coords(self, wrapper: DataWrapper) -> Mapping[int, Sequence]:
+        """Return the coordinates of the data as positive integers."""
+        return {wrapper.normalize_axis_key(d): wrapper.coords[d] for d in wrapper.dims}
+
+    @staticmethod
+    def process_request(req: DataRequest) -> DataResponse:
+        """Process a data request and return the sliced data as a DataResponse."""
+        data = req.wrapper.isel(req.index)
+
+        # for transposing according to the order of visible axes
+        vis_ax = req.visible_axes
+        t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
+
+        data_response: dict[ChannelKey, np.ndarray] = {}
+        ch_ax = req.channel_axis
+        # For RGB and Grayscale - keep the whole array together
+        if req.channel_mode == ChannelMode.RGBA:
+            data_response["RGB"] = data.transpose(*t_dims).squeeze()
+        elif req.channel_axis is None:
+            data_response[None] = data.transpose(*t_dims).squeeze()
+        # For Composite and Color - slice along channel axis
+        else:
+            for i in range(data.shape[req.channel_axis]):
+                ch_keepdims = (slice(None),) * cast("int", ch_ax) + (i,) + (None,)
+                ch_data = data[ch_keepdims]
+                data_response[i] = ch_data.transpose(*t_dims).squeeze()
+
+        return DataResponse(n_visible_axes=len(vis_ax), data=data_response, request=req)
