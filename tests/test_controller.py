@@ -79,7 +79,7 @@ def test_controller() -> None:
 
     data = np.empty(SHAPE)
     ctrl.data = data
-    wrapper = ctrl._data_model.data_wrapper
+    wrapper = ctrl._data_wrapper
 
     # showing the controller shows the view
     ctrl.show()
