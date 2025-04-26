@@ -70,7 +70,7 @@ class WxAppWrap(NDVApp):
             )
 
         if hasattr(canvas, "_subwidget"):
-            canvas = canvas._subwidget
+            canvas = canvas._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
         # TIP: event.Skip() allows the event to propagate to other handlers.
 

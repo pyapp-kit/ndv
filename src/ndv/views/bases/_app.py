@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import traceback
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import suppress
 from functools import cache
+from threading import Timer
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, cast
 
 if TYPE_CHECKING:
     from types import TracebackType
 
+    import pydevd
     from IPython.core.interactiveshell import InteractiveShell
     from typing_extensions import ParamSpec, TypeVar
 
@@ -97,8 +100,6 @@ class NDVApp:
         """Call `func` after `msec` milliseconds."""
         # generic implementation using python threading
 
-        from threading import Timer
-
         Timer(msec / 1000, func).start()
 
 
@@ -144,13 +145,9 @@ def ndv_excepthook(
         (debugpy := sys.modules.get("debugpy"))
         and debugpy.is_client_connected()
         and ("pydevd" in sys.modules)
+        and (py_db := _pydevd_debugger())
     ):
         with suppress(Exception):
-            import threading
-
-            import pydevd
-
-            py_db = pydevd.get_global_debugger()
             thread = threading.current_thread()
             additional_info = py_db.set_additional_thread_info(thread)
             additional_info.is_tracing += 1
@@ -169,3 +166,11 @@ def ndv_excepthook(
     if os.getenv(EXIT_ON_EXCEPTION) in ("1", "true", "True"):
         print(f"\n{EXIT_ON_EXCEPTION} is set, exiting.")
         sys.exit(1)
+
+
+def _pydevd_debugger() -> pydevd.PyDB | None:
+    with suppress(Exception):
+        import pydevd
+
+        return pydevd.get_global_debugger()
+    return None

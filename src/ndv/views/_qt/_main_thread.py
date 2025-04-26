@@ -3,7 +3,14 @@ from __future__ import annotations
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Callable
 
-from qtpy.QtCore import QCoreApplication, QMetaObject, QObject, Qt, QThread, Slot
+from qtpy.QtCore import (  # type: ignore
+    QCoreApplication,
+    QMetaObject,
+    QObject,
+    Qt,
+    QThread,
+    Slot,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar

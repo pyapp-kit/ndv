@@ -1,5 +1,6 @@
 """In this module, we provide built-in support for many array types."""
 
+# pyright: reportMissingImports=none
 from __future__ import annotations
 
 import json
@@ -17,7 +18,7 @@ from psygnal import Signal
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
-    from typing import Any, TypeAlias, TypeGuard
+    from typing import Any, Union
 
     import dask.array.core as da
     import numpy.typing as npt
@@ -28,8 +29,9 @@ if TYPE_CHECKING:
     import torch
     import xarray as xr
     from pydantic import GetCoreSchemaHandler
+    from typing_extensions import TypeAlias, TypeGuard
 
-    Index: TypeAlias = int | slice
+    Index: TypeAlias = Union[int, slice]
 
 
 class SupportsIndexing(Protocol):

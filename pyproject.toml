@@ -64,15 +64,12 @@ pyside = [
     "superqt[iconify,pyside6] >=0.7.2",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
-    "numpy >=1.23,<2; sys_platform == 'win32'",  # needed for pyside6.6
+    "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
     "pyside6 >=6.4",
     "pyside6 >=6.6; python_version >= '3.12'",
     "qtpy >=2",
 ]
-wxpython = [
-    "pyconify>=0.2.1",
-    "wxpython >=4.2.2",
-]
+wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
@@ -110,7 +107,7 @@ dev = [
     # omitting wxpython from dev env for now
     # because `uv sync && pytest hangs` on a wx test in the "full" env
     # use `make test extras=wx,[pygfx|vispy] isolated=1` to test
-    "ndv[vispy,pygfx,pyqt,jupyter]",   
+    "ndv[vispy,pygfx,pyqt,jupyter]",
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",
@@ -119,6 +116,9 @@ dev = [
     "pre-commit>=4.1.0",
     "rich>=13.9.4",
     "ruff>=0.9.4",
+    "pyright>=1.1.400",
+    "types-wxpython",
+    "pydevd",
 ]
 docs = [
     "mkdocs >=1.6.1",
@@ -188,6 +188,20 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
 ignore_missing_imports = true
+
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.9"
+enableExperimentalFeatures = true
+# reportMissingImports = false
+reportOptionalMemberAccess = "none"
+reportIncompatibleMethodOverride = "none"
+reportAttributeAccessIssue = "none"
+reportPrivateImportUsage = "none"
+reportCallIssue = "none"
+verboseOutput = true
+venv = ".venv"
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]

@@ -32,3 +32,6 @@ repos:
           - pydantic
           - psygnal
           - IPython
+          - types-wxpython
+          - qtpy
+          - git+https://github.com/tlambert03/PyQt6-stubs.git@v6.7.3

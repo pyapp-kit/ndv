@@ -25,15 +25,16 @@ from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import TypeAlias
+    from typing import Union
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
+    from typing_extensions import TypeAlias
     from wgpu.gui.jupyter import JupyterWgpuCanvas
     from wgpu.gui.qt import QWgpuCanvas
     from wgpu.gui.wx import WxWgpuCanvas
 
-    WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas | WxWgpuCanvas
+    WgpuCanvas: TypeAlias = Union[QWgpuCanvas, JupyterWgpuCanvas, WxWgpuCanvas]
 
 
 def _is_inside(bounding_box: np.ndarray, pos: Sequence[float]) -> bool:
@@ -58,7 +59,7 @@ class PyGFXImageHandle(ImageHandle):
     def set_data(self, data: np.ndarray) -> None:
         # If dimensions are unchanged, reuse the buffer
         if data.shape == self._grid.data.shape:
-            self._grid.data[:] = data
+            self._grid.data[:] = data  # pyright: ignore[reportOptionalSubscript]
             self._grid.update_range((0, 0, 0), self._grid.size)
         # Otherwise, the size (and maybe number of dimensions) changed
         # - we need a new buffer
@@ -202,7 +203,7 @@ class PyGFXRectangle(RectangularROIHandle):
             self._handles.material.color = color.rgba
             self._render()
 
-    def _create_fill(self) -> pygfx.Mesh | None:
+    def _create_fill(self) -> pygfx.Mesh:
         fill = pygfx.Mesh(
             geometry=pygfx.Geometry(
                 positions=self._positions,
@@ -212,7 +213,7 @@ class PyGFXRectangle(RectangularROIHandle):
         )
         return fill
 
-    def _create_outline(self) -> pygfx.Line | None:
+    def _create_outline(self) -> pygfx.Line:
         outline = pygfx.Line(
             geometry=pygfx.Geometry(
                 positions=self._positions,
@@ -222,20 +223,24 @@ class PyGFXRectangle(RectangularROIHandle):
         )
         return outline
 
-    def _create_handles(self) -> pygfx.Points | None:
+    def _create_handles(self) -> pygfx.Points:
         geometry = pygfx.Geometry(positions=self._positions[:-1])
         handles = pygfx.Points(
             geometry=geometry,
             # FIXME Size in pixels is not ideal for selection.
             # TODO investigate what size_mode = vertex does...
-            material=pygfx.PointsMaterial(size=1.5 * self._handle_rad),
+            material=pygfx.PointsMaterial(size=1.5 * self._handle_rad),  # pyright: ignore[reportArgumentType]
         )
 
         # NB: Default bounding box for points does not consider the radius of
         # those points. We need to HACK it for handle selection
-        def get_handle_bb(old: Callable[[], np.ndarray]) -> Callable[[], np.ndarray]:
-            def new_get_bb() -> np.ndarray:
-                bb = old().copy()
+        def get_handle_bb(
+            old: Callable[[], np.ndarray | None],
+        ) -> Callable[[], np.ndarray | None]:
+            def new_get_bb() -> np.ndarray | None:
+                if (bb := old()) is None:
+                    return None
+                bb = bb.copy()
                 bb[0, :2] -= self._handle_rad
                 bb[1, :2] += self._handle_rad
                 return bb
@@ -352,8 +357,9 @@ class PyGFXRectangle(RectangularROIHandle):
             return CursorType.BDIAG_ARROW
         # Step 2: Entire ROI
         if self._outline:
-            roi_bb = self._outline.get_bounding_box()
-            if _is_inside(roi_bb, world_pos):
+            if (roi_bb := self._outline.get_bounding_box()) and _is_inside(
+                roi_bb, world_pos
+            ):
                 return CursorType.ALL_ARROW
         return None
 
@@ -515,14 +521,15 @@ class GfxArrayCanvas(ArrayCanvas):
         cam = self._camera
         cam.show_object(self._scene)
 
-        width, height, depth = np.ptp(self._scene.get_world_bounding_box(), axis=0)
-        if width < 0.01:
-            width = 1
-        if height < 0.01:
-            height = 1
-        cam.width = width
-        cam.height = height
-        cam.zoom = 1 - margin
+        if bb := self._scene.get_world_bounding_box():
+            width, height, depth = np.ptp(bb, axis=0)
+            if width < 0.01:
+                width = 1
+            if height < 0.01:
+                height = 1
+            cam.width = width
+            cam.height = height
+            cam.zoom = 1 - margin
         self.refresh()
 
     def refresh(self) -> None:
@@ -531,7 +538,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._canvas.request_draw(self._animate)
 
     def _animate(self) -> None:
-        self._renderer.render(self._scene, self._camera)
+        if self._camera is not None:
+            self._renderer.render(self._scene, self._camera)
 
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
@@ -575,8 +583,7 @@ class GfxArrayCanvas(ArrayCanvas):
         elements: list[CanvasElement] = []
         pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
-            bb = c.get_bounding_box()
-            if _is_inside(bb, pos):
+            if (bb := c.get_bounding_box()) and _is_inside(bb, pos):
                 elements.append(self._elements[c])
         return elements
 

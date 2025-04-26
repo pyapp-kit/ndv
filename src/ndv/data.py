@@ -1,5 +1,6 @@
 """Sample data for testing and examples."""
 
+# pyright: reportMissingImports=none
 from __future__ import annotations
 
 from typing import Any
@@ -41,7 +42,6 @@ def nd_sine_wave(
                 angle = np.pi / angle_dim * angle_idx
                 # Rotate x and y coordinates
                 xr = np.cos(angle) * x - np.sin(angle) * y
-                np.sin(angle) * x + np.cos(angle) * y
 
                 # Compute the sine wave
                 sine_wave = (amplitude * 0.5) * np.sin(frequency * xr + phase)
