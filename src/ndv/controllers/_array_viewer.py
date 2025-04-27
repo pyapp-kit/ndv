@@ -79,7 +79,7 @@ class ArrayViewer:
         )
         self._roi_model: RectangularROIModel | None = None
 
-        app = _app.gui_frontend()
+        self._app = app = _app.gui_frontend()
 
         # whether to fetch data asynchronously.  Not publicly exposed yet...
         # but can use 'NDV_SYNCHRONOUS' env var to set globally
