@@ -4,26 +4,29 @@
 #     "imageio[tifffile]",
 # ]
 # ///
-import time
-
 import ndv
 from ndv.models import RingBuffer
 
-cells = ndv.data.cells3d()[1]
-frame_shape = cells.shape[-2:]
-dtype = cells.dtype
+# some data we're going to stream (as if it was coming from a camera)
+data = ndv.data.cells3d()[:, 1]
 
-rb = RingBuffer(max_capacity=10, dtype=(dtype, frame_shape))
+# a ring buffer to hold the data as it comes in
+# the ring buffer is a circular buffer that holds the last N frames
+rb = RingBuffer(max_capacity=20, dtype=(data.dtype, data.shape[-2:]))
+
+# pass the ring buffer to the viewer
 viewer = ndv.ArrayViewer(rb)
 viewer.show()
 
 
+# function that will be called after the app is running
 def stream() -> None:
-    for plane in cells:
+    # iterate over the data, add it to the ring buffer, and update the viewer index
+    for n, plane in enumerate(data):
         rb.append(plane)
-        time.sleep(0.01)
-        # bit of a hack to force updates for this example
-        viewer._app.process_events()
+        viewer.display_model.current_index.update({0: max(n, 20 - 1)})
+
+        ndv.process_events()  # force viewer updates for this example
 
 
 ndv.call_later(200, stream)

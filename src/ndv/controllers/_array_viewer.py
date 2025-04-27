@@ -79,7 +79,7 @@ class ArrayViewer:
         )
         self._roi_model: RectangularROIModel | None = None
 
-        self._app = app = _app.gui_frontend()
+        app = _app.gui_frontend()
 
         # whether to fetch data asynchronously.  Not publicly exposed yet...
         # but can use 'NDV_SYNCHRONOUS' env var to set globally
@@ -557,6 +557,9 @@ class ArrayViewer:
 
         display_model = self._data_model.display
         for key, data in response.data.items():
+            if data.size == 0:
+                # no data for this channel
+                continue
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
                     model = display_model.default_lut
