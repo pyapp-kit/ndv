@@ -117,6 +117,7 @@ class ArrayViewer:
         self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+        self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
         if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
@@ -456,6 +457,11 @@ class ArrayViewer:
 
         # collect and format intensity values at the current mouse position
         channel_values = self._get_values_at_world_point(int(x), int(y))
+
+        # Update highlight on histograms
+        for ch, hist in self._histograms.items():
+            hist.highlight(channel_values.get(ch, None))
+
         if not channel_values:
             # clear hover info if no values found
             self._view.set_hover_info("")
@@ -469,11 +475,11 @@ class ArrayViewer:
         text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
         self._view.set_hover_info(text)
 
-        # Update highlight on histograms
-        # FIXME: Moving the mouse quickly off the canvas (on VisPy, at least)
-        # can prevent an update.
-        for ch, hist in self._histograms.items():
-            hist.highlight(channel_values.get(ch, None))
+    def _on_canvas_mouse_left(self) -> None:
+        """Respond to a mouse leaving the canvas in the view."""
+        # Disable highlight on histograms
+        for hist in self._histograms.values():
+            hist.highlight(None)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
