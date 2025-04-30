@@ -273,6 +273,13 @@ class VispyHistogramCanvas(HistogramCanvas):
         # Looks like https://github.com/vispy/vispy/issues/1899
         self._hist_mesh._bounds_changed()
 
+        if self._vertical:
+            scale = values.max() / 0.98
+            self._handle_transform.scale = (scale, 1)
+        else:
+            scale = values.max() / 0.98
+            self._handle_transform.scale = (1, scale)
+
     def _update_lut_ctrls(self, npoints: int = 256) -> None:
         """
         Updates the DOMAIN of the lut controls.
@@ -447,9 +454,18 @@ class VispyHistogramCanvas(HistogramCanvas):
         self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None
     ) -> None:
         if x is None:
+            # User specified
             x = self._range if self._vertical else self._domain
+        if x is None and self._bin_edges is not None:
+            # Data-specified
+            x = (self._bin_edges[0], self._bin_edges[-1])
+
         if y is None:
+            # User specified
             y = self._domain if self._vertical else self._range
+        if y is None:
+            # Data-specified
+            y = (0, self._handle_transform.scale[0 if self._vertical else 1])
 
         self.plot.camera.set_range(
             x=x,
@@ -458,12 +474,6 @@ class VispyHistogramCanvas(HistogramCanvas):
             # It's pretty visible in logarithmic mode
             margin=1e-30,
         )
-        if self._vertical:
-            scale = 0.98 * self.plot.xaxis.axis.domain[1]
-            self._handle_transform.scale = (scale, 1)
-        else:
-            scale = 0.98 * self.plot.yaxis.axis.domain[1]
-            self._handle_transform.scale = (1, scale)
 
     def setVisible(self, visible: bool) -> None: ...
 
