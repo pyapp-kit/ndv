@@ -3272,10 +3272,10 @@ requires-dist = [
     { name = "pyconify", marker = "extra == 'wx'", specifier = ">=0.2.1" },
     { name = "pyconify", marker = "extra == 'wxpython'", specifier = ">=0.2.1" },
     { name = "pydantic", specifier = ">=2.9" },
-    { name = "pygfx", marker = "extra == 'jup'", specifier = ">=0.6.0" },
-    { name = "pygfx", marker = "extra == 'pygfx'", specifier = ">=0.6.0" },
-    { name = "pygfx", marker = "extra == 'qt'", specifier = ">=0.6.0" },
-    { name = "pygfx", marker = "extra == 'wx'", specifier = ">=0.6.0" },
+    { name = "pygfx", marker = "extra == 'jup'", specifier = ">=0.8.0" },
+    { name = "pygfx", marker = "extra == 'pygfx'", specifier = ">=0.8.0" },
+    { name = "pygfx", marker = "extra == 'qt'", specifier = ">=0.8.0" },
+    { name = "pygfx", marker = "extra == 'wx'", specifier = ">=0.8.0" },
     { name = "pyopengl", marker = "extra == 'vispy'", specifier = ">=3.1" },
     { name = "pyqt6", marker = "python_full_version >= '3.12' and extra == 'pyqt'", specifier = ">=6.5.3" },
     { name = "pyqt6", marker = "python_full_version >= '3.12' and extra == 'qt'", specifier = ">=6.5.3" },
@@ -4464,7 +4464,7 @@ wheels = [
 
 [[package]]
 name = "pygfx"
-version = "0.7.0"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "freetype-py" },
@@ -4476,9 +4476,9 @@ dependencies = [
     { name = "uharfbuzz" },
     { name = "wgpu" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/9c/96d87190ee9cd959097f7041418a535dec99a542505a61930aab8f78c7f0/pygfx-0.7.0.tar.gz", hash = "sha256:c29a58dfb16ab2439f36afd0ef7731aac1d5fdf5881c680338ef01964fb4a1e1", size = 1068403 }
+sdist = { url = "https://files.pythonhosted.org/packages/09/dc/c6f0aa66fc258ce3e9e663a30fa4b270c6c420bfbaf7579eb8677e00dc32/pygfx-0.9.0.tar.gz", hash = "sha256:80928c30e9525492ba8b9fa90e45422e833de702c7221074250d0f9f61d9f37f", size = 1092808 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/4e/a9fad9c3faf4cf83042cf8cd0ec4c4b574f82e4e26c20ee68febaa256c4c/pygfx-0.7.0-py3-none-any.whl", hash = "sha256:1a72c3aeb226042b84b54f8df72ed9b1be5734cf500ef0760743695ac6e11332", size = 1145974 },
+    { url = "https://files.pythonhosted.org/packages/51/b7/fcdbaeaf970bdd8bc42dbb6b6ba4b8208e9a9bebd2127342a28990c49a1d/pygfx-0.9.0-py3-none-any.whl", hash = "sha256:9e619a4d3233f395e9137d1037b5f83201ec77cb84cb600287d91379d803e68a", size = 1171545 },
 ]
 
 [[package]]
@@ -4492,14 +4492,14 @@ wheels = [
 
 [[package]]
 name = "pylinalg"
-version = "0.6.3"
+version = "0.6.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/93/29/5a4942034f43bc2243c0fbb6b3d662d896572cce1de3c81cd9f9920acc09/pylinalg-0.6.3.tar.gz", hash = "sha256:66e24a87cf7b13e85400f07bab0d0665efb7bc27d9b4ce26bf3039d4e4b62133", size = 15786 }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/79/b3e346cc0fc4db0df6bd1e429e8f1edd115c6a839aaf651a1021a795a930/pylinalg-0.6.7.tar.gz", hash = "sha256:c3f0d01d936129ec4b9cfcdd2cc4f68382a7a3ede0a5a9448091279e1187f204", size = 15990 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/ca/15ec7c71745fe198722b6eabf937f89b4631ffa3775e349a0ed40cd6112c/pylinalg-0.6.3-py3-none-any.whl", hash = "sha256:00abedba27c9dd257812b8dd819793c98ab566a47eff0947837e5e34fe7cdac1", size = 18151 },
+    { url = "https://files.pythonhosted.org/packages/ba/55/470aa69f6fde6ca08449469dc9e58e08994acede0977dda05de8268a581f/pylinalg-0.6.7-py3-none-any.whl", hash = "sha256:7d71f98b20ea7d8805f03101198761c2e7952648f60eaba58c407cc1fe7406f1", size = 18408 },
 ]
 
 [[package]]

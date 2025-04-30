@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -69,9 +70,9 @@ class ArrayViewer:
                 stacklevel=2,
             )
 
-        self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=wrapper, display=display_model
-        )
+        self._data_model = _ArrayDataDisplayModel(display=display_model)
+        self._set_data_wrapper(wrapper)
+
         self._viewer_model = ArrayViewerModel()
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
@@ -122,10 +123,6 @@ class ArrayViewer:
 
     # -------------- public attributes and methods -------------------------
 
-    # @property
-    # def view(self) -> ArrayView:
-    #     return self._view
-
     def widget(self) -> Any:
         """Return the native front-end widget.
 
@@ -170,11 +167,20 @@ class ArrayViewer:
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        if data is None:
-            self._data_model.data_wrapper = None
-        else:
-            self._data_model.data_wrapper = DataWrapper.create(data)
+        self._set_data_wrapper(data)
         self._fully_synchronize_view()
+
+    def _set_data_wrapper(self, data: Any | None) -> None:
+        """Set new datawrapper and hook up events."""
+        _new = None if data is None else DataWrapper.create(data)
+        self._data_model.data_wrapper, old = _new, self._data_model.data_wrapper
+        if old is not None:
+            with suppress(Exception):
+                old.data_changed.disconnect(self._request_data)
+                old.dims_changed.disconnect(self._fully_synchronize_view)
+        if _new is not None:
+            _new.data_changed.connect(self._request_data)
+            _new.dims_changed.connect(self._fully_synchronize_view)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -247,22 +253,25 @@ class ArrayViewer:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
         if ctrl := self._lut_controllers.get(channel, None):
-            self._view.add_histogram(channel, hist.frontend_widget())
+            # Add histogram to ArrayView for display
+            self._view.add_histogram(channel, hist)
+            # Add histogram to channel controller for updates
             ctrl.add_lut_view(hist)
-            # FIXME: hack
+            # Compute histogram from the (first) image handle.
+            # TODO: Compute histogram from all image handles
             if handles := ctrl.handles:
                 data = handles[0].data()
                 counts, edges = _calc_hist_bins(data)
                 hist.set_data(counts, edges)
+            # Reset camera view (accounting for data)
+            hist.set_range()
 
         self._histograms[channel] = hist
-        if self.data is not None:
-            self._update_hist_domain_for_dtype()
 
-    def _update_hist_domain_for_dtype(
-        self, dtype: np.typing.DTypeLike | None = None
+    def _update_channel_dtype(
+        self, channel: ChannelKey, dtype: np.typing.DTypeLike | None = None
     ) -> None:
-        if len(self._histograms) == 0:
+        if not (ctrl := self._lut_controllers.get(channel, None)):
             return
         if dtype is None:
             if (wrapper := self._data_model.data_wrapper) is None:
@@ -272,8 +281,7 @@ class ArrayViewer:
             dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
-            for hist in self._histograms.values():
-                hist.set_range(x=(iinfo.min, iinfo.max))
+            ctrl.lut_model.clim_bounds = (iinfo.min, iinfo.max)
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -340,7 +348,6 @@ class ArrayViewer:
             self._request_data()
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
-            self._update_hist_domain_for_dtype()
         self._synchronize_roi()
 
     def _synchronize_roi(self) -> None:
@@ -449,6 +456,10 @@ class ArrayViewer:
 
         # collect and format intensity values at the current mouse position
         channel_values = self._get_values_at_world_point(int(x), int(y))
+        if not channel_values:
+            # clear hover info if no values found
+            self._view.set_hover_info("")
+            return
         vals = []
         for ch, value in channel_values.items():
             # restrict to 2 decimal places, but remove trailing zeros
@@ -570,6 +581,7 @@ class ArrayViewer:
                     lut_model=model,
                     views=lut_views,
                 )
+                self._update_channel_dtype(key)
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
@@ -587,10 +599,7 @@ class ArrayViewer:
                 # TODO: once data comes in in chunks, we'll need a proper stateful
                 # stats object that calculates the histogram incrementally
                 counts, bin_edges = _calc_hist_bins(data)
-                # FIXME: currently this is updating the histogram on *any*
-                # channel index... so it doesn't work with composite mode
                 hist.set_data(counts, bin_edges)
-                hist.set_range()
 
         self._canvas.refresh()
 

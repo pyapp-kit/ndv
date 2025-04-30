@@ -128,6 +128,11 @@ class MouseEventFilter(QObject):
 
         intercept = False
         receiver = self.receiver
+        if (
+            qevent.type() == qevent.Type.ContextMenu
+            and type(obj).__name__ == "CanvasBackendDesktop"
+        ):
+            return False  # pragma: no cover
         if obj is self.canvas or obj in children:
             if isinstance(qevent, QMouseEvent):
                 pos = qevent.pos()
@@ -139,6 +144,11 @@ class MouseEventFilter(QObject):
                     if cursor := receiver.get_cursor(mme):
                         self.set_cursor(cursor)
                     receiver.mouseMoved.emit(mme)
+                elif etype == QEvent.Type.MouseButtonDblClick:
+                    self.active_button = btn
+                    mpe = MousePressEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
+                    intercept |= receiver.on_mouse_double_press(mpe)
+                    receiver.mouseDoublePressed.emit(mpe)
                 elif etype == QEvent.Type.MouseButtonPress:
                     self.active_button = btn
                     mpe = MousePressEvent(x=pos.x(), y=pos.y(), btn=self.active_button)

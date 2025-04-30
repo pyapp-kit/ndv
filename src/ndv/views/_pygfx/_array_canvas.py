@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
@@ -93,11 +92,11 @@ class PyGFXImageHandle(ImageHandle):
         self._render()
 
     def gamma(self) -> float:
-        return 1
+        return float(self._material.gamma)
 
     def set_gamma(self, gamma: float) -> None:
-        if gamma != 1:
-            warnings.warn("Gamma correction is not supported in pygfx", stacklevel=2)
+        self._material.gamma = gamma
+        self._render()
 
     def colormap(self) -> _cmap.Colormap:
         return self._cmap
@@ -243,7 +242,7 @@ class PyGFXRectangle(RectangularROIHandle):
 
             return new_get_bb
 
-        geometry.get_bounding_box = get_handle_bb(geometry.get_bounding_box)
+        handles.get_bounding_box = get_handle_bb(handles.get_bounding_box)
         return handles
 
     def can_select(self) -> bool:
@@ -353,7 +352,7 @@ class PyGFXRectangle(RectangularROIHandle):
             return CursorType.BDIAG_ARROW
         # Step 2: Entire ROI
         if self._outline:
-            roi_bb = self._outline.geometry.get_bounding_box()
+            roi_bb = self._outline.get_bounding_box()
             if _is_inside(roi_bb, world_pos):
                 return CursorType.ALL_ARROW
         return None
@@ -380,16 +379,9 @@ class GfxArrayCanvas(ArrayCanvas):
         # the returned function can be called to remove the filter, (and it also
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
+
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        try:
-            # requires https://github.com/pygfx/pygfx/pull/752
-            self._renderer.blend_mode = "additive"
-        except ValueError:
-            warnings.warn(
-                "This version of pygfx does not yet support additive blending.",
-                stacklevel=3,
-            )
-            self._renderer.blend_mode = "weighted_depth"
+        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None

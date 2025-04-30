@@ -26,9 +26,9 @@ def test_array_options(viewer: JupyterArrayView) -> None:
     viewer._viewer_model.show_3d_button = False
     assert viewer._ndims_btn.layout.display == "none"
 
-    assert lut._histogram.layout.display is None
+    assert lut._histogram_btn.layout.display is None
     viewer._viewer_model.show_histogram_button = False
-    assert lut._histogram.layout.display == "none"
+    assert lut._histogram_btn.layout.display == "none"
 
     assert viewer._reset_zoom_btn.layout.display is None
     viewer._viewer_model.show_reset_zoom_button = False
@@ -50,7 +50,7 @@ def test_histogram(viewer: JupyterArrayView) -> None:
     # Ensure lut signal gets passed through the viewer with the channel as the arg
     histogram_mock = Mock()
     viewer.histogramRequested.connect(histogram_mock)
-    lut._histogram.value = True
+    lut._histogram_btn.value = True
     histogram_mock.assert_called_once_with(channel)
 
     # FIXME: Throws event loop errors
