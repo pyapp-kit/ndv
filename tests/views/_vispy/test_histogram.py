@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from pytest import fixture
+from vispy.app.canvas import MouseEvent
+from vispy.scene.events import SceneMouseEvent
 
 from ndv._types import (
     CursorType,
@@ -29,6 +31,26 @@ def histogram() -> VispyHistogramCanvas:
     canvas = VispyHistogramCanvas()
     canvas.set_range(x=(0, 10), y=(0, 1))
     return canvas
+
+
+@pytest.mark.usefixtures("any_app")
+def test_hscroll(histogram: VispyHistogramCanvas) -> None:
+    old_rect = histogram.plot.camera.rect
+    evt = SceneMouseEvent(
+        MouseEvent(type="mouse_wheel", delta=[1, 0]), histogram.plot.camera.viewbox
+    )
+    histogram.plot.camera.viewbox_mouse_event(evt)
+    new_rect = histogram.plot.camera.rect
+    assert new_rect.left < old_rect.left
+    assert abs(new_rect.width - old_rect.width) <= 1e-6
+
+    evt = SceneMouseEvent(
+        MouseEvent(type="mouse_wheel", delta=[-1, 0]), histogram.plot.camera.viewbox
+    )
+    histogram.plot.camera.viewbox_mouse_event(evt)
+    new_rect = histogram.plot.camera.rect
+    assert abs(new_rect.left - old_rect.left) <= 1e-6
+    assert abs(new_rect.width - old_rect.width) <= 1e-6
 
 
 @pytest.mark.usefixtures("any_app")

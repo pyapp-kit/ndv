@@ -9,6 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TypeVar
 
+    from vispy.scene.events import SceneMouseEvent
+
     # just here cause vispy has poor type hints
     T = TypeVar("T")
 
@@ -365,3 +367,15 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     ) -> None:
         """Reset the camera view to the specified range."""
         super().set_range(x, y, z, margin)
+
+    def viewbox_mouse_event(self, event: SceneMouseEvent) -> None:
+        # Horizontal zooming should pan
+        if event.type == "mouse_wheel":
+            dx, dy = event.delta
+            if abs(dx) > abs(dy):
+                # TODO: Can we do better here? Some sort of adaptive behavior?
+                pan_dist = 0.1 * self.rect.width
+                self.pan([pan_dist if dx < 0 else -pan_dist, 0])
+                event.handled = True
+                return
+        super().viewbox_mouse_event(event)

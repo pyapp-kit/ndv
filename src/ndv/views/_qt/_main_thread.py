@@ -38,24 +38,27 @@ class MainThreadInvoker(QObject):
     @Slot()  # type: ignore [misc]
     def _invoke_current(self) -> None:
         """Invokes the current callable."""
-        if self._current_callable is not None:
-            self._current_callable()
-            self._current_callable = None
+        if (cb := self._current_callable) is not None:
+            cb()
+            _INVOKERS.discard(self)
 
 
 if (QAPP := QCoreApplication.instance()) is None:
     raise RuntimeError("QApplication must be created before this module is imported.")
 
-_MAIN_THREAD_INVOKER = MainThreadInvoker()
 _APP_THREAD = QAPP.thread()
-_MAIN_THREAD_INVOKER.moveToThread(_APP_THREAD)
+
+_INVOKERS = set()
 
 
 def call_in_main_thread(
     func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
 ) -> Future[T]:
     if QThread.currentThread() is not _APP_THREAD:
-        return _MAIN_THREAD_INVOKER.invoke(func, *args, **kwargs)
+        invoker = MainThreadInvoker()
+        invoker.moveToThread(_APP_THREAD)
+        _INVOKERS.add(invoker)
+        return invoker.invoke(func, *args, **kwargs)
 
     future: Future[T] = Future()
     future.set_result(func(*args, **kwargs))

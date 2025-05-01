@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -69,9 +70,9 @@ class ArrayViewer:
                 stacklevel=2,
             )
 
-        self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=wrapper, display=display_model
-        )
+        self._data_model = _ArrayDataDisplayModel(display=display_model)
+        self._set_data_wrapper(wrapper)
+
         self._viewer_model = ArrayViewerModel()
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
@@ -122,10 +123,6 @@ class ArrayViewer:
 
     # -------------- public attributes and methods -------------------------
 
-    # @property
-    # def view(self) -> ArrayView:
-    #     return self._view
-
     def widget(self) -> Any:
         """Return the native front-end widget.
 
@@ -170,11 +167,20 @@ class ArrayViewer:
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        if data is None:
-            self._data_model.data_wrapper = None
-        else:
-            self._data_model.data_wrapper = DataWrapper.create(data)
+        self._set_data_wrapper(data)
         self._fully_synchronize_view()
+
+    def _set_data_wrapper(self, data: Any | None) -> None:
+        """Set new datawrapper and hook up events."""
+        _new = None if data is None else DataWrapper.create(data)
+        self._data_model.data_wrapper, old = _new, self._data_model.data_wrapper
+        if old is not None:
+            with suppress(Exception):
+                old.data_changed.disconnect(self._request_data)
+                old.dims_changed.disconnect(self._fully_synchronize_view)
+        if _new is not None:
+            _new.data_changed.connect(self._request_data)
+            _new.dims_changed.connect(self._fully_synchronize_view)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -450,6 +456,10 @@ class ArrayViewer:
 
         # collect and format intensity values at the current mouse position
         channel_values = self._get_values_at_world_point(int(x), int(y))
+        if not channel_values:
+            # clear hover info if no values found
+            self._view.set_hover_info("")
+            return
         vals = []
         for ch, value in channel_values.items():
             # restrict to 2 decimal places, but remove trailing zeros
