@@ -82,8 +82,6 @@ class RightClickButton(widgets.ToggleButton):
         display(self.popup_content)  # type: ignore [no-untyped-call]
 
     def add_right_click_handler(self) -> None:
-        # FIXME: This function was mostly generated via LLM and likely
-        # contains unnecessary code. It should be reviewed.
         # fmt: off
         js_code = ( """
         (function() {
@@ -109,15 +107,7 @@ class RightClickButton(widgets.ToggleButton):
                     var scrollTop = window.pageYOffset ||
                         document.documentElement.scrollTop;
 
-                    // Get the widget model id from data attributes
-                    var modelId = '';
-                    for (var key in this.dataset) {
-                        if (key.startsWith('modelId')) {
-                            modelId = this.dataset[key];
-                            break;
-                        }
-                    }
-
+                    // Position the popup above the button
                     var popup = document.getElementsByClassName(
                         'ipywidget-popup""" + f"{self._channel}" + """'
                     )[0];
@@ -125,6 +115,8 @@ class RightClickButton(widgets.ToggleButton):
                     popup.style.position = 'absolute';
                     popup.style.top = (rect.bottom + scrollTop) + 'px';
                     popup.style.left = (rect.left + scrollLeft) + 'px';
+
+                    // Style the popup
                     popup.style.background = 'white';
                     popup.style.border = '1px solid #ccc';
                     popup.style.borderRadius = '3px';
@@ -134,12 +126,6 @@ class RightClickButton(widgets.ToggleButton):
 
                     // Add to body
                     document.body.appendChild(popup);
-
-                    // Set model value to indicate right click happened
-                    if (window[modelName]) {
-                        window[modelName].set('_right_click_triggered', true);
-                        window[modelName].save_changes();
-                    }
 
                     // Close popup when clicking elsewhere
                     document.addEventListener('click', function closePopup(event) {
@@ -154,40 +140,7 @@ class RightClickButton(widgets.ToggleButton):
 
                     return false;
                 });
-
-                // Set up content updating
-                var modelId = '';
-                for (var key in button.dataset) {
-                    if (key.startsWith('modelId')) {
-                        modelId = button.dataset[key];
-                        break;
-                    }
-                }
-
-                var modelName = 'IPY_MODEL_' + modelId;
-                if (window[modelName]) {
-                    button.setAttribute(
-                        'data-popup-content',
-                        window[modelName].get('popup_content')
-                    );
-
-                    // This part is tricky without jQuery, but we can use a polling
-                    // approach to check for content changes
-                    (function(btn, model) {
-                        var lastContent = window[model].get('popup_content');
-                        setInterval(function() {
-                            var newContent = window[model].get('popup_content');
-                            if (newContent !== lastContent) {
-                                btn.setAttribute('data-popup-content', newContent);
-                                lastContent = newContent;
-                            }
-                        }, 500);
-                    })(button, modelName);
-                }
             }
-
-            // Set up for current elements
-            // setup_rightclick();
 
             // Make sure it works even after widget is redrawn/updated
             setTimeout(setup_rightclick, 1000);
@@ -195,24 +148,6 @@ class RightClickButton(widgets.ToggleButton):
         """)
         # fmt: on
         display(Javascript(js_code))  # type: ignore [no-untyped-call]
-
-    # TODO: This code was also provided by the LLM.
-    # Delete once sure it is not needed.
-    # def on_right_click(self, callback: Any) -> None:
-    #     """Register a callback to be called when the button is right-clicked."""
-
-    #     def _handle_right_click_event(change: Any) -> None:
-    #         if change["new"]:
-    #             # Reset the flag
-    #             self._right_click_triggered = False
-    #             # Call the callback
-    #             callback(self)
-
-    #     self.observe(_handle_right_click_event, names="_right_click_triggered")
-
-    # def set_popup_content(self, content: Any) -> None:
-    #     """Update the content shown in the popup."""
-    #     self.popup_content = content
 
 
 class JupyterLutView(LutView):
