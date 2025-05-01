@@ -10,7 +10,7 @@ import psygnal
 from IPython.display import Javascript, display
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimPolicy, ClimsManual
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
@@ -219,7 +219,7 @@ class JupyterLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
-    def __init__(self, channel: ChannelKey = None) -> None:
+    def __init__(self, channel: ChannelKey) -> None:
         self._channel = channel
         self._histogram: HistogramCanvas | None = None
         # WIDGETS
@@ -351,16 +351,17 @@ class JupyterLutView(LutView):
             if change["new"]:  # Autoscale
                 lower_tail = self._auto_clim.lower_tail.value
                 upper_tail = self._auto_clim.upper_tail.value
-                self._model.clims = ClimsManual(min=lower_tail, max=100 - upper_tail)
-                # self._model.clims = ClimsPercentile(
-                #     min_percentile=lower_tail, max_percentile=100 - upper_tail
-                # )
+                self._model.clims = ClimsPercentile(
+                    min_percentile=lower_tail, max_percentile=100 - upper_tail
+                )
             else:  # Manually scale
                 clims = self._clims.value
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
     def _on_auto_tails_changed(self, change: dict[str, Any]) -> None:
-        self._on_autoscale_changed(self._auto_clim.value)
+        # Update clim policy if autoscaling is active
+        if self._auto_clim.value:
+            self._on_autoscale_changed({"new": True})
 
     def _on_histogram_requested(self, change: dict[str, Any]) -> None:
         # Generate the histogram if we haven't done so yet
@@ -384,7 +385,8 @@ class JupyterLutView(LutView):
         self._visible.description = name
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._auto_clim.value = not policy.is_manual
+        with notifications_blocked(self._auto_clim):
+            self._auto_clim.value = not policy.is_manual
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
@@ -392,7 +394,9 @@ class JupyterLutView(LutView):
     def set_clims(self, clims: tuple[float, float]) -> None:
         # block self._clims.observe, otherwise autoscale will be forced off
         with notifications_blocked(self._clims):
-            self._clims.value = clims
+            # FIXME: Internally the clims are being rounded to whole numbers.
+            # The rounding is somehow avoiding notifications_blocked.
+            self._clims.value = [int(c) for c in clims]
 
     def set_clim_bounds(
         self,

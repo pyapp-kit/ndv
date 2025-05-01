@@ -18,7 +18,7 @@ def model() -> LUTModel:
 
 @fixture
 def view(model: LUTModel) -> JupyterLutView:
-    view = JupyterLutView()
+    view = JupyterLutView(None)
     # Set the model
     assert view.model is None
     view.model = model
