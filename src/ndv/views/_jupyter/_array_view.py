@@ -387,6 +387,9 @@ class JupyterLutView(LutView):
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         with notifications_blocked(self._auto_clim):
             self._auto_clim.value = not policy.is_manual
+            if isinstance(policy, ClimsPercentile):
+                self._auto_clim.lower_tail.value = policy.min_percentile
+                self._auto_clim.upper_tail.value = 100 - policy.max_percentile
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
