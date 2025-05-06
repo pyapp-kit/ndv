@@ -21,6 +21,7 @@ nav:
   - env_var.md
   - Cookbook:
       - cookbook/embedding.md
+      - cookbook/streaming.md
   # This is populated by api-autonav plugin
   # - API reference: reference/
 

@@ -24,9 +24,10 @@ viewer.show()
 
 # function that will be called after the app is running
 def stream() -> None:
-    # iterate over the data, add it to the ring buffer, and update the viewer index
+    # iterate over the data, add it to the ring buffer
     for n, plane in enumerate(data):
         rb.append(plane)
+        # and update the viewer index to redraw (and possibly move the slider)
         viewer.display_model.current_index.update({0: max(n, N - 1)})
 
         ndv.process_events()  # force viewer updates for this example

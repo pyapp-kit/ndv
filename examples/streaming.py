@@ -21,9 +21,10 @@ viewer.show()
 
 # function that will be called after the app is running
 def stream(nframes: int = len(data) * 4) -> None:
-    # iterate over the data, update the buffer *in place*, and update the viewer index
     for i in range(nframes):
+        # iterate over the data, update the buffer *in place*,
         buffer[:] = data[i % len(data)]
+        # and update the viewer index to redraw
         viewer.display_model.current_index.update()
         ndv.process_events()  # force viewer updates for this example
 

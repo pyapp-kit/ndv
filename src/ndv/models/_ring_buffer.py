@@ -43,6 +43,33 @@ if TYPE_CHECKING:
 
 
 class RingBuffer(Sequence):
+    """Ring buffer structure with a given capacity and element type.
+
+    Parameters
+    ----------
+    max_capacity: int
+        The maximum capacity of the ring buffer.
+    dtype: npt.DTypeLike
+        Desired type (and shape) of individual buffer elements.
+        This is passed to `np.empty`, so it can be any
+        [dtype-like object](https://numpy.org/doc/stable/reference/arrays.dtypes.html).
+        Common scenarios will be:
+            - a fixed dtype (e.g. `int`, `np.uint8`, `'u2'`, `np.dtype('f4')`)
+            - a `(fixed_dtype, shape)` tuple (e.g. `('uint16', (512, 512))`)
+    allow_overwrite: bool
+        If false, throw an IndexError when trying to append to an already full
+        buffer.
+    create_buffer: Callable[[int, npt.DTypeLike], npt.NDArray]
+        A callable that creates the underlying array.
+        May be used to customize the initialization of the array.  Defaults to
+        `np.empty`.
+
+    Notes
+    -----
+    Vendored from [numpy-ringbuffer](https://github.com/eric-wieser/numpy_ringbuffer),
+    by Eric Wieser (MIT License).  And updated with typing and signals.
+    """
+
     resized = Signal(int)
 
     def __init__(
@@ -53,31 +80,6 @@ class RingBuffer(Sequence):
         allow_overwrite: bool = True,
         create_buffer: Callable[[int, npt.DTypeLike], npt.NDArray] = np.empty,
     ) -> None:
-        """Create a new ring buffer with the given capacity and element type.
-
-        Parameters
-        ----------
-        max_capacity: int
-            The maximum capacity of the ring buffer.
-        dtype: npt.DTypeLike
-            Desired type (and shape) of individual buffer elements.
-            This is passed to `np.empty`, so it can be any
-            [dtype-like object](https://numpy.org/doc/stable/reference/arrays.dtypes.html).
-            Common scenarios will be:
-                - a fixed dtype (e.g. `int`, `np.uint8`, `'u2'`, `np.dtype('f4')`)
-                - a `(fixed_dtype, shape)` tuple (e.g. `('uint16', (512, 512))`)
-        allow_overwrite: bool
-            If false, throw an IndexError when trying to append to an already full
-            buffer.
-        create_buffer: Callable[[int, npt.DTypeLike], npt.NDArray]
-            A callable that creates the underlying array.
-            May be used to customize the initialization of the array.  Defaults to
-            `np.empty`.
-
-        Notes
-        -----
-        Vendored from numpy-ringbuffer, by Eric Wieser (MIT License).
-        """
         self._arr = create_buffer(max_capacity, dtype)
         self._left_index = 0
         self._right_index = 0
