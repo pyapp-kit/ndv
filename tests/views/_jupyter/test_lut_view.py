@@ -6,7 +6,7 @@ import cmap
 from jupyter_rfb.widget import RemoteFrameBuffer
 from pytest import fixture
 
-from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
 from ndv.views._jupyter._array_view import JupyterLutView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
@@ -18,7 +18,7 @@ def model() -> LUTModel:
 
 @fixture
 def view(model: LUTModel) -> JupyterLutView:
-    view = JupyterLutView()
+    view = JupyterLutView(None)
     # Set the model
     assert view.model is None
     view.model = model
@@ -29,14 +29,23 @@ def view(model: LUTModel) -> JupyterLutView:
 def test_JupyterLutView_update_model(model: LUTModel, view: JupyterLutView) -> None:
     """Ensures the view updates when the model is changed."""
 
-    auto_scale = not model.clims.is_manual
-    assert view._auto_clim.value == auto_scale
-    model.clims = ClimsManual(min=0, max=1) if auto_scale else ClimsMinMax()
-    assert view._auto_clim.value != auto_scale
+    # Test modifying model.clims
+    assert view._auto_clim.value
+    model.clims = ClimsManual(min=0, max=1)
+    assert not view._auto_clim.value
+    model.clims = ClimsPercentile(min_percentile=0, max_percentile=100)
+    assert view._auto_clim.value
+    model.clims = ClimsPercentile(min_percentile=1, max_percentile=99)
+    assert view._auto_clim.value
+    assert view._auto_clim.lower_tail.value == 1
+    assert view._auto_clim.upper_tail.value == 1
 
-    new_visible = not model.visible
-    model.visible = new_visible
-    assert view._visible.value == new_visible
+    # Test modifying model.visible
+    assert view._visible.value
+    model.visible = False
+    assert not view._visible.value
+    model.visible = True
+    assert view._visible.value
 
     new_cmap = cmap.Colormap("red")
     new_name = new_cmap.name.split(":")[-1]
@@ -57,10 +66,19 @@ def test_JupyterLutView_update_view(model: LUTModel, view: JupyterLutView) -> No
     view._cmap.value = new_cmap
     assert model.cmap == new_cmap
 
+    # Test toggling auto_clim
+    assert model.clims == ClimsMinMax()
+    view._auto_clim.value = False
     mi, ma = view._clims.value
-    new_clims = ClimsManual(min=mi, max=ma) if view._auto_clim.value else ClimsMinMax()
-    view._auto_clim.value = not new_clims.is_manual
-    assert model.clims == new_clims
+    assert model.clims == ClimsManual(min=mi, max=ma)
+    view._auto_clim.value = True
+    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+
+    # Test modifying tails changes percentiles
+    view._auto_clim.lower_tail.value = 0.1
+    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=100)
+    view._auto_clim.upper_tail.value = 0.2
+    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=99.8)
 
     # When gui clims change, autoscale should be disabled
     model.clims = ClimsMinMax()
