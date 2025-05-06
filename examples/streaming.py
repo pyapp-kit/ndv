@@ -4,28 +4,27 @@
 #     "imageio[tifffile]",
 # ]
 # ///
+"""Example of streaming data."""
+
+import numpy as np
+
 import ndv
-from ndv.models import RingBuffer
 
 # some data we're going to stream (as if it was coming from a camera)
 data = ndv.data.cells3d()[:, 1]
 
-# a ring buffer to hold the data as it comes in
-# the ring buffer is a circular buffer that holds the last N frames
-rb = RingBuffer(max_capacity=20, dtype=(data.dtype, data.shape[-2:]))
-
-# pass the ring buffer to the viewer
-viewer = ndv.ArrayViewer(rb)
+# a buffer to hold the current frame in the viewer
+buffer = np.zeros_like(data[0])
+viewer = ndv.ArrayViewer(buffer)
 viewer.show()
 
 
 # function that will be called after the app is running
-def stream() -> None:
-    # iterate over the data, add it to the ring buffer, and update the viewer index
-    for n, plane in enumerate(data):
-        rb.append(plane)
-        viewer.display_model.current_index.update({0: max(n, 20 - 1)})
-
+def stream(nframes: int = len(data) * 4) -> None:
+    # iterate over the data, update the buffer *in place*, and update the viewer index
+    for i in range(nframes):
+        buffer[:] = data[i % len(data)]
+        viewer.display_model.current_index.update()
         ndv.process_events()  # force viewer updates for this example
 
 
