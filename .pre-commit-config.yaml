@@ -4,6 +4,17 @@ ci:
   autoupdate_commit_msg: "ci(pre-commit.ci): autoupdate"
 
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ".*\\.md"
+      - id: end-of-file-fixer
+      - id: check-toml
+      - id: check-yaml
+        args: ["--unsafe"]
+      - id: check-added-large-files
+
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.24.1
     hooks:
@@ -35,3 +46,13 @@ repos:
           - types-wxpython
           - qtpy
           - git+https://github.com/tlambert03/PyQt6-stubs.git@v6.7.3
+
+  - repo: local
+    hooks:
+      - id: pyright
+        exclude: "^docs/"
+        name: pyright
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+        entry: uv run pyright
