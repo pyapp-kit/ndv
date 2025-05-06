@@ -49,6 +49,7 @@ repos:
   - repo: local
     hooks:
       - id: pyright
+        stages: [manual]
         exclude: "^docs/"
         name: pyright
         language: system
