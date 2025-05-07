@@ -40,5 +40,5 @@ docs:
 docs-serve:
 	uv run --group docs mkdocs serve --no-strict
 
-lint: 
+lint:
 	uv run pre-commit run --all-files

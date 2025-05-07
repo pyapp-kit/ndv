@@ -14,6 +14,8 @@ The `DashboardWidget` is a simple GUI that displays the images and allows the us
 - move the stage in the x and y directions.
 """
 
+from __future__ import annotations
+
 from typing import Any, cast
 
 import astropy.units as u

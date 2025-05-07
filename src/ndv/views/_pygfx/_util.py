@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from rendercanvas import BaseRenderCanvas
 
 
-def rendercanvas_class() -> "BaseRenderCanvas":
+def rendercanvas_class() -> "type[BaseRenderCanvas]":
     from ndv.views._app import GuiFrontend, gui_frontend
 
     frontend = gui_frontend()
@@ -21,11 +21,13 @@ def rendercanvas_class() -> "BaseRenderCanvas":
     if frontend == GuiFrontend.JUPYTER:
         import rendercanvas.jupyter
 
-        return rendercanvas.jupyter.JupyterRenderCanvas
+        return rendercanvas.jupyter.JupyterRenderCanvas  # type: ignore[no-any-return]
     if frontend == GuiFrontend.WX:
         # ...still not working
         # import rendercanvas.wx
         # return rendercanvas.wx.WxRenderWidget
         from wgpu.gui.wx import WxWgpuCanvas
 
-        return WxWgpuCanvas
+        return WxWgpuCanvas  # type: ignore[no-any-return]
+
+    raise ValueError(f"Unsupported frontend: {frontend}")  # pragma: no cover

@@ -43,7 +43,7 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
     def __init__(self) -> None: ...
     @overload
     def __init__(  # type: ignore[misc]
-        self: dict[str, _VT],
+        self: dict,
         key_validator: Callable[[Any], _KT] | None = None,
         value_validator: Callable[[Any], _VT] | None = None,
         **kwargs: _VT,
@@ -58,10 +58,10 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
     ) -> None: ...
     @overload
     def __init__(  # type: ignore[misc]
-        self: dict[str, _VT],
+        self: dict,
         map: SupportsKeysAndGetItem[str, _VT],
         /,
-        key_validator: Callable[[Any], _KT] | None = ...,
+        key_validator: Callable[[Any], _KT] | None = None,
         value_validator: Callable[[Any], _VT] | None = ...,
         validate_lookup: bool = ...,
         **kwargs: _VT,
@@ -77,10 +77,10 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
     ) -> None: ...
     @overload
     def __init__(  # type: ignore[misc]
-        self: dict[str, _VT],
+        self: dict,
         iterable: Iterable[tuple[str, _VT]],
         /,
-        key_validator: Callable[[Any], _KT] | None = ...,
+        key_validator: Callable[[Any], _KT] | None = None,
         value_validator: Callable[[Any], _VT] | None = ...,
         validate_lookup: bool = ...,
         **kwargs: _VT,

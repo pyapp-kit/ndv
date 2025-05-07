@@ -127,8 +127,8 @@ class ClimsStdDev(ClimPolicy):
     center: Optional[float] = None  # None means center around the mean
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
-        center = np.nanmean(data) if self.center is None else self.center
-        diff = self.n_stdev * np.nanstd(data)
+        center = float(np.nanmean(data) if self.center is None else self.center)
+        diff = float(self.n_stdev * np.nanstd(data))
         return center - diff, center + diff
 
     def __eq__(self, other: object) -> bool:

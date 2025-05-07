@@ -23,7 +23,7 @@ class WxLabeledSlider(wx.Panel):
         self.slider.SetValue(value)
 
     def value(self) -> int:
-        return self.slider.GetValue()  # type: ignore [no-any-return]
+        return self.slider.GetValue()
 
     def setSingleStep(self, step: int) -> None:
         self.slider.SetLineSize(step)
