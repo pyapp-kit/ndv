@@ -521,7 +521,7 @@ class GfxArrayCanvas(ArrayCanvas):
         cam = self._camera
         cam.show_object(self._scene)
 
-        if bb := self._scene.get_world_bounding_box():
+        if (bb := self._scene.get_world_bounding_box()) is not None:
             width, height, depth = np.ptp(bb, axis=0)
             if width < 0.01:
                 width = 1
