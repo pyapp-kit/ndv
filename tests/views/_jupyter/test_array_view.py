@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import ipywidgets
 from pytest import fixture
 
-from ndv.models._data_display_model import _ArrayDataDisplayModel
+from ndv.models._array_display_model import ArrayDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._jupyter._array_view import JupyterArrayView
 
@@ -13,7 +13,7 @@ from ndv.views._jupyter._array_view import JupyterArrayView
 @fixture
 def viewer() -> JupyterArrayView:
     viewer = JupyterArrayView(
-        ipywidgets.DOMWidget(), _ArrayDataDisplayModel(), ArrayViewerModel()
+        ipywidgets.DOMWidget(), ArrayDisplayModel(), ArrayViewerModel()
     )
     viewer.add_lut_view(None)
     return viewer

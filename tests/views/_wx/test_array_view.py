@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, Mock
 import wx
 from pytest import fixture
 
-from ndv.models._data_display_model import _ArrayDataDisplayModel
+from ndv.models._array_display_model import ArrayDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
 from ndv.views._wx._array_view import WxArrayView
@@ -13,7 +13,7 @@ from ndv.views._wx._array_view import WxArrayView
 
 @fixture
 def viewer(wxapp: wx.App) -> WxArrayView:
-    viewer = WxArrayView(MagicMock(), _ArrayDataDisplayModel(), ArrayViewerModel())
+    viewer = WxArrayView(MagicMock(), ArrayDisplayModel(), ArrayViewerModel())
     viewer.add_lut_view(None)
     return viewer
 
