@@ -30,4 +30,4 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
 
         return WxWgpuCanvas  # type: ignore[no-any-return]
 
-    raise ValueError(f"Unsupported frontend: {frontend}")
+    raise ValueError(f"Unsupported frontend: {frontend}")  # pragma: no cover
