@@ -23,6 +23,8 @@ import numpy as np
 import numpy.typing as npt
 from psygnal import Signal
 
+from ._ring_buffer import RingBuffer
+
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
     from typing import Any, TypeAlias, TypeGuard
@@ -535,3 +537,62 @@ class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
         if (torch := sys.modules.get("torch")) and isinstance(obj, torch.Tensor):
             return True
         return False
+
+
+class RingBufferWrapper(DataWrapper[RingBuffer]):
+    """Wrapper for ring buffer objects."""
+
+    def __init__(
+        self,
+        max_capacity: int | RingBuffer,
+        dtype: npt.DTypeLike = None,
+        *,
+        allow_overwrite: bool = True,
+    ):
+        if isinstance(max_capacity, RingBuffer):
+            if dtype is not None:  # pragma: no cover
+                raise ValueError(
+                    "Cannot specify dtype when passing an existing RingBuffer."
+                )
+            self._ring = max_capacity
+        else:
+            if dtype is None:
+                dtype = float
+            self._ring = RingBuffer(
+                max_capacity=max_capacity, dtype=dtype, allow_overwrite=allow_overwrite
+            )
+        self._ring.resized.connect(self.dims_changed)
+        super().__init__(self._ring)
+
+    @property
+    def dims(self) -> tuple[int, ...]:
+        """Return the dimensions of the data."""
+        return tuple(range(len(self._ring.shape)))
+
+    @property
+    def coords(self) -> Mapping:
+        """Return the coordinates for the data."""
+        shape = self._ring.shape
+        return {i: range(s) for i, s in enumerate(shape)}
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[np.ndarray]:
+        if isinstance(obj, RingBuffer):
+            return True
+        return False
+
+    def append(self, value: npt.ArrayLike) -> None:
+        """Append a value to the right end of the buffer."""
+        self._ring.append(value)
+
+    def appendleft(self, value: npt.ArrayLike) -> None:
+        """Append a value to the left end of the buffer."""
+        self._ring.appendleft(value)
+
+    def pop(self) -> np.ndarray:
+        """Pop a value from the right end of the buffer."""
+        return self._ring.pop()
+
+    def popleft(self) -> np.ndarray:
+        """Pop a value from the left end of the buffer."""
+        return self._ring.popleft()
