@@ -161,4 +161,14 @@ class MouseEventFilter(QObject):
                     self.active_button = MouseButton.NONE
                     intercept |= receiver.on_mouse_release(mre)
                     receiver.mouseReleased.emit(mre)
+                elif etype == QEvent.Type.MouseButtonRelease:
+                    mre = MouseReleaseEvent(
+                        x=pos.x(), y=pos.y(), btn=self.active_button
+                    )
+                    self.active_button = MouseButton.NONE
+                    intercept |= receiver.on_mouse_release(mre)
+                    receiver.mouseReleased.emit(mre)
+            elif qevent.type() == QEvent.Type.Leave:
+                intercept |= receiver.on_mouse_leave()
+                receiver.mouseLeft.emit()
         return intercept

@@ -89,3 +89,6 @@ class HistogramCanvas(GraphicsCanvas, LutView):
         bin_edges : np.ndarray
             The bin edges of the histogram.
         """
+
+    def highlight(self, value: float | None) -> None:
+        """Highlights a domain value on the histogram."""

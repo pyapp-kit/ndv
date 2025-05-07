@@ -188,8 +188,23 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             ),
             render_order=-10,
         )
+        # The highlight is a line that draws attention to a particular domain value.
+        # e.g. identifying the value under the mouse cursor on an array canvas.
+        self._highlight = pygfx.Line(
+            geometry=pygfx.Geometry(
+                positions=np.array([[0, 0, 0], [0, 1, 0]], dtype=np.float32),
+            ),
+            material=pygfx.LineMaterial(
+                color=(1.0, 1.0, 0.0),
+                dash_pattern=[4, 4],
+            ),
+            visible=False,
+        )
+
         self._update_clims()
-        self._scene.add(self._histogram, self._clim_handles, self._gamma_handle)
+        self._scene.add(
+            self._histogram, self._clim_handles, self._gamma_handle, self._highlight
+        )
 
         self._x = pygfx.Ruler(
             start_pos=(0, 0, 0),
@@ -414,6 +429,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self._clim_handles.local.scale_y = values.max() / 0.98
         self._gamma_handle.local.scale_y = values.max() / 0.98
+        self._highlight.local.scale_y = values.max() / 0.98
 
         self.refresh()
 
@@ -468,6 +484,13 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def elements_at(self, pos_xy: tuple[float, float]) -> list:
         raise NotImplementedError()
+
+    def highlight(self, value: float | None) -> None:
+        self._highlight.visible = value is not None
+        self._highlight.local.x = value
+        self.refresh()
+
+        return super().highlight(value)
 
     # ------------- Private methods ------------- #
 
