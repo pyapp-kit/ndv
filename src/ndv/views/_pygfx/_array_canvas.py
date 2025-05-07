@@ -357,7 +357,7 @@ class PyGFXRectangle(RectangularROIHandle):
             return CursorType.BDIAG_ARROW
         # Step 2: Entire ROI
         if self._outline:
-            if (roi_bb := self._outline.get_bounding_box()) and _is_inside(
+            if (roi_bb := self._outline.get_bounding_box()) is not None and _is_inside(
                 roi_bb, world_pos
             ):
                 return CursorType.ALL_ARROW
@@ -583,7 +583,7 @@ class GfxArrayCanvas(ArrayCanvas):
         elements: list[CanvasElement] = []
         pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
-            if (bb := c.get_bounding_box()) and _is_inside(bb, pos):
+            if (bb := c.get_bounding_box()) is not None and _is_inside(bb, pos):
                 elements.append(self._elements[c])
         return elements
 
