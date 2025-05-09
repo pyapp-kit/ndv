@@ -13,9 +13,11 @@ from ._lut_model import (
 )
 from ._ring_buffer import RingBuffer
 from ._roi_model import RectangularROIModel
+from ._viewer_model import ArrayViewerModel
 
 __all__ = [
     "ArrayDisplayModel",
+    "ArrayViewerModel",
     "ChannelMode",
     "ClimPolicy",
     "ClimsManual",

@@ -48,14 +48,9 @@ def _default_luts() -> "list[cmap.Colormap]":
 
 
 class ArrayViewerModel(NDVModel):
-    """Representation of an array viewer.
+    """Options and state for the [`ArrayViewer`][ndv.ArrayViewer].
 
-    TODO: This will likely contain other fields including:
-        * Dimensionality
-        * Camera position
-        * Camera frustum
-
-    Parameters
+    Attributes
     ----------
     interaction_mode : InteractionMode
         Describes the current interaction mode of the Viewer.
