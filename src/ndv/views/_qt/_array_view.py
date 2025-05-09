@@ -206,7 +206,11 @@ class _DimToggleButton(QPushButton):
 
 
 class _QLUTWidget(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        default_luts: Sequence[Any],
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
 
         # -- WIDGETS -- #
@@ -214,7 +218,7 @@ class _QLUTWidget(QWidget):
 
         self.cmap = _CmapCombo()
         self.cmap.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.cmap.addColormaps(["gray", "green", "magenta"])
+        self.cmap.addColormaps(default_luts)
 
         self.clims = QLabeledRangeSlider(Qt.Orientation.Horizontal)
 
@@ -300,9 +304,13 @@ class QLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
-    def __init__(self, channel: ChannelKey = None) -> None:
+    def __init__(
+        self,
+        channel: ChannelKey = None,
+        default_luts: Sequence[Any] = ("gray", "green", "magenta"),
+    ) -> None:
         super().__init__()
-        self._qwidget = _QLUTWidget()
+        self._qwidget = _QLUTWidget(default_luts)
         self._channel = channel
         self.histogram: HistogramCanvas | None = None
         # TODO: use emit_fast
@@ -798,7 +806,11 @@ class QtArrayView(ArrayView):
         self._visible_axes: Sequence[AxisKey] = []
 
     def add_lut_view(self, channel: ChannelKey) -> QLutView:
-        view = QRGBView(channel) if channel == "RGB" else QLutView(channel)
+        view = (
+            QRGBView(channel)
+            if channel == "RGB"
+            else QLutView(channel, self._viewer_model.default_luts)
+        )
         self._luts[channel] = view
 
         view.histogramRequested.connect(self.histogramRequested)
