@@ -1,17 +1,50 @@
-from enum import Enum, auto
+from enum import Enum
 from typing import TYPE_CHECKING
+
+import cmap
+import cmap._colormap
+from pydantic import Field
 
 from ndv.models._base_model import NDVModel
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import TypedDict
+
     from psygnal import Signal, SignalGroup
 
+    class ArrayViewerModelKwargs(TypedDict, total=False):
+        """Keyword arguments for `ArrayViewerModel`."""
 
-class InteractionMode(Enum):
+        default_luts: "Sequence[cmap._colormap.ColorStopsLike]"
+        interaction_mode: "InteractionMode"
+        show_controls: bool
+        show_3d_button: bool
+        show_histogram_button: bool
+        show_reset_zoom_button: bool
+        show_roi_button: bool
+        show_channel_mode_selector: bool
+        show_play_button: bool
+        show_data_info: bool
+        show_progress_spinner: bool
+
+
+class InteractionMode(str, Enum):
     """An enum defining graphical interaction mechanisms with an array Viewer."""
 
-    PAN_ZOOM = auto()  # Mode allowing the user to pan and zoom
-    CREATE_ROI = auto()  # Mode where user clicks create ROIs
+    PAN_ZOOM = "pan_zoom"
+    CREATE_ROI = "create_sroi"
+
+    def __str__(self) -> str:
+        """Return the string representation of the enum value."""
+        return self.value
+
+
+def _default_luts() -> "list[cmap.Colormap]":
+    return [
+        cmap.Colormap(x)
+        for x in ("gray", "green", "magenta", "cyan", "red", "blue", "yellow")
+    ]
 
 
 class ArrayViewerModel(NDVModel):
@@ -44,6 +77,12 @@ class ArrayViewerModel(NDVModel):
         Whether to show the progress spinner, by default
     show_data_info : bool, optional
         Whether to show shape, dtype, size, etc. about the array
+    default_luts : list[cmap.Colormap], optional
+        List of colormaps to use when populating the LUT dropdown menu in the viewer.
+        Only editable upon initialization. Values may be any `cmap`
+        [ColormapLike](https://cmap-docs.readthedocs.io/en/stable/colormaps/#colormaplike-objects)
+        object (most commonly, just a string name of the colormap, like
+        "gray" or "viridis").
     """
 
     interaction_mode: InteractionMode = InteractionMode.PAN_ZOOM
@@ -56,6 +95,9 @@ class ArrayViewerModel(NDVModel):
     show_play_button: bool = True
     show_data_info: bool = True
     show_progress_spinner: bool = False
+    default_luts: list[cmap.Colormap] = Field(
+        default_factory=_default_luts, frozen=True
+    )
 
     if TYPE_CHECKING:
         # just to make IDE autocomplete better
