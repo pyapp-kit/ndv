@@ -445,8 +445,13 @@ class _WxArrayViewer(wx.Frame):
         self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
+        # create a scrolled panel for LUTs
+        self.luts_scroll = wx.ScrolledWindow(self, style=wx.VSCROLL)
+        self.luts_scroll.SetScrollRate(0, 10)
+
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
+        self.luts_scroll.SetSizer(self.luts)
 
         self._btns = wx.BoxSizer(wx.HORIZONTAL)
         self._btns.AddStretchSpacer()
@@ -465,13 +470,17 @@ class _WxArrayViewer(wx.Frame):
         inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
-        inner.Add(self.luts, 0, wx.EXPAND)
+        inner.Add(self.luts_scroll, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self._btns, 0, wx.EXPAND)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(inner, 1, wx.EXPAND | wx.ALL, 10)
         self.SetSizer(outer)
         self.SetInitialSize(wx.Size(600, 800))
+
+        # set a fixed height for the scrollable area for luts
+        inner.SetItemMinSize(self.luts_scroll, -1, 200) # fixed height of 200 px
+
         self.Layout()
 
 
@@ -538,8 +547,11 @@ class WxArrayView(ArrayView):
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
 
+    def _lut_area(self) -> wx.Window:
+        return self._wxwidget.luts_scroll
+
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
-        wdg = self.frontend_widget()
+        wdg = self._lut_area()
         view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
@@ -548,7 +560,8 @@ class WxArrayView(ArrayView):
         view.histogramRequested.connect(self.histogramRequested)
 
         # Update the layout to reflect above changes
-        self._wxwidget.Layout()
+        wdg.Layout()
+        wdg.FitInside()
         return view
 
     # TODO: Fix type
@@ -559,10 +572,12 @@ class WxArrayView(ArrayView):
         self._wxwidget.Layout()
 
     def remove_lut_view(self, lut: LutView) -> None:
+        scrollwdg = self._lut_area()
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
         self._wxwidget.luts.Detach(wxwdg)
         wxwdg.Destroy()
-        self._wxwidget.Layout()
+        scrollwdg.Layout()
+        scrollwdg.FitInside()
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         self._wxwidget.dims_sliders.create_sliders(coords)
