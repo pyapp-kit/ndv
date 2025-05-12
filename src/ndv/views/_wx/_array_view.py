@@ -67,6 +67,142 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
     btn.SetLabel("")
     btn.SetBitmapLabel(bitmap)
 
+class _LutChannelSelector(wx.Panel):
+    def __init__(self, parent: wx.Window, channels: None | list[ChannelKey]=None):
+        super().__init__(parent)
+
+        self.channels = channels or []
+        # all channels visible, by default
+        self.visible_channels = set(self.channels)
+
+        # Dropdown button with currenct selection
+        self.dropdown_btn = wx.Button(
+            self, label="Channel Display Options", style=wx.BU_EXACTFIT)
+        self.dropdown_btn.Bind(wx.EVT_BUTTON, self._on_dropdown_clicked)
+
+        # Display indicator for how many channels are currently visible
+        self.selection_info = wx.StaticText(self, label="")
+        self._update_selection_info()
+
+        # Create a popup window for the checklist
+        self.popup = wx.Dialog(self, style=wx.BORDER_SIMPLE | wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR | wx.FRAME_FLOAT_ON_PARENT)
+        self.popup.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+        # evt handler for clicking outside of popup dialog
+        self.popup.Bind(wx.EVT_ACTIVATE, self._on_popup_deactivate)
+
+        # Create a checklist for the popup
+        self.checklist = wx.CheckListBox(self.popup, choices=[])
+        self.checklist.Bind(wx.EVT_CHECKLISTBOX, self._on_selection_changed)
+
+        # Select All / None buttons
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.select_all_btn = wx.Button(self.popup, label="Select All", size=(80, -1))
+        self.select_none_btn = wx.Button(self.popup, label="Select None", size=(80, -1))
+        self.select_all_btn.Bind(wx.EVT_BUTTON, self._on_select_all)
+        self.select_none_btn.Bind(wx.EVT_BUTTON, self._on_select_none)
+        btn_sizer.Add(self.select_all_btn, 0, wx.ALL, 5)
+        btn_sizer.Add(self.select_none_btn, 0, wx.ALL, 5)
+
+        # Layout for popup
+        popup_sizer = wx.BoxSizer(wx.VERTICAL)
+        popup_sizer.Add(self.checklist, 1, wx.EXPAND | wx.ALL, 5)
+        popup_sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 5)
+        self.popup.SetSizer(popup_sizer)
+
+        # Layout for the main widget
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.dropdown_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        sizer.Add(self.selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
+        self.SetSizer(sizer)
+
+        # Signals
+        self.on_selection_changed_callback = None
+
+    def set_channels(self, channels: list[ChannelKey]):
+        """Update the channel list."""
+        self.channels = list(channels)
+        self.visible_channels = set(self.channels)
+        self._update_checklist()
+        self._update_selection_info()
+
+    def _update_checklist(self):
+        """Update the checklist with current channels."""
+        self.checklist.Clear()
+        for channel in self.channels:
+            self.checklist.Append(str(channel))
+            idx = self.checklist.FindString(str(channel))
+            if channel in self.visible_channels:
+                self.checklist.Check(idx)
+
+    def _update_selection_info(self):
+        """Update the selection info text."""
+        if len(self.visible_channels) == len(self.channels):
+            self.selection_info.SetLabel(
+                f"All channels visible ({len(self.channels)})")
+        else:
+            self.selection_info.SetLabel(
+                f"{len(self.visible_channels)} of {len(self.channels)} channels visible")
+        self.Layout()
+
+    def _on_dropdown_clicked(self, evt):
+        """Show the dropdown checklist."""
+        # Position the popup below the button
+        btn_size = self.dropdown_btn.GetSize()
+        btn_pos = self.dropdown_btn.GetPosition()
+        popup_pos = self.ClientToScreen(
+            wx.Point(btn_pos.x, btn_pos.y + btn_size.height))
+
+        # Update the checklist
+        self._update_checklist()
+
+        # Size the popup according to content
+        self.popup.SetSize(wx.Size(250, min(400, 50 + len(self.channels) * 22)))
+        self.checklist.SetSize(self.popup.GetClientSize())
+        self.popup.Layout()
+
+        # Show the popup
+        self.popup.SetPosition(popup_pos)
+        self.popup.Show(show=True)
+
+    def _on_popup_deactivate(self, evt):
+        """Close the popup when it loses focus (user clicks outside)."""        
+        if not evt.GetActive():
+            self.popup.Show(show=False)
+
+    def _on_selection_changed(self, evt):
+        """Handle selection changes in the checklist."""
+        idx = evt.GetSelection()
+        channel = self.channels[idx]
+
+        if self.checklist.IsChecked(idx):
+            self.visible_channels.add(channel)
+        else:
+            self.visible_channels.discard(channel)
+
+        self._update_selection_info()
+
+        # Notify parent
+        if self.on_selection_changed_callback:
+            self.on_selection_changed_callback(self.visible_channels)
+
+    def _on_select_all(self, evt):
+        """Select all channels."""
+        for i in range(self.checklist.GetCount()):
+            self.checklist.Check(i, True)
+        self.visible_channels = set(self.channels)
+        self._update_selection_info()
+        if self.on_selection_changed_callback:
+            self.on_selection_changed_callback(self.visible_channels)
+
+    def _on_select_none(self, evt):
+        """Deselect all channels."""
+        for i in range(self.checklist.GetCount()):
+            self.checklist.Check(i, False)
+        self.visible_channels = set()
+        self._update_selection_info()
+        if self.on_selection_changed_callback:
+            self.on_selection_changed_callback(self.visible_channels)
+
 
 # mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
@@ -445,7 +581,15 @@ class _WxArrayViewer(wx.Frame):
         self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
-        # create a scrolled panel for LUTs
+        # Add LUT channel selector
+        self.lut_selector = _LutChannelSelector(self)
+
+        # Toolbar for LUT management
+        self.lut_toolbar = wx.BoxSizer(wx.HORIZONTAL)
+        self.lut_toolbar.Add(self.lut_selector, 0, wx.EXPAND | wx.ALL, 5)
+        self.lut_toolbar.AddStretchSpacer()
+
+        # Create a scrolled panel for LUTs
         self.luts_scroll = wx.ScrolledWindow(self, style=wx.VSCROLL)
         self.luts_scroll.SetScrollRate(0, 10)
 
@@ -470,6 +614,7 @@ class _WxArrayViewer(wx.Frame):
         inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
+        inner.Add(self.lut_toolbar, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self.luts_scroll, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self._btns, 0, wx.EXPAND)
 
@@ -479,7 +624,7 @@ class _WxArrayViewer(wx.Frame):
         self.SetInitialSize(wx.Size(600, 800))
 
         # set a fixed height for the scrollable area for luts
-        inner.SetItemMinSize(self.luts_scroll, -1, 200) # fixed height of 200 px
+        inner.SetItemMinSize(self.luts_scroll, -1, 200)
 
         self.Layout()
 
@@ -505,6 +650,9 @@ class WxArrayView(ArrayView):
         wdg.set_range_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
+
+        # Connect the LUT selector callback
+        wdg.lut_selector.on_selection_changed_callback = self._on_lut_selection_changed
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
@@ -537,6 +685,18 @@ class WxArrayView(ArrayView):
             InteractionMode.CREATE_ROI if create_roi else InteractionMode.PAN_ZOOM
         )
 
+    def _on_lut_selection_changed(self, visible_channels: list[ChannelKey]):
+        """Handle changes in visible LUT selection."""
+        for channel, lut_view in self._luts.items():
+            # Show/Hide the LUT view based on selection
+            if channel in visible_channels:
+                lut_view._wxwidget.Show()
+            else:
+                lut_view._wxwidget.Hide()
+
+        # Update layout
+        self._wxwidget.Layout()
+
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet
 
@@ -550,6 +710,9 @@ class WxArrayView(ArrayView):
     def _lut_area(self) -> wx.Window:
         return self._wxwidget.luts_scroll
 
+    def _lut_selector(self) -> _LutChannelSelector:
+        return self._wxwidget.lut_selector
+
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
         wdg = self._lut_area()
         view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
@@ -558,6 +721,10 @@ class WxArrayView(ArrayView):
         # TODO: Reusable synchronization with ViewerModel
         view._wxwidget.histogram_btn.Show(self._viewer_model.show_histogram_button)
         view.histogramRequested.connect(self.histogramRequested)
+
+        # Add the channel to the selector
+        channels = list(self._luts.keys())
+        self._lut_selector().set_channels(channels)
 
         # Update the layout to reflect above changes
         wdg.Layout()
@@ -572,10 +739,25 @@ class WxArrayView(ArrayView):
         self._wxwidget.Layout()
 
     def remove_lut_view(self, lut: LutView) -> None:
+        # Find the channel key for this LUT view
+        channel_to_remove = None
+        for channel, view in self._luts.items():
+            if view == lut:
+                channel_to_remove = channel
+                break
+
         scrollwdg = self._lut_area()
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
         self._wxwidget.luts.Detach(wxwdg)
         wxwdg.Destroy()
+
+        # Remove from our dictionaries
+        if channel_to_remove:
+            del self._luts[channel_to_remove]
+
+            # Update the channel selector
+            self._lut_selector().set_channels(list(self._luts.keys()))
+
         scrollwdg.Layout()
         scrollwdg.FitInside()
 
