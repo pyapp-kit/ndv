@@ -67,11 +67,12 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
     btn.SetLabel("")
     btn.SetBitmapLabel(bitmap)
 
+
 class _LutChannelSelector(wx.Panel):
     # actually set[ChannelKey] | set
     selectionChanged = Signal(set)
 
-    def __init__(self, parent: wx.Window, channels: None | list[ChannelKey]=None):
+    def __init__(self, parent: wx.Window, channels: None | list[ChannelKey] = None):
         super().__init__(parent)
 
         self.channels: list[ChannelKey] = channels or []
@@ -80,7 +81,8 @@ class _LutChannelSelector(wx.Panel):
 
         # Dropdown button with currenct selection
         self.dropdown_btn = wx.Button(
-            self, label="Channel Display Options", style=wx.BU_EXACTFIT)
+            self, label="Channel Display Options", style=wx.BU_EXACTFIT
+        )
         self.dropdown_btn.Bind(wx.EVT_BUTTON, self._on_dropdown_clicked)
 
         # Display indicator for how many channels are currently visible
@@ -88,8 +90,16 @@ class _LutChannelSelector(wx.Panel):
         self._update_selection_info()
 
         # Create a popup window for the checklist
-        self.popup = wx.Dialog(self, style=wx.BORDER_SIMPLE | wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR | wx.FRAME_FLOAT_ON_PARENT)
-        self.popup.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW))
+        self.popup = wx.Dialog(
+            self,
+            style=wx.BORDER_SIMPLE
+            | wx.STAY_ON_TOP
+            | wx.FRAME_NO_TASKBAR
+            | wx.FRAME_FLOAT_ON_PARENT,
+        )
+        self.popup.SetBackgroundColour(
+            wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        )
         # evt handler for clicking outside of popup dialog
         self.popup.Bind(wx.EVT_ACTIVATE, self._on_popup_deactivate)
 
@@ -134,7 +144,9 @@ class _LutChannelSelector(wx.Panel):
 
     def remove_channel(self, channel: ChannelKey):
         self.channels = [ch for ch in self.channels if not ch == channel]
-        self.visible_channels = {ch for ch in self.visible_channels if not ch == channel}
+        self.visible_channels = {
+            ch for ch in self.visible_channels if not ch == channel
+        }
         self._update_checklist()
         self._update_selection_info()
 
@@ -150,11 +162,11 @@ class _LutChannelSelector(wx.Panel):
     def _update_selection_info(self):
         """Update the selection info text."""
         if len(self.visible_channels) == len(self.channels):
-            self.selection_info.SetLabel(
-                f"All channels visible ({len(self.channels)})")
+            self.selection_info.SetLabel(f"All channels visible ({len(self.channels)})")
         else:
             self.selection_info.SetLabel(
-                f"{len(self.visible_channels)} of {len(self.channels)} channels visible")
+                f"{len(self.visible_channels)} of {len(self.channels)} channels visible"
+            )
         self.Layout()
 
     def _on_dropdown_clicked(self, evt):
@@ -163,7 +175,8 @@ class _LutChannelSelector(wx.Panel):
         btn_size = self.dropdown_btn.GetSize()
         btn_pos = self.dropdown_btn.GetPosition()
         popup_pos = self.ClientToScreen(
-            wx.Point(btn_pos.x, btn_pos.y + btn_size.height))
+            wx.Point(btn_pos.x, btn_pos.y + btn_size.height)
+        )
 
         # Update the checklist
         self._update_checklist()
@@ -736,7 +749,11 @@ class WxArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
         scrollwdg = self._lut_area()
-        view = WxRGBView(scrollwdg, channel) if channel == "RGB" else WxLutView(scrollwdg, channel)
+        view = (
+            WxRGBView(scrollwdg, channel)
+            if channel == "RGB"
+            else WxLutView(scrollwdg, channel)
+        )
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
         # TODO: Reusable synchronization with ViewerModel
