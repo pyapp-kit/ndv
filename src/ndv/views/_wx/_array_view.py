@@ -74,9 +74,9 @@ class _LutChannelSelector(wx.Panel):
     def __init__(self, parent: wx.Window, channels: None | list[ChannelKey]=None):
         super().__init__(parent)
 
-        self.channels = channels or []
+        self.channels: list[ChannelKey] = channels or []
         # all channels visible, by default
-        self.visible_channels = set(self.channels)
+        self.visible_channels: set[ChannelKey] = set(self.channels)
 
         # Dropdown button with currenct selection
         self.dropdown_btn = wx.Button(
@@ -118,10 +118,23 @@ class _LutChannelSelector(wx.Panel):
         sizer.Add(self.selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
 
-    def set_channels(self, channels: list[ChannelKey]):
-        """Update the channel list."""
-        self.channels = list(channels)
-        self.visible_channels = set(self.channels)
+    def set_visible_channels(self, visible_channels: list[ChannelKey]):
+        """Update the visible channels."""
+        self.visible_channels = set(visible_channels)
+        self._update_checklist()
+        self._update_selection_info()
+
+    def add_channel(self, channel: ChannelKey):
+        if (type(channel) is int) or (type(channel) is str and channel.isdigit()):
+            if channel not in self.channels:
+                self.channels.append(channel)
+            self.visible_channels.add(channel)
+            self._update_checklist()
+            self._update_selection_info()
+
+    def remove_channel(self, channel: ChannelKey):
+        self.channels = [ch for ch in self.channels if not ch == channel]
+        self.visible_channels = {ch for ch in self.visible_channels if not ch == channel}
         self._update_checklist()
         self._update_selection_info()
 
@@ -440,7 +453,6 @@ class WxLutView(LutView):
 
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
-        self.lutsUpdated.emit()
 
     def set_visible(self, visible: bool) -> None:
         if visible:
@@ -695,12 +707,13 @@ class WxArrayView(ArrayView):
 
     def _on_lut_selection_changed(self, visible_channels: list[ChannelKey]):
         """Handle changes in visible LUT selection."""
+        self._wxwidget.lut_selector.set_visible_channels(visible_channels)
         for channel, lut_view in self._luts.items():
             # Show/Hide the LUT view based on selection
             if channel in visible_channels:
-                lut_view.set_channel_visible(True)
+                lut_view.set_visible(True)
             else:
-                lut_view.set_channel_visible(False)
+                lut_view.set_visible(False)
 
         # Update layout
         self._wxwidget.Layout()
@@ -731,10 +744,7 @@ class WxArrayView(ArrayView):
         view.histogramRequested.connect(self.histogramRequested)
         view.lutsUpdated.connect(self._wxwidget.update_lut_scroll_size)
 
-        # Add the channel to the selector
-        channels = list(self._luts.keys())
-        self._lut_selector().set_channels(channels)
-
+        self._lut_selector().add_channel(channel)
         self._wxwidget.update_lut_scroll_size()
 
         return view
@@ -754,7 +764,6 @@ class WxArrayView(ArrayView):
                 channel_to_remove = channel
                 break
 
-        scrollwdg = self._lut_area()
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
         self._wxwidget.luts.Detach(wxwdg)
         wxwdg.Destroy()
@@ -763,8 +772,7 @@ class WxArrayView(ArrayView):
         if channel_to_remove:
             del self._luts[channel_to_remove]
 
-            # Update the channel selector
-            self._lut_selector().set_channels(list(self._luts.keys()))
+        self._lut_selector().add_channel(channel)
 
         self._wxwidget.update_lut_scroll_size()
 
@@ -792,6 +800,10 @@ class WxArrayView(ArrayView):
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
         self._wxwidget.channel_mode_combo.SetValue(mode)
+        if mode == ChannelMode.COMPOSITE:
+            self._wxwidget.lut_selector.Show()
+        else:
+            self._wxwidget.lut_selector.Hide()
 
     def set_visible(self, visible: bool) -> None:
         if visible:
