@@ -762,14 +762,14 @@ class WxArrayView(ArrayView):
         # TODO: Reusable synchronization with ViewerModel
         view._wxwidget.histogram_btn.Show(self._viewer_model.show_histogram_button)
         view.histogramRequested.connect(self.histogramRequested)
-        view.lutUpdated.connect(self.update_lut_view)
+        view.lutUpdated.connect(self._update_lut_view)
 
         self._lut_selector().add_channel(channel)
         self._wxwidget.update_lut_scroll_size()
 
         return view
 
-    def update_lut_view(
+    def _update_lut_view(
         self,
         channel: ChannelKey,
         visible: None | bool = None,
