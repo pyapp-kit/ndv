@@ -317,7 +317,8 @@ class _WxLUTWidget(wx.Panel):
 class WxLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
-    lutsUpdated = Signal()
+    # channel: ChannelKey, visible: bool|None, validate: bool|None
+    lutUpdated = Signal(object, bool, bool)
 
     def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__()
@@ -467,16 +468,17 @@ class WxLutView(LutView):
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
 
-    def set_visible(self, visible: bool) -> None:
-        if visible:
-            self._wxwidget.Show()
-        else:
-            self._wxwidget.Hide()
-        self.lutsUpdated.emit()
+    def set_visible(self, visible: bool, validate: bool=True) -> None:
+        """Sets visibility.
+
+        `validate` will check the display options (`_LUTChannelSelctor`)
+        to ensure that visibility is toggled off there.
+        """
+        self.lutUpdated.emit(self._channel, visible, validate)
 
     def close(self) -> None:
         self._wxwidget.Close()
-        self.lutsUpdated.emit()
+        self.lutUpdated.emit(self._channel)
 
 
 class WxRGBView(WxLutView):
@@ -723,10 +725,11 @@ class WxArrayView(ArrayView):
         self._wxwidget.lut_selector.set_visible_channels(visible_channels)
         for channel, lut_view in self._luts.items():
             # Show/Hide the LUT view based on selection
+            # don't validate since we just set the visible channels
             if channel in visible_channels:
-                lut_view.set_visible(True)
+                lut_view.set_visible(True, validate=False)
             else:
-                lut_view.set_visible(False)
+                lut_view.set_visible(False, validate=False)
 
         # Update layout
         self._wxwidget.Layout()
@@ -759,12 +762,34 @@ class WxArrayView(ArrayView):
         # TODO: Reusable synchronization with ViewerModel
         view._wxwidget.histogram_btn.Show(self._viewer_model.show_histogram_button)
         view.histogramRequested.connect(self.histogramRequested)
-        view.lutsUpdated.connect(self._wxwidget.update_lut_scroll_size)
+        view.lutUpdated.connect(self.update_lut_view)
 
         self._lut_selector().add_channel(channel)
         self._wxwidget.update_lut_scroll_size()
 
         return view
+
+    def update_lut_view(
+        self,
+        channel: ChannelKey,
+        visible: None | bool=None,
+        validate: None | bool=None
+    ):
+        # NOTE: we validate on `channel_mode` change
+        # and only when changed to `COMPOSITE`
+        # so this working properly depends on
+        # `channel_mode_combo`'s value being changed FIRST
+        # before each lut_view's `set_visible` is called,
+        # which is currently the case
+        mode = self._wxwidget.channel_mode_combo.GetValue()
+        if validate and mode == ChannelMode.COMPOSITE.value:
+            visible_channels = self._wxwidget.lut_selector.visible_channels
+            visible = visible and channel in visible_channels
+        if visible:
+            self._luts[channel]._wxwidget.Show()
+        elif visible is not None:
+            self._luts[channel]._wxwidget.Hide()
+        self._wxwidget.update_lut_scroll_size()
 
     # TODO: Fix type
     def add_histogram(self, channel: ChannelKey, canvas: HistogramCanvas) -> None:
