@@ -76,8 +76,8 @@ class _LutChannelSelector(wx.Panel):
         super().__init__(parent)
 
         self.channels: list[ChannelKey] = channels or []
-        # all channels visible, by default
-        self.visible_channels: set[ChannelKey] = set(self.channels)
+        # all channels displayed, by default
+        self.displayed_channels: set[ChannelKey] = set(self.channels)
 
         # Dropdown button with currenct selection
         self.dropdown_btn = wx.Button(
@@ -85,7 +85,7 @@ class _LutChannelSelector(wx.Panel):
         )
         self.dropdown_btn.Bind(wx.EVT_BUTTON, self._on_dropdown_clicked)
 
-        # Display indicator for how many channels are currently visible
+        # Display indicator for how many channels are currently displayed
         self.selection_info = wx.StaticText(self, label="")
         self._update_selection_info()
 
@@ -128,9 +128,8 @@ class _LutChannelSelector(wx.Panel):
         sizer.Add(self.selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
 
-    def set_visible_channels(self, visible_channels: list[ChannelKey]):
-        """Update the visible channels."""
-        self.visible_channels = set(visible_channels)
+    def set_displayed_channels(self, displayed_channels: list[ChannelKey]):
+        self.displayed_channels = set(displayed_channels)
         self._update_checklist()
         self._update_selection_info()
 
@@ -138,14 +137,14 @@ class _LutChannelSelector(wx.Panel):
         if (type(channel) is int) or (type(channel) is str and channel.isdigit()):
             if channel not in self.channels:
                 self.channels.append(channel)
-            self.visible_channels.add(channel)
+            self.displayed_channels.add(channel)
             self._update_checklist()
             self._update_selection_info()
 
     def remove_channel(self, channel: ChannelKey):
         self.channels = [ch for ch in self.channels if not ch == channel]
-        self.visible_channels = {
-            ch for ch in self.visible_channels if not ch == channel
+        self.displayed_channels = {
+            ch for ch in self.displayed_channels if not ch == channel
         }
         self._update_checklist()
         self._update_selection_info()
@@ -156,16 +155,18 @@ class _LutChannelSelector(wx.Panel):
         for channel in self.channels:
             self.checklist.Append(str(channel))
             idx = self.checklist.FindString(str(channel))
-            if channel in self.visible_channels:
+            if channel in self.displayed_channels:
                 self.checklist.Check(idx)
 
     def _update_selection_info(self):
         """Update the selection info text."""
-        if len(self.visible_channels) == len(self.channels):
-            self.selection_info.SetLabel(f"All channels visible ({len(self.channels)})")
+        if len(self.displayed_channels) == len(self.channels):
+            self.selection_info.SetLabel(
+                f"All channels displayed ({len(self.channels)})"
+            )
         else:
             self.selection_info.SetLabel(
-                f"{len(self.visible_channels)} of {len(self.channels)} channels visible"
+                f"{len(self.displayed_channels)} of {len(self.channels)} channels displayed"
             )
         self.Layout()
 
@@ -201,29 +202,29 @@ class _LutChannelSelector(wx.Panel):
         channel = self.channels[idx]
 
         if self.checklist.IsChecked(idx):
-            self.visible_channels.add(channel)
+            self.displayed_channels.add(channel)
         else:
-            self.visible_channels.discard(channel)
+            self.displayed_channels.discard(channel)
 
         self._update_selection_info()
 
-        self.selectionChanged.emit(self.visible_channels)
+        self.selectionChanged.emit(self.displayed_channels)
 
     def _on_select_all(self, evt):
         """Select all channels."""
         for i in range(self.checklist.GetCount()):
             self.checklist.Check(i, True)
-        self.visible_channels = set(self.channels)
+        self.displayed_channels = set(self.channels)
         self._update_selection_info()
-        self.selectionChanged.emit(self.visible_channels)
+        self.selectionChanged.emit(self.displayed_channels)
 
     def _on_select_none(self, evt):
         """Deselect all channels."""
         for i in range(self.checklist.GetCount()):
             self.checklist.Check(i, False)
-        self.visible_channels = set()
+        self.displayed_channels = set()
         self._update_selection_info()
-        self.selectionChanged.emit(self.visible_channels)
+        self.selectionChanged.emit(self.displayed_channels)
 
 
 # mostly copied from _qt.qt_view._QLUTWidget
@@ -720,13 +721,13 @@ class WxArrayView(ArrayView):
             InteractionMode.CREATE_ROI if create_roi else InteractionMode.PAN_ZOOM
         )
 
-    def _on_lut_selection_changed(self, visible_channels: list[ChannelKey]):
-        """Handle changes in visible LUT selection."""
-        self._wxwidget.lut_selector.set_visible_channels(visible_channels)
+    def _on_lut_selection_changed(self, displayed_channels: list[ChannelKey]):
+        """Handle changes in displayed LUT selection."""
+        self._wxwidget.lut_selector.set_displayed_channels(displayed_channels)
         for channel, lut_view in self._luts.items():
             # Show/Hide the LUT view based on selection
-            # don't validate since we just set the visible channels
-            if channel in visible_channels:
+            # don't validate since we just set the displayed channels
+            if channel in displayed_channels:
                 lut_view.set_visible(True, validate=False)
             else:
                 lut_view.set_visible(False, validate=False)
@@ -783,8 +784,8 @@ class WxArrayView(ArrayView):
         # which is currently the case
         mode = self._wxwidget.channel_mode_combo.GetValue()
         if validate and mode == ChannelMode.COMPOSITE.value:
-            visible_channels = self._wxwidget.lut_selector.visible_channels
-            visible = visible and channel in visible_channels
+            displayed_channels = self._wxwidget.lut_selector.displayed_channels
+            visible = visible and channel in displayed_channels
         if visible:
             self._luts[channel]._wxwidget.Show()
         elif visible is not None:
