@@ -468,7 +468,7 @@ class WxLutView(LutView):
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
 
-    def set_visible(self, visible: bool, validate: bool=True) -> None:
+    def set_visible(self, visible: bool, validate: bool = True) -> None:
         """Sets visibility.
 
         `validate` will check the display options (`_LUTChannelSelctor`)
@@ -772,8 +772,8 @@ class WxArrayView(ArrayView):
     def update_lut_view(
         self,
         channel: ChannelKey,
-        visible: None | bool=None,
-        validate: None | bool=None
+        visible: None | bool = None,
+        validate: None | bool = None,
     ):
         # NOTE: we validate on `channel_mode` change
         # and only when changed to `COMPOSITE`
