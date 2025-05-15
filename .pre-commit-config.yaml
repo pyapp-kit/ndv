@@ -10,7 +10,7 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1
+    rev: v1.32.0
     hooks:
       - id: typos
         args: [--force-exclude] # omitting --write-changes
