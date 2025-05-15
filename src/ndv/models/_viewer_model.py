@@ -33,7 +33,7 @@ class InteractionMode(str, Enum):
     """An enum defining graphical interaction mechanisms with an array Viewer."""
 
     PAN_ZOOM = "pan_zoom"
-    CREATE_ROI = "create_sroi"
+    CREATE_ROI = "create_roi"
 
     def __str__(self) -> str:
         """Return the string representation of the enum value."""
