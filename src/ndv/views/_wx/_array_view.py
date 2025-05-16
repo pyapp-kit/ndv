@@ -227,7 +227,6 @@ class _LutChannelSelector(wx.Panel):
         self.selectionChanged.emit(self.displayed_channels)
 
 
-# mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -318,8 +317,7 @@ class _WxLUTWidget(wx.Panel):
 class WxLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
-    # channel: ChannelKey, visible: bool|None, validate: bool|None
-    lutUpdated = Signal(object, bool, bool)
+    lutUpdated = Signal()
 
     def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__()
@@ -469,17 +467,16 @@ class WxLutView(LutView):
     def set_channel_visible(self, visible: bool) -> None:
         self._wxwidget.visible.SetValue(visible)
 
-    def set_visible(self, visible: bool, validate: bool = True) -> None:
-        """Sets visibility.
-
-        `validate` will check the display options (`_LUTChannelSelctor`)
-        to ensure that visibility is toggled off there.
-        """
-        self.lutUpdated.emit(self._channel, visible, validate)
+    def set_visible(self, visible: bool) -> None:
+        if visible:
+            self._wxwidget.Show()
+        else:
+            self._wxwidget.Hide()
+        self.lutUpdated.emit()
 
     def close(self) -> None:
         self._wxwidget.Close()
-        self.lutUpdated.emit(self._channel)
+        self.lutUpdated.emit()
 
 
 class WxRGBView(WxLutView):
@@ -723,16 +720,12 @@ class WxArrayView(ArrayView):
 
     def _on_lut_selection_changed(self, displayed_channels: list[ChannelKey]):
         """Handle changes in displayed LUT selection."""
-        self._wxwidget.lut_selector.set_displayed_channels(displayed_channels)
         for channel, lut_view in self._luts.items():
-            # Show/Hide the LUT view based on selection
-            # don't validate since we just set the displayed channels
             if channel in displayed_channels:
-                lut_view.set_visible(True, validate=False)
+                lut_view.set_visible(True)
             else:
-                lut_view.set_visible(False, validate=False)
+                lut_view.set_visible(False)
 
-        # Update layout
         self._wxwidget.Layout()
 
     def visible_axes(self) -> Sequence[AxisKey]:
@@ -763,34 +756,12 @@ class WxArrayView(ArrayView):
         # TODO: Reusable synchronization with ViewerModel
         view._wxwidget.histogram_btn.Show(self._viewer_model.show_histogram_button)
         view.histogramRequested.connect(self.histogramRequested)
-        view.lutUpdated.connect(self._update_lut_view)
+        view.lutUpdated.connect(self._wxwidget.update_lut_scroll_size)
 
         self._lut_selector().add_channel(channel)
         self._wxwidget.update_lut_scroll_size()
 
         return view
-
-    def _update_lut_view(
-        self,
-        channel: ChannelKey,
-        visible: None | bool = None,
-        validate: None | bool = None,
-    ):
-        # NOTE: we validate on `channel_mode` change
-        # and only when changed to `COMPOSITE`
-        # so this working properly depends on
-        # `channel_mode_combo`'s value being changed FIRST
-        # before each lut_view's `set_visible` is called,
-        # which is currently the case
-        mode = self._wxwidget.channel_mode_combo.GetValue()
-        if validate and mode == ChannelMode.COMPOSITE.value:
-            displayed_channels = self._wxwidget.lut_selector.displayed_channels
-            visible = visible and channel in displayed_channels
-        if visible:
-            self._luts[channel]._wxwidget.Show()
-        elif visible is not None:
-            self._luts[channel]._wxwidget.Hide()
-        self._wxwidget.update_lut_scroll_size()
 
     # TODO: Fix type
     def add_histogram(self, channel: ChannelKey, canvas: HistogramCanvas) -> None:
@@ -815,8 +786,7 @@ class WxArrayView(ArrayView):
         if channel_to_remove:
             del self._luts[channel_to_remove]
 
-        self._lut_selector().add_channel(channel)
-
+        self._lut_selector().remove_channel(channel)
         self._wxwidget.update_lut_scroll_size()
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
