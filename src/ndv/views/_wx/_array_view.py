@@ -758,7 +758,7 @@ class WxArrayView(ArrayView):
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
 
-        wdg.lut_selector.selectionChanged.connect(self._wxwidget.Layout)
+        wdg.lut_selector.selectionChanged.connect(lambda: self._wxwidget.Layout())
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
