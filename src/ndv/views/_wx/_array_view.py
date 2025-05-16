@@ -486,6 +486,8 @@ class WxLutView(LutView):
     def _display_hidden(self):
         self._display_status = _DisplayStatus.HIDDEN
         self._wxwidget.Hide()
+        self._wxwidget.visible.SetValue(False)
+        self._on_visible_changed(None)
 
     def _display_enable(self):
         self._display_status = _DisplayStatus.DISPLAYED
@@ -505,18 +507,20 @@ class WxLutView(LutView):
     def set_visible(self, visible: bool) -> None:
         if visible and self._display_status != _DisplayStatus.HIDDEN:
             self._wxwidget.Show()
+            self.lutUpdated.emit()
         # elif visible do nothing
         elif not visible:
             self._wxwidget.Hide()
-        self.lutUpdated.emit()
+            self.lutUpdated.emit()
 
     def set_display(self, display: bool) -> None:
         if display and self._display_status == _DisplayStatus.HIDDEN:
             self._display_enable()
+            self.lutUpdated.emit()
         # elif display do nothing
         elif not display:
             self._display_hidden()
-        self.lutUpdated.emit()
+            self.lutUpdated.emit()
 
     def close(self) -> None:
         self._wxwidget.Close()
