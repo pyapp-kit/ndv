@@ -435,7 +435,7 @@ class ArrayViewer:
         self._data_model.display.current_index.update(self._view.current_index())
 
     def _on_view_ndims_requested(self, ndims: int) -> None:
-        """Update the model when the visible axes change."""
+        """Update the model when the user requests ndims visualized axes."""
         # TODO: Disable 3D mode when only 2 axes?
         current_axes = self.display_model.visible_axes
         if len(current_axes) > 2:
