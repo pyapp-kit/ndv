@@ -654,13 +654,23 @@ class _WxArrayViewer(wx.Frame):
         self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
-        # Add LUT channel selector
-        self.lut_selector = _LutChannelSelector(self)
+        # how many luts need to be present before lut toolbar appears
+        self._toolbar_display_thresh = 7
 
         # Toolbar for LUT management
-        self.lut_toolbar = wx.BoxSizer(wx.HORIZONTAL)
-        self.lut_toolbar.Add(self.lut_selector, 0, wx.EXPAND | wx.ALL, 5)
-        self.lut_toolbar.AddStretchSpacer()
+        self._lut_toolbar_panel = wx.Panel(self)
+        self._lut_toolbar = wx.BoxSizer(wx.HORIZONTAL)
+        self._lut_toolbar_panel.SetSizer(self._lut_toolbar)
+
+        # Add LUT channel selector
+        self.lut_selector = _LutChannelSelector(self._lut_toolbar_panel)
+
+        self._lut_toolbar.Add(self.lut_selector, 0, wx.EXPAND | wx.ALL, 5)
+        self._lut_toolbar.AddStretchSpacer()
+
+        self.lut_selector.Hide()
+        self._lut_toolbar_panel.Hide()
+        self._lut_toolbar_shown = False
 
         # Create a scrolled panel for LUTs
         self.luts_scroll = wx.ScrolledWindow(self, style=wx.VSCROLL)
@@ -687,7 +697,7 @@ class _WxArrayViewer(wx.Frame):
         inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
-        inner.Add(self.lut_toolbar, 0, wx.EXPAND | wx.BOTTOM, 5)
+        inner.Add(self._lut_toolbar_panel, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self.luts_scroll, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self._btns, 0, wx.EXPAND)
         self._inner_sizer = inner
@@ -710,6 +720,16 @@ class _WxArrayViewer(wx.Frame):
         self.luts_scroll.FitInside()
         self.Layout()
 
+    def toggle_lut_toolbar(self, show: bool) -> None:
+        if show and not self._lut_toolbar_shown:
+            self.lut_selector.Show()
+            self._lut_toolbar_panel.Show()
+            self._lut_toolbar_shown = True
+        elif not show and self._lut_toolbar_shown:
+            self.lut_selector.Hide()
+            self._lut_toolbar_panel.Hide()
+            self._lut_toolbar_shown = False
+        self._inner_sizer.Layout()
 
 class WxArrayView(ArrayView):
     def __init__(
@@ -799,6 +819,9 @@ class WxArrayView(ArrayView):
         self._lut_selector().add_channel(view)
         self._wxwidget.update_lut_scroll_size()
 
+        if len(self._luts) >= self._wxwidget._toolbar_display_thresh:
+            self._wxwidget.toggle_lut_toolbar(True)
+
         return view
 
     # TODO: Fix type
@@ -826,6 +849,9 @@ class WxArrayView(ArrayView):
 
         self._lut_selector().remove_channel(channel)
         self._wxwidget.update_lut_scroll_size()
+
+        if len(self._luts) < self._wxwidget._toolbar_display_thresh:
+            self._wxwidget.toggle_lut_toolbar(False)
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         self._wxwidget.dims_sliders.create_sliders(coords)
