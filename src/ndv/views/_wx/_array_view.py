@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import warnings
+from enum import Enum
 from pathlib import Path
 from sys import version_info
-from enum import Enum
 from typing import TYPE_CHECKING, cast
 
 import psygnal
@@ -115,7 +115,9 @@ class _LutChannelSelector(wx.Panel):
         # Select All / None buttons
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._select_all_btn = wx.Button(self._popup, label="Select All", size=(80, -1))
-        self._select_none_btn = wx.Button(self._popup, label="Select None", size=(80, -1))
+        self._select_none_btn = wx.Button(
+            self._popup, label="Select None", size=(80, -1)
+        )
         self._select_all_btn.Bind(wx.EVT_BUTTON, self._on_select_all)
         self._select_none_btn.Bind(wx.EVT_BUTTON, self._on_select_none)
         btn_sizer.Add(self._select_all_btn, 0, wx.ALL, 5)
@@ -139,7 +141,9 @@ class _LutChannelSelector(wx.Panel):
         self._update_selection_info()
 
     def add_channel(self, view: WxLutView):
-        if (type(view.channel) is int) or (type(view.channel) is str and view.channel.isdigit()):
+        if (type(view.channel) is int) or (
+            type(view.channel) is str and view.channel.isdigit()
+        ):
             if view.channel not in self._channels:
                 self._channels.append(view.channel)
             self._displayed_channels.add(view.channel)
@@ -730,6 +734,7 @@ class _WxArrayViewer(wx.Frame):
             self._lut_toolbar_panel.Hide()
             self._lut_toolbar_shown = False
         self._inner_sizer.Layout()
+
 
 class WxArrayView(ArrayView):
     def __init__(
