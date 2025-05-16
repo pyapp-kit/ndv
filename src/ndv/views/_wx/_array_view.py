@@ -27,7 +27,6 @@ if TYPE_CHECKING:
     import cmap
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
@@ -479,11 +478,9 @@ class WxArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: wx.Window,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
         parent: wx.Window = None,
     ) -> None:
-        self._data_model = data_model
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
