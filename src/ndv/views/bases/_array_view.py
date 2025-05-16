@@ -30,7 +30,7 @@ class ArrayView(Viewable):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     histogramRequested = Signal(int)
-    visibleAxesChanged = Signal()
+    nDimsRequested = Signal(int)
     channelModeChanged = Signal(ChannelMode)
 
     # model: _ArrayDataDisplayModel is likely a temporary parameter
