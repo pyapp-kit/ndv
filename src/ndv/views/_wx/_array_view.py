@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from enum import Enum
 from pathlib import Path
 from sys import version_info
 from typing import TYPE_CHECKING, cast
@@ -68,7 +69,180 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
     btn.SetBitmapLabel(bitmap)
 
 
-# mostly copied from _qt.qt_view._QLUTWidget
+class _LutChannelSelector(wx.Panel):
+    # actually set[ChannelKey] | set
+    selectionChanged = Signal(set)
+
+    def __init__(self, parent: wx.Window, channels: None | list[ChannelKey] = None):
+        super().__init__(parent)
+
+        # channels must be list not set, because we index into it
+        # when the corresponding checklist index is changed
+        self._channels: list[ChannelKey] = channels or []
+        # all channels displayed in view
+        # if displayed, may or may not be visible, if not displayed, not visible
+        self._displayed_channels: set[ChannelKey] = set(self._channels)
+        self._luts: dict[ChannelKey, WxLutView] = {}
+
+        # Dropdown button with currenct selection
+        self._dropdown_btn = wx.Button(
+            self, label="Channel Display Options", style=wx.BU_EXACTFIT
+        )
+        self._dropdown_btn.Bind(wx.EVT_BUTTON, self._on_dropdown_clicked)
+
+        # Display indicator for how many channels are currently displayed
+        self._selection_info = wx.StaticText(self, label="")
+        self._update_selection_info()
+
+        # Create a popup window for the checklist
+        self._popup = wx.Dialog(
+            self,
+            style=wx.BORDER_SIMPLE
+            | wx.STAY_ON_TOP
+            | wx.FRAME_NO_TASKBAR
+            | wx.FRAME_FLOAT_ON_PARENT,
+        )
+        self._popup.SetBackgroundColour(
+            wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOW)
+        )
+        # evt handler for clicking outside of popup dialog
+        self._popup.Bind(wx.EVT_ACTIVATE, self._on_popup_deactivate)
+
+        # Create a checklist for the popup
+        self._checklist = wx.CheckListBox(self._popup, choices=[])
+        self._checklist.Bind(wx.EVT_CHECKLISTBOX, self._on_selection_changed)
+
+        # Select All / None buttons
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._select_all_btn = wx.Button(self._popup, label="Select All", size=(80, -1))
+        self._select_none_btn = wx.Button(
+            self._popup, label="Select None", size=(80, -1)
+        )
+        self._select_all_btn.Bind(wx.EVT_BUTTON, self._on_select_all)
+        self._select_none_btn.Bind(wx.EVT_BUTTON, self._on_select_none)
+        btn_sizer.Add(self._select_all_btn, 0, wx.ALL, 5)
+        btn_sizer.Add(self._select_none_btn, 0, wx.ALL, 5)
+
+        # Layout for popup
+        popup_sizer = wx.BoxSizer(wx.VERTICAL)
+        popup_sizer.Add(self._checklist, 1, wx.EXPAND | wx.ALL, 5)
+        popup_sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.BOTTOM, 5)
+        self._popup.SetSizer(popup_sizer)
+
+        # Layout for the main widget
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self._dropdown_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        sizer.Add(self._selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
+        self.SetSizer(sizer)
+
+    def set_displayed_channels(self, displayed_channels: list[ChannelKey]):
+        self._displayed_channels = set(displayed_channels)
+        self._update_checklist()
+        self._update_selection_info()
+
+    def add_channel(self, view: WxLutView):
+        if (type(view.channel) is int) or (
+            type(view.channel) is str and view.channel.isdigit()
+        ):
+            if view.channel not in self._channels:
+                self._channels.append(view.channel)
+            self._displayed_channels.add(view.channel)
+            self._luts[view.channel] = view
+            self._update_checklist()
+            self._update_selection_info()
+
+    def remove_channel(self, channel: ChannelKey):
+        self._channels = [ch for ch in self._channels if not ch == channel]
+        self._displayed_channels.discard(channel)
+        del self._luts[channel]
+        self._update_checklist()
+        self._update_selection_info()
+
+    def _update_checklist(self):
+        """Update the checklist with current channels."""
+        self._checklist.Clear()
+        for channel in self._channels:
+            self._checklist.Append(str(channel))
+            idx = self._checklist.FindString(str(channel))
+            if channel in self._displayed_channels:
+                self._checklist.Check(idx)
+
+    def _update_selection_info(self):
+        """Update the selection info text."""
+        if len(self._displayed_channels) == len(self._channels):
+            self._selection_info.SetLabel(
+                f"All channels displayed ({len(self._channels)})"
+            )
+        else:
+            self._selection_info.SetLabel(
+                f"{len(self._displayed_channels)} of {len(self._channels)} channels displayed"
+            )
+        self.Layout()
+
+    def _on_dropdown_clicked(self, evt):
+        """Show the dropdown checklist."""
+        # Position the popup below the button
+        btn_size = self._dropdown_btn.GetSize()
+        btn_pos = self._dropdown_btn.GetPosition()
+        popup_pos = self.ClientToScreen(
+            wx.Point(btn_pos.x, btn_pos.y + btn_size.height)
+        )
+
+        # Update the checklist
+        self._update_checklist()
+
+        # Size the popup according to content
+        self._popup.SetSize(wx.Size(250, min(400, 50 + len(self._channels) * 22)))
+        self._checklist.SetSize(self._popup.GetClientSize())
+        self._popup.Layout()
+
+        # Show the popup
+        self._popup.SetPosition(popup_pos)
+        self._popup.Show(show=True)
+
+    def _on_popup_deactivate(self, evt):
+        """Close the popup when it loses focus (user clicks outside)."""
+        if not evt.GetActive():
+            self._popup.Show(show=False)
+
+    def _on_selection_changed(self, evt):
+        """Handle selection changes in the checklist."""
+        idx = evt.GetSelection()
+        channel = self._channels[idx]
+
+        if self._checklist.IsChecked(idx):
+            self._displayed_channels.add(channel)
+            self._luts[channel].set_display(True)
+        else:
+            self._displayed_channels.discard(channel)
+            self._luts[channel].set_display(False)
+
+        self._update_selection_info()
+
+        self.selectionChanged.emit()
+
+    def _on_select_all(self, evt):
+        """Select all channels."""
+        for i in range(self._checklist.GetCount()):
+            self._checklist.Check(i, True)
+        self._displayed_channels.clear()
+        for channel in self._channels:
+            self._luts[channel].set_display(True)
+            self._displayed_channels.add(channel)
+        self._update_selection_info()
+        self.selectionChanged.emit()
+
+    def _on_select_none(self, evt):
+        """Deselect all channels."""
+        for i in range(self._checklist.GetCount()):
+            self._checklist.Check(i, False)
+        self._displayed_channels.clear()
+        for channel in self._channels:
+            self._luts[channel].set_display(False)
+        self._update_selection_info()
+        self.selectionChanged.emit()
+
+
 class _WxLUTWidget(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -156,15 +330,23 @@ class _WxLUTWidget(wx.Panel):
         self.Layout()
 
 
+# VISIBLE: LUT controls are displayed and channel is included in rendered raster
+# DISPLAYED: LUT controls are displayed and channel is not included in rendered raster
+# HIDDEN: LUT controls are not displayed and channel is not included in rendered raster
+_DisplayStatus = Enum("DisplayStatus", "VISIBLE DISPLAYED HIDDEN")
+
+
 class WxLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
+    lutUpdated = Signal()
 
     def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent)
-        self._channel = channel
+        self.channel = channel
         self.histogram: HistogramCanvas | None = None
+        self._display_status: _DisplayStatus = _DisplayStatus.VISIBLE
         # TODO: use emit_fast
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
@@ -218,7 +400,7 @@ class WxLutView(LutView):
         self._show_histogram(toggled)
 
         if self.histogram is None:
-            self.histogramRequested.emit(self._channel)
+            self.histogramRequested.emit(self.channel)
 
     def _on_log_btn_toggled(self, event: wx.CommandEvent) -> None:
         toggled = self._wxwidget.log_btn.GetValue()
@@ -305,17 +487,48 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMin(mi)
         self._wxwidget.clims.SetMax(ma)
 
+    def _display_hidden(self):
+        self._display_status = _DisplayStatus.HIDDEN
+        self._wxwidget.Hide()
+        self._wxwidget.visible.SetValue(False)
+        self._on_visible_changed(None)
+
+    def _display_enable(self):
+        self._display_status = _DisplayStatus.DISPLAYED
+        self._wxwidget.Show()
+
+    def _display_visible(self):
+        self._display_status = _DisplayStatus.VISIBLE
+        self._wxwidget.visible.SetValue(True)
+
     def set_channel_visible(self, visible: bool) -> None:
-        self._wxwidget.visible.SetValue(visible)
+        if visible and self._display_status != _DisplayStatus.HIDDEN:
+            self._display_visible()
+        # elif visible do nothing
+        elif not visible:
+            self._wxwidget.visible.SetValue(False)
 
     def set_visible(self, visible: bool) -> None:
-        if visible:
+        if visible and self._display_status != _DisplayStatus.HIDDEN:
             self._wxwidget.Show()
-        else:
+            self.lutUpdated.emit()
+        # elif visible do nothing
+        elif not visible:
             self._wxwidget.Hide()
+            self.lutUpdated.emit()
+
+    def set_display(self, display: bool) -> None:
+        if display and self._display_status == _DisplayStatus.HIDDEN:
+            self._display_enable()
+            self.lutUpdated.emit()
+        # elif display do nothing
+        elif not display:
+            self._display_hidden()
+            self.lutUpdated.emit()
 
     def close(self) -> None:
         self._wxwidget.Close()
+        self.lutUpdated.emit()
 
 
 class WxRGBView(WxLutView):
@@ -445,8 +658,31 @@ class _WxArrayViewer(wx.Frame):
         self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
+        # how many luts need to be present before lut toolbar appears
+        self._toolbar_display_thresh = 7
+
+        # Toolbar for LUT management
+        self._lut_toolbar_panel = wx.Panel(self)
+        self._lut_toolbar = wx.BoxSizer(wx.HORIZONTAL)
+        self._lut_toolbar_panel.SetSizer(self._lut_toolbar)
+
+        # Add LUT channel selector
+        self.lut_selector = _LutChannelSelector(self._lut_toolbar_panel)
+
+        self._lut_toolbar.Add(self.lut_selector, 0, wx.EXPAND | wx.ALL, 5)
+        self._lut_toolbar.AddStretchSpacer()
+
+        self.lut_selector.Hide()
+        self._lut_toolbar_panel.Hide()
+        self._lut_toolbar_shown = False
+
+        # Create a scrolled panel for LUTs
+        self.luts_scroll = wx.ScrolledWindow(self, style=wx.VSCROLL)
+        self.luts_scroll.SetScrollRate(0, 10)
+
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
+        self.luts_scroll.SetSizer(self.luts)
 
         self._btns = wx.BoxSizer(wx.HORIZONTAL)
         self._btns.AddStretchSpacer()
@@ -465,14 +701,39 @@ class _WxArrayViewer(wx.Frame):
         inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
-        inner.Add(self.luts, 0, wx.EXPAND)
+        inner.Add(self._lut_toolbar_panel, 0, wx.EXPAND | wx.BOTTOM, 5)
+        inner.Add(self.luts_scroll, 0, wx.EXPAND | wx.BOTTOM, 5)
         inner.Add(self._btns, 0, wx.EXPAND)
+        self._inner_sizer = inner
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(inner, 1, wx.EXPAND | wx.ALL, 10)
         self.SetSizer(outer)
         self.SetInitialSize(wx.Size(600, 800))
+
+        self.update_lut_scroll_size()
         self.Layout()
+
+    def update_lut_scroll_size(self):
+        self.luts_scroll.Layout()
+        total_size = self.luts.GetMinSize()
+        total_height = total_size.GetHeight()
+        new_height = max(30, min(total_height, 200))
+        self._inner_sizer.SetItemMinSize(self.luts_scroll, -1, new_height)
+        self.luts_scroll.SetVirtualSize(total_size)
+        self.luts_scroll.FitInside()
+        self.Layout()
+
+    def toggle_lut_toolbar(self, show: bool) -> None:
+        if show and not self._lut_toolbar_shown:
+            self.lut_selector.Show()
+            self._lut_toolbar_panel.Show()
+            self._lut_toolbar_shown = True
+        elif not show and self._lut_toolbar_shown:
+            self.lut_selector.Hide()
+            self._lut_toolbar_panel.Hide()
+            self._lut_toolbar_shown = False
+        self._inner_sizer.Layout()
 
 
 class WxArrayView(ArrayView):
@@ -496,6 +757,8 @@ class WxArrayView(ArrayView):
         wdg.set_range_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
+
+        wdg.lut_selector.selectionChanged.connect(lambda: self._wxwidget.Layout())
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
@@ -538,17 +801,32 @@ class WxArrayView(ArrayView):
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
 
+    def _lut_area(self) -> wx.Window:
+        return self._wxwidget.luts_scroll
+
+    def _lut_selector(self) -> _LutChannelSelector:
+        return self._wxwidget.lut_selector
+
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
-        wdg = self.frontend_widget()
-        view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
+        scrollwdg = self._lut_area()
+        view = (
+            WxRGBView(scrollwdg, channel)
+            if channel == "RGB"
+            else WxLutView(scrollwdg, channel)
+        )
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
         # TODO: Reusable synchronization with ViewerModel
         view._wxwidget.histogram_btn.Show(self._viewer_model.show_histogram_button)
         view.histogramRequested.connect(self.histogramRequested)
+        view.lutUpdated.connect(self._wxwidget.update_lut_scroll_size)
 
-        # Update the layout to reflect above changes
-        self._wxwidget.Layout()
+        self._lut_selector().add_channel(view)
+        self._wxwidget.update_lut_scroll_size()
+
+        if len(self._luts) >= self._wxwidget._toolbar_display_thresh:
+            self._wxwidget.toggle_lut_toolbar(True)
+
         return view
 
     # TODO: Fix type
@@ -559,10 +837,26 @@ class WxArrayView(ArrayView):
         self._wxwidget.Layout()
 
     def remove_lut_view(self, lut: LutView) -> None:
+        # Find the channel key for this LUT view
+        channel_to_remove = None
+        for channel, view in self._luts.items():
+            if view == lut:
+                channel_to_remove = channel
+                break
+
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
         self._wxwidget.luts.Detach(wxwdg)
         wxwdg.Destroy()
-        self._wxwidget.Layout()
+
+        # Remove from our dictionaries
+        if channel_to_remove:
+            del self._luts[channel_to_remove]
+
+        self._lut_selector().remove_channel(channel)
+        self._wxwidget.update_lut_scroll_size()
+
+        if len(self._luts) < self._wxwidget._toolbar_display_thresh:
+            self._wxwidget.toggle_lut_toolbar(False)
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         self._wxwidget.dims_sliders.create_sliders(coords)
@@ -588,6 +882,10 @@ class WxArrayView(ArrayView):
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
         self._wxwidget.channel_mode_combo.SetValue(mode)
+        if mode == ChannelMode.COMPOSITE:
+            self._wxwidget.lut_selector.Show()
+        else:
+            self._wxwidget.lut_selector.Hide()
 
     def set_visible(self, visible: bool) -> None:
         if visible:
