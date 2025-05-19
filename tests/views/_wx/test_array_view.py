@@ -7,7 +7,6 @@ from pytest import fixture
 
 from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
-from ndv.models import ChannelMode
 from ndv.views._app import get_histogram_canvas_class
 from ndv.views._wx._array_view import WxArrayView
 
@@ -56,7 +55,6 @@ def test_array_options(viewer: WxArrayView) -> None:
 
 
 def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
-
     channel = None
     lut = viewer._luts[channel]
     btn = lut._wxwidget.histogram_btn
@@ -77,6 +75,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
 
 # == Tests for display of channels ==
 
+
 def test_display_options_visibility(wxapp: wx.App, viewer: WxArrayView) -> None:
     # display options button should appear only after thresh is reached
     # -2 to account for add_lut_view(None) in fixture
@@ -94,6 +93,7 @@ def test_display_options_visibility(wxapp: wx.App, viewer: WxArrayView) -> None:
     assert viewer._wxwidget._lut_toolbar_shown
     assert viewer._wxwidget.lut_selector.IsShown()
     assert viewer._wxwidget._lut_toolbar_panel.IsShown()
+
 
 def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
     # display options button should appear after thresh reached
@@ -116,12 +116,12 @@ def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
     assert not checklist.IsChecked(0)
     assert not viewer._luts[0]._wxwidget.IsShown()
 
-    #channel_mode = viewer._wxwidget.channel_mode_combo
-    #viewer.set_channel_mode(ChannelMode.GRAYSCALE)
-    #_processEvent(wxapp, wx.EVT_COMBOBOX, channel_mode)
+    # channel_mode = viewer._wxwidget.channel_mode_combo
+    # viewer.set_channel_mode(ChannelMode.GRAYSCALE)
+    # _processEvent(wxapp, wx.EVT_COMBOBOX, channel_mode)
 
     ## all channels should be hidden
-    #for ch, lut_view in viewer._luts.items():
+    # for ch, lut_view in viewer._luts.items():
     #    if type(ch) is int or (type(ch) is str and ch.isdigit()):
     #        print('checking', ch)
     #        assert not lut_view._wxwidget.IsShown()
