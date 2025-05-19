@@ -18,8 +18,18 @@ def viewer(wxapp: wx.App) -> WxArrayView:
     return viewer
 
 
-def _processEvent(wxapp: wx.App, evt: wx.PyEventBinder, wdg: wx.Control) -> None:
-    ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
+def _processEvent(
+    wxapp: wx.App,
+    evt: wx.PyEventBinder,
+    wdg: wx.Control,
+    **kwargs
+) -> None:
+    if evt == wx.EVT_ACTIVATE:
+        active = kwargs.get("active", True)
+        ev = wx.ActivateEvent(eventType=evt.typeId, active=active)
+    else:
+        ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
+
     wx.PostEvent(wdg.GetEventHandler(), ev)
     # Borrowed from:
     # https://github.com/wxWidgets/Phoenix/blob/master/unittests/wtc.py#L41
@@ -127,7 +137,6 @@ def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
 
 def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
     # display options button should appear only after thresh is reached
-    # -2 to account for add_lut_view(None) in fixture
     for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
         viewer.add_lut_view(ch)
 
@@ -143,3 +152,20 @@ def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
     assert len(viewer._luts) == 1
     assert len(viewer._wxwidget.luts.Children) == 1
     assert len(viewer._wxwidget.lut_selector._checklist.Children) == 0
+
+def test_dropdown_popup(wxapp: wx.App, viewer: WxArrayView) -> None:
+    for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
+        viewer.add_lut_view(ch)
+
+    assert not viewer._wxwidget.lut_selector._popup.IsShown()
+
+    ch_selection_dropdown = viewer._wxwidget.lut_selector._dropdown_btn
+    _processEvent(wxapp, wx.EVT_BUTTON, ch_selection_dropdown)
+
+    assert viewer._wxwidget.lut_selector._popup.IsShown()
+
+    _processEvent(
+        wxapp, wx.EVT_ACTIVATE, viewer._wxwidget.lut_selector._popup, active=False
+    )
+
+    assert not viewer._wxwidget.lut_selector._popup.IsShown()
