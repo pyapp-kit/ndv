@@ -134,11 +134,6 @@ class _LutChannelSelector(wx.Panel):
         sizer.Add(self._selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
 
-    def set_displayed_channels(self, displayed_channels: list[ChannelKey]):
-        self._displayed_channels = set(displayed_channels)
-        self._update_checklist()
-        self._update_selection_info()
-
     def add_channel(self, view: WxLutView):
         if (type(view.channel) is int) or (
             type(view.channel) is str and view.channel.isdigit()
