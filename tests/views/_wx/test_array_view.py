@@ -19,10 +19,7 @@ def viewer(wxapp: wx.App) -> WxArrayView:
 
 
 def _processEvent(
-    wxapp: wx.App,
-    evt: wx.PyEventBinder,
-    wdg: wx.Control,
-    **kwargs
+    wxapp: wx.App, evt: wx.PyEventBinder, wdg: wx.Control, **kwargs
 ) -> None:
     if evt == wx.EVT_ACTIVATE:
         active = kwargs.get("active", True)
@@ -143,6 +140,7 @@ def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
     #    if type(ch) is int or (type(ch) is str and ch.isdigit()):
     #        assert not lut_view._wxwidget.IsShown()
 
+
 def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
     # display options button should appear only after thresh is reached
     for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
@@ -161,6 +159,7 @@ def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
     assert len(viewer._wxwidget.luts.Children) == 1
     assert len(viewer._wxwidget.lut_selector._checklist.Children) == 0
 
+
 def test_dropdown_popup(wxapp: wx.App, viewer: WxArrayView) -> None:
     for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
         viewer.add_lut_view(ch)
@@ -177,6 +176,7 @@ def test_dropdown_popup(wxapp: wx.App, viewer: WxArrayView) -> None:
     )
 
     assert not viewer._wxwidget.lut_selector._popup.IsShown()
+
 
 def test_none_all(wxapp: wx.App, viewer: WxArrayView) -> None:
     for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
