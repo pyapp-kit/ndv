@@ -347,7 +347,7 @@ class WxLutView(LutView):
     ) -> None:
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
-        self._channel = channel
+        self.channel = channel
         self.histogram: HistogramCanvas | None = None
         self._display_status: _DisplayStatus = _DisplayStatus.VISIBLE
         # TODO: use emit_fast
@@ -811,7 +811,7 @@ class WxArrayView(ArrayView):
         return self._wxwidget.lut_selector
 
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
-        scrollwdg = self.frontend_widget()
+        scrollwdg = self._lut_area()
         view = (
             WxRGBView(scrollwdg, channel)
             if channel == "RGB"
