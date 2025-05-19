@@ -7,6 +7,7 @@ from pytest import fixture
 
 from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
+from ndv.models import ChannelMode
 from ndv.views._app import get_histogram_canvas_class
 from ndv.views._wx._array_view import WxArrayView
 
@@ -16,6 +17,16 @@ def viewer(wxapp: wx.App) -> WxArrayView:
     viewer = WxArrayView(MagicMock(), _ArrayDataDisplayModel(), ArrayViewerModel())
     viewer.add_lut_view(None)
     return viewer
+
+
+def _processEvent(wxapp: wx.App, evt: wx.PyEventBinder, wdg: wx.Control) -> None:
+    ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
+    wx.PostEvent(wdg.GetEventHandler(), ev)
+    # Borrowed from:
+    # https://github.com/wxWidgets/Phoenix/blob/master/unittests/wtc.py#L41
+    evtLoop = wxapp.GetTraits().CreateEventLoop()
+    wx.EventLoopActivator(evtLoop)
+    evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
 
 
 def test_array_options(viewer: WxArrayView) -> None:
@@ -45,14 +56,6 @@ def test_array_options(viewer: WxArrayView) -> None:
 
 
 def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
-    def processEvent(evt: wx.PyEventBinder, wdg: wx.Control) -> None:
-        ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
-        wx.PostEvent(wdg.GetEventHandler(), ev)
-        # Borrowed from:
-        # https://github.com/wxWidgets/Phoenix/blob/master/unittests/wtc.py#L41
-        evtLoop = wxapp.GetTraits().CreateEventLoop()
-        wx.EventLoopActivator(evtLoop)
-        evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
 
     channel = None
     lut = viewer._luts[channel]
@@ -62,7 +65,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
     histogram_mock = Mock()
     viewer.histogramRequested.connect(histogram_mock)
     btn.SetValue(True)
-    processEvent(wx.EVT_TOGGLEBUTTON, btn)
+    _processEvent(wxapp, wx.EVT_TOGGLEBUTTON, btn)
     histogram_mock.assert_called_once_with(channel)
 
     # Test adding the histogram widget puts it on the relevant lut
@@ -70,3 +73,55 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
     histogram = get_histogram_canvas_class()()  # will raise if not supported
     viewer.add_histogram(channel, histogram)
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 2
+
+
+# == Tests for display of channels ==
+
+def test_display_options_visibility(wxapp: wx.App, viewer: WxArrayView) -> None:
+    # display options button should appear only after thresh is reached
+    # -2 to account for add_lut_view(None) in fixture
+    for ch in range(viewer._wxwidget._toolbar_display_thresh - 2):
+        viewer.add_lut_view(ch)
+
+    assert viewer._wxwidget.lut_selector.IsEnabled()
+
+    assert not viewer._wxwidget._lut_toolbar_shown
+    assert not viewer._wxwidget.lut_selector.IsShown()
+    assert not viewer._wxwidget._lut_toolbar_panel.IsShown()
+
+    viewer.add_lut_view(ch + 1)
+
+    assert viewer._wxwidget._lut_toolbar_shown
+    assert viewer._wxwidget.lut_selector.IsShown()
+    assert viewer._wxwidget._lut_toolbar_panel.IsShown()
+
+def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
+    # display options button should appear after thresh reached
+    num_channels = viewer._wxwidget._toolbar_display_thresh - 1
+    for ch in range(num_channels):
+        viewer.add_lut_view(ch)
+
+    assert len(viewer._wxwidget.luts.Children) == len(viewer._luts)
+
+    # all channels should initially be displayed
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int or (type(ch) is str and ch.isdigit()):
+            assert lut_view._wxwidget.IsShown()
+
+    # display off for a single channel
+    checklist = viewer._wxwidget.lut_selector._checklist
+    checklist.Check(0, False)
+    _processEvent(wxapp, wx.EVT_CHECKLISTBOX, checklist)
+
+    assert not checklist.IsChecked(0)
+    assert not viewer._luts[0]._wxwidget.IsShown()
+
+    #channel_mode = viewer._wxwidget.channel_mode_combo
+    #viewer.set_channel_mode(ChannelMode.GRAYSCALE)
+    #_processEvent(wxapp, wx.EVT_COMBOBOX, channel_mode)
+
+    ## all channels should be hidden
+    #for ch, lut_view in viewer._luts.items():
+    #    if type(ch) is int or (type(ch) is str and ch.isdigit()):
+    #        print('checking', ch)
+    #        assert not lut_view._wxwidget.IsShown()
