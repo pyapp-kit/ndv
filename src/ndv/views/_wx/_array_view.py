@@ -847,7 +847,7 @@ class WxArrayView(ArrayView):
         wxwdg.Destroy()
 
         # Remove from our dictionaries
-        if channel_to_remove:
+        if channel_to_remove is not None:
             del self._luts[channel_to_remove]
 
         self._lut_selector().remove_channel(channel)

@@ -123,5 +123,23 @@ def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
     ## all channels should be hidden
     # for ch, lut_view in viewer._luts.items():
     #    if type(ch) is int or (type(ch) is str and ch.isdigit()):
-    #        print('checking', ch)
     #        assert not lut_view._wxwidget.IsShown()
+
+def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
+    # display options button should appear only after thresh is reached
+    # -2 to account for add_lut_view(None) in fixture
+    for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
+        viewer.add_lut_view(ch)
+
+    for ch in range(viewer._wxwidget._toolbar_display_thresh - 1):
+        lut_view = viewer._luts[ch]
+        viewer.remove_lut_view(lut_view)
+
+    assert not viewer._wxwidget._lut_toolbar_shown
+    assert not viewer._wxwidget.lut_selector.IsShown()
+    assert not viewer._wxwidget._lut_toolbar_panel.IsShown()
+
+    # len == 1 to account for the None key
+    assert len(viewer._luts) == 1
+    assert len(viewer._wxwidget.luts.Children) == 1
+    assert len(viewer._wxwidget.lut_selector._checklist.Children) == 0
