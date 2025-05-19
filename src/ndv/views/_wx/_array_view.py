@@ -4,8 +4,9 @@ import warnings
 from enum import Enum
 from pathlib import Path
 from sys import version_info
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
+import cmap
 import psygnal
 import wx
 import wx.adv
@@ -24,8 +25,6 @@ from .range_slider import RangeSlider
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
-
-    import cmap
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
@@ -244,7 +243,7 @@ class _LutChannelSelector(wx.Panel):
 
 
 class _WxLUTWidget(wx.Panel):
-    def __init__(self, parent: wx.Window) -> None:
+    def __init__(self, parent: wx.Window, default_luts: Sequence[Any]) -> None:
         super().__init__(parent)
 
         # -- WDIDGETS -- #
@@ -252,9 +251,8 @@ class _WxLUTWidget(wx.Panel):
         self.visible.SetValue(True)
 
         # Placeholder for the custom colormap combo box
-        self.cmap = wx.ComboBox(
-            self, choices=["gray", "green", "magenta"], style=wx.CB_DROPDOWN
-        )
+        _luts = [cmap.Colormap(x).name.split(":")[-1] for x in default_luts]
+        self.cmap = wx.ComboBox(self, choices=_luts, style=wx.CB_DROPDOWN)
 
         # Placeholder for the QLabeledRangeSlider equivalent
         self.clims = RangeSlider(self, style=wx.SL_HORIZONTAL)
@@ -341,10 +339,15 @@ class WxLutView(LutView):
     histogramRequested = psygnal.Signal(object)
     lutUpdated = Signal()
 
-    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
+    def __init__(
+        self,
+        parent: wx.Window,
+        channel: ChannelKey = None,
+        default_luts: Sequence[Any] = ("gray", "green", "magenta"),
+    ) -> None:
         super().__init__()
-        self._wxwidget = wdg = _WxLUTWidget(parent)
-        self.channel = channel
+        self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
+        self._channel = channel
         self.histogram: HistogramCanvas | None = None
         self._display_status: _DisplayStatus = _DisplayStatus.VISIBLE
         # TODO: use emit_fast
@@ -808,11 +811,11 @@ class WxArrayView(ArrayView):
         return self._wxwidget.lut_selector
 
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
-        scrollwdg = self._lut_area()
+        scrollwdg = self.frontend_widget()
         view = (
             WxRGBView(scrollwdg, channel)
             if channel == "RGB"
-            else WxLutView(scrollwdg, channel)
+            else WxLutView(scrollwdg, channel, self._viewer_model.default_luts)
         )
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
