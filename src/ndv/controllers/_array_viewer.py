@@ -490,7 +490,7 @@ class ArrayViewer:
             if canvas_pos is not None:
                 pos = f"[{canvas_pos[1]:.0f}, {canvas_pos[0]:.0f}] "
             else:
-                pos = " "
+                pos = " "  # pragma: no cover
 
             vals = []
             for ch, value in channel_values.items():
