@@ -5,6 +5,7 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import cmap
 import ipywidgets as widgets
 import psygnal
 
@@ -16,7 +17,6 @@ from ndv.views.bases import ArrayView, LutView
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
-    import cmap
     from psygnal import EmissionInfo
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
@@ -45,26 +45,18 @@ class JupyterLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
-    def __init__(self, channel: ChannelKey = None) -> None:
+    def __init__(
+        self,
+        channel: ChannelKey = None,
+        default_luts: Sequence[Any] = ("gray", "green", "magenta", "red", "blue"),
+    ) -> None:
         self._channel = channel
         self._histogram: HistogramCanvas | None = None
         # WIDGETS
         self._visible = widgets.Checkbox(value=True, indent=False)
         self._visible.layout.width = "60px"
-        self._cmap = widgets.Dropdown(
-            options=[
-                "gray",
-                "red",
-                "green",
-                "blue",
-                "cyan",
-                "magenta",
-                "yellow",
-                "viridis",
-                "magma",
-            ],
-            value="gray",
-        )
+        _luts = [cmap.Colormap(x).name.split(":")[-1] for x in default_luts]
+        self._cmap = widgets.Dropdown(options=_luts, value=_luts[0])
         self._cmap.layout.width = "200px"
         self._clims = widgets.FloatRangeSlider(
             value=[0, 2**16],
@@ -427,7 +419,11 @@ class JupyterArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterRGBView(channel) if channel == "RGB" else JupyterLutView(channel)
+        wdg = (
+            JupyterRGBView(channel)
+            if channel == "RGB"
+            else JupyterLutView(channel, self._viewer_model.default_luts)
+        )
         layout = self._luts_box
         self._luts[channel] = wdg
 
@@ -534,4 +530,3 @@ class JupyterArrayView(ArrayView):
             self._slider_box.display = "flex" if value else None
             self._btns_box.display = "flex" if value else None
             self._luts_box.display = "flex" if value else None
-            print("controls", value)

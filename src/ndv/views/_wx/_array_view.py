@@ -3,8 +3,9 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 from sys import version_info
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
+import cmap
 import psygnal
 import wx
 import wx.adv
@@ -23,8 +24,6 @@ from .range_slider import RangeSlider
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
-
-    import cmap
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.views.bases._graphics._canvas import HistogramCanvas
@@ -69,7 +68,7 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
 
 # mostly copied from _qt.qt_view._QLUTWidget
 class _WxLUTWidget(wx.Panel):
-    def __init__(self, parent: wx.Window) -> None:
+    def __init__(self, parent: wx.Window, default_luts: Sequence[Any]) -> None:
         super().__init__(parent)
 
         # -- WDIDGETS -- #
@@ -77,9 +76,8 @@ class _WxLUTWidget(wx.Panel):
         self.visible.SetValue(True)
 
         # Placeholder for the custom colormap combo box
-        self.cmap = wx.ComboBox(
-            self, choices=["gray", "green", "magenta"], style=wx.CB_DROPDOWN
-        )
+        _luts = [cmap.Colormap(x).name.split(":")[-1] for x in default_luts]
+        self.cmap = wx.ComboBox(self, choices=_luts, style=wx.CB_DROPDOWN)
 
         # Placeholder for the QLabeledRangeSlider equivalent
         self.clims = RangeSlider(self, style=wx.SL_HORIZONTAL)
@@ -159,9 +157,14 @@ class WxLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
-    def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
+    def __init__(
+        self,
+        parent: wx.Window,
+        channel: ChannelKey = None,
+        default_luts: Sequence[Any] = ("gray", "green", "magenta"),
+    ) -> None:
         super().__init__()
-        self._wxwidget = wdg = _WxLUTWidget(parent)
+        self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
         self._channel = channel
         self.histogram: HistogramCanvas | None = None
         # TODO: use emit_fast
@@ -523,7 +526,11 @@ class WxArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey) -> WxLutView:
         wdg = self.frontend_widget()
-        view = WxRGBView(wdg, channel) if channel == "RGB" else WxLutView(wdg, channel)
+        view = (
+            WxRGBView(wdg, channel)
+            if channel == "RGB"
+            else WxLutView(wdg, channel, self._viewer_model.default_luts)
+        )
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
         # TODO: Reusable synchronization with ViewerModel

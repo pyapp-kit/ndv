@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
+    from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
@@ -58,6 +59,8 @@ class ArrayViewer:
         self,
         data: Any | DataWrapper = None,
         /,
+        *,
+        viewer_options: ArrayViewerModel | ArrayViewerModelKwargs | None = None,
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
@@ -73,7 +76,7 @@ class ArrayViewer:
         self._data_model = _ArrayDataDisplayModel(display=display_model)
         self._set_data_wrapper(wrapper)
 
-        self._viewer_model = ArrayViewerModel()
+        self._viewer_model = ArrayViewerModel.model_validate(viewer_options or {})
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
         )
@@ -115,6 +118,7 @@ class ArrayViewer:
         self._view.nDimsRequested.connect(self._on_view_ndims_requested)
 
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+        self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
         if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
@@ -471,23 +475,46 @@ class ArrayViewer:
 
         # collect and format intensity values at the current mouse position
         channel_values = self._get_values_at_world_point(int(x), int(y))
-        if not channel_values:
-            # clear hover info if no values found
-            self._view.set_hover_info("")
-            return
-        vals = []
-        for ch, value in channel_values.items():
-            # restrict to 2 decimal places, but remove trailing zeros
-            fval = f"{value:.2f}".rstrip("0").rstrip(".")
-            fch = f"{ch}: " if ch is not None else ""
-            vals.append(f"{fch}{fval}")
-        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
-        self._view.set_hover_info(text)
+
+        self._highlight_values(channel_values, (x, y))
+
+    def _on_canvas_mouse_left(self) -> None:
+        """Respond to a mouse leaving the canvas in the view."""
+        self._highlight_values({})
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
 
     # ------------------ Helper methods ------------------
+
+    def _highlight_values(
+        self,
+        channel_values: dict[ChannelKey, float],
+        canvas_pos: tuple[float, float] | None = None,
+    ) -> None:
+        """Highlights the given values for each channel."""
+        # Update highlight each histogram. If the histogram channel is not present
+        # in channel_values, the highlight will be set to None (i.e. hidden)
+        for ch, hist in self._histograms.items():
+            hist.highlight(channel_values.get(ch, None))
+
+        if not channel_values:
+            # clear hover info if no values found
+            self._view.set_hover_info("")
+        else:
+            if canvas_pos is not None:
+                pos = f"[{canvas_pos[1]:.0f}, {canvas_pos[0]:.0f}] "
+            else:
+                pos = " "  # pragma: no cover
+
+            vals = []
+            for ch, value in channel_values.items():
+                # restrict to 2 decimal places, but remove trailing zeros
+                fval = f"{value:.2f}".rstrip("0").rstrip(".")
+                fch = f"{ch}: " if ch is not None else ""
+                vals.append(f"{fch}{fval}")
+
+            self._view.set_hover_info(pos + ",".join(vals))
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
