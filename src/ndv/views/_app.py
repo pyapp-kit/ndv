@@ -339,6 +339,11 @@ def call_later(msec: int, func: Callable[[], None]) -> None:
     ndv_app().call_later(msec, func)
 
 
+def process_events() -> None:
+    """Force processing of events for the application."""
+    ndv_app().process_events()
+
+
 def run_app() -> None:
     """Start the active GUI application event loop."""
     ndv_app().run()

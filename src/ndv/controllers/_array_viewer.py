@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
+    from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
@@ -58,6 +59,8 @@ class ArrayViewer:
         self,
         data: Any | DataWrapper = None,
         /,
+        *,
+        viewer_options: ArrayViewerModel | ArrayViewerModelKwargs | None = None,
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
@@ -73,7 +76,7 @@ class ArrayViewer:
         self._data_model = _ArrayDataDisplayModel(display=display_model)
         self._set_data_wrapper(wrapper)
 
-        self._viewer_model = ArrayViewerModel()
+        self._viewer_model = ArrayViewerModel.model_validate(viewer_options or {})
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
         )
@@ -581,6 +584,9 @@ class ArrayViewer:
 
         display_model = self._data_model.display
         for key, data in response.data.items():
+            if data.size == 0:
+                # no data for this channel
+                continue
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
                     model = display_model.default_lut
