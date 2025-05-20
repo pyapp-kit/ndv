@@ -92,10 +92,26 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._gamma_handle.visible = False
         self._gamma_handle.order = -2
 
+        # The highlight draws attention to a particular domain value.
+        # TODO: Can we make this easier on the eyes? MMStudio uses cmap color, dashed
+        self._highlight = scene.Line(
+            pos=np.array([[0, 0], [0, 1]]),
+            color=(1, 1, 0.2, 0.75),
+            connect="strip",
+            width=1,
+        )
+        self._highlight_tform = scene.transforms.STTransform()
+        self._highlight.visible = False
+        self._highlight.order = -2
+
         # One transform to rule them all!
         self._handle_transform = scene.transforms.STTransform()
         self._lut_line.transform = self._handle_transform
         self._gamma_handle.transform = self._handle_transform
+        self._highlight.transform = self._highlight_tform
+        self._highlight.transform = scene.transforms.ChainTransform(
+            self._handle_transform, self._highlight_tform
+        )
 
         ## -- Plot -- ##
         self.plot = PlotWidget()
@@ -106,6 +122,7 @@ class VispyHistogramCanvas(HistogramCanvas):
         self.plot._view.add(self._hist_mesh)
         self.plot._view.add(self._lut_line)
         self.plot._view.add(self._gamma_handle)
+        self.plot._view.add(self._highlight)
 
         self.set_vertical(vertical)
 
@@ -226,6 +243,12 @@ class VispyHistogramCanvas(HistogramCanvas):
     def elements_at(self, pos_xy: tuple[float, float]) -> list:
         raise NotImplementedError
 
+    def highlight(self, value: float | None) -> None:
+        self._highlight.visible = value is not None
+        self._highlight_tform.translate = (value,)
+
+        return super().highlight(value)
+
     # ------------- Private methods ------------- #
 
     def _update_histogram(self) -> None:
@@ -249,6 +272,13 @@ class VispyHistogramCanvas(HistogramCanvas):
         # FIXME: This should be called internally upon set_data, right?
         # Looks like https://github.com/vispy/vispy/issues/1899
         self._hist_mesh._bounds_changed()
+
+        if self._vertical:
+            scale = values.max() / 0.98
+            self._handle_transform.scale = (scale, 1)
+        else:
+            scale = values.max() / 0.98
+            self._handle_transform.scale = (1, scale)
 
     def _update_lut_ctrls(self, npoints: int = 256) -> None:
         """
@@ -424,9 +454,18 @@ class VispyHistogramCanvas(HistogramCanvas):
         self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None
     ) -> None:
         if x is None:
+            # User specified
             x = self._range if self._vertical else self._domain
+        if x is None and self._bin_edges is not None:
+            # Data-specified
+            x = (self._bin_edges[0], self._bin_edges[-1])
+
         if y is None:
+            # User specified
             y = self._domain if self._vertical else self._range
+        if y is None:
+            # Data-specified
+            y = (0, self._handle_transform.scale[0 if self._vertical else 1])
 
         self.plot.camera.set_range(
             x=x,
@@ -435,12 +474,6 @@ class VispyHistogramCanvas(HistogramCanvas):
             # It's pretty visible in logarithmic mode
             margin=1e-30,
         )
-        if self._vertical:
-            scale = 0.98 * self.plot.xaxis.axis.domain[1]
-            self._handle_transform.scale = (scale, 1)
-        else:
-            scale = 0.98 * self.plot.yaxis.axis.domain[1]
-            self._handle_transform.scale = (1, scale)
 
     def setVisible(self, visible: bool) -> None: ...
 
