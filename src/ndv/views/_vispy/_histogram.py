@@ -96,9 +96,9 @@ class VispyHistogramCanvas(HistogramCanvas):
         # TODO: Can we make this easier on the eyes? MMStudio uses cmap color, dashed
         self._highlight = scene.Line(
             pos=np.array([[0, 0], [0, 1]]),
-            color="yellow",
+            color=(1, 1, 0.2, 0.75),
             connect="strip",
-            width=1.5,
+            width=1,
         )
         self._highlight_tform = scene.transforms.STTransform()
         self._highlight.visible = False

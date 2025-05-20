@@ -195,8 +195,9 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 positions=np.array([[0, 0, 0], [0, 1, 0]], dtype=np.float32),
             ),
             material=pygfx.LineMaterial(
-                color=(1.0, 1.0, 0.0),
+                color=(1.0, 1.0, 0.2, 0.75),
                 dash_pattern=[4, 4],
+                thickness=1.5,
             ),
             visible=False,
         )
