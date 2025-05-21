@@ -23,9 +23,6 @@ def rendercanvas_class() -> "BaseRenderCanvas":
 
         return rendercanvas.jupyter.JupyterRenderCanvas
     if frontend == GuiFrontend.WX:
-        # ...still not working
-        # import rendercanvas.wx
-        # return rendercanvas.wx.WxRenderWidget
-        from wgpu.gui.wx import WxWgpuCanvas
+        import rendercanvas.wx
 
-        return WxWgpuCanvas
+        return rendercanvas.wx.WxRenderWidget

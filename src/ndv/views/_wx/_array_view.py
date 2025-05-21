@@ -399,19 +399,12 @@ class _WxDimsSliders(wx.Panel):
 
 
 class _WxArrayViewer(wx.Frame):
-    def __init__(self, canvas_widget: wx.Window, parent: wx.Window = None):
+    def __init__(self, viewer_model: Any, parent: wx.Window = None):
         super().__init__(parent)
+        from ndv.views import _app
 
-        # FIXME: pygfx backend needs this to be canvas_widget._subwidget
-        if hasattr(canvas_widget, "_subwidget"):
-            canvas_widget = canvas_widget._subwidget
-
-        if (parent := canvas_widget.GetParent()) and parent is not self:
-            canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
-            if parent:
-                parent.Destroy()
-            canvas_widget.Show()
-
+        canvas_cls = _app.get_array_canvas_class()
+        canvas_widget = canvas_cls(viewer_model, parent=self)
         self._canvas = canvas_widget
 
         # Dynamic sliders for dimensions
@@ -465,7 +458,7 @@ class _WxArrayViewer(wx.Frame):
 
         inner = wx.BoxSizer(wx.VERTICAL)
         inner.Add(top_info, 0, wx.EXPAND | wx.BOTTOM, 5)
-        inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
+        inner.Add(self._canvas.frontend_widget(), 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.luts, 0, wx.EXPAND)
@@ -481,7 +474,6 @@ class _WxArrayViewer(wx.Frame):
 class WxArrayView(ArrayView):
     def __init__(
         self,
-        canvas_widget: wx.Window,
         data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
         parent: wx.Window = None,
@@ -489,7 +481,9 @@ class WxArrayView(ArrayView):
         self._data_model = data_model
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
-        self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
+        self._wxwidget = wdg = _WxArrayViewer(self._viewer_model, parent)
+        self._canvas = wdg._canvas
+
         # Mapping of channel key to LutViews
         self._luts: dict[ChannelKey, WxLutView] = {}
         self._visible_axes: Sequence[AxisKey] = []
