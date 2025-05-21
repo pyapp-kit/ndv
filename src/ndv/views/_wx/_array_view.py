@@ -18,7 +18,7 @@ from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LutView, ArrayCanvas
 
 from .range_slider import RangeSlider
 
@@ -399,13 +399,8 @@ class _WxDimsSliders(wx.Panel):
 
 
 class _WxArrayViewer(wx.Frame):
-    def __init__(self, viewer_model: Any, parent: wx.Window = None):
+    def __init__(self, parent: wx.Window | None = None) -> None:
         super().__init__(parent)
-        from ndv.views import _app
-
-        canvas_cls = _app.get_array_canvas_class()
-        canvas_widget = canvas_cls(viewer_model, parent=self)
-        self._canvas = canvas_widget
 
         # Dynamic sliders for dimensions
         self.dims_sliders = _WxDimsSliders(self)
@@ -456,9 +451,8 @@ class _WxArrayViewer(wx.Frame):
         top_info.AddStretchSpacer()
         top_info.Add(self._progress_spinner, 0, wx.EXPAND | wx.BOTTOM, 0)
 
-        inner = wx.BoxSizer(wx.VERTICAL)
+        self._inner = inner = wx.BoxSizer(wx.VERTICAL)
         inner.Add(top_info, 0, wx.EXPAND | wx.BOTTOM, 5)
-        inner.Add(self._canvas.frontend_widget(), 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.luts, 0, wx.EXPAND)
@@ -471,18 +465,19 @@ class _WxArrayViewer(wx.Frame):
         self.Layout()
 
 
+
+
 class WxArrayView(ArrayView):
     def __init__(
         self,
         data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
-        parent: wx.Window = None,
+        parent: wx.Window | None = None,
     ) -> None:
         self._data_model = data_model
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
-        self._wxwidget = wdg = _WxArrayViewer(self._viewer_model, parent)
-        self._canvas = wdg._canvas
+        self._wxwidget = wdg = _WxArrayViewer(parent)
 
         # Mapping of channel key to LutViews
         self._luts: dict[ChannelKey, WxLutView] = {}
@@ -524,6 +519,13 @@ class WxArrayView(ArrayView):
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if create_roi else InteractionMode.PAN_ZOOM
         )
+
+    def embed_canvas(self, canvas: ArrayCanvas) -> None:
+        # insert the canvas into the inner sizer at position 1
+        # (between top_info and hover_info)
+        self._wxwidget._inner.Insert(1, canvas.frontend_widget(), 1, wx.EXPAND | wx.ALL)
+        self._wxwidget._inner.Layout()
+        self._wxwidget.Layout()
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet

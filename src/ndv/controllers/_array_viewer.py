@@ -100,10 +100,11 @@ class ArrayViewer:
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
-
-        # TODO: Is this necessary?
         self._view = frontend_cls(self._data_model, self._viewer_model)
-        self._canvas = self._view._canvas
+        canvas_cls = _app.get_array_canvas_class()
+        parent = self._view.frontend_widget()
+        self._canvas = canvas_cls(self._viewer_model, parent=parent)
+        self._view.embed_canvas(self._canvas)
 
         self._roi_view: RectangularROIHandle | None = None
 
