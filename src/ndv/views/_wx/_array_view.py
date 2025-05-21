@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
@@ -482,11 +481,9 @@ class WxArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: wx.Window,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
         parent: wx.Window = None,
     ) -> None:
-        self._data_model = data_model
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
@@ -509,21 +506,7 @@ class WxArrayView(ArrayView):
 
     def _on_ndims_toggled(self, event: wx.CommandEvent) -> None:
         is_3d = self._wxwidget.ndims_btn.GetValue()
-        if len(self._visible_axes) > 2:
-            if not is_3d:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                sld = reversed(self._wxwidget.dims_sliders._sliders)
-                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
-        self.visibleAxesChanged.emit()
+        self.nDimsRequested.emit(3 if is_3d else 2)
 
     def _on_add_roi_toggled(self, event: wx.CommandEvent) -> None:
         create_roi = self._wxwidget.add_roi_btn.GetValue()
