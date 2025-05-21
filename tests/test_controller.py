@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
+from ndv import process_events
 from ndv._types import (
     CursorType,
     MouseButton,
@@ -237,13 +238,9 @@ def test_array_viewer_with_app() -> None:
     visax_mock = Mock()
     viewer.display_model.events.visible_axes.connect(visax_mock)
     viewer._view.nDimsRequested.emit(3)
-
-    # FIXME:
-    # calling set_visible_axes on wx during testing is not triggering the
-    # _on_ndims_toggled callback... and I don't know enough about wx yet to know why.
-    if gui_frontend() != _app.GuiFrontend.WX:
-        visax_mock.assert_called_once()
-        assert viewer.display_model.visible_axes == (2, -2, -1)
+    process_events()
+    visax_mock.assert_called_once()
+    assert viewer.display_model.visible_axes == (2, -2, -1)
 
 
 @pytest.mark.usefixtures("any_app")
