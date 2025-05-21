@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 from pytest import fixture
-from qtpy.QtWidgets import QWidget
 
 from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 
 @fixture
 def viewer(qtbot: QtBot) -> QtArrayView:
-    viewer = QtArrayView(QWidget(), _ArrayDataDisplayModel(), ArrayViewerModel())
+    viewer = QtArrayView(_ArrayDataDisplayModel(), ArrayViewerModel())
     viewer.add_lut_view(None)
     viewer.create_sliders({0: range(10), 1: range(64), 2: range(128)})
     qtbot.addWidget(viewer.frontend_widget())

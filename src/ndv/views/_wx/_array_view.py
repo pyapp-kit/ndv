@@ -18,7 +18,7 @@ from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
-from ndv.views.bases import ArrayView, LutView, ArrayCanvas
+from ndv.views.bases import ArrayCanvas, ArrayView, LutView
 
 from .range_slider import RangeSlider
 
@@ -240,16 +240,9 @@ class WxLutView(LutView):
             hist.set_range()
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
-        widget = cast("wx.Window", histogram.frontend_widget())
-        # FIXME: pygfx backend needs this to be widget._subwidget
-        if hasattr(widget, "_subwidget"):
-            widget = widget._subwidget
-
-        # FIXME: Rendercanvas may make this unnecessary
-        if (parent := widget.GetParent()) and parent is not self:
-            widget.Reparent(self._wxwidget)  # Reparent widget to this frame
-            wx.CallAfter(parent.Destroy)
-            widget.Show()
+        widget = histogram.frontend_widget()
+        if not isinstance(widget, wx.Window):
+            raise TypeError(f"Expected wx.Window, got {type(widget)} instead. ")
 
         # Setup references to the histogram
         self.histogram = histogram
@@ -463,8 +456,6 @@ class _WxArrayViewer(wx.Frame):
         self.SetSizer(outer)
         self.SetInitialSize(wx.Size(600, 800))
         self.Layout()
-
-
 
 
 class WxArrayView(ArrayView):

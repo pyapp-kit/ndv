@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import wx
 from pygfx.objects import WheelEvent
 
 from ndv._types import (
@@ -15,14 +16,15 @@ from ndv.models._lut_model import ClimsManual, LUTModel
 from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
 
 
-@pytest.mark.usefixtures("any_app")
+@pytest.mark.usefixtures("wxapp")
 def test_hscroll() -> None:
     model = LUTModel(
         visible=True,
         cmap="red",
         # gamma=2,
     )
-    histogram = PyGFXHistogramCanvas()
+    frame = wx.Frame(None, title="Test Frame")
+    histogram = PyGFXHistogramCanvas(parent=frame)
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10
@@ -47,10 +49,11 @@ def test_hscroll() -> None:
     histogram.close()
 
 
-@pytest.mark.usefixtures("any_app")
+@pytest.mark.usefixtures("wxapp")
 def test_highlight() -> None:
     # Set up a histogram
-    histogram = PyGFXHistogramCanvas()
+    frame = wx.Frame(None, title="Test Frame")
+    histogram = PyGFXHistogramCanvas(parent=frame)
     assert not histogram._highlight.visible
     assert histogram._highlight.local.x == 0
     assert histogram._highlight.local.scale_y == 1
@@ -76,7 +79,7 @@ def test_highlight() -> None:
     histogram.close()
 
 
-@pytest.mark.usefixtures("any_app")
+@pytest.mark.usefixtures("wxapp")
 def test_interaction() -> None:
     """Checks basic histogram functionality."""
     model = LUTModel(
@@ -84,7 +87,8 @@ def test_interaction() -> None:
         cmap="red",
         # gamma=2,
     )
-    histogram = PyGFXHistogramCanvas()
+    frame = wx.Frame(None, title="Test Frame")
+    histogram = PyGFXHistogramCanvas(parent=frame)
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10

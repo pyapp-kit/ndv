@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -51,7 +51,9 @@ class ArrayCanvas(GraphicsCanvas):
     """ABC for canvases that show array data."""
 
     @abstractmethod
-    def __init__(self, viewer_model: ArrayViewerModel | None = ...) -> None: ...
+    def __init__(
+        self, viewer_model: ArrayViewerModel | None = ..., parent: Any = None
+    ) -> None: ...
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod

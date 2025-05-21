@@ -88,7 +88,7 @@ class _Controller(pygfx.PanZoomController):
 class PyGFXHistogramCanvas(HistogramCanvas):
     """A HistogramCanvas utilizing VisPy."""
 
-    def __init__(self, *, vertical: bool = False) -> None:
+    def __init__(self, *, vertical: bool = False, parent: Any = None) -> None:
         # ------------ data and state ------------ #
 
         self._values: np.ndarray | None = None
@@ -116,7 +116,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # ------------ PyGFX Canvas ------------ #
         cls = rendercanvas_class()
         self._size = (600, 600)
-        self._canvas = cls(size=self._size)
+        self._canvas = cls(size=self._size, parent=parent)
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
