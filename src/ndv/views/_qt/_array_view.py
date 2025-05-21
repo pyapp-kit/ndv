@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
-    from ndv.views.bases._graphics._canvas import HistogramCanvas
+    from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
         RectangularROIHandle,
@@ -680,10 +680,10 @@ class _UpCollapsible(QCollapsible):
 
 # this is a PView ... but that would make a metaclass conflict
 class _QArrayViewer(QWidget):
-    def __init__(self, canvas_widget: QWidget, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
+        self._canvas_widget: QWidget | None = None
 
-        self._canvas_widget = canvas_widget
         self.dims_sliders = _QDimsSliders(self)
 
         # place to display dataset summary
@@ -692,7 +692,7 @@ class _QArrayViewer(QWidget):
         self.hover_info_label = QLabel("", self)
 
         # spinner to indicate progress
-        self._progress_spinner = _QSpinner(canvas_widget)
+        self._progress_spinner = _QSpinner(self)
         self._progress_spinner.hide()
 
         # the button that controls the display mode of the channels
@@ -749,11 +749,10 @@ class _QArrayViewer(QWidget):
         info.addWidget(self.hover_info_label)
 
         left = QWidget()
-        left_layout = QVBoxLayout(left)
+        self._left_layout = left_layout = QVBoxLayout(left)
         left_layout.setSpacing(2)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(self._info_widget)
-        left_layout.addWidget(canvas_widget, 1)
         left_layout.addWidget(self.dims_sliders)
         left_layout.addWidget(self.luts)
         left_layout.addWidget(self._btns)
@@ -768,9 +767,10 @@ class _QArrayViewer(QWidget):
 
     def resizeEvent(self, a0: Any) -> None:
         # position at spinner the top right of the canvas_widget:
-        canv, spinner = self._canvas_widget, self._progress_spinner
-        pad = 4
-        spinner.move(canv.width() - spinner.width() - pad, pad)
+        if self._canvas_widget is not None:
+            canv, spinner = self._canvas_widget, self._progress_spinner
+            pad = 4
+            spinner.move(canv.width() - spinner.width() - pad, pad)
         super().resizeEvent(a0)
 
     def closeEvent(self, a0: Any) -> None:
@@ -778,17 +778,29 @@ class _QArrayViewer(QWidget):
             del self._canvas_widget
         super().closeEvent(a0)
 
+    def embed_canvas(self, canvas: QWidget) -> None:
+        """Embed the canvas widget into the viewer."""
+        if self._canvas_widget is not None:
+            # remove the old canvas
+            self._progress_spinner.setParent(self)
+            self._left_layout.removeWidget(self._canvas_widget)
+            self._canvas_widget.setParent(None)
+            self._canvas_widget.deleteLater()
+
+        self._canvas_widget = canvas
+        self._left_layout.insertWidget(1, canvas, 1)
+        self._progress_spinner.setParent(canvas)
+
 
 class QtArrayView(ArrayView):
     def __init__(
         self,
-        canvas_widget: QWidget,
         data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._data_model = data_model
         self._viewer_model = viewer_model
-        self._qwidget = qwdg = _QArrayViewer(canvas_widget)
+        self._qwidget = qwdg = _QArrayViewer()
         # Mapping of channel key to LutViews
         self._luts: dict[ChannelKey, QLutView] = {}
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
@@ -804,6 +816,9 @@ class QtArrayView(ArrayView):
         qwdg.ndims_btn.toggled.connect(self._on_ndims_toggled)
 
         self._visible_axes: Sequence[AxisKey] = []
+
+    def embed_canvas(self, canvas: ArrayCanvas) -> None:
+        return self._qwidget.embed_canvas(canvas.frontend_widget())
 
     def add_lut_view(self, channel: ChannelKey) -> QLutView:
         view = (

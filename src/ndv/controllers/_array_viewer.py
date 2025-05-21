@@ -96,17 +96,15 @@ class ArrayViewer:
         # mapping of channel keys to their respective controllers
         # where None is the default channel
         self._lut_controllers: dict[ChannelKey, ChannelController] = {}
+        self._histograms: dict[ChannelKey, HistogramCanvas] = {}
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
+        self._view = frontend_cls(self._data_model, self._viewer_model)
         canvas_cls = _app.get_array_canvas_class()
-        self._canvas = canvas_cls(self._viewer_model)
-
-        # TODO: Is this necessary?
-        self._histograms: dict[ChannelKey, HistogramCanvas] = {}
-        self._view = frontend_cls(
-            self._canvas.frontend_widget(), self._data_model, self._viewer_model
-        )
+        parent = self._view.frontend_widget()
+        self._canvas = canvas_cls(self._viewer_model, parent=parent)
+        self._view.embed_canvas(self._canvas)
 
         self._roi_view: RectangularROIHandle | None = None
 

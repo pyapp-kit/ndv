@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
-    from ndv.views.bases._graphics._canvas import HistogramCanvas
+    from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -383,7 +383,6 @@ SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 class JupyterArrayView(ArrayView):
     def __init__(
         self,
-        canvas_widget: _jupyter_rfb.CanvasBackend,
         data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
@@ -391,7 +390,6 @@ class JupyterArrayView(ArrayView):
         self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
         self._data_model = data_model
-        self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
         self._luts: dict[ChannelKey, JupyterLutView] = {}
 
@@ -457,12 +455,6 @@ class JupyterArrayView(ArrayView):
             ),
         )
 
-        try:
-            width = getattr(canvas_widget, "css_width", "600px").replace("px", "")
-            width = f"{int(width) + 4}px"
-        except Exception:
-            width = "604px"
-
         self._btns_box = widgets.HBox(
             [
                 self._channel_mode_combo,
@@ -475,18 +467,31 @@ class JupyterArrayView(ArrayView):
         self.layout = widgets.VBox(
             [
                 top_row,
-                self._canvas_widget,
                 self._hover_info_label,
                 self._slider_box,
                 self._luts_box,
                 self._btns_box,
             ],
-            layout=widgets.Layout(width=width),
+            layout=widgets.Layout(width="604px"),
         )
 
         # CONNECTIONS
 
         self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
+
+    def embed_canvas(self, canvas: ArrayCanvas) -> None:
+        canvas_widget: _jupyter_rfb.CanvasBackend = canvas.frontend_widget()
+
+        try:
+            width = getattr(canvas_widget, "css_width", "600px").replace("px", "")
+            width = f"{int(width) + 4}px"
+        except Exception:
+            width = "604px"
+
+        children = list(self.layout.children)
+        children.insert(1, canvas_widget)
+        self.layout.children = tuple(children)
+        self.layout.layout.width = width
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""

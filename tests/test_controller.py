@@ -37,7 +37,7 @@ IS_PYSIDE6 = API_NAME == "PySide6"
 IS_PYGFX = _app.canvas_backend(None) == "pygfx"
 
 
-def _get_mock_canvas(*_: Any) -> ArrayCanvas:
+def _get_mock_canvas(*_: Any, **__: Any) -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
     img_handle = MagicMock(spec=ImageHandle)
     img_handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
