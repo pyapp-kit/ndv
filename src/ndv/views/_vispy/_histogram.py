@@ -1,9 +1,13 @@
+# pyright: reportGeneralTypeIssues=none, reportOptionalSubscript=none
+# pyright: reportOptionalMemberAccess=none, reportIndexIssue=none
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import vispy
+import vispy.scene
 from vispy import scene
 
 from ndv._types import CursorType
@@ -117,7 +121,9 @@ class VispyHistogramCanvas(HistogramCanvas):
         self.plot = PlotWidget()
         self.plot.lock_axis("y")
         self._canvas.central_widget.add_widget(self.plot)
-        self.node_tform = self.plot.node_transform(self.plot._view.scene)
+        self.node_tform = cast("vispy.scene.Node", self.plot).node_transform(
+            self.plot._view.scene
+        )
 
         self.plot._view.add(self._hist_mesh)
         self.plot._view.add(self._lut_line)
@@ -146,9 +152,9 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._lut_line.visible = visible
         self._gamma_handle.visible = visible
 
-    def set_colormap(self, lut: cmap.Colormap) -> None:
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
         if self._hist_mesh is not None:
-            self._hist_mesh.color = lut.color_stops[-1].color.hex
+            self._hist_mesh.color = cmap.color_stops[-1].color.hex
 
     def set_gamma(self, gamma: float) -> None:
         if gamma < 0:
@@ -194,15 +200,15 @@ class VispyHistogramCanvas(HistogramCanvas):
         margin: float = 0,
     ) -> None:
         if x:
-            _x = (min(x), max(x))
+            x = (min(x), max(x))
         elif self._bin_edges is not None:
-            _x = self._bin_edges[0], self._bin_edges[-1]
+            x = self._bin_edges[0], self._bin_edges[-1]
         if y:
-            _y = (min(y), max(y))
+            y = (min(y), max(y))
         elif self._values is not None:
-            _y = (0, np.max(self._values))
-        self._range = _y if y else None
-        self._domain = _x if x else None
+            y = (0, np.max(self._values))
+        self._range = y
+        self._domain = x
         self._resize()
 
     def set_vertical(self, vertical: bool) -> None:

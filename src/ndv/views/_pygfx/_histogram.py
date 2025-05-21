@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from wgpu.gui.jupyter import JupyterWgpuCanvas
     from wgpu.gui.qt import QWgpuCanvas
 
-    WgpuCanvas: TypeAlias = QWgpuCanvas | JupyterWgpuCanvas
+    WgpuCanvas: TypeAlias = "QWgpuCanvas | JupyterWgpuCanvas"
 
 MIN_GAMMA: np.float64 = np.float64(1e-6)
 
@@ -611,6 +611,8 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 if self._bin_edges is not None:
                     new_right = min(new_right, self._bin_edges[-1])
                 newlims = (self._clims[0], new_right)
+            else:
+                newlims = (self._clims[0], self._clims[1])
             if self.model:
                 self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
