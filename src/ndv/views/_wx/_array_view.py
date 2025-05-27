@@ -68,9 +68,6 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
 
 
 class _LutChannelSelector(wx.Panel):
-    # actually set[ChannelKey] | set
-    selectionChanged = Signal(set)
-
     def __init__(
         self, parent: wx.Window, channels: None | list[ChannelKey] = None
     ) -> None:
@@ -213,8 +210,6 @@ class _LutChannelSelector(wx.Panel):
 
         self._update_selection_info()
 
-        self.selectionChanged.emit()
-
     def _on_select_all(self, evt: wx.CommandEvent) -> None:
         """Select all channels."""
         for i in range(self._checklist.GetCount()):
@@ -224,7 +219,6 @@ class _LutChannelSelector(wx.Panel):
             self._luts[channel].set_display(True)
             self._displayed_channels.add(channel)
         self._update_selection_info()
-        self.selectionChanged.emit()
 
     def _on_select_none(self, evt: wx.CommandEvent) -> None:
         """Deselect all channels."""
@@ -234,7 +228,6 @@ class _LutChannelSelector(wx.Panel):
         for channel in self._channels:
             self._luts[channel].set_display(False)
         self._update_selection_info()
-        self.selectionChanged.emit()
 
 
 class _WxLUTWidget(wx.Panel):
@@ -242,7 +235,7 @@ class _WxLUTWidget(wx.Panel):
         super().__init__(parent)
 
         # -- WDIDGETS -- #
-        self.visible = wx.CheckBox(self, label="Visible")
+        self.visible = wx.CheckBox(self, label="")
         self.visible.SetValue(True)
 
         # Placeholder for the custom colormap combo box
@@ -684,7 +677,6 @@ class _WxArrayViewer(wx.Frame):
 
         self.lut_selector.Hide()
         self._lut_toolbar_panel.Hide()
-        self._lut_toolbar_shown = False
 
         # Create a scrolled panel for LUTs
         self.luts_scroll = wx.ScrolledWindow(self, style=wx.VSCROLL)
@@ -734,15 +726,13 @@ class _WxArrayViewer(wx.Frame):
         self.luts_scroll.FitInside()
         self.Layout()
 
-    def toggle_lut_toolbar(self, show: bool) -> None:
-        if show and not self._lut_toolbar_shown:
+    def set_lut_toolbar_visible(self, visible: bool) -> None:
+        if visible and not self._lut_toolbar_panel.IsShown():
             self.lut_selector.Show()
             self._lut_toolbar_panel.Show()
-            self._lut_toolbar_shown = True
-        elif not show and self._lut_toolbar_shown:
+        elif not visible and self._lut_toolbar_panel.IsShown():
             self.lut_selector.Hide()
             self._lut_toolbar_panel.Hide()
-            self._lut_toolbar_shown = False
         self._inner_sizer.Layout()
 
 
@@ -765,8 +755,6 @@ class WxArrayView(ArrayView):
         wdg.set_range_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
-
-        wdg.lut_selector.selectionChanged.connect(lambda: self._wxwidget.Layout())
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
@@ -819,7 +807,7 @@ class WxArrayView(ArrayView):
         self._wxwidget.update_lut_scroll_size()
 
         if len(self._luts) >= self._wxwidget._toolbar_display_thresh:
-            self._wxwidget.toggle_lut_toolbar(True)
+            self._wxwidget.set_lut_toolbar_visible(True)
 
         return view
 
@@ -850,7 +838,7 @@ class WxArrayView(ArrayView):
         self._wxwidget.update_lut_scroll_size()
 
         if len(self._luts) < self._wxwidget._toolbar_display_thresh:
-            self._wxwidget.toggle_lut_toolbar(False)
+            self._wxwidget.set_lut_toolbar_visible(False)
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         self._wxwidget.dims_sliders.create_sliders(coords)
