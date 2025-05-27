@@ -72,7 +72,9 @@ class _LutChannelSelector(wx.Panel):
     # actually set[ChannelKey] | set
     selectionChanged = Signal(set)
 
-    def __init__(self, parent: wx.Window, channels: None | list[ChannelKey] = None):
+    def __init__(
+        self, parent: wx.Window, channels: None | list[ChannelKey] = None
+    ) -> None:
         super().__init__(parent)
 
         # channels must be list not set, because we index into it
@@ -83,7 +85,7 @@ class _LutChannelSelector(wx.Panel):
         self._displayed_channels: set[ChannelKey] = set(self._channels)
         self._luts: dict[ChannelKey, WxLutView] = {}
 
-        # Dropdown button with currenct selection
+        # Dropdown button with current selection
         self._dropdown_btn = wx.Button(
             self, label="Channel Display Options", style=wx.BU_EXACTFIT
         )
@@ -134,7 +136,7 @@ class _LutChannelSelector(wx.Panel):
         sizer.Add(self._selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
 
-    def add_channel(self, view: WxLutView):
+    def add_channel(self, view: WxLutView) -> None:
         if (type(view.channel) is int) or (
             type(view.channel) is str and view.channel.isdigit()
         ):
@@ -145,14 +147,14 @@ class _LutChannelSelector(wx.Panel):
             self._update_checklist()
             self._update_selection_info()
 
-    def remove_channel(self, channel: ChannelKey):
+    def remove_channel(self, channel: ChannelKey) -> None:
         self._channels = [ch for ch in self._channels if not ch == channel]
         self._displayed_channels.discard(channel)
         del self._luts[channel]
         self._update_checklist()
         self._update_selection_info()
 
-    def _update_checklist(self):
+    def _update_checklist(self) -> None:
         """Update the checklist with current channels."""
         self._checklist.Clear()
         for channel in self._channels:
@@ -161,19 +163,18 @@ class _LutChannelSelector(wx.Panel):
             if channel in self._displayed_channels:
                 self._checklist.Check(idx)
 
-    def _update_selection_info(self):
+    def _update_selection_info(self) -> None:
         """Update the selection info text."""
-        if len(self._displayed_channels) == len(self._channels):
-            self._selection_info.SetLabel(
-                f"All channels displayed ({len(self._channels)})"
-            )
+        nchannels = len(self._channels)
+        ndisplayed = len(self._displayed_channels)
+        if ndisplayed == nchannels:
+            label = f"All channels displayed ({nchannels})"
         else:
-            self._selection_info.SetLabel(
-                f"{len(self._displayed_channels)} of {len(self._channels)} channels displayed"
-            )
+            label = f"{ndisplayed} of {nchannels} channels displayed"
+        self._selection_info.SetLabel(label)
         self.Layout()
 
-    def _on_dropdown_clicked(self, evt):
+    def _on_dropdown_clicked(self, evt: wx.CommandEvent) -> None:
         """Show the dropdown checklist."""
         # Position the popup below the button
         btn_size = self._dropdown_btn.GetSize()
@@ -194,12 +195,12 @@ class _LutChannelSelector(wx.Panel):
         self._popup.SetPosition(popup_pos)
         self._popup.Show(show=True)
 
-    def _on_popup_deactivate(self, evt):
+    def _on_popup_deactivate(self, evt: wx.CommandEvent) -> None:
         """Close the popup when it loses focus (user clicks outside)."""
         if not evt.GetActive():
             self._popup.Show(show=False)
 
-    def _on_selection_changed(self, evt):
+    def _on_selection_changed(self, evt: wx.CommandEvent) -> None:
         """Handle selection changes in the checklist."""
         idx = evt.GetSelection()
         channel = self._channels[idx]
@@ -215,7 +216,7 @@ class _LutChannelSelector(wx.Panel):
 
         self.selectionChanged.emit()
 
-    def _on_select_all(self, evt):
+    def _on_select_all(self, evt: wx.CommandEvent) -> None:
         """Select all channels."""
         for i in range(self._checklist.GetCount()):
             self._checklist.Check(i, True)
@@ -226,7 +227,7 @@ class _LutChannelSelector(wx.Panel):
         self._update_selection_info()
         self.selectionChanged.emit()
 
-    def _on_select_none(self, evt):
+    def _on_select_none(self, evt: wx.CommandEvent) -> None:
         """Deselect all channels."""
         for i in range(self._checklist.GetCount()):
             self._checklist.Check(i, False)
@@ -323,10 +324,22 @@ class _WxLUTWidget(wx.Panel):
         self.Layout()
 
 
-# VISIBLE: LUT controls are displayed and channel is included in rendered raster
-# DISPLAYED: LUT controls are displayed and channel is not included in rendered raster
-# HIDDEN: LUT controls are not displayed and channel is not included in rendered raster
-_DisplayStatus = Enum("DisplayStatus", "VISIBLE DISPLAYED HIDDEN")
+class _DisplayStatus(Enum):
+    """Enum to represent the display status of a LUT view.
+
+    Attributes
+    ----------
+    VISIBLE : str
+        LUT controls are displayed and channel is included in rendered raster
+    DISPLAYED : str
+        LUT controls are displayed and channel is not included in rendered raster
+    HIDDEN : str
+        LUT controls are not displayed and channel is not included in rendered raster
+    """
+
+    VISIBLE = "visible"
+    DISPLAYED = "displayed"
+    HIDDEN = "hidden"
 
 
 class WxLutView(LutView):
@@ -485,17 +498,17 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMin(mi)
         self._wxwidget.clims.SetMax(ma)
 
-    def _display_hidden(self):
+    def _display_hidden(self) -> None:
         self._display_status = _DisplayStatus.HIDDEN
         self._wxwidget.Hide()
         self._wxwidget.visible.SetValue(False)
         self._on_visible_changed(None)
 
-    def _display_enable(self):
+    def _display_enable(self) -> None:
         self._display_status = _DisplayStatus.DISPLAYED
         self._wxwidget.Show()
 
-    def _display_visible(self):
+    def _display_visible(self) -> None:
         self._display_status = _DisplayStatus.VISIBLE
         self._wxwidget.visible.SetValue(True)
 
@@ -712,7 +725,7 @@ class _WxArrayViewer(wx.Frame):
         self.update_lut_scroll_size()
         self.Layout()
 
-    def update_lut_scroll_size(self):
+    def update_lut_scroll_size(self) -> None:
         self.luts_scroll.Layout()
         total_size = self.luts.GetMinSize()
         total_height = total_size.GetHeight()
