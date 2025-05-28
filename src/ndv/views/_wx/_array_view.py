@@ -349,7 +349,6 @@ class _DisplayStatus(Enum):
 class WxLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
-    lutUpdated = Signal()
 
     def __init__(
         self,
@@ -375,7 +374,7 @@ class WxLutView(LutView):
         wdg.set_hist_range_btn.Bind(wx.EVT_BUTTON, self._on_set_histogram_range_clicked)
 
     # Event Handlers
-    def _on_visible_changed(self, event: wx.CommandEvent) -> None:
+    def _on_visible_changed(self, event: Any) -> None:
         if self._model:
             self._model.visible = self._wxwidget.visible.GetValue()
 
@@ -502,23 +501,10 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMin(mi)
         self._wxwidget.clims.SetMax(ma)
 
-    def _display_hidden(self) -> None:
-        self._display_status = _DisplayStatus.HIDDEN
-        self._wxwidget.Hide()
-        self._wxwidget.visible.SetValue(False)
-        self._on_visible_changed(None)
-
-    def _display_enable(self) -> None:
-        self._display_status = _DisplayStatus.DISPLAYED
-        self._wxwidget.Show()
-
-    def _display_visible(self) -> None:
-        self._display_status = _DisplayStatus.VISIBLE
-        self._wxwidget.visible.SetValue(True)
-
     def set_channel_visible(self, visible: bool) -> None:
         if visible and self._display_status != _DisplayStatus.HIDDEN:
-            self._display_visible()
+            self._display_status = _DisplayStatus.VISIBLE
+            self._wxwidget.visible.SetValue(True)
         # elif visible do nothing
         elif not visible:
             self._wxwidget.visible.SetValue(False)
@@ -526,24 +512,21 @@ class WxLutView(LutView):
     def set_visible(self, visible: bool) -> None:
         if visible and self._display_status != _DisplayStatus.HIDDEN:
             self._wxwidget.Show()
-            self.lutUpdated.emit()
-        # elif visible do nothing
         elif not visible:
             self._wxwidget.Hide()
-            self.lutUpdated.emit()
 
     def set_display(self, display: bool) -> None:
         if display and self._display_status == _DisplayStatus.HIDDEN:
-            self._display_enable()
-            self.lutUpdated.emit()
-        # elif display do nothing
+            self._display_status = _DisplayStatus.DISPLAYED
+            self._wxwidget.Show()
         elif not display:
-            self._display_hidden()
-            self.lutUpdated.emit()
+            self._display_status = _DisplayStatus.HIDDEN
+            self._wxwidget.Hide()
+            self._wxwidget.visible.SetValue(False)
+            self._on_visible_changed(None)
 
     def close(self) -> None:
         self._wxwidget.Close()
-        self.lutUpdated.emit()
 
 
 class WxRGBView(WxLutView):
@@ -728,7 +711,7 @@ class _WxArrayViewer(wx.Frame):
         self.update_lut_scroll_size()
         self.Layout()
 
-    def update_lut_scroll_size(self) -> None:
+    def update_lut_scroll_size(self, *_: Any) -> None:
         self.luts_scroll.Layout()
         total_size = self.luts.GetMinSize()
         total_height = total_size.GetHeight()
@@ -813,7 +796,8 @@ class WxArrayView(ArrayView):
         # TODO: Reusable synchronization with ViewerModel
         view._wxwidget.histogram_btn.Show(self._viewer_model.show_histogram_button)
         view.histogramRequested.connect(self.histogramRequested)
-        view.lutUpdated.connect(self._wxwidget.update_lut_scroll_size)
+        # Bind to show/hide events for automatic layout updates
+        view._wxwidget.Bind(wx.EVT_SHOW, self._wxwidget.update_lut_scroll_size)
 
         self._lut_selector().add_channel(view)
         self._wxwidget.update_lut_scroll_size()
