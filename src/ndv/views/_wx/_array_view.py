@@ -482,24 +482,21 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMax(ma)
 
     def set_channel_visible(self, visible: bool) -> None:
-        if visible and self._wxwidget.IsShown():
-            self._wxwidget.visible.SetValue(True)
-        elif not visible:
-            self._wxwidget.visible.SetValue(False)
+        self._wxwidget.visible.SetValue(visible and self._wxwidget.IsShown())
 
     def set_visible(self, visible: bool) -> None:
-        if visible and not self._wxwidget.IsShown():
-            self._wxwidget.Show()
-        elif not visible:
+        if not visible:
             self._wxwidget.Hide()
+        elif self._wxwidget.IsShown():
+            self._wxwidget.Show()
 
     def set_display(self, display: bool) -> None:
-        if display and not self._wxwidget.IsShown():
-            self._wxwidget.Show()
-        elif not display:
+        if not display:
             self._wxwidget.Hide()
             self._wxwidget.visible.SetValue(False)
             self._on_visible_changed(None)
+        elif not self._wxwidget.IsShown():
+            self._wxwidget.Show()
 
     def close(self) -> None:
         self._wxwidget.Close()
@@ -792,11 +789,9 @@ class WxArrayView(ArrayView):
 
     def remove_lut_view(self, lut: LutView) -> None:
         # Find the channel key for this LUT view
-        channel_to_remove = None
-        for channel, view in self._luts.items():
-            if view == lut:
-                channel_to_remove = channel
-                break
+        channel_to_remove = next(
+            (channel for channel, view in self._luts.items() if view == lut), None
+        )
 
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
         self._wxwidget.luts.Detach(wxwdg)
@@ -806,7 +801,7 @@ class WxArrayView(ArrayView):
         if channel_to_remove is not None:
             del self._luts[channel_to_remove]
 
-        self._lut_selector().remove_channel(channel)
+        self._lut_selector().remove_channel(channel_to_remove)
         self._wxwidget.update_lut_scroll_size()
 
         if len(self._luts) < self._wxwidget._toolbar_display_thresh:
