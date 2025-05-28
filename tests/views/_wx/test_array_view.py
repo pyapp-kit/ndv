@@ -90,13 +90,11 @@ def test_display_options_visibility(wxapp: wx.App, viewer: WxArrayView) -> None:
 
     assert viewer._wxwidget.lut_selector.IsEnabled()
 
-    assert not viewer._wxwidget._lut_toolbar_shown
     assert not viewer._wxwidget.lut_selector.IsShown()
     assert not viewer._wxwidget._lut_toolbar_panel.IsShown()
 
     viewer.add_lut_view(ch + 1)
 
-    assert viewer._wxwidget._lut_toolbar_shown
     assert viewer._wxwidget.lut_selector.IsShown()
     assert viewer._wxwidget._lut_toolbar_panel.IsShown()
 
@@ -149,7 +147,6 @@ def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
         lut_view = viewer._luts[ch]
         viewer.remove_lut_view(lut_view)
 
-    assert not viewer._wxwidget._lut_toolbar_shown
     assert not viewer._wxwidget.lut_selector.IsShown()
     assert not viewer._wxwidget._lut_toolbar_panel.IsShown()
 
