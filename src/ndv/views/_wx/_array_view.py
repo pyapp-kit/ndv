@@ -199,16 +199,8 @@ class _LutChannelSelector(wx.Panel):
         """Handle selection changes in the checklist."""
         idx = evt.GetSelection()
         channel = self._channels[idx]
-
-        if self._checklist.IsChecked(idx):
-            self._displayed_channels.add(channel)
-            self._luts[channel].set_display(True)
-            self._update_view_visibility(channel, True)
-        else:
-            self._displayed_channels.discard(channel)
-            self._luts[channel].set_display(False)
-            self._update_view_visibility(channel, False)
-
+        selected = self._checklist.IsChecked(idx)
+        self._apply_selection(channel, selected)
         self._update_selection_info()
 
     def _on_select_all(self, evt: wx.CommandEvent) -> None:
@@ -217,9 +209,7 @@ class _LutChannelSelector(wx.Panel):
             self._checklist.Check(i, True)
         self._displayed_channels.clear()
         for channel in self._channels:
-            self._luts[channel].set_display(True)
-            self._update_view_visibility(channel, True)
-            self._displayed_channels.add(channel)
+            self._apply_selection(channel, True)
         self._update_selection_info()
 
     def _on_select_none(self, evt: wx.CommandEvent) -> None:
@@ -228,14 +218,18 @@ class _LutChannelSelector(wx.Panel):
             self._checklist.Check(i, False)
         self._displayed_channels.clear()
         for channel in self._channels:
-            self._luts[channel].set_display(False)
-            self._update_view_visibility(channel, False)
+            self._apply_selection(channel, False)
         self._update_selection_info()
 
-    def _update_view_visibility(self, channel: ChannelKey, visible: bool) -> None:
-        # Trigger the visible checkbox event to update the model
-        visible_checkbox = self._luts[channel]._wxwidget.visible
-        visible_checkbox.SetValue(visible)
+    def _apply_selection(self, channel: ChannelKey, display: bool) -> None:
+        if display:
+            self._displayed_channels.add(channel)
+        else:
+            self._displayed_channels.discard(channel)
+        lut_view = self._luts[channel]
+        lut_view.set_display(display)
+        visible_checkbox = lut_view._wxwidget.visible
+        visible_checkbox.SetValue(display)
         event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, visible_checkbox.GetId())
         event.SetEventObject(visible_checkbox)
         wx.PostEvent(visible_checkbox.GetEventHandler(), event)
