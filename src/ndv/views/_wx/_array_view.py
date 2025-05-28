@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from contextlib import suppress
 from enum import Enum
 from pathlib import Path
 from sys import version_info
@@ -111,10 +112,8 @@ class _LutChannelSelector(wx.Panel):
 
         # Select All / None buttons
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self._select_all_btn = wx.Button(self._popup, label="Select All", size=(80, -1))
-        self._select_none_btn = wx.Button(
-            self._popup, label="Select None", size=(80, -1)
-        )
+        self._select_all_btn = wx.Button(self._popup, label="Select All")
+        self._select_none_btn = wx.Button(self._popup, label="Select None")
         self._select_all_btn.Bind(wx.EVT_BUTTON, self._on_select_all)
         self._select_none_btn.Bind(wx.EVT_BUTTON, self._on_select_none)
         btn_sizer.Add(self._select_all_btn, 0, wx.ALL, 5)
@@ -191,10 +190,11 @@ class _LutChannelSelector(wx.Panel):
         self._popup.SetPosition(popup_pos)
         self._popup.Show(show=True)
 
-    def _on_popup_deactivate(self, evt: wx.CommandEvent) -> None:
+    def _on_popup_deactivate(self, evt: wx.ActivateEvent) -> None:
         """Close the popup when it loses focus (user clicks outside)."""
         if not evt.GetActive():
-            self._popup.Show(show=False)
+            with suppress(RuntimeError):  # if we quit with dialog open, it's deleted...
+                self._popup.Show(show=False)
 
     def _on_selection_changed(self, evt: wx.CommandEvent) -> None:
         """Handle selection changes in the checklist."""
