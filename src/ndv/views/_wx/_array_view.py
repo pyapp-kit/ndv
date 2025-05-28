@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from contextlib import suppress
-from enum import Enum
 from pathlib import Path
 from sys import version_info
 from typing import TYPE_CHECKING, Any, cast
@@ -328,24 +327,6 @@ class _WxLUTWidget(wx.Panel):
         self.Layout()
 
 
-class _DisplayStatus(Enum):
-    """Enum to represent the display status of a LUT view.
-
-    Attributes
-    ----------
-    VISIBLE : str
-        LUT controls are displayed and channel is included in rendered raster
-    DISPLAYED : str
-        LUT controls are displayed and channel is not included in rendered raster
-    HIDDEN : str
-        LUT controls are not displayed and channel is not included in rendered raster
-    """
-
-    VISIBLE = "visible"
-    DISPLAYED = "displayed"
-    HIDDEN = "hidden"
-
-
 class WxLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
@@ -360,8 +341,7 @@ class WxLutView(LutView):
         self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
         self.channel = channel
         self.histogram: HistogramCanvas | None = None
-        self._display_status: _DisplayStatus = _DisplayStatus.VISIBLE
-        # TODO: use emit_fast
+
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
         wdg.clims.Bind(wx.EVT_SLIDER, self._on_clims_changed)
@@ -502,25 +482,21 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMax(ma)
 
     def set_channel_visible(self, visible: bool) -> None:
-        if visible and self._display_status != _DisplayStatus.HIDDEN:
-            self._display_status = _DisplayStatus.VISIBLE
+        if visible and self._wxwidget.IsShown():
             self._wxwidget.visible.SetValue(True)
-        # elif visible do nothing
         elif not visible:
             self._wxwidget.visible.SetValue(False)
 
     def set_visible(self, visible: bool) -> None:
-        if visible and self._display_status != _DisplayStatus.HIDDEN:
+        if visible and not self._wxwidget.IsShown():
             self._wxwidget.Show()
         elif not visible:
             self._wxwidget.Hide()
 
     def set_display(self, display: bool) -> None:
-        if display and self._display_status == _DisplayStatus.HIDDEN:
-            self._display_status = _DisplayStatus.DISPLAYED
+        if display and not self._wxwidget.IsShown():
             self._wxwidget.Show()
         elif not display:
-            self._display_status = _DisplayStatus.HIDDEN
             self._wxwidget.Hide()
             self._wxwidget.visible.SetValue(False)
             self._on_visible_changed(None)
