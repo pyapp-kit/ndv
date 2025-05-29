@@ -165,6 +165,20 @@ def test_canvas_interaction() -> None:
     mock_view.reset_mock()
     mock_histogram.reset_mock()
 
+    # updating the image also updates the hover info in the view
+    # NB Since the image handle is a mock, the data won't be updated.
+    ctrl.data = np.empty(SHAPE, dtype=np.uint8)
+    # FIXME: These methods are actually called twice, both within
+    # _fully_synchronize_view. The first time is on
+    # ArrayViewer._on_view_current_index_change, and the second on
+    # ArrayViewer._request_data
+    mock_view.set_hover_info.assert_called_with("[2, 1] 0")
+    mock_histogram.highlight.assert_called_with(0)
+
+    mock_canvas.reset_mock()
+    mock_view.reset_mock()
+    mock_histogram.reset_mock()
+
     # hovering off the image clears the hover info in the view
     mock_canvas.canvas_to_world.return_value = (-1, -1, 3)
     ctrl._on_canvas_mouse_moved(MouseMoveEvent(-1, -1))

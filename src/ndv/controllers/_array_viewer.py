@@ -117,6 +117,7 @@ class ArrayViewer:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.nDimsRequested.connect(self._on_view_ndims_requested)
 
+        self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
@@ -472,15 +473,16 @@ class ArrayViewer:
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+        self._highlight_pos = (int(x), int(y))
 
-        # collect and format intensity values at the current mouse position
-        channel_values = self._get_values_at_world_point(int(x), int(y))
-
-        self._highlight_values(channel_values, (x, y))
+        # update highlight display
+        channel_values = self._get_values_at_world_point(*self._highlight_pos)
+        self._highlight_values(channel_values, self._highlight_pos)
 
     def _on_canvas_mouse_left(self) -> None:
         """Respond to a mouse leaving the canvas in the view."""
-        self._highlight_values({})
+        self._highlight_pos = None
+        self._highlight_values({}, self._highlight_pos)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
@@ -641,6 +643,10 @@ class ArrayViewer:
                 hist.set_data(counts, bin_edges)
 
         self._canvas.refresh()
+        # update highlight display
+        if self._highlight_pos is not None:
+            channel_values = self._get_values_at_world_point(*self._highlight_pos)
+            self._highlight_values(channel_values, self._highlight_pos)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
