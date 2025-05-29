@@ -50,7 +50,7 @@ def _get_mock_canvas(*_: Any, **__: Any) -> ArrayCanvas:
     return mock
 
 
-def _get_mock_hist_canvas() -> HistogramCanvas:
+def _get_mock_hist_canvas(parent: Any) -> HistogramCanvas:
     return MagicMock(spec=HistogramCanvas)
 
 

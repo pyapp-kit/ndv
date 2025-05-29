@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
-import wx
 from pygfx.objects import WheelEvent
 
 from ndv._types import (
@@ -16,15 +17,24 @@ from ndv.models._lut_model import ClimsManual, LUTModel
 from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
 
 
-@pytest.mark.usefixtures("wxapp")
-def test_hscroll() -> None:
+@pytest.fixture
+def parent(any_app: Any) -> Any:
+    """Fixture to create a wx.Frame as a parent for the histogram canvas."""
+    if "wx" in any_app.__module__:
+        import wx
+
+        return wx.Frame(None, title="Test Frame")
+    return None
+
+
+@pytest.mark.usefixtures("any_app")
+def test_hscroll(parent: Any) -> None:
     model = LUTModel(
         visible=True,
         cmap="red",
         # gamma=2,
     )
-    frame = wx.Frame(None, title="Test Frame")
-    histogram = PyGFXHistogramCanvas(parent=frame)
+    histogram = PyGFXHistogramCanvas(parent=parent)
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10
@@ -49,11 +59,10 @@ def test_hscroll() -> None:
     histogram.close()
 
 
-@pytest.mark.usefixtures("wxapp")
-def test_highlight() -> None:
+@pytest.mark.usefixtures("any_app")
+def test_highlight(parent: Any) -> None:
     # Set up a histogram
-    frame = wx.Frame(None, title="Test Frame")
-    histogram = PyGFXHistogramCanvas(parent=frame)
+    histogram = PyGFXHistogramCanvas(parent=parent)
     assert not histogram._highlight.visible
     assert histogram._highlight.local.x == 0
     assert histogram._highlight.local.scale_y == 1
@@ -79,16 +88,11 @@ def test_highlight() -> None:
     histogram.close()
 
 
-@pytest.mark.usefixtures("wxapp")
-def test_interaction() -> None:
+@pytest.mark.usefixtures("any_app")
+def test_interaction(parent: Any) -> None:
     """Checks basic histogram functionality."""
-    model = LUTModel(
-        visible=True,
-        cmap="red",
-        # gamma=2,
-    )
-    frame = wx.Frame(None, title="Test Frame")
-    histogram = PyGFXHistogramCanvas(parent=frame)
+    model = LUTModel(visible=True, cmap="red")
+    histogram = PyGFXHistogramCanvas(parent=parent)
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10

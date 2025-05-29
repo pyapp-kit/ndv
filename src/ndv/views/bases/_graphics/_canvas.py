@@ -22,6 +22,10 @@ class GraphicsCanvas(Viewable, Mouseable):
     """ABC for graphics canvas providers."""
 
     @abstractmethod
+    def __init__(self, parent: Any = None) -> None:
+        """Initializes the canvas with an optional viewer model and parent."""
+
+    @abstractmethod
     def refresh(self) -> None: ...
     @abstractmethod
     def set_range(

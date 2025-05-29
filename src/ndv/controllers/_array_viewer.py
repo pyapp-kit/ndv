@@ -254,7 +254,7 @@ class ArrayViewer:
 
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
-        hist = histogram_cls()
+        hist = histogram_cls(parent=self._view.frontend_widget())
         if ctrl := self._lut_controllers.get(channel, None):
             # Add histogram to ArrayView for display
             self._view.add_histogram(channel, hist)

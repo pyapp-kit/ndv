@@ -88,7 +88,7 @@ class _Controller(pygfx.PanZoomController):
 class PyGFXHistogramCanvas(HistogramCanvas):
     """A HistogramCanvas utilizing VisPy."""
 
-    def __init__(self, *, vertical: bool = False, parent: Any = None) -> None:
+    def __init__(self, parent: Any = None) -> None:
         # ------------ data and state ------------ #
 
         self._values: np.ndarray | None = None
@@ -101,7 +101,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # whether the y-axis is logarithmic
         self._log_base: float | None = None
         # whether the histogram is vertical
-        self._vertical: bool = vertical
+        self._vertical: bool = False
         # The values of the left and right edges on the canvas (respectively)
         self._domain: tuple[float, float] | None = None
         # The values of the bottom and top edges on the canvas (respectively)

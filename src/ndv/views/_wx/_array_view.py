@@ -410,6 +410,8 @@ class WxLutView(LutView):
         widget = histogram.frontend_widget()
         if not isinstance(widget, wx.Window):
             raise TypeError(f"Expected wx.Window, got {type(widget)} instead. ")
+        if widget.Parent is not self._wxwidget:
+            widget.Reparent(self._wxwidget)
 
         # Setup references to the histogram
         self.histogram = histogram
