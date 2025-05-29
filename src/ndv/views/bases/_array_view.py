@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.models._viewer_model import ArrayViewerModel
     from ndv.views.bases import LutView
     from ndv.views.bases._graphics._canvas import ArrayCanvas
@@ -31,14 +30,13 @@ class ArrayView(Viewable):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     histogramRequested = Signal(int)
-    visibleAxesChanged = Signal()
+    nDimsRequested = Signal(int)
     channelModeChanged = Signal(ChannelMode)
 
     # model: _ArrayDataDisplayModel is likely a temporary parameter
     @abstractmethod
     def __init__(
         self,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
         **kwargs: Any,
     ) -> None: ...

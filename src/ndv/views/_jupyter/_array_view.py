@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -383,13 +382,11 @@ SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 class JupyterArrayView(ArrayView):
     def __init__(
         self,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
-        self._data_model = data_model
         self._visible_axes: Sequence[AxisKey] = []
         self._luts: dict[ChannelKey, JupyterLutView] = {}
 
@@ -624,22 +621,7 @@ class JupyterArrayView(ArrayView):
         self._ndims_btn.value = len(axes) == 3
 
     def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
-        if len(self._visible_axes) > 2:
-            if not change["new"]:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                z_ax = next(
-                    ax for ax in reversed(self._sliders) if ax not in self._visible_axes
-                )
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
-        self.visibleAxesChanged.emit()
+        self.nDimsRequested.emit(3 if change["new"] else 2)
 
     def _on_reset_zoom_clicked(self, change: dict[str, Any]) -> None:
         self.resetZoomClicked.emit()

@@ -1,5 +1,35 @@
 # Changelog
 
+## [v0.4.0](https://github.com/pyapp-kit/ndv/tree/v0.4.0) (2025-05-21)
+
+[Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.3.1...v0.4.0)
+
+**Implemented enhancements:**
+
+- feat: Purge ArrayDataDisplayModel from ArrayViews [\#196](https://github.com/pyapp-kit/ndv/pull/196) ([gselzer](https://github.com/gselzer))
+- feat: Expose viewer model as `viewer_options` argument to imshow and ArrayViewer [\#194](https://github.com/pyapp-kit/ndv/pull/194) ([tlambert03](https://github.com/tlambert03))
+- feat: add circular/ring buffer and data wrapper, that can be used to facilitate a streaming viewer [\#186](https://github.com/pyapp-kit/ndv/pull/186) ([tlambert03](https://github.com/tlambert03))
+- feat: add signals to DataWrapper [\#182](https://github.com/pyapp-kit/ndv/pull/182) ([tlambert03](https://github.com/tlambert03))
+- feat: histogram highlights [\#181](https://github.com/pyapp-kit/ndv/pull/181) ([gselzer](https://github.com/gselzer))
+- feat: explicit backend setters [\#180](https://github.com/pyapp-kit/ndv/pull/180) ([gselzer](https://github.com/gselzer))
+- feat: Add autoscale tails to Jupyter [\#179](https://github.com/pyapp-kit/ndv/pull/179) ([gselzer](https://github.com/gselzer))
+- Histogram hscroll pan [\#176](https://github.com/pyapp-kit/ndv/pull/176) ([gselzer](https://github.com/gselzer))
+- feat: add show\_controls and show\_data\_info options to viewer model [\#175](https://github.com/pyapp-kit/ndv/pull/175) ([tlambert03](https://github.com/tlambert03))
+- feat: add back play button, as well as dimension size label [\#163](https://github.com/pyapp-kit/ndv/pull/163) ([tlambert03](https://github.com/tlambert03))
+- feat: pygfx gamma [\#158](https://github.com/pyapp-kit/ndv/pull/158) ([gselzer](https://github.com/gselzer))
+- feat: Add autoscale tail ignore via popup [\#147](https://github.com/pyapp-kit/ndv/pull/147) ([gselzer](https://github.com/gselzer))
+- feat: Better histogram control \(plus pygfx histogram overhaul\) [\#146](https://github.com/pyapp-kit/ndv/pull/146) ([gselzer](https://github.com/gselzer))
+
+**Fixed bugs:**
+
+- fix: improve callable invocation and cleanup in MainThreadInvoker [\#183](https://github.com/pyapp-kit/ndv/pull/183) ([tlambert03](https://github.com/tlambert03))
+
+**Merged pull requests:**
+
+- ci\(pre-commit.ci\): autoupdate [\#188](https://github.com/pyapp-kit/ndv/pull/188) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- ci\(dependabot\): bump astral-sh/setup-uv from 5 to 6 [\#187](https://github.com/pyapp-kit/ndv/pull/187) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ci\(pre-commit.ci\): autoupdate [\#173](https://github.com/pyapp-kit/ndv/pull/173) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+
 ## [v0.3.1](https://github.com/pyapp-kit/ndv/tree/v0.3.1) (2025-03-26)
 
 [Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.3.0...v0.3.1)

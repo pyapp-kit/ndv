@@ -100,7 +100,7 @@ class ArrayViewer:
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
-        self._view = frontend_cls(self._data_model, self._viewer_model)
+        self._view = frontend_cls(self._viewer_model)
         canvas_cls = _app.get_array_canvas_class()
         parent = self._view.frontend_widget()
         self._canvas = canvas_cls(self._viewer_model, parent=parent)
@@ -115,8 +115,9 @@ class ArrayViewer:
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
-        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
+        self._view.nDimsRequested.connect(self._on_view_ndims_requested)
 
+        self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
@@ -154,7 +155,7 @@ class ArrayViewer:
         self._fully_synchronize_view()
 
     @property
-    def data_wrapper(self) -> Any:
+    def data_wrapper(self) -> DataWrapper | None:
         """Return data being displayed."""
         return self._data_model.data_wrapper
 
@@ -438,9 +439,26 @@ class ArrayViewer:
         """Update the model when slider value changes."""
         self._data_model.display.current_index.update(self._view.current_index())
 
-    def _on_view_visible_axes_changed(self) -> None:
-        """Update the model when the visible axes change."""
-        self.display_model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
+    def _on_view_ndims_requested(self, ndims: int) -> None:
+        """Update the model when the user requests ndims visualized axes."""
+        # TODO: Disable 3D mode when only 2 axes?
+        current_axes = self.display_model.visible_axes
+        if len(current_axes) > 2:
+            if ndims == 2:  # is now 2D
+                self.display_model.visible_axes = current_axes[-2:]
+        else:
+            z_ax = None
+            # Check the data wrapper for a guess on the z axis
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            # In absence of a (valid) guess, just choose the last dimension that is
+            # not in the visible axes.
+            if z_ax is None or z_ax in current_axes:
+                sld = reversed(self.data_wrapper.dims)  # type: ignore
+                z_ax = next(
+                    ax for ax in sld if ax not in self._data_model.normed_visible_axes
+                )
+            self.display_model.visible_axes = (z_ax, *current_axes)
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
@@ -455,15 +473,16 @@ class ArrayViewer:
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+        self._highlight_pos = (int(x), int(y))
 
-        # collect and format intensity values at the current mouse position
-        channel_values = self._get_values_at_world_point(int(x), int(y))
-
-        self._highlight_values(channel_values, (x, y))
+        # update highlight display
+        channel_values = self._get_values_at_world_point(*self._highlight_pos)
+        self._highlight_values(channel_values, self._highlight_pos)
 
     def _on_canvas_mouse_left(self) -> None:
         """Respond to a mouse leaving the canvas in the view."""
-        self._highlight_values({})
+        self._highlight_pos = None
+        self._highlight_values({}, self._highlight_pos)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
@@ -624,6 +643,10 @@ class ArrayViewer:
                 hist.set_data(counts, bin_edges)
 
         self._canvas.refresh()
+        # update highlight display
+        if self._highlight_pos is not None:
+            channel_values = self._get_values_at_world_point(*self._highlight_pos)
+            self._highlight_values(channel_values, self._highlight_pos)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
