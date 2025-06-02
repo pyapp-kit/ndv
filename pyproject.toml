@@ -44,6 +44,9 @@ dependencies = [
     "typing_extensions >= 4.0",
 ]
 
+[project.scripts]
+ndv = "ndv.cli:main"
+
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
@@ -64,24 +67,24 @@ pyside = [
     "superqt[iconify,pyside6] >=0.7.2",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
-    "numpy >=1.23,<2; sys_platform == 'win32'",  # needed for pyside6.6
+    "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
     "pyside6 >=6.4",
     "pyside6 >=6.6; python_version >= '3.12'",
     "qtpy >=2",
 ]
-wxpython = [
-    "pyconify>=0.2.1",
-    "wxpython >=4.2.2",
-]
+wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
 pygfx = ["pygfx>=0.8.0"]
 
+# opinionated image reading support
+io = ["imageio[tifffile] >=2.20", "zarr >2,<3", "tensorstore>=0.1.69,!=0.1.72"]
+
 # ready to go bundles with pygfx
-qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
-jup = ["ndv[pygfx,jupyter]", "imageio[tifffile] >=2.20"]
-wx = ["ndv[pygfx,wxpython]", "imageio[tifffile] >=2.20"]
+qt = ["ndv[pygfx,pyqt,io]"]
+jup = ["ndv[pygfx,jupyter,io]"]
+wx = ["ndv[pygfx,wxpython,io]"]
 
 
 [project.urls]
@@ -110,7 +113,7 @@ dev = [
     # omitting wxpython from dev env for now
     # because `uv sync && pytest hangs` on a wx test in the "full" env
     # use `make test extras=wx,[pygfx|vispy] isolated=1` to test
-    "ndv[vispy,pygfx,pyqt,jupyter]",   
+    "ndv[vispy,pygfx,pyqt,jupyter]",
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",
