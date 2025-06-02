@@ -59,7 +59,7 @@ class _OrthographicCamera(pygfx.OrthographicCamera):
 
         # Constrain position+/-radius within bounds
         x = state["x"]
-        rad = state["width"] / 2
+        rad = state.get("width", 0) / 2
         if self.xbounds[0] is not None:
             x = max(x, self.xbounds[0] + rad)
         if self.xbounds[1] is not None:
@@ -67,6 +67,22 @@ class _OrthographicCamera(pygfx.OrthographicCamera):
         state["x"] = x
 
         super().set_state(state)
+
+
+class _Controller(pygfx.PanZoomController):
+    def handle_event(
+        self, event: pygfx.objects.Event, viewport: pygfx.Viewport
+    ) -> None:
+        # Replace horizontal mouse scroll with panning
+        if isinstance(event, pygfx.objects.WheelEvent):
+            if abs(event.dx) > abs(event.dy):
+                # FIXME: 5000 is a magic number
+                pan_dist = -event.dx / 5000 * viewport.rect[2]
+                self.pan((pan_dist, 0), viewport.rect)
+                viewport.renderer.request_draw()
+                return
+        super().handle_event(event, viewport)
+        return None
 
 
 class PyGFXHistogramCanvas(HistogramCanvas):
@@ -120,7 +136,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # This greatly simplifies the clipping of nodes on the plot.
         self._scene = pygfx.Scene()
         self._plot_view = pygfx.Viewport(self._renderer)
-        self._controller = pygfx.PanZoomController(register_events=self._plot_view)
+        self._controller = _Controller(register_events=self._plot_view)
         # increase zoom wheel gain
         self._controller.controls.update({"wheel": ("zoom_to_point", "push", -0.005)})
         self._camera = _OrthographicCamera(maintain_aspect=False)
@@ -172,8 +188,24 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             ),
             render_order=-10,
         )
+        # The highlight is a line that draws attention to a particular domain value.
+        # e.g. identifying the value under the mouse cursor on an array canvas.
+        self._highlight = pygfx.Line(
+            geometry=pygfx.Geometry(
+                positions=np.array([[0, 0, 0], [0, 1, 0]], dtype=np.float32),
+            ),
+            material=pygfx.LineMaterial(
+                color=(1.0, 1.0, 0.2, 0.75),
+                dash_pattern=[4, 4],
+                thickness=1.5,
+            ),
+            visible=False,
+        )
+
         self._update_clims()
-        self._scene.add(self._histogram, self._clim_handles, self._gamma_handle)
+        self._scene.add(
+            self._histogram, self._clim_handles, self._gamma_handle, self._highlight
+        )
 
         self._x = pygfx.Ruler(
             start_pos=(0, 0, 0),
@@ -398,6 +430,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self._clim_handles.local.scale_y = values.max() / 0.98
         self._gamma_handle.local.scale_y = values.max() / 0.98
+        self._highlight.local.scale_y = values.max() / 0.98
 
         self.refresh()
 
@@ -452,6 +485,13 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def elements_at(self, pos_xy: tuple[float, float]) -> list:
         raise NotImplementedError()
+
+    def highlight(self, value: float | None) -> None:
+        self._highlight.visible = value is not None
+        self._highlight.local.x = value
+        self.refresh()
+
+        return super().highlight(value)
 
     # ------------- Private methods ------------- #
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from pytest import fixture
+from vispy.app.canvas import MouseEvent
+from vispy.scene.events import SceneMouseEvent
 
 from ndv._types import (
     CursorType,
@@ -29,6 +31,59 @@ def histogram() -> VispyHistogramCanvas:
     canvas = VispyHistogramCanvas()
     canvas.set_range(x=(0, 10), y=(0, 1))
     return canvas
+
+
+@pytest.mark.usefixtures("any_app")
+def test_hscroll(histogram: VispyHistogramCanvas) -> None:
+    old_rect = histogram.plot.camera.rect
+    evt = SceneMouseEvent(
+        MouseEvent(type="mouse_wheel", delta=[1, 0]), histogram.plot.camera.viewbox
+    )
+    histogram.plot.camera.viewbox_mouse_event(evt)
+    new_rect = histogram.plot.camera.rect
+    assert new_rect.left < old_rect.left
+    assert abs(new_rect.width - old_rect.width) <= 1e-6
+
+    evt = SceneMouseEvent(
+        MouseEvent(type="mouse_wheel", delta=[-1, 0]), histogram.plot.camera.viewbox
+    )
+    histogram.plot.camera.viewbox_mouse_event(evt)
+    new_rect = histogram.plot.camera.rect
+    assert abs(new_rect.left - old_rect.left) <= 1e-6
+    assert abs(new_rect.width - old_rect.width) <= 1e-6
+
+
+@pytest.mark.usefixtures("any_app")
+def test_highlight() -> None:
+    # Set up a histogram
+    histogram = VispyHistogramCanvas()
+    assert not histogram._highlight.visible
+    tform = histogram._highlight.transform
+    assert np.allclose(tform.map(histogram._highlight.pos)[:, :2], ((0, 0), (0, 1)))
+
+    # Add some data...
+    values = np.random.randint(0, 100, (100))
+    bin_edges = np.linspace(0, 10, values.size + 1)
+    histogram.set_data(values, bin_edges)
+    # ...and ensure the scale is updated
+    assert np.allclose(
+        tform.map(histogram._highlight.pos)[:, :2], ((0, 0), (0, values.max() / 0.98))
+    )
+
+    # Highlight a value...
+    histogram.highlight(5)
+    # ...and ensure the highlight is shown in the right place
+    assert histogram._highlight.visible
+    assert np.allclose(
+        tform.map(histogram._highlight.pos)[:, :2], ((5, 0), (5, values.max() / 0.98))
+    )
+
+    # Remove the highlight...
+    histogram.highlight(None)
+    # ...and ensure the highlight is hidden
+    assert not histogram._highlight.visible
+
+    histogram.close()
 
 
 @pytest.mark.usefixtures("any_app")

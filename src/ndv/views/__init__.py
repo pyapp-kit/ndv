@@ -12,7 +12,10 @@ from ._app import (
     get_array_view_class,
     get_histogram_canvas_class,
     gui_frontend,
+    process_events,
     run_app,
+    set_canvas_backend,
+    set_gui_backend,
 )
 
 __all__ = [
@@ -23,5 +26,8 @@ __all__ = [
     "get_array_view_class",
     "get_histogram_canvas_class",
     "gui_frontend",
+    "process_events",
     "run_app",
+    "set_canvas_backend",
+    "set_gui_backend",
 ]
