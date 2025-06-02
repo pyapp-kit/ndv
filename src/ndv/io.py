@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    import xarray as xr
     import zarr
 
 logger = logging.getLogger(__name__)
@@ -47,6 +46,10 @@ def imread(path: str | Path) -> Any:
 
     errors: dict[str, Exception] = {}
 
+    if _is_tiff_file(path):
+        with collect_errors(errors, "tifffile"):
+            return _read_tifffile(path)
+
     if _is_zarr_folder(path):
         with collect_errors(errors, "tensorstore-zarr"):
             return _read_tensorstore(path)
@@ -57,10 +60,14 @@ def imread(path: str | Path) -> Any:
         with collect_errors(errors, "tensorstore-n5"):
             return _read_tensorstore(path, driver="n5")
 
-    with collect_errors(errors, "bioio"):
-        return _read_bioio(path)
-
     raise ValueError(_format_error_message(errors))
+
+
+def _is_tiff_file(path: str | Path) -> bool:
+    path = Path(path)
+    if path.is_file() and path.suffix.lower() in {".tif", ".tiff"}:
+        return True
+    return False
 
 
 def _is_n5_folder(path: str | Path) -> bool:
@@ -73,6 +80,16 @@ def _is_zarr_folder(path: str | Path) -> bool:
         return True
     path = Path(path)
     return path.is_dir() and any(path.glob("*.zarr"))
+
+
+def _read_tifffile(path: str | Path) -> Any:
+    import tifffile
+
+    path = Path(path)
+    if not path.is_file():
+        raise ValueError(f"Path {path} is not a file.")
+    logger.info("using tifffile")
+    return tifffile.imread(path)
 
 
 def _read_tensorstore(path: str | Path, driver: str = "zarr", level: int = 0) -> Any:
@@ -91,15 +108,11 @@ def _format_error_message(errors: dict[str, Exception]) -> str:
         wrapped = wrap(str(err), width=120)
         indented = indent("\n".join(wrapped), "    ")
         lines.append(indented)
-    return "\n".join(lines)
+    msg = "\n".join(lines)
 
-
-def _read_bioio(path: str | Path) -> xr.DataArray:
-    from bioio import BioImage
-
-    data = BioImage(str(path))
-    logger.info("using bioio")
-    return data.xarray_dask_data
+    if "No module named" in msg:
+        msg += "\n\nPlease install ndv with io support `pip install ndv[io]`."
+    return msg
 
 
 def _read_zarr_python(path: str | Path, level: int = 0) -> zarr.Array:
