@@ -788,6 +788,8 @@ class WxArrayView(ArrayView):
         )
 
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
+        # Unbind the event before destroying the widget
+        wxwdg.Unbind(wx.EVT_SHOW, handler=self._wxwidget.update_lut_scroll_size)
         self._wxwidget.luts.Detach(wxwdg)
         wxwdg.Destroy()
 
