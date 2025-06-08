@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
+from ndv import process_events
 from ndv._types import (
     CursorType,
     MouseButton,
@@ -251,6 +252,7 @@ def test_array_viewer_with_app() -> None:
     visax_mock = Mock()
     viewer.display_model.events.visible_axes.connect(visax_mock)
     viewer._view.nDimsRequested.emit(3)
+    process_events()
     visax_mock.assert_called_once()
     assert viewer.display_model.visible_axes == (2, -2, -1)
 

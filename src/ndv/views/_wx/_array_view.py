@@ -647,9 +647,6 @@ class _WxArrayViewer(wx.Frame):
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
         self.luts_scroll.SetSizer(self.luts)
-        self.luts_scroll.Bind(
-            wx.EVT_WINDOW_DESTROY, lambda *_: setattr(self, "luts_scroll", None)
-        )
 
         self._btns = wx.BoxSizer(wx.HORIZONTAL)
         self._btns.AddStretchSpacer()
@@ -682,15 +679,14 @@ class _WxArrayViewer(wx.Frame):
         self.Layout()
 
     def update_lut_scroll_size(self, *_: Any) -> None:
-        if self.luts_scroll:  # Check if the window object still exists
-            self.luts_scroll.Layout()
-            total_size = self.luts.GetMinSize()
-            total_height = total_size.GetHeight()
-            new_height = max(30, min(total_height, 200))
-            self._inner_sizer.SetItemMinSize(self.luts_scroll, -1, new_height)
-            self.luts_scroll.SetVirtualSize(total_size)
-            self.luts_scroll.FitInside()
-            self.Layout()
+        self.luts_scroll.Layout()
+        total_size = self.luts.GetMinSize()
+        total_height = total_size.GetHeight()
+        new_height = max(30, min(total_height, 200))
+        self._inner_sizer.SetItemMinSize(self.luts_scroll, -1, new_height)
+        self.luts_scroll.SetVirtualSize(total_size)
+        self.luts_scroll.FitInside()
+        self.Layout()
 
     def set_lut_toolbar_visible(self, visible: bool) -> None:
         if visible and not self._lut_toolbar_panel.IsShown():
@@ -792,8 +788,6 @@ class WxArrayView(ArrayView):
         )
 
         wxwdg = cast("_WxLUTWidget", lut.frontend_widget())
-        # Unbind the event before destroying the widget
-        wxwdg.Unbind(wx.EVT_SHOW, handler=self._wxwidget.update_lut_scroll_size)
         self._wxwidget.luts.Detach(wxwdg)
         wxwdg.Destroy()
 
