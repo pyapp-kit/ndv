@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import wx
 from pytest import fixture
@@ -12,7 +12,7 @@ from ndv.views._wx._array_view import WxArrayView
 
 @fixture
 def viewer(wxapp: wx.App) -> WxArrayView:
-    viewer = WxArrayView(MagicMock(), ArrayViewerModel())
+    viewer = WxArrayView(ArrayViewerModel())
     viewer.add_lut_view(None)
     return viewer
 
@@ -74,7 +74,10 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
 
     # Test adding the histogram widget puts it on the relevant lut
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 1
-    histogram = get_histogram_canvas_class()()  # will raise if not supported
+    parent = wx.Frame(None)
+    histogram = get_histogram_canvas_class()(
+        parent=parent
+    )  # will raise if not supported
     viewer.add_histogram(channel, histogram)
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 2
 
