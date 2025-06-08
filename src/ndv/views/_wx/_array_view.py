@@ -679,14 +679,15 @@ class _WxArrayViewer(wx.Frame):
         self.Layout()
 
     def update_lut_scroll_size(self, *_: Any) -> None:
-        self.luts_scroll.Layout()
-        total_size = self.luts.GetMinSize()
-        total_height = total_size.GetHeight()
-        new_height = max(30, min(total_height, 200))
-        self._inner_sizer.SetItemMinSize(self.luts_scroll, -1, new_height)
-        self.luts_scroll.SetVirtualSize(total_size)
-        self.luts_scroll.FitInside()
-        self.Layout()
+        if self.luts_scroll:  # Check if the window object still exists
+            self.luts_scroll.Layout()
+            total_size = self.luts.GetMinSize()
+            total_height = total_size.GetHeight()
+            new_height = max(30, min(total_height, 200))
+            self._inner_sizer.SetItemMinSize(self.luts_scroll, -1, new_height)
+            self.luts_scroll.SetVirtualSize(total_size)
+            self.luts_scroll.FitInside()
+            self.Layout()
 
     def set_lut_toolbar_visible(self, visible: bool) -> None:
         if visible and not self._lut_toolbar_panel.IsShown():
