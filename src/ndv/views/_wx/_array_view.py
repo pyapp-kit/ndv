@@ -647,6 +647,9 @@ class _WxArrayViewer(wx.Frame):
         # LUT layout (simple vertical grouping for LUT widgets)
         self.luts = wx.BoxSizer(wx.VERTICAL)
         self.luts_scroll.SetSizer(self.luts)
+        self.luts_scroll.Bind(
+            wx.EVT_WINDOW_DESTROY, lambda *_: setattr(self, "luts_scroll", None)
+        )
 
         self._btns = wx.BoxSizer(wx.HORIZONTAL)
         self._btns.AddStretchSpacer()
