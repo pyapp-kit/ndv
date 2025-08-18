@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 from pytest import fixture
-from qtpy.QtWidgets import QWidget
 
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
 
 @fixture
 def viewer(qtbot: QtBot) -> QtArrayView:
-    viewer = QtArrayView(QWidget(), ArrayViewerModel())
+    viewer = QtArrayView(ArrayViewerModel())
     viewer.add_lut_view(None)
     viewer.create_sliders({0: range(10), 1: range(64), 2: range(128)})
     qtbot.addWidget(viewer.frontend_widget())

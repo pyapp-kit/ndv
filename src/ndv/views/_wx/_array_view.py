@@ -19,7 +19,7 @@ from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayCanvas, ArrayView, LutView
 
 from .range_slider import RangeSlider
 
@@ -407,16 +407,11 @@ class WxLutView(LutView):
             hist.set_range()
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
-        widget = cast("wx.Window", histogram.frontend_widget())
-        # FIXME: pygfx backend needs this to be widget._subwidget
-        if hasattr(widget, "_subwidget"):
-            widget = widget._subwidget
-
-        # FIXME: Rendercanvas may make this unnecessary
-        if (parent := widget.GetParent()) and parent is not self:
-            widget.Reparent(self._wxwidget)  # Reparent widget to this frame
-            wx.CallAfter(parent.Destroy)
-            widget.Show()
+        widget = histogram.frontend_widget()
+        if not isinstance(widget, wx.Window):
+            raise TypeError(f"Expected wx.Window, got {type(widget)} instead. ")
+        if widget.Parent is not self._wxwidget:
+            widget.Reparent(self._wxwidget)
 
         # Setup references to the histogram
         self.histogram = histogram
@@ -574,20 +569,8 @@ class _WxDimsSliders(wx.Panel):
 
 
 class _WxArrayViewer(wx.Frame):
-    def __init__(self, canvas_widget: wx.Window, parent: wx.Window = None):
+    def __init__(self, parent: wx.Window | None = None) -> None:
         super().__init__(parent)
-
-        # FIXME: pygfx backend needs this to be canvas_widget._subwidget
-        if hasattr(canvas_widget, "_subwidget"):
-            canvas_widget = canvas_widget._subwidget
-
-        if (parent := canvas_widget.GetParent()) and parent is not self:
-            canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
-            if parent:
-                parent.Destroy()
-            canvas_widget.Show()
-
-        self._canvas = canvas_widget
 
         # Dynamic sliders for dimensions
         self.dims_sliders = _WxDimsSliders(self)
@@ -660,9 +643,8 @@ class _WxArrayViewer(wx.Frame):
         top_info.AddStretchSpacer()
         top_info.Add(self._progress_spinner, 0, wx.EXPAND | wx.BOTTOM, 0)
 
-        inner = wx.BoxSizer(wx.VERTICAL)
+        self._inner = inner = wx.BoxSizer(wx.VERTICAL)
         inner.Add(top_info, 0, wx.EXPAND | wx.BOTTOM, 5)
-        inner.Add(self._canvas, 1, wx.EXPAND | wx.ALL)
         inner.Add(self._hover_info_label, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self.dims_sliders, 0, wx.EXPAND | wx.BOTTOM)
         inner.Add(self._lut_toolbar_panel, 0, wx.EXPAND | wx.BOTTOM, 5)
@@ -701,13 +683,13 @@ class _WxArrayViewer(wx.Frame):
 class WxArrayView(ArrayView):
     def __init__(
         self,
-        canvas_widget: wx.Window,
         viewer_model: ArrayViewerModel,
-        parent: wx.Window = None,
+        parent: wx.Window | None = None,
     ) -> None:
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
-        self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
+        self._wxwidget = wdg = _WxArrayViewer(parent)
+
         # Mapping of channel key to LutViews
         self._luts: dict[ChannelKey, WxLutView] = {}
         self._visible_axes: Sequence[AxisKey] = []
@@ -734,6 +716,13 @@ class WxArrayView(ArrayView):
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if create_roi else InteractionMode.PAN_ZOOM
         )
+
+    def embed_canvas(self, canvas: ArrayCanvas) -> None:
+        # insert the canvas into the inner sizer at position 1
+        # (between top_info and hover_info)
+        self._wxwidget._inner.Insert(1, canvas.frontend_widget(), 1, wx.EXPAND | wx.ALL)
+        self._wxwidget._inner.Layout()
+        self._wxwidget.Layout()
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet

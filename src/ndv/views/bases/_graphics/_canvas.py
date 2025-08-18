@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 
 class GraphicsCanvas(Viewable, Mouseable):
     """ABC for graphics canvas providers."""
+
+    @abstractmethod
+    def __init__(self, parent: Any = None) -> None:
+        """Initializes the canvas with an optional viewer model and parent."""
 
     @abstractmethod
     def refresh(self) -> None: ...
@@ -51,7 +55,9 @@ class ArrayCanvas(GraphicsCanvas):
     """ABC for canvases that show array data."""
 
     @abstractmethod
-    def __init__(self, viewer_model: ArrayViewerModel | None = ...) -> None: ...
+    def __init__(
+        self, viewer_model: ArrayViewerModel | None = ..., parent: Any = None
+    ) -> None: ...
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod

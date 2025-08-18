@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._viewer_model import ArrayViewerModel
     from ndv.views.bases import LutView
+    from ndv.views.bases._graphics._canvas import ArrayCanvas
 
 
 class ArrayView(Viewable):
@@ -36,10 +37,11 @@ class ArrayView(Viewable):
     @abstractmethod
     def __init__(
         self,
-        canvas_widget: Any,
         viewer_model: ArrayViewerModel,
         **kwargs: Any,
     ) -> None: ...
+    @abstractmethod
+    def embed_canvas(self, canvas: ArrayCanvas) -> None: ...
     @abstractmethod
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None: ...
     @abstractmethod

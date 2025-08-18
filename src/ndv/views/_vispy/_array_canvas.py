@@ -289,7 +289,7 @@ class VispyArrayCanvas(ArrayCanvas):
     could be swapped in if needed as long as they implement the same interface).
     """
 
-    def __init__(self, viewer_model: ArrayViewerModel) -> None:
+    def __init__(self, viewer_model: ArrayViewerModel, parent: Any = None) -> None:
         self._viewer = viewer_model
 
         self._canvas = scene.SceneCanvas(size=(600, 600))

@@ -64,19 +64,16 @@ pyside = [
     "superqt[iconify,pyside6] >=0.7.2",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
-    "numpy >=1.23,<2; sys_platform == 'win32'",  # needed for pyside6.6
+    "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
     "pyside6 >=6.4",
     "pyside6 >=6.6; python_version >= '3.12'",
     "qtpy >=2",
 ]
-wxpython = [
-    "pyconify>=0.2.1",
-    "wxpython >=4.2.2",
-]
+wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
-pygfx = ["pygfx>=0.8.0"]
+pygfx = ["pygfx>=0.8.0", "rendercanvas>=2.1.0"]
 
 # ready to go bundles with pygfx
 qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
@@ -110,7 +107,7 @@ dev = [
     # omitting wxpython from dev env for now
     # because `uv sync && pytest hangs` on a wx test in the "full" env
     # use `make test extras=wx,[pygfx|vispy] isolated=1` to test
-    "ndv[vispy,pygfx,pyqt,jupyter]",   
+    "ndv[vispy,pygfx,pyqt,jupyter]",
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",

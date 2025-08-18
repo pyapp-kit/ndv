@@ -365,23 +365,20 @@ class PyGFXRectangle(RectangularROIHandle):
 class GfxArrayCanvas(ArrayCanvas):
     """pygfx-based canvas wrapper."""
 
-    def __init__(self, viewer_model: ArrayViewerModel) -> None:
+    def __init__(self, viewer_model: ArrayViewerModel, parent: Any = None) -> None:
         self._viewer = viewer_model
 
         self._current_shape: tuple[int, ...] = ()
         self._last_state: dict[Literal[2, 3], Any] = {}
 
         cls = rendercanvas_class()
-        self._canvas = cls(size=(600, 600))
+        self._canvas = cls(parent=parent)
 
         # this filter needs to remain in scope for the lifetime of the canvas
         # or mouse events will not be intercepted
         # the returned function can be called to remove the filter, (and it also
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
-
-        self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None
@@ -391,6 +388,13 @@ class GfxArrayCanvas(ArrayCanvas):
         self._selection: CanvasElement | None = None
         # Maintain a weak reference to the last ROI created.
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
+
+    @property
+    def _renderer(self) -> pygfx.Renderer:
+        if not hasattr(self, "_renderer_"):
+            self._renderer_ = pygfx.renderers.WgpuRenderer(self._canvas)
+            self._renderer_.blend_mode = "additive"
+        return self._renderer_
 
     def frontend_widget(self) -> Any:
         return self._canvas
