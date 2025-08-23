@@ -72,6 +72,8 @@ class ChannelController:
             return None
         # only getting one handle per channel for now
         handle = handles[0]
+        if not handle.visible():
+            return None
         with suppress(IndexError):  # skip out of bounds
             # here, we're retrieving the value from the in-memory data
             # stored by the backend visual, rather than querying the data itself

@@ -121,7 +121,9 @@ class ArrayViewer:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
 
+        self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+        self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
         if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
@@ -458,26 +460,50 @@ class ArrayViewer:
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+        self._highlight_pos = (int(x), int(y))
 
-        # collect and format intensity values at the current mouse position
-        channel_values = self._get_values_at_world_point(int(x), int(y))
-        if not channel_values:
-            # clear hover info if no values found
-            self._view.set_hover_info("")
-            return
-        vals = []
-        for ch, value in channel_values.items():
-            # restrict to 2 decimal places, but remove trailing zeros
-            fval = f"{value:.2f}".rstrip("0").rstrip(".")
-            fch = f"{ch}: " if ch is not None else ""
-            vals.append(f"{fch}{fval}")
-        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
-        self._view.set_hover_info(text)
+        # update highlight display
+        channel_values = self._get_values_at_world_point(*self._highlight_pos)
+        self._highlight_values(channel_values, self._highlight_pos)
+
+    def _on_canvas_mouse_left(self) -> None:
+        """Respond to a mouse leaving the canvas in the view."""
+        self._highlight_pos = None
+        self._highlight_values({}, self._highlight_pos)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
 
     # ------------------ Helper methods ------------------
+
+    def _highlight_values(
+        self,
+        channel_values: dict[ChannelKey, float],
+        canvas_pos: tuple[float, float] | None = None,
+    ) -> None:
+        """Highlights the given values for each channel."""
+        # Update highlight each histogram. If the histogram channel is not present
+        # in channel_values, the highlight will be set to None (i.e. hidden)
+        for ch, hist in self._histograms.items():
+            hist.highlight(channel_values.get(ch, None))
+
+        if not channel_values:
+            # clear hover info if no values found
+            self._view.set_hover_info("")
+        else:
+            if canvas_pos is not None:
+                pos = f"[{canvas_pos[1]:.0f}, {canvas_pos[0]:.0f}] "
+            else:
+                pos = " "  # pragma: no cover
+
+            vals = []
+            for ch, value in channel_values.items():
+                # restrict to 2 decimal places, but remove trailing zeros
+                fval = f"{value:.2f}".rstrip("0").rstrip(".")
+                fch = f"{ch}: " if ch is not None else ""
+                vals.append(f"{fch}{fval}")
+
+            self._view.set_hover_info(pos + ",".join(vals))
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
@@ -604,6 +630,10 @@ class ArrayViewer:
                 hist.set_data(counts, bin_edges)
 
         self._canvas.refresh()
+        # update highlight display
+        if self._highlight_pos is not None:
+            channel_values = self._get_values_at_world_point(*self._highlight_pos)
+            self._highlight_values(channel_values, self._highlight_pos)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data

@@ -48,6 +48,35 @@ def test_hscroll() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_highlight() -> None:
+    # Set up a histogram
+    histogram = PyGFXHistogramCanvas()
+    assert not histogram._highlight.visible
+    assert histogram._highlight.local.x == 0
+    assert histogram._highlight.local.scale_y == 1
+
+    # Add some data...
+    values = np.random.randint(0, 100, (100))
+    bin_edges = np.linspace(0, 10, values.size + 1)
+    histogram.set_data(values, bin_edges)
+    # ...and ensure the scale is updated
+    assert histogram._highlight.local.scale_y == values.max() / 0.98
+
+    # Highlight a value...
+    histogram.highlight(5)
+    # ...and ensure the highlight is shown in the right place
+    assert histogram._highlight.visible
+    assert histogram._highlight.local.x == 5
+
+    # Remove the highlight...
+    histogram.highlight(None)
+    # ...and ensure the highlight is hidden
+    assert not histogram._highlight.visible
+
+    histogram.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_interaction() -> None:
     """Checks basic histogram functionality."""
     model = LUTModel(

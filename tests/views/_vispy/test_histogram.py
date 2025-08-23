@@ -54,6 +54,39 @@ def test_hscroll(histogram: VispyHistogramCanvas) -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_highlight() -> None:
+    # Set up a histogram
+    histogram = VispyHistogramCanvas()
+    assert not histogram._highlight.visible
+    tform = histogram._highlight.transform
+    assert np.allclose(tform.map(histogram._highlight.pos)[:, :2], ((0, 0), (0, 1)))
+
+    # Add some data...
+    values = np.random.randint(0, 100, (100))
+    bin_edges = np.linspace(0, 10, values.size + 1)
+    histogram.set_data(values, bin_edges)
+    # ...and ensure the scale is updated
+    assert np.allclose(
+        tform.map(histogram._highlight.pos)[:, :2], ((0, 0), (0, values.max() / 0.98))
+    )
+
+    # Highlight a value...
+    histogram.highlight(5)
+    # ...and ensure the highlight is shown in the right place
+    assert histogram._highlight.visible
+    assert np.allclose(
+        tform.map(histogram._highlight.pos)[:, :2], ((5, 0), (5, values.max() / 0.98))
+    )
+
+    # Remove the highlight...
+    histogram.highlight(None)
+    # ...and ensure the highlight is hidden
+    assert not histogram._highlight.visible
+
+    histogram.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_interaction(model: LUTModel, histogram: VispyHistogramCanvas) -> None:
     """Checks basic histogram functionality."""
     histogram.model = model

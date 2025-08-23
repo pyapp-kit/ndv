@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import wx
 from wx import (
+    EVT_LEAVE_WINDOW,
     EVT_LEFT_DCLICK,
     EVT_LEFT_DOWN,
     EVT_LEFT_UP,
@@ -88,6 +89,14 @@ class WxAppWrap(NDVApp):
             if cursor := receiver.get_cursor(mme):
                 canvas.SetCursor(cursor.to_wx())
 
+        def on_mouse_leave(event: MouseEvent) -> None:
+            nonlocal active_button
+            nonlocal canvas
+
+            if not receiver.on_mouse_leave():
+                event.Skip()
+            receiver.mouseLeft.emit()
+
         def on_mouse_press(event: MouseEvent) -> None:
             nonlocal active_button
 
@@ -118,12 +127,14 @@ class WxAppWrap(NDVApp):
                 event.Skip()
 
         canvas.Bind(EVT_MOTION, handler=on_mouse_move)
+        canvas.Bind(EVT_LEAVE_WINDOW, handler=on_mouse_leave)
         canvas.Bind(EVT_LEFT_DOWN, handler=on_mouse_press)
         canvas.Bind(EVT_LEFT_DCLICK, handler=on_mouse_double_press)
         canvas.Bind(EVT_LEFT_UP, handler=on_mouse_release)
 
         def _unbind() -> None:
             canvas.Unbind(EVT_MOTION, handler=on_mouse_move)
+            canvas.Unbind(EVT_LEAVE_WINDOW, handler=on_mouse_leave)
             canvas.Unbind(EVT_LEFT_DOWN, handler=on_mouse_press)
             canvas.Unbind(EVT_LEFT_DCLICK, handler=on_mouse_double_press)
             canvas.Unbind(EVT_LEFT_UP, handler=on_mouse_release)
