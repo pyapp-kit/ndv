@@ -104,7 +104,9 @@ class ArrayViewer:
 
         # TODO: Is this necessary?
         self._histograms: dict[ChannelKey, HistogramCanvas] = {}
-        self._view = frontend_cls(self._canvas.frontend_widget(), self._viewer_model)
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._data_model, self._viewer_model
+        )
 
         self._roi_view: RectangularROIHandle | None = None
 
@@ -115,7 +117,7 @@ class ArrayViewer:
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
-        self._view.nDimsRequested.connect(self._on_view_ndims_requested)
+        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
 
         self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
@@ -155,7 +157,7 @@ class ArrayViewer:
         self._fully_synchronize_view()
 
     @property
-    def data_wrapper(self) -> DataWrapper | None:
+    def data_wrapper(self) -> Any:
         """Return data being displayed."""
         return self._data_model.data_wrapper
 
@@ -439,26 +441,9 @@ class ArrayViewer:
         """Update the model when slider value changes."""
         self._data_model.display.current_index.update(self._view.current_index())
 
-    def _on_view_ndims_requested(self, ndims: int) -> None:
-        """Update the model when the user requests ndims visualized axes."""
-        # TODO: Disable 3D mode when only 2 axes?
-        current_axes = self.display_model.visible_axes
-        if len(current_axes) > 2:
-            if ndims == 2:  # is now 2D
-                self.display_model.visible_axes = current_axes[-2:]
-        else:
-            z_ax = None
-            # Check the data wrapper for a guess on the z axis
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            # In absence of a (valid) guess, just choose the last dimension that is
-            # not in the visible axes.
-            if z_ax is None or z_ax in current_axes:
-                sld = reversed(self.data_wrapper.dims)  # type: ignore
-                z_ax = next(
-                    ax for ax in sld if ax not in self._data_model.normed_visible_axes
-                )
-            self.display_model.visible_axes = (z_ax, *current_axes)
+    def _on_view_visible_axes_changed(self) -> None:
+        """Update the model when the visible axes change."""
+        self.display_model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""

@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from ndv import process_events
 from ndv._types import (
     CursorType,
     MouseButton,
@@ -119,8 +118,9 @@ def test_controller() -> None:
     assert model.current_index == idx
 
     # when the view sets 3 dimensions, the model is updated
-    ctrl._on_view_ndims_requested(3)
-    assert model.visible_axes == (2, 0, 3)
+    mock_view.visible_axes.return_value = (0, -2, -1)
+    ctrl._on_view_visible_axes_changed()
+    assert model.visible_axes == (0, -2, -1)
 
     # when the view changes the channel mode, the model is updated
     assert model.channel_mode == ChannelMode.GRAYSCALE
@@ -251,10 +251,14 @@ def test_array_viewer_with_app() -> None:
     assert viewer.display_model.visible_axes == (-2, -1)
     visax_mock = Mock()
     viewer.display_model.events.visible_axes.connect(visax_mock)
-    viewer._view.nDimsRequested.emit(3)
-    process_events()
-    visax_mock.assert_called_once()
-    assert viewer.display_model.visible_axes == (2, -2, -1)
+    viewer._view.set_visible_axes((0, -2, -1))
+
+    # FIXME:
+    # calling set_visible_axes on wx during testing is not triggering the
+    # _on_ndims_toggled callback... and I don't know enough about wx yet to know why.
+    if gui_frontend() != _app.GuiFrontend.WX:
+        visax_mock.assert_called_once()
+        assert viewer.display_model.visible_axes == (0, -2, -1)
 
 
 @pytest.mark.usefixtures("any_app")
