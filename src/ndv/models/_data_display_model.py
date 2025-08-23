@@ -108,14 +108,6 @@ class _ArrayDataDisplayModel(NDVModel):
                 if len(self.normed_visible_axes) == 3:
                     raise Exception("")
                 self._inject_channel_axis()
-                # # FIXME? going back another ChannelMode retains these changes
-                # if guess in self.normed_visible_axes:
-                #     dims = list(self.data_wrapper.sizes().keys())
-                #     dims.remove(guess)
-                #     new_visible_axes = dims[-self.display.n_visible_axes :]
-                #     self.display.visible_axes = cast(
-                #         "TwoOrThreeAxisTuple", tuple(new_visible_axes)
-                #     )
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
