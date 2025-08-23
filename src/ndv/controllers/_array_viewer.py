@@ -103,7 +103,8 @@ class ArrayViewer:
         init_future.result()
 
         if self._data_model.data_wrapper is not None:
-            # Queue view synchronization to main thread as well since it involves GUI operations
+            # Queue view synchronization to main thread as well
+            # since it involves GUI operations
             sync_future = _app.ndv_app().call_in_main_thread(
                 self._fully_synchronize_view
             )
