@@ -235,6 +235,9 @@ class DataWrapper(Generic[ArrayT], ABC):
         # for arrays with labeled dimensions,
         # see if any of the dimensions are named "channel"
         sizes = self.sizes()
+        if len(sizes) < 3 or min(sizes.values()) > self.MAX_CHANNELS:
+            return None
+
         for dimkey, val in sizes.items():
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
