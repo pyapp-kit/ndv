@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
-from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal
+from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore[attr-defined]
 from qtpy.QtGui import QCursor, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey, ChannelKey
+    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
@@ -104,17 +105,18 @@ class _CmapCombo(QColormapComboBox):
         popup.move(popup.x(), popup.y() - self.height() - popup.height())
 
     # TODO: upstream me
-    def setCurrentColormap(self, cmap_: cmap.Colormap) -> None:
+    def setCurrentColormap(self, color: cmap.Colormap) -> None:
         """Adds the color to the QComboBox and selects it."""
+        idx = 0
         for idx in range(self.count()):
             if item := self.itemColormap(idx):
-                if item.name == cmap_.name:
+                if item.name == color.name:
                     # cmap_ is already here - just select it
                     self.setCurrentIndex(idx)
                     return
 
         # cmap_ not in the combo box - add it!
-        self.addColormap(cmap_)
+        self.addColormap(color)
         # then, select it!
         # NB: "Add..." was at idx, now it's at idx+1 and cmap_ is at idx
         self.setCurrentIndex(idx)
@@ -488,7 +490,7 @@ class DimRow(QObject):
             self._timer_id = None
             self.play_btn.setChecked(False)
 
-    def timerEvent(self, event: Any) -> None:
+    def timerEvent(self, a0: Any) -> None:
         """Handle timer event for play button, move to the next frame."""
         # TODO
         # for now just increment the value by 1, but we should be able to
@@ -782,8 +784,10 @@ class QtArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: QWidget,
+        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
+        self._data_model = data_model
         self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         # Mapping of channel key to LutViews
@@ -820,9 +824,9 @@ class QtArrayView(ArrayView):
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
 
-    def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
-            lut._add_histogram(histogram)
+            lut._add_histogram(widget)
 
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
@@ -833,7 +837,7 @@ class QtArrayView(ArrayView):
         self._qwidget.dims_sliders.create_sliders(coords)
 
     def hide_sliders(
-        self, axes_to_hide: Container[Hashable], show_remainder: bool = True
+        self, axes_to_hide: Container[Hashable], *, show_remainder: bool = True
     ) -> None:
         """Hide sliders based on visible axes."""
         self._qwidget.dims_sliders.hide_dimensions(axes_to_hide, show_remainder)
@@ -847,8 +851,22 @@ class QtArrayView(ArrayView):
         self._qwidget.dims_sliders.set_current_index(value)
 
     def _on_ndims_toggled(self, is_3d: bool) -> None:
+        if len(self._visible_axes) > 2:
+            if not is_3d:  # is now 2D
+                self._visible_axes = self._visible_axes[-2:]
+        else:
+            z_ax = None
+            if wrapper := self._data_model.data_wrapper:
+                z_ax = wrapper.guess_z_axis()
+            if z_ax is None:
+                # get the last slider that is not in visible axes
+                sld = reversed(self._qwidget.dims_sliders._sliders)
+                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
+            self._visible_axes = (z_ax, *self._visible_axes)
+        # TODO: a future PR may decide to set this on the model directly...
+        # since we now have access to it.
         self._qwidget.dims_sliders.stop_animations()
-        self.nDimsRequested.emit(3 if is_3d else 2)
+        self.visibleAxesChanged.emit()
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet
@@ -857,13 +875,13 @@ class QtArrayView(ArrayView):
         self._visible_axes = tuple(axes)
         self._qwidget.ndims_btn.setChecked(len(axes) > 2)
 
-    def set_data_info(self, text: str) -> None:
+    def set_data_info(self, data_info: str) -> None:
         """Set the data info text, above the canvas."""
-        self._qwidget.data_info_label.setText(text)
+        self._qwidget.data_info_label.setText(data_info)
 
-    def set_hover_info(self, text: str) -> None:
+    def set_hover_info(self, hover_info: str) -> None:
         """Set the hover info text, below the canvas."""
-        self._qwidget.hover_info_label.setText(text)
+        self._qwidget.hover_info_label.setText(hover_info)
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
         """Set the channel mode button text."""

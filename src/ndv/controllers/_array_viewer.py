@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
     from typing import Any, Unpack
 
+    import numpy.typing as npt
+
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
@@ -73,8 +75,10 @@ class ArrayViewer:
                 stacklevel=2,
             )
 
-        self._data_model = _ArrayDataDisplayModel(display=display_model)
-        self._set_data_wrapper(wrapper)
+        self._data_model = _ArrayDataDisplayModel(
+            display=display_model, data_wrapper=wrapper
+        )
+        self._connect_datawrapper(None, wrapper)
 
         self._viewer_model = ArrayViewerModel.model_validate(viewer_options or {})
         self._viewer_model.events.interaction_mode.connect(
@@ -104,7 +108,9 @@ class ArrayViewer:
 
         # TODO: Is this necessary?
         self._histograms: dict[ChannelKey, HistogramCanvas] = {}
-        self._view = frontend_cls(self._canvas.frontend_widget(), self._viewer_model)
+        self._view = frontend_cls(
+            self._canvas.frontend_widget(), self._data_model, self._viewer_model
+        )
 
         self._roi_view: RectangularROIHandle | None = None
 
@@ -115,7 +121,7 @@ class ArrayViewer:
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
-        self._view.nDimsRequested.connect(self._on_view_ndims_requested)
+        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
 
         self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
@@ -155,7 +161,7 @@ class ArrayViewer:
         self._fully_synchronize_view()
 
     @property
-    def data_wrapper(self) -> DataWrapper | None:
+    def data_wrapper(self) -> Any:
         """Return data being displayed."""
         return self._data_model.data_wrapper
 
@@ -170,20 +176,22 @@ class ArrayViewer:
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        self._set_data_wrapper(data)
-        self._fully_synchronize_view()
-
-    def _set_data_wrapper(self, data: Any | None) -> None:
-        """Set new datawrapper and hook up events."""
         _new = None if data is None else DataWrapper.create(data)
         self._data_model.data_wrapper, old = _new, self._data_model.data_wrapper
+        self._connect_datawrapper(old, _new)
+        self._fully_synchronize_view()
+
+    def _connect_datawrapper(
+        self, old: DataWrapper | None, new: DataWrapper | None
+    ) -> None:
+        """Set new datawrapper and hook up events."""
         if old is not None:
             with suppress(Exception):
                 old.data_changed.disconnect(self._request_data)
                 old.dims_changed.disconnect(self._fully_synchronize_view)
-        if _new is not None:
-            _new.data_changed.connect(self._request_data)
-            _new.dims_changed.connect(self._fully_synchronize_view)
+        if new is not None:
+            new.data_changed.connect(self._request_data)
+            new.dims_changed.connect(self._fully_synchronize_view)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -272,7 +280,7 @@ class ArrayViewer:
         self._histograms[channel] = hist
 
     def _update_channel_dtype(
-        self, channel: ChannelKey, dtype: np.typing.DTypeLike | None = None
+        self, channel: ChannelKey, dtype: npt.DTypeLike | None = None
     ) -> None:
         if not (ctrl := self._lut_controllers.get(channel, None)):
             return
@@ -439,26 +447,9 @@ class ArrayViewer:
         """Update the model when slider value changes."""
         self._data_model.display.current_index.update(self._view.current_index())
 
-    def _on_view_ndims_requested(self, ndims: int) -> None:
-        """Update the model when the user requests ndims visualized axes."""
-        # TODO: Disable 3D mode when only 2 axes?
-        current_axes = self.display_model.visible_axes
-        if len(current_axes) > 2:
-            if ndims == 2:  # is now 2D
-                self.display_model.visible_axes = current_axes[-2:]
-        else:
-            z_ax = None
-            # Check the data wrapper for a guess on the z axis
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            # In absence of a (valid) guess, just choose the last dimension that is
-            # not in the visible axes.
-            if z_ax is None or z_ax in current_axes:
-                sld = reversed(self.data_wrapper.dims)  # type: ignore
-                z_ax = next(
-                    ax for ax in sld if ax not in self._data_model.normed_visible_axes
-                )
-            self.display_model.visible_axes = (z_ax, *current_axes)
+    def _on_view_visible_axes_changed(self) -> None:
+        """Update the model when the visible axes change."""
+        self.display_model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""

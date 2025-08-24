@@ -12,7 +12,7 @@ def test_set_gui_backend() -> None:
     }
     with patch.object(ndv.views._app, "_load_app") as mock_load:
         for backend, import_tuple in backends.items():
-            ndv.set_gui_backend(backend)  # type:ignore
+            ndv.set_gui_backend(backend)
             ndv.views._app.ndv_app()
             mock_load.assert_called_once_with(*import_tuple)
 
@@ -27,6 +27,6 @@ def test_set_canvas_backend() -> None:
         ndv.views._app.CanvasBackend.PYGFX,
     ]
     for backend in backends:
-        ndv.set_canvas_backend(backend.value)  # type: ignore
+        ndv.set_canvas_backend(backend.value)
         assert ndv.views._app.canvas_backend() == backend
     ndv.set_canvas_backend()

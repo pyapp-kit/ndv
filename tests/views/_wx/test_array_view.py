@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, Mock
 import wx
 from pytest import fixture
 
+from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
 from ndv.views._wx._array_view import WxArrayView
@@ -12,7 +13,7 @@ from ndv.views._wx._array_view import WxArrayView
 
 @fixture
 def viewer(wxapp: wx.App) -> WxArrayView:
-    viewer = WxArrayView(MagicMock(), ArrayViewerModel())
+    viewer = WxArrayView(MagicMock(), _ArrayDataDisplayModel(), ArrayViewerModel())
     viewer.add_lut_view(None)
     return viewer
 
@@ -85,6 +86,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
 def test_display_options_visibility(wxapp: wx.App, viewer: WxArrayView) -> None:
     # display options button should appear only after thresh is reached
     # -2 to account for add_lut_view(None) in fixture
+    ch = 0
     for ch in range(viewer._wxwidget._toolbar_display_thresh - 2):
         viewer.add_lut_view(ch)
 

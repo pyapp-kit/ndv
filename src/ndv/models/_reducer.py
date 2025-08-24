@@ -18,6 +18,7 @@ class Reducer(Protocol):
 
     def __call__(self, a: npt.ArrayLike, axis: _ShapeLike = ...) -> npt.ArrayLike:
         """Reduce an array along an axis."""
+        raise NotImplementedError()
 
 
 def _str_to_callable(obj: Any) -> Callable:

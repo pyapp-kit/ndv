@@ -83,7 +83,7 @@ def test_JupyterLutView_update_view(model: LUTModel, view: JupyterLutView) -> No
     # When gui clims change, autoscale should be disabled
     model.clims = ClimsMinMax()
     view._clims.value = (0, 1)
-    assert model.clims == ClimsManual(min=0, max=1)  # type:ignore
+    assert model.clims == ClimsManual(min=0, max=1)  # type:ignore[union-attr]
 
 
 def test_JupyterLutView_histogram_controls(view: JupyterLutView) -> None:

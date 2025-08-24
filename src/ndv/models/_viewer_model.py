@@ -111,4 +111,4 @@ class ArrayViewerModel(NDVModel):
             show_data_info = Signal(bool, bool)
             show_progress_spinner = Signal(bool, bool)
 
-        events: ArrayViewerModelEvents = ArrayViewerModelEvents()  # type: ignore
+        events: ArrayViewerModelEvents = ArrayViewerModelEvents()  # type: ignore[misc]

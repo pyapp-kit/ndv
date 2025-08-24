@@ -57,7 +57,7 @@ def test_WxLutView_update_model(model: LUTModel, view: WxLutView) -> None:
 def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) -> None:
     """Ensures the model updates when the view is changed."""
 
-    def processEvent(evt: wx.PyEventBinder, wdg: wx.Control) -> None:
+    def processEvent(evt: wx.PyEventBinder | int, wdg: wx.Window) -> None:
         ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
         wx.PostEvent(wdg.GetEventHandler(), ev)
         # Borrowed from:
@@ -118,7 +118,7 @@ def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) 
 
 
 def test_WxLutView_histogram_controls(wxapp: wx.App, view: WxLutView) -> None:
-    def processEvent(evt: wx.PyEventBinder, wdg: wx.Control) -> None:
+    def processEvent(evt: wx.PyEventBinder | int, wdg: wx.Window) -> None:
         ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
         wx.PostEvent(wdg.GetEventHandler(), ev)
         # Borrowed from:

@@ -64,12 +64,13 @@ pyqt = [
 ]
 pyside = [
     # defer to superqt's pyside6 restrictions
-    "superqt[iconify,pyside6] >=0.7.2",
+    "superqt[iconify,pyside6] >=0.7.2,<0.7.5",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
-    "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
+    "numpy >=1.23,<2; sys_platform == 'win32'",                            # needed for pyside6.6
     "pyside6 >=6.4",
-    "pyside6 >=6.6; python_version >= '3.12'",
+    "pyside6 >=6.6; python_version >= '3.12' and sys_platform == 'win32'",
+    "pyside6 >=6.7; python_version >= '3.12' and sys_platform != 'win32'",
     "qtpy >=2",
 ]
 wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
@@ -107,7 +108,7 @@ array-libs = [
     "zarr >2,<3",
 ]
 test = ["pytest >=8", "pytest-cov >=6"]
-testqt = [{ include-group = "test" }, "pytest-qt >=4.4"]
+testqt = [{ include-group = "test" }, "pytest-qt >=4.4.0"]
 dev = [
     { include-group = "testqt" },
     # omitting wxpython from dev env for now
@@ -122,13 +123,16 @@ dev = [
     "pre-commit>=4.1.0",
     "rich>=13.9.4",
     "ruff>=0.9.4",
+    "pyright>=1.1.404",
+    "types-wxpython",
+    "pydevd",
 ]
 docs = [
     "mkdocs >=1.6.1",
     "mkdocs-api-autonav >=0.1.2",
     "mkdocs-material >=9.5.49",
     "mkdocs-minify-plugin >=0.8.0",
-    "mkdocs-spellcheck[codespell] >=1.1.0",
+    "mkdocs-spellcheck[codespell] ==1.1.0",
     "mkdocstrings-python >=1.13.0",
     "mike >=2.1.3",
     "ruff>=0.9.4",
@@ -144,24 +148,27 @@ ndv = { workspace = true }
 line-length = 88
 target-version = "py39"
 src = ["src"]
+fix = true
+unsafe-fixes = true
 
 # https://docs.astral.sh/ruff/rules
 [tool.ruff.lint]
 pydocstyle = { convention = "numpy" }
 select = [
-    "E",    # style errors
-    "W",    # style warnings
-    "F",    # flakes
-    "D",    # pydocstyle
-    "D417", # Missing argument descriptions in Docstrings
-    "I",    # isort
-    "UP",   # pyupgrade
-    "C4",   # flake8-comprehensions
-    "B",    # flake8-bugbear
-    "A001", # flake8-builtins
-    "RUF",  # ruff-specific rules
-    "TC",   # flake8-type-checking
-    "TID",  # flake8-tidy-imports
+    "E",      # style errors
+    "W",      # style warnings
+    "F",      # flakes
+    "D",      # pydocstyle
+    "D417",   # Missing argument descriptions in Docstrings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "C4",     # flake8-comprehensions
+    "B",      # flake8-bugbear
+    "A001",   # flake8-builtins
+    "RUF",    # ruff-specific rules
+    "TC",     # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    "PGH003", # no blanket type: ignore
 ]
 ignore = [
     "D401", # First line should be in imperative mood
@@ -191,6 +198,23 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
 ignore_missing_imports = true
+
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.9"
+enableExperimentalFeatures = true
+# reportMissingImports = false
+reportOptionalMemberAccess = "none"
+reportIncompatibleMethodOverride = "none"
+reportAttributeAccessIssue = "none"
+reportMissingModuleSource = "none"
+reportPrivateImportUsage = "none"
+reportMissingImports = "information"
+reportArgumentType = "none"               # because of pydantic
+reportCallIssue = "none"
+verboseOutput = true
+venv = ".venv"
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]

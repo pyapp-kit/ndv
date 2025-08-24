@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, cast
 from vispy import geometry, scene
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from typing import TypeVar
 
     from vispy.scene.events import SceneMouseEvent
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
             col_span: int = 1,
             **kwargs: Any,
         ) -> scene.ViewBox:
-            super().add_view(...)
+            return super().add_view(...)  # pyright: ignore[reportReturnType]
 
         def add_widget(
             self,
@@ -34,7 +33,7 @@ if TYPE_CHECKING:
             col_span: int = 1,
             **kwargs: Any,
         ) -> scene.Widget:
-            super().add_widget(...)
+            return super().add_widget(...)
 
         def __getitem__(self, idxs: int | tuple[int, int]) -> T:
             return super().__getitem__(idxs)  # type: ignore [no-any-return]
@@ -331,7 +330,7 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
                 y = min(y, self.ybounds[1] - args.height)
 
             args.pos = (x, y)
-        super(PanZoom1DCamera, type(self)).rect.fset(self, args)
+        super(PanZoom1DCamera, type(self)).rect.fset(self, args)  # pyright: ignore[reportAttributeAccessIssue]
 
     def zoom(
         self,
@@ -349,7 +348,7 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         _factor[self.axis_index] = 1
         super().zoom(_factor, center=center)
 
-    def pan(self, pan: Sequence[float]) -> None:
+    def pan(self, *pan: float) -> None:
         """Pan the camera by `pan`."""
         if self.axis_index is None:
             super().pan(pan)
@@ -375,7 +374,7 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
             if abs(dx) > abs(dy):
                 # TODO: Can we do better here? Some sort of adaptive behavior?
                 pan_dist = 0.1 * self.rect.width
-                self.pan([pan_dist if dx < 0 else -pan_dist, 0])
+                self.pan(*[pan_dist if dx < 0 else -pan_dist, 0])
                 event.handled = True
                 return
         super().viewbox_mouse_event(event)

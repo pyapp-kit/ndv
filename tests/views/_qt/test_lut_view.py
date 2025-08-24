@@ -88,7 +88,7 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     # When gui clims change, autoscale should be disabled
     model.clims = ClimsMinMax()
     view._qwidget.clims.setValue((0, 1))
-    assert model.clims == ClimsManual(min=0, max=1)  #  type:ignore
+    assert model.clims == ClimsManual(min=0, max=1)
 
 
 def test_QLutView_histogram_controls(model: LUTModel, view: QLutView) -> None:

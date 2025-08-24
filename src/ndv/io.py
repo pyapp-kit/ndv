@@ -130,11 +130,11 @@ def _array_path(path: str | Path, level: int = 0) -> str:
     z = zarr.open(path, mode="r")
     if isinstance(z, zarr.Array):
         return "/"
+    levels: list[str] = []
     if isinstance(z, zarr.Group):
         with suppress(TypeError):
             zattrs = json.loads(z.store.get(".zattrs"))
             if "multiscales" in zattrs:
-                levels: list[str] = []
                 for dset in zattrs["multiscales"][0]["datasets"]:
                     if "path" in dset:
                         levels.append(dset["path"])

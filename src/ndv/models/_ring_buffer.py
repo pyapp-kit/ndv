@@ -101,7 +101,7 @@ class RingBuffer(Sequence):
     @property
     def shape(self) -> tuple[int, ...]:
         """Return the shape of the valid buffer (excluding unused space)."""
-        return (len(self),) + self._arr.shape[1:]
+        return (len(self), *self._arr.shape[1:])
 
     # these mirror methods from deque
     @property
