@@ -16,8 +16,8 @@ from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping  # noqa: F401
-    from typing import Callable  # noqa: F401
+    from collections.abc import Hashable, Mapping  # noqa: F401 # used for mkdocstrings
+    from typing import Callable  # noqa: F401  # used for mkdocstrings
 
     import cmap
     import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
