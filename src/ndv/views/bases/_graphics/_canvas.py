@@ -30,7 +30,10 @@ class GraphicsCanvas(Viewable, Mouseable):
         y: tuple[float, float] | None = None,
         z: tuple[float, float] | None = None,
         margin: float = ...,
-    ) -> None: ...
+    ) -> None:
+        """Sets the bounds of the camera."""
+        ...
+
     @abstractmethod
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
@@ -86,3 +89,6 @@ class HistogramCanvas(GraphicsCanvas, LutView):
         bin_edges : np.ndarray
             The bin edges of the histogram.
         """
+
+    def highlight(self, value: float | None) -> None:
+        """Highlights a domain value on the histogram."""

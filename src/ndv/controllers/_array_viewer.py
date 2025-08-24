@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -18,8 +19,11 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
     from typing import Any, Unpack
 
+    import numpy.typing as npt
+
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
+    from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
@@ -57,6 +61,8 @@ class ArrayViewer:
         self,
         data: Any | DataWrapper = None,
         /,
+        *,
+        viewer_options: ArrayViewerModel | ArrayViewerModelKwargs | None = None,
         display_model: ArrayDisplayModel | None = None,
         **kwargs: Unpack[ArrayDisplayModelKwargs],
     ) -> None:
@@ -70,9 +76,11 @@ class ArrayViewer:
             )
 
         self._data_model = _ArrayDataDisplayModel(
-            data_wrapper=wrapper, display=display_model
+            display=display_model, data_wrapper=wrapper
         )
-        self._viewer_model = ArrayViewerModel()
+        self._connect_datawrapper(None, wrapper)
+
+        self._viewer_model = ArrayViewerModel.model_validate(viewer_options or {})
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
         )
@@ -115,16 +123,14 @@ class ArrayViewer:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
 
+        self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
+        self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
         if self._data_model.data_wrapper is not None:
             self._fully_synchronize_view()
 
     # -------------- public attributes and methods -------------------------
-
-    # @property
-    # def view(self) -> ArrayView:
-    #     return self._view
 
     def widget(self) -> Any:
         """Return the native front-end widget.
@@ -170,11 +176,22 @@ class ArrayViewer:
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        if data is None:
-            self._data_model.data_wrapper = None
-        else:
-            self._data_model.data_wrapper = DataWrapper.create(data)
+        _new = None if data is None else DataWrapper.create(data)
+        self._data_model.data_wrapper, old = _new, self._data_model.data_wrapper
+        self._connect_datawrapper(old, _new)
         self._fully_synchronize_view()
+
+    def _connect_datawrapper(
+        self, old: DataWrapper | None, new: DataWrapper | None
+    ) -> None:
+        """Set new datawrapper and hook up events."""
+        if old is not None:
+            with suppress(Exception):
+                old.data_changed.disconnect(self._request_data)
+                old.dims_changed.disconnect(self._fully_synchronize_view)
+        if new is not None:
+            new.data_changed.connect(self._request_data)
+            new.dims_changed.connect(self._fully_synchronize_view)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -247,22 +264,25 @@ class ArrayViewer:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
         if ctrl := self._lut_controllers.get(channel, None):
-            self._view.add_histogram(channel, hist.frontend_widget())
+            # Add histogram to ArrayView for display
+            self._view.add_histogram(channel, hist)
+            # Add histogram to channel controller for updates
             ctrl.add_lut_view(hist)
-            # FIXME: hack
+            # Compute histogram from the (first) image handle.
+            # TODO: Compute histogram from all image handles
             if handles := ctrl.handles:
                 data = handles[0].data()
                 counts, edges = _calc_hist_bins(data)
                 hist.set_data(counts, edges)
+            # Reset camera view (accounting for data)
+            hist.set_range()
 
         self._histograms[channel] = hist
-        if self.data is not None:
-            self._update_hist_domain_for_dtype()
 
-    def _update_hist_domain_for_dtype(
-        self, dtype: np.typing.DTypeLike | None = None
+    def _update_channel_dtype(
+        self, channel: ChannelKey, dtype: npt.DTypeLike | None = None
     ) -> None:
-        if len(self._histograms) == 0:
+        if not (ctrl := self._lut_controllers.get(channel, None)):
             return
         if dtype is None:
             if (wrapper := self._data_model.data_wrapper) is None:
@@ -272,8 +292,7 @@ class ArrayViewer:
             dtype = np.dtype(dtype)
         if dtype.kind in "iu":
             iinfo = np.iinfo(dtype)
-            for hist in self._histograms.values():
-                hist.set_range(x=(iinfo.min, iinfo.max))
+            ctrl.lut_model.clim_bounds = (iinfo.min, iinfo.max)
 
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
@@ -341,7 +360,6 @@ class ArrayViewer:
             self._request_data()
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
-            self._update_hist_domain_for_dtype()
         self._synchronize_roi()
 
     def _synchronize_roi(self) -> None:
@@ -456,22 +474,50 @@ class ArrayViewer:
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+        self._highlight_pos = (int(x), int(y))
 
-        # collect and format intensity values at the current mouse position
-        channel_values = self._get_values_at_world_point(int(x), int(y))
-        vals = []
-        for ch, value in channel_values.items():
-            # restrict to 2 decimal places, but remove trailing zeros
-            fval = f"{value:.2f}".rstrip("0").rstrip(".")
-            fch = f"{ch}: " if ch is not None else ""
-            vals.append(f"{fch}{fval}")
-        text = f"[{y:.0f}, {x:.0f}] " + ",".join(vals)
-        self._view.set_hover_info(text)
+        # update highlight display
+        channel_values = self._get_values_at_world_point(*self._highlight_pos)
+        self._highlight_values(channel_values, self._highlight_pos)
+
+    def _on_canvas_mouse_left(self) -> None:
+        """Respond to a mouse leaving the canvas in the view."""
+        self._highlight_pos = None
+        self._highlight_values({}, self._highlight_pos)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._data_model.display.channel_mode = mode
 
     # ------------------ Helper methods ------------------
+
+    def _highlight_values(
+        self,
+        channel_values: dict[ChannelKey, float],
+        canvas_pos: tuple[float, float] | None = None,
+    ) -> None:
+        """Highlights the given values for each channel."""
+        # Update highlight each histogram. If the histogram channel is not present
+        # in channel_values, the highlight will be set to None (i.e. hidden)
+        for ch, hist in self._histograms.items():
+            hist.highlight(channel_values.get(ch, None))
+
+        if not channel_values:
+            # clear hover info if no values found
+            self._view.set_hover_info("")
+        else:
+            if canvas_pos is not None:
+                pos = f"[{canvas_pos[1]:.0f}, {canvas_pos[0]:.0f}] "
+            else:
+                pos = " "  # pragma: no cover
+
+            vals = []
+            for ch, value in channel_values.items():
+                # restrict to 2 decimal places, but remove trailing zeros
+                fval = f"{value:.2f}".rstrip("0").rstrip(".")
+                fch = f"{ch}: " if ch is not None else ""
+                vals.append(f"{fch}{fval}")
+
+            self._view.set_hover_info(pos + ",".join(vals))
 
     def _update_visible_sliders(self) -> None:
         """Update which sliders are visible based on the current data and model."""
@@ -556,6 +602,9 @@ class ArrayViewer:
 
         display_model = self._data_model.display
         for key, data in response.data.items():
+            if data.size == 0:
+                # no data for this channel
+                continue
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
                     model = display_model.default_lut
@@ -574,6 +623,7 @@ class ArrayViewer:
                     lut_model=model,
                     views=lut_views,
                 )
+                self._update_channel_dtype(key)
 
             if not lut_ctrl.handles:
                 if response.n_visible_axes == 2:
@@ -592,12 +642,13 @@ class ArrayViewer:
                 # TODO: once data comes in in chunks, we'll need a proper stateful
                 # stats object that calculates the histogram incrementally
                 counts, bin_edges = _calc_hist_bins(data)
-                # FIXME: currently this is updating the histogram on *any*
-                # channel index... so it doesn't work with composite mode
                 hist.set_data(counts, bin_edges)
-                hist.set_range()
 
         self._canvas.refresh()
+        # update highlight display
+        if self._highlight_pos is not None:
+            channel_values = self._get_values_at_world_point(*self._highlight_pos)
+            self._highlight_values(channel_values, self._highlight_pos)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data

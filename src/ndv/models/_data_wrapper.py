@@ -1,5 +1,6 @@
 """In this module, we provide built-in support for many array types."""
 
+# pyright: reportMissingImports=none
 from __future__ import annotations
 
 import json
@@ -13,10 +14,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
 
 import numpy as np
 import numpy.typing as npt
+from psygnal import Signal
+
+from ._ring_buffer import RingBuffer
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
-    from typing import Any, TypeAlias, TypeGuard
+    from typing import Any, Union
 
     import dask.array.core as da
     import numpy.typing as npt
@@ -27,8 +31,9 @@ if TYPE_CHECKING:
     import torch
     import xarray as xr
     from pydantic import GetCoreSchemaHandler
+    from typing_extensions import TypeAlias, TypeGuard
 
-    Index: TypeAlias = int | slice
+    Index: TypeAlias = Union[int, slice]
 
 
 class SupportsIndexing(Protocol):
@@ -78,6 +83,20 @@ class DataWrapper(Generic[ArrayT], ABC):
     # Maximum dimension size consider when guessing the channel axis
     MAX_CHANNELS: ClassVar[int] = 16
 
+    dims_changed = Signal()
+    """Signal to emit when the dimensions of the data change.
+
+    NOTE: It is up to data wrappers, or even end-users to emit this signal when the
+    dimensions/shape of the wrapped _data object changes.
+    """
+    data_changed = Signal()
+    """Signal emitted when the data changes.
+
+    NOTE: It is up to data wrappers, or even end-users to emit this signal when the
+    data object changes.  We do not currently use object proxies to spy on mutation
+    of the underlying data.
+    """
+
     def __init__(self, data: ArrayT) -> None:
         self._data = data
         if not hasattr(self._data, "__getitem__") and "isel" not in type(self).__dict__:
@@ -94,6 +113,7 @@ class DataWrapper(Generic[ArrayT], ABC):
                 " if data does not have a `shape` attribute or if the shape is not "
                 "a tuple."
             )
+        self.dims_changed.connect(self.clear_cache)
 
     # ----------------------------- Mandatory methods -----------------------------
 
@@ -144,7 +164,7 @@ class DataWrapper(Generic[ArrayT], ABC):
     def dtype(self) -> np.dtype:
         """Return the dtype for the data."""
         try:
-            return np.dtype(self._data.dtype)  # type: ignore
+            return np.dtype(self._data.dtype)  # type: ignore[attr-defined]
         except AttributeError as e:
             raise NotImplementedError(
                 "`dtype` property not properly implemented for DataWrapper of type: "
@@ -217,6 +237,9 @@ class DataWrapper(Generic[ArrayT], ABC):
         # for arrays with labeled dimensions,
         # see if any of the dimensions are named "channel"
         sizes = self.sizes()
+        if len(sizes) < 3 or min(sizes.values()) > self.MAX_CHANNELS:
+            return None
+
         for dimkey, val in sizes.items():
             if str(dimkey).lower() in self.COMMON_CHANNEL_NAMES:
                 if val <= self.MAX_CHANNELS:
@@ -261,7 +284,6 @@ class DataWrapper(Generic[ArrayT], ABC):
             info += f", {_human_readable_size(nbytes)}"
         return info
 
-    # TODO: this needs to be cleared when data.dims changes
     @cached_property
     def axis_map(self) -> Mapping[Hashable, int]:
         """Mapping of ALL valid axis keys to normalized, positive integer keys."""
@@ -483,3 +505,62 @@ class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
         if (torch := sys.modules.get("torch")) and isinstance(obj, torch.Tensor):
             return True
         return False
+
+
+class RingBufferWrapper(DataWrapper[RingBuffer]):
+    """Wrapper for ring buffer objects."""
+
+    def __init__(
+        self,
+        max_capacity: int | RingBuffer,
+        dtype: npt.DTypeLike = None,
+        *,
+        allow_overwrite: bool = True,
+    ):
+        if isinstance(max_capacity, RingBuffer):
+            if dtype is not None:  # pragma: no cover
+                raise ValueError(
+                    "Cannot specify dtype when passing an existing RingBuffer."
+                )
+            self._ring = max_capacity
+        else:
+            if dtype is None:
+                dtype = float
+            self._ring = RingBuffer(
+                max_capacity=max_capacity, dtype=dtype, allow_overwrite=allow_overwrite
+            )
+        self._ring.resized.connect(self.dims_changed)
+        super().__init__(self._ring)
+
+    @property
+    def dims(self) -> tuple[int, ...]:
+        """Return the dimensions of the data."""
+        return tuple(range(len(self._ring.shape)))
+
+    @property
+    def coords(self) -> Mapping:
+        """Return the coordinates for the data."""
+        shape = self._ring.shape
+        return {i: range(s) for i, s in enumerate(shape)}
+
+    @classmethod
+    def supports(cls, obj: Any) -> TypeGuard[np.ndarray]:
+        if isinstance(obj, RingBuffer):
+            return True
+        return False
+
+    def append(self, value: npt.ArrayLike) -> None:
+        """Append a value to the right end of the buffer."""
+        self._ring.append(value)
+
+    def appendleft(self, value: npt.ArrayLike) -> None:
+        """Append a value to the left end of the buffer."""
+        self._ring.appendleft(value)
+
+    def pop(self) -> np.ndarray:
+        """Pop a value from the right end of the buffer."""
+        return self._ring.pop()
+
+    def popleft(self) -> np.ndarray:
+        """Pop a value from the left end of the buffer."""
+        return self._ring.popleft()

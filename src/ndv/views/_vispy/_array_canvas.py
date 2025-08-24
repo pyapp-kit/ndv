@@ -1,3 +1,4 @@
+# pyright: reportOptionalSubscript=none
 from __future__ import annotations
 
 import warnings
@@ -8,11 +9,9 @@ from weakref import ReferenceType, WeakKeyDictionary
 import cmap as _cmap
 import numpy as np
 import vispy
-import vispy.app
 import vispy.color
 import vispy.scene
-import vispy.visuals
-from vispy import scene
+from vispy import scene, visuals
 from vispy.util.quaternion import Quaternion
 from vispy.visuals.transforms import MatrixTransform
 
@@ -42,9 +41,9 @@ DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
 
 
 class VispyImageHandle(ImageHandle):
-    def __init__(self, visual: scene.Image | scene.Volume) -> None:
+    def __init__(self, visual: visuals.ImageVisual | visuals.VolumeVisual) -> None:
         self._visual = visual
-        self._allowed_dims = {2, 3} if isinstance(visual, scene.visuals.Image) else {3}
+        self._allowed_dims = {2, 3} if isinstance(visual, visuals.ImageVisual) else {3}
 
     def data(self) -> np.ndarray:
         try:
@@ -113,7 +112,7 @@ class VispyImageHandle(ImageHandle):
     def remove(self) -> None:
         self._visual.parent = None
 
-    def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType | None:
         return None
 
 
@@ -175,16 +174,16 @@ class VispyRectangle(RectangularROIHandle):
     def set_handles(self, color: _cmap.Color) -> None:
         _vis_color = vispy.color.Color(color.hex)
         _vis_color.alpha = color.alpha
-        self._handles.set_data(face_color=_vis_color)
+        self._handles.set_data(face_color=_vis_color)  # pyright: ignore[reportArgumentType]
 
     def set_bounding_box(
-        self, mi: tuple[float, float], ma: tuple[float, float]
+        self, minimum: tuple[float, float], maximum: tuple[float, float]
     ) -> None:
         # NB: Support two diagonal points, not necessarily true min/max
-        x1 = float(min(mi[0], ma[0]))
-        y1 = float(min(mi[1], ma[1]))
-        x2 = float(max(mi[0], ma[0]))
-        y2 = float(max(mi[1], ma[1]))
+        x1 = float(min(minimum[0], maximum[0]))
+        y1 = float(min(minimum[1], maximum[1]))
+        x2 = float(max(minimum[0], maximum[0]))
+        y2 = float(max(minimum[1], maximum[1]))
 
         # Update rectangle
         self._rect.center = [(x1 + x2) / 2, (y1 + y2) / 2]
@@ -247,8 +246,8 @@ class VispyRectangle(RectangularROIHandle):
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         return False
 
-    def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
-        canvas_pos = (mme.x, mme.y)
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType | None:
+        canvas_pos = (event.x, event.y)
         pos = self._tform().map(canvas_pos)[:2]
         if self._handle_under(pos) is not None:
             center = self._rect.center
@@ -512,11 +511,11 @@ class VispyArrayCanvas(ArrayCanvas):
             self._selection.on_mouse_release(event)
         return False
 
-    def get_cursor(self, mme: MouseMoveEvent) -> CursorType:
+    def get_cursor(self, event: MouseMoveEvent) -> CursorType:
         if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             return CursorType.CROSS
-        for vis in self.elements_at((mme.x, mme.y)):
-            if cursor := vis.get_cursor(mme):
+        for vis in self.elements_at((event.x, event.y)):
+            if cursor := vis.get_cursor(event):
                 return cursor
         return CursorType.DEFAULT
 

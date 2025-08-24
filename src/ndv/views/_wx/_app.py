@@ -3,7 +3,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 
 import wx
-from wx import EVT_LEFT_DOWN, EVT_LEFT_UP, EVT_MOTION, EvtHandler, MouseEvent
+from wx import (
+    EVT_LEAVE_WINDOW,
+    EVT_LEFT_DCLICK,
+    EVT_LEFT_DOWN,
+    EVT_LEFT_UP,
+    EVT_MOTION,
+    EvtHandler,
+    MouseEvent,
+)
 
 from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
 from ndv.views.bases._app import NDVApp
@@ -63,7 +71,7 @@ class WxAppWrap(NDVApp):
             )
 
         if hasattr(canvas, "_subwidget"):
-            canvas = canvas._subwidget
+            canvas = canvas._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
         # TIP: event.Skip() allows the event to propagate to other handlers.
 
@@ -81,6 +89,14 @@ class WxAppWrap(NDVApp):
             if cursor := receiver.get_cursor(mme):
                 canvas.SetCursor(cursor.to_wx())
 
+        def on_mouse_leave(event: MouseEvent) -> None:
+            nonlocal active_button
+            nonlocal canvas
+
+            if not receiver.on_mouse_leave():
+                event.Skip()
+            receiver.mouseLeft.emit()
+
         def on_mouse_press(event: MouseEvent) -> None:
             nonlocal active_button
 
@@ -89,6 +105,16 @@ class WxAppWrap(NDVApp):
             mpe = MousePressEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
             if not receiver.on_mouse_press(mpe):
                 receiver.mousePressed.emit(mpe)
+                event.Skip()
+
+        def on_mouse_double_press(event: MouseEvent) -> None:
+            nonlocal active_button
+
+            # NB This function is bound to the left mouse button press
+            active_button = MouseButton.LEFT
+            mpe = MousePressEvent(x=event.GetX(), y=event.GetY(), btn=active_button)
+            if not receiver.on_mouse_double_press(mpe):
+                receiver.mouseDoublePressed.emit(mpe)
                 event.Skip()
 
         def on_mouse_release(event: MouseEvent) -> None:
@@ -101,12 +127,16 @@ class WxAppWrap(NDVApp):
                 event.Skip()
 
         canvas.Bind(EVT_MOTION, handler=on_mouse_move)
+        canvas.Bind(EVT_LEAVE_WINDOW, handler=on_mouse_leave)
         canvas.Bind(EVT_LEFT_DOWN, handler=on_mouse_press)
+        canvas.Bind(EVT_LEFT_DCLICK, handler=on_mouse_double_press)
         canvas.Bind(EVT_LEFT_UP, handler=on_mouse_release)
 
         def _unbind() -> None:
             canvas.Unbind(EVT_MOTION, handler=on_mouse_move)
+            canvas.Unbind(EVT_LEAVE_WINDOW, handler=on_mouse_leave)
             canvas.Unbind(EVT_LEFT_DOWN, handler=on_mouse_press)
+            canvas.Unbind(EVT_LEFT_DCLICK, handler=on_mouse_double_press)
             canvas.Unbind(EVT_LEFT_UP, handler=on_mouse_release)
 
         return _unbind

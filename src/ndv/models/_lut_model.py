@@ -67,8 +67,8 @@ class ClimsManual(ClimPolicy):
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, ClimsManual)
-            and self.min == other.min
-            and self.max == other.max
+            and abs(self.min - other.min) < 1e-6
+            and abs(self.max - other.max) < 1e-6
         )
 
 
@@ -127,8 +127,8 @@ class ClimsStdDev(ClimPolicy):
     center: Optional[float] = None  # None means center around the mean
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
-        center = np.nanmean(data) if self.center is None else self.center
-        diff = self.n_stdev * np.nanstd(data)
+        center = float(np.nanmean(data) if self.center is None else self.center)
+        diff = float(self.n_stdev * np.nanstd(data))
         return center - diff, center + diff
 
     def __eq__(self, other: object) -> bool:
@@ -169,6 +169,8 @@ class LUTModel(NDVModel):
     clims : Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
         Method for determining the contrast limits for this channel.  If a 2-element
         `tuple` or `list` is provided, it is interpreted as a manual contrast limit.
+    bounds : tuple[float | None, float | None]
+        Optional extrema for limiting the range of the contrast limits
     gamma : float
         Gamma applied to the data before applying the colormap. By default, `1.0`.
     """
@@ -176,6 +178,7 @@ class LUTModel(NDVModel):
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
     clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
+    clim_bounds: tuple[Optional[float], Optional[float]] = (None, None)
     gamma: float = 1.0
 
     @model_validator(mode="before")

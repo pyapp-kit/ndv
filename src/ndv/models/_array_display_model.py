@@ -5,6 +5,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, Union, cast
 
 import numpy as np
+from cmap import Colormap
 from pydantic import Field, computed_field, field_validator, model_validator
 from typing_extensions import Self, TypeAlias
 
@@ -16,8 +17,8 @@ from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping  # noqa: F401
-    from typing import Callable  # noqa: F401
+    from collections.abc import Hashable, Mapping  # noqa: F401 # used for mkdocstrings
+    from typing import Callable  # noqa: F401  # used for mkdocstrings
 
     import cmap
     import numpy.typing as npt  # used for mkdocstrings
@@ -28,23 +29,23 @@ if TYPE_CHECKING:
         """Keyword arguments for `LUTModel`."""
 
         visible: bool
-        cmap: cmap.Colormap | cmap._colormap.ColorStopsLike
-        clims: tuple[float, float] | None
+        cmap: "cmap.Colormap | cmap._colormap.ColorStopsLike"
+        clims: "tuple[float, float] | None"
         gamma: float
         autoscale: AutoscaleType
 
     class ArrayDisplayModelKwargs(TypedDict, total=False):
         """Keyword arguments for `ArrayDisplayModel`."""
 
-        visible_axes: tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
+        visible_axes: "tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]"
         current_index: Mapping[AxisKey, Union[int, slice]]
-        channel_mode: "ChannelMode" | Literal["grayscale", "composite", "color", "rgba"]
+        channel_mode: 'ChannelMode | Literal["grayscale", "composite", "color", "rgba"]'
         channel_axis: Optional[AxisKey]
-        reducers: Mapping[AxisKey | None, ReducerType]
-        luts: Mapping[int | None, LUTModel | LutModelKwargs]
-        default_lut: LUTModel | LutModelKwargs
+        reducers: Mapping["AxisKey | None", ReducerType]
+        luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
+        default_lut: "LUTModel | LutModelKwargs"
 
-        scale: tuple[float, float, float] | npt.ArrayLike
+        scale: "tuple[float, float, float] | npt.ArrayLike"
         # translate: tuple[float, float, float] | npt.ArrayLike
 
 
@@ -63,7 +64,7 @@ TwoOrThreeAxisTuple: TypeAlias = Union[
 def _default_luts() -> LutMap:
     colors = ["green", "magenta", "cyan", "red", "blue", "yellow"]
     return ValidatedEventedDict(
-        (i, LUTModel(cmap=color)) for i, color in enumerate(colors)
+        (i, LUTModel(cmap=Colormap(color))) for i, color in enumerate(colors)
     )
 
 
@@ -209,7 +210,7 @@ class ArrayDisplayModel(NDVModel):
     @property
     def transform(self) -> np.ndarray:
         """Return the current transformation matrix."""
-        tform = np.diag(self.scale[::-1] + (1,))
+        tform = np.diag((*self.scale[::-1], 1))
         # tform[:3, 3] = self.translate[::-1]  # Set the translation part of the matrix
         return tform
 
@@ -229,7 +230,9 @@ class ArrayDisplayModel(NDVModel):
         # prevent channel_axis from being in visible_axes
         if self.channel_axis in self.visible_axes:
             warnings.warn(
-                "Channel_axis cannot be in visible_axes. Setting channel_axis to None.",
+                f"Channel_axis {self.channel_axis!r} "
+                f"cannot be in visible_axes {self.visible_axes!r}. "
+                "Setting channel_axis to None.",
                 UserWarning,
                 stacklevel=2,
             )

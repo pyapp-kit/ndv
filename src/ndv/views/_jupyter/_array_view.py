@@ -5,24 +5,26 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import cmap
 import ipywidgets as widgets
 import psygnal
+from IPython.display import Javascript, display
 
 from ndv.models._array_display_model import ChannelMode
-from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsMinMax
+from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views.bases import ArrayView, LutView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
-    import cmap
     from psygnal import EmissionInfo
     from traitlets import HasTraits
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
+    from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -41,30 +43,129 @@ def notifications_blocked(
             obj._trait_notifiers[name][type] = notifiers
 
 
+class RightClickButton(widgets.ToggleButton):
+    """Custom Button widget that shows a popup on right-click."""
+
+    # TODO: These are likely unnecessary
+    # _right_click_triggered = Bool(False).tag(sync=True)
+    # popup_content = Unicode("Right-click menu").tag(sync=True)
+
+    def __init__(self, channel: ChannelKey, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._channel = channel
+        self.add_class(f"right-click-button{channel}")
+        self.add_right_click_handler()
+
+        self.lower_tail = widgets.BoundedFloatText(
+            value=0.0,
+            min=0.0,
+            max=100.0,
+            step=0.1,
+            description="Ignore Lower Tail:",
+            style={"description_width": "initial"},
+        )
+        self.upper_tail = widgets.BoundedFloatText(
+            value=0.0,
+            min=0.0,
+            max=100.0,
+            step=0.1,
+            description="Ignore Upper Tail:",
+            style={"description_width": "initial"},
+        )
+        self.popup_content = widgets.VBox(
+            [self.lower_tail, self.upper_tail],
+            layout=widgets.Layout(
+                display="none",
+            ),
+        )
+        self.popup_content.add_class(f"ipywidget-popup{channel}")
+        display(self.popup_content)  # type: ignore [no-untyped-call]
+
+    def add_right_click_handler(self) -> None:
+        # fmt: off
+        js_code = ( """
+        (function() {
+            function setup_rightclick() {
+                // Get all buttons with the right-click-button class
+                var button = document.getElementsByClassName(
+                    'right-click-button""" + f"{self._channel}" + """'
+                )[0];
+                if (!button) {
+                    return;
+                }
+
+                // For each button, add a contextmenu listener
+                button.addEventListener('contextmenu', function(e) {
+                    // Prevent default context menu
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Get button position
+                    var rect = this.getBoundingClientRect();
+                    var scrollLeft = window.pageXOffset ||
+                        document.documentElement.scrollLeft;
+                    var scrollTop = window.pageYOffset ||
+                        document.documentElement.scrollTop;
+
+                    // Position the popup above the button
+                    var popup = document.getElementsByClassName(
+                        'ipywidget-popup""" + f"{self._channel}" + """'
+                    )[0];
+                    popup.style.display = '';
+                    popup.style.position = 'absolute';
+                    popup.style.top = (rect.bottom + scrollTop) + 'px';
+                    popup.style.left = (rect.left + scrollLeft) + 'px';
+
+                    // Style the popup
+                    popup.style.background = 'white';
+                    popup.style.border = '1px solid #ccc';
+                    popup.style.borderRadius = '3px';
+                    popup.style.padding = '8px';
+                    popup.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                    popup.style.zIndex = '1000';
+
+                    // Add to body
+                    document.body.appendChild(popup);
+
+                    // Close popup when clicking elsewhere
+                    document.addEventListener('click', function closePopup(event) {
+                        var popup = document.getElementsByClassName(
+                            'ipywidget-popup""" + f"{self._channel}" + """'
+                        )[0];
+                        if (popup && !popup.contains(event.target)) {
+                            popup.style.display = 'none';
+                            document.removeEventListener('click', closePopup);
+                        }
+                    });
+
+                    return false;
+                });
+            }
+
+            // Make sure it works even after widget is redrawn/updated
+            setTimeout(setup_rightclick, 1000);
+        })();
+        """)
+        # fmt: on
+        display(Javascript(js_code))  # type: ignore [no-untyped-call]
+
+
 class JupyterLutView(LutView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
-    def __init__(self, channel: ChannelKey = None) -> None:
+    def __init__(
+        self,
+        channel: ChannelKey = None,
+        default_luts: Sequence[Any] = ("gray", "green", "magenta", "red", "blue"),
+    ) -> None:
         self._channel = channel
-        self._histogram_wdg: widgets.Widget | None = None
+        self._histogram: HistogramCanvas | None = None
         # WIDGETS
         self._visible = widgets.Checkbox(value=True, indent=False)
         self._visible.layout.width = "60px"
-        self._cmap = widgets.Dropdown(
-            options=[
-                "gray",
-                "red",
-                "green",
-                "blue",
-                "cyan",
-                "magenta",
-                "yellow",
-                "viridis",
-                "magma",
-            ],
-            value="gray",
-        )
+        _luts = [cmap.Colormap(x).name.split(":")[-1] for x in default_luts]
+        self._cmap = widgets.Dropdown(options=_luts, value=_luts[0])
         self._cmap.layout.width = "200px"
         self._clims = widgets.FloatRangeSlider(
             value=[0, 2**16],
@@ -76,14 +177,15 @@ class JupyterLutView(LutView):
             readout_format=".0f",
         )
         self._clims.layout.width = "100%"
-        self._auto_clim = widgets.ToggleButton(
+        self._auto_clim = RightClickButton(
+            channel=channel,
             value=True,
             description="Auto",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
             tooltip="Auto scale",
             layout=widgets.Layout(min_width="40px"),
         )
-        self._histogram = widgets.ToggleButton(
+        self._histogram_btn = widgets.ToggleButton(
             value=False,
             description="",
             button_style="",  # 'success', 'info', 'warning', 'danger' or ''
@@ -92,12 +194,57 @@ class JupyterLutView(LutView):
             layout=widgets.Layout(width="40px"),
         )
 
+        histogram_ctrl_width = 40
+        self._log = widgets.ToggleButton(
+            value=False,
+            description="log",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip="Apply logarithm (base 10, count+1) to bins",
+            layout=widgets.Layout(width=f"{histogram_ctrl_width}px"),
+        )
+        self._reset_histogram = widgets.Button(
+            description="",
+            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
+            icon="expand",
+            tooltip="Reset histogram view",
+            layout=widgets.Layout(width=f"{histogram_ctrl_width}px"),
+        )
+
         # LAYOUT
 
         lut_ctrls = widgets.HBox(
-            [self._visible, self._cmap, self._clims, self._auto_clim, self._histogram]
+            [
+                self._visible,
+                self._cmap,
+                self._clims,
+                self._auto_clim,
+                self._histogram_btn,
+            ]
         )
-        self._histogram_container = widgets.HBox([])
+
+        histogram_ctrls = widgets.VBox(
+            [self._log, self._reset_histogram],
+            layout=widgets.Layout(
+                # Avoids scrollbar on buttons
+                min_width=f"{histogram_ctrl_width + 10}px",
+                # Floats buttons to the bottom
+                justify_content="flex-end",
+            ),
+        )
+
+        self._histogram_container = widgets.HBox(
+            # Note that we'll add a histogram here later
+            [histogram_ctrls],
+            layout=widgets.Layout(
+                # Constrains histogram to 100px tall
+                max_height="100px",
+                # Avoids vertical scrollbar from
+                # histogram being *just a bit* too tall
+                overflow="hidden",
+                # Hide histogram initially
+                display="none",
+            ),
+        )
         self.layout = widgets.VBox([lut_ctrls, self._histogram_container])
 
         # CONNECTIONS
@@ -105,7 +252,11 @@ class JupyterLutView(LutView):
         self._cmap.observe(self._on_cmap_changed, names="value")
         self._clims.observe(self._on_clims_changed, names="value")
         self._auto_clim.observe(self._on_autoscale_changed, names="value")
-        self._histogram.observe(self._on_histogram_requested, names="value")
+        self._auto_clim.lower_tail.observe(self._on_auto_tails_changed, names="value")
+        self._auto_clim.upper_tail.observe(self._on_auto_tails_changed, names="value")
+        self._histogram_btn.observe(self._on_histogram_requested, names="value")
+        self._log.observe(self._on_log_toggled, names="value")
+        self._reset_histogram.on_click(self._on_reset_histogram_clicked)
 
     # ------------------ emit changes to the controller ------------------
 
@@ -125,19 +276,35 @@ class JupyterLutView(LutView):
     def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
         if self._model:
             if change["new"]:  # Autoscale
-                self._model.clims = ClimsMinMax()
+                lower_tail = self._auto_clim.lower_tail.value
+                upper_tail = self._auto_clim.upper_tail.value
+                self._model.clims = ClimsPercentile(
+                    min_percentile=lower_tail, max_percentile=100 - upper_tail
+                )
             else:  # Manually scale
                 clims = self._clims.value
                 self._model.clims = ClimsManual(min=clims[0], max=clims[1])
 
+    def _on_auto_tails_changed(self, change: dict[str, Any]) -> None:
+        # Update clim policy if autoscaling is active
+        if self._auto_clim.value:
+            self._on_autoscale_changed({"new": True})
+
     def _on_histogram_requested(self, change: dict[str, Any]) -> None:
-        if self._histogram_wdg:
-            # show or hide the actual widget itself
-            self._histogram_container.layout.display = (
-                "flex" if change["new"] else "none"
-            )
-        else:
+        # Generate the histogram if we haven't done so yet
+        if not self._histogram:
             self.histogramRequested.emit(self._channel)
+        # show or hide the histogram controls
+        self._histogram_container.layout.display = "flex" if change["new"] else "none"
+
+    def _on_log_toggled(self, change: dict[str, Any]) -> None:
+        if hist := self._histogram:
+            hist.set_log_base(10 if change["new"] else None)
+
+    def _on_reset_histogram_clicked(self, change: dict[str, Any]) -> None:
+        self._log.value = False
+        if hist := self._histogram:
+            hist.set_range()
 
     # ------------------ receive changes from the controller ---------------
 
@@ -145,7 +312,11 @@ class JupyterLutView(LutView):
         self._visible.description = name
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._auto_clim.value = not policy.is_manual
+        with notifications_blocked(self._auto_clim):
+            self._auto_clim.value = not policy.is_manual
+            if isinstance(policy, ClimsPercentile):
+                self._auto_clim.lower_tail.value = policy.min_percentile
+                self._auto_clim.upper_tail.value = 100 - policy.max_percentile
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
         self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
@@ -153,7 +324,22 @@ class JupyterLutView(LutView):
     def set_clims(self, clims: tuple[float, float]) -> None:
         # block self._clims.observe, otherwise autoscale will be forced off
         with notifications_blocked(self._clims):
-            self._clims.value = clims
+            # FIXME: Internally the clims are being rounded to whole numbers.
+            # The rounding is somehow avoiding notifications_blocked.
+            self._clims.value = [int(c) for c in clims]
+
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        mi = 0 if bounds[0] is None else int(bounds[0])
+        ma = 65535 if bounds[1] is None else int(bounds[1])
+        # block self._clims.observe, otherwise autoscale will be forced off
+        with notifications_blocked(self._clims):
+            self._clims.min = mi
+            self._clims.max = ma
+            current_value = self._clims.value
+            self._clims.value = (max(current_value[0], mi), min(current_value[1], ma))
 
     def set_channel_visible(self, visible: bool) -> None:
         self._visible.value = visible
@@ -170,6 +356,19 @@ class JupyterLutView(LutView):
 
     def frontend_widget(self) -> Any:
         return self.layout
+
+    # ------------------ private methods ---------------
+
+    def add_histogram(self, histogram: HistogramCanvas) -> None:
+        widget = histogram.frontend_widget()
+        # Resize widget to a respectable size
+        widget.set_trait("css_height", "auto")
+        # Add widget to view
+        self._histogram_container.children = (
+            *self._histogram_container.children,
+            widget,
+        )
+        self._histogram = histogram
 
 
 class JupyterRGBView(JupyterLutView):
@@ -264,7 +463,7 @@ class JupyterArrayView(ArrayView):
         except Exception:
             width = "604px"
 
-        btns = widgets.HBox(
+        self._btns_box = widgets.HBox(
             [
                 self._channel_mode_combo,
                 self._ndims_btn,
@@ -280,7 +479,7 @@ class JupyterArrayView(ArrayView):
                 self._hover_info_label,
                 self._slider_box,
                 self._luts_box,
-                btns,
+                self._btns_box,
             ],
             layout=widgets.Layout(width=width),
         )
@@ -349,7 +548,11 @@ class JupyterArrayView(ArrayView):
 
     def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
         """Add a LUT view to the viewer."""
-        wdg = JupyterRGBView(channel) if channel == "RGB" else JupyterLutView(channel)
+        wdg = (
+            JupyterRGBView(channel)
+            if channel == "RGB"
+            else JupyterLutView(channel, self._viewer_model.default_luts)
+        )
         layout = self._luts_box
         self._luts[channel] = wdg
 
@@ -383,16 +586,9 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
-    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
-            # Resize widget to a respectable size
-            widget.set_trait("css_height", "100px")
-            # Add widget to view
-            lut._histogram_container.children = (
-                *lut._histogram_container.children,
-                widget,
-            )
-            lut._histogram_wdg = widget
+            lut.add_histogram(histogram)
 
     def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
         """Emit signal when the channel mode changes."""
@@ -459,7 +655,7 @@ class JupyterArrayView(ArrayView):
         elif sig_name == "show_histogram_button":
             # Note that "block" displays the icon better than "flex"
             for lut in self._luts.values():
-                lut._histogram.layout.display = "block" if value else "none"
+                lut._histogram_btn.layout.display = "block" if value else "none"
         elif sig_name == "show_roi_button":
             self._add_roi_btn.layout.display = "flex" if value else "none"
         elif sig_name == "show_channel_mode_selector":
@@ -468,3 +664,13 @@ class JupyterArrayView(ArrayView):
             self._reset_zoom_btn.layout.display = "flex" if value else "none"
         elif sig_name == "show_3d_button":
             self._ndims_btn.layout.display = "flex" if value else "none"
+        # elif sig_name == "show_play_button":
+        #     ...
+        elif sig_name == "show_data_info":
+            self._data_info_label.display = "flex" if value else None
+            self._hover_info_label.display = "flex" if value else None
+        elif sig_name == "show_controls":
+            # Show or hide the entire controls area (dims sliders + LUTs + btns)
+            self._slider_box.display = "flex" if value else None
+            self._btns_box.display = "flex" if value else None
+            self._luts_box.display = "flex" if value else None

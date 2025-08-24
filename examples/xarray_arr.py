@@ -15,4 +15,6 @@ except ImportError:
 import ndv
 
 da = xr.tutorial.open_dataset("air_temperature").air
-ndv.imshow(da, default_lut={"cmap": "thermal"}, visible_axes=("lat", "lon"))
+ndv.imshow(
+    da.astype("float32"), default_lut={"cmap": "thermal"}, visible_axes=("lat", "lon")
+)

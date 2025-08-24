@@ -54,7 +54,6 @@ def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
         # since it requires very little setup
         if importlib.util.find_spec("jupyter"):
             os.environ[GUI_ENV_VAR] = "jupyter"
-            gui_frontend.cache_clear()
 
         frontend = gui_frontend()
 
@@ -117,6 +116,8 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
             referrers = gc.get_referrers(widget)
             msg += "\n  Referrers:"
             for ref in referrers:
+                if ref is remaining:
+                    continue
                 msg += f"\n  -   {ref}, {id(ref):#x}"
 
         raise AssertionError(msg)

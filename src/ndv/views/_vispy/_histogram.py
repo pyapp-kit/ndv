@@ -1,9 +1,13 @@
+# pyright: reportGeneralTypeIssues=none, reportOptionalSubscript=none
+# pyright: reportOptionalMemberAccess=none, reportIndexIssue=none
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+import vispy
+import vispy.scene
 from vispy import scene
 
 from ndv._types import CursorType
@@ -37,8 +41,8 @@ class VispyHistogramCanvas(HistogramCanvas):
     def __init__(self, *, vertical: bool = False) -> None:
         # ------------ data and state ------------ #
 
-        self._values: Sequence[float] | np.ndarray | None = None
-        self._bin_edges: Sequence[float] | np.ndarray | None = None
+        self._values: np.ndarray | None = None
+        self._bin_edges: np.ndarray | None = None
         self._clims: tuple[float, float] | None = None
         self._gamma: float = 1
 
@@ -92,20 +96,39 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._gamma_handle.visible = False
         self._gamma_handle.order = -2
 
+        # The highlight draws attention to a particular domain value.
+        # TODO: Can we make this easier on the eyes? MMStudio uses cmap color, dashed
+        self._highlight = scene.Line(
+            pos=np.array([[0, 0], [0, 1]]),
+            color=(1, 1, 0.2, 0.75),
+            connect="strip",
+            width=1,
+        )
+        self._highlight_tform = scene.transforms.STTransform()
+        self._highlight.visible = False
+        self._highlight.order = -2
+
         # One transform to rule them all!
         self._handle_transform = scene.transforms.STTransform()
         self._lut_line.transform = self._handle_transform
         self._gamma_handle.transform = self._handle_transform
+        self._highlight.transform = self._highlight_tform
+        self._highlight.transform = scene.transforms.ChainTransform(
+            self._handle_transform, self._highlight_tform
+        )
 
         ## -- Plot -- ##
         self.plot = PlotWidget()
         self.plot.lock_axis("y")
         self._canvas.central_widget.add_widget(self.plot)
-        self.node_tform = self.plot.node_transform(self.plot._view.scene)
+        self.node_tform = cast("vispy.scene.Node", self.plot).node_transform(
+            self.plot._view.scene
+        )
 
         self.plot._view.add(self._hist_mesh)
         self.plot._view.add(self._lut_line)
         self.plot._view.add(self._gamma_handle)
+        self.plot._view.add(self._highlight)
 
         self.set_vertical(vertical)
 
@@ -129,25 +152,27 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._lut_line.visible = visible
         self._gamma_handle.visible = visible
 
-    def set_colormap(self, lut: cmap.Colormap) -> None:
+    def set_colormap(self, cmap: cmap.Colormap) -> None:
         if self._hist_mesh is not None:
-            self._hist_mesh.color = lut.color_stops[-1].color.hex
+            self._hist_mesh.color = cmap.color_stops[-1].color.hex
 
     def set_gamma(self, gamma: float) -> None:
         if gamma < 0:
             raise ValueError("gamma must be non-negative!")
         self._gamma = gamma
-        self._update_lut_lines()
+        self._update_lut_ctrls()
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         if clims[1] < clims[0]:
             clims = (clims[1], clims[0])
         self._clims = clims
-        self._update_lut_lines()
+        self._update_lut_ctrls()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        # Nothing to do (yet)
-        pass
+        if isinstance(policy, ClimsManual):
+            self.set_clims((policy.min, policy.max))
+        # Otherwise, nothing to do (yet)
+        return
 
     # ------------- HistogramView Protocol methods ------------- #
 
@@ -158,6 +183,14 @@ class VispyHistogramCanvas(HistogramCanvas):
         """
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
+        camera_rect = self.plot.camera.rect
+        self._resize(x=(camera_rect.left, camera_rect.right))
+
+    def set_clim_bounds(
+        self,
+        bounds: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        self.plot.camera.xbounds = bounds
 
     def set_range(
         self,
@@ -167,13 +200,11 @@ class VispyHistogramCanvas(HistogramCanvas):
         margin: float = 0,
     ) -> None:
         if x:
-            if x[0] > x[1]:
-                x = (x[1], x[0])
+            x = (min(x), max(x))
         elif self._bin_edges is not None:
             x = self._bin_edges[0], self._bin_edges[-1]
         if y:
-            if y[0] > y[1]:
-                y = (y[1], y[0])
+            y = (min(y), max(y))
         elif self._values is not None:
             y = (0, np.max(self._values))
         self._range = y
@@ -186,15 +217,25 @@ class VispyHistogramCanvas(HistogramCanvas):
         self.plot.lock_axis("x" if vertical else "y")
         # When vertical, smaller values should appear at the top of the canvas
         self.plot.camera.flip = [False, vertical, False]
-        self._update_lut_lines()
+        self._update_lut_ctrls()
         self._resize()
 
     def set_log_base(self, base: float | None) -> None:
         if base != self._log_base:
             self._log_base = base
+            # Update histogram
             self._update_histogram()
-            self._update_lut_lines()
-            self._resize()
+            # Resize vertical axis
+            camera_rect = self.plot.camera.rect
+            self._resize(x=(camera_rect.left, camera_rect.right))
+
+        # Disable labels for log axis
+        self.plot.yaxis.axis.tick_color = (
+            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
+        )
+        self.plot.yaxis.axis.text_color = (
+            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
+        )
 
     def frontend_widget(self) -> Any:
         return self._canvas.native
@@ -203,10 +244,16 @@ class VispyHistogramCanvas(HistogramCanvas):
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
         """Map XY canvas position (pixels) to XYZ coordinate in world space."""
-        raise NotImplementedError
+        return self.plot._view.scene.transform.imap(pos_xy)[:3]  # type: ignore [no-any-return]
 
     def elements_at(self, pos_xy: tuple[float, float]) -> list:
         raise NotImplementedError
+
+    def highlight(self, value: float | None) -> None:
+        self._highlight.visible = value is not None
+        self._highlight_tform.translate = (value,)
+
+        return super().highlight(value)
 
     # ------------- Private methods ------------- #
 
@@ -222,9 +269,8 @@ class VispyHistogramCanvas(HistogramCanvas):
             return  # pragma: no cover
         values = self._values
         if self._log_base:
-            #  Replace zero values with 1
-            values = np.where(values == 0, 1, values)
-            values = np.log(values) / np.log(self._log_base)
+            # Use a count+1 histogram to gracefully handle 0, 1
+            values = np.log(values + 1) / np.log(self._log_base)
 
         verts, faces = _hist_counts_to_mesh(values, self._bin_edges, self._vertical)
         self._hist_mesh.set_data(vertices=verts, faces=faces)
@@ -233,7 +279,19 @@ class VispyHistogramCanvas(HistogramCanvas):
         # Looks like https://github.com/vispy/vispy/issues/1899
         self._hist_mesh._bounds_changed()
 
-    def _update_lut_lines(self, npoints: int = 256) -> None:
+        if self._vertical:
+            scale = values.max() / 0.98
+            self._handle_transform.scale = (scale, 1)
+        else:
+            scale = values.max() / 0.98
+            self._handle_transform.scale = (1, scale)
+
+    def _update_lut_ctrls(self, npoints: int = 256) -> None:
+        """
+        Updates the DOMAIN of the lut controls.
+
+        Note that the RANGE is automatically scaled in _resize()
+        """
         if self._clims is None or self._gamma is None:
             return  # pragma: no cover
 
@@ -301,6 +359,15 @@ class VispyHistogramCanvas(HistogramCanvas):
             self.plot.camera.interactive = False
         return False
 
+    def on_mouse_double_press(self, event: MousePressEvent) -> bool:
+        pos = event.x, event.y
+        # check whether the user grabbed a node
+        self._grabbed = self._find_nearby_node(pos)
+        if self._grabbed == Grabbable.GAMMA:
+            if self.model:
+                self.model.gamma = 1
+        return False
+
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
         self.plot.camera.interactive = True
@@ -317,12 +384,21 @@ class VispyHistogramCanvas(HistogramCanvas):
                 c = self._to_plot_coords(pos)[1]
             else:
                 c = self._to_plot_coords(pos)[0]
-            if self._grabbed is Grabbable.LEFT_CLIM:
-                newlims = (min(self._clims[1], c), self._clims[1])
-            elif self._grabbed is Grabbable.RIGHT_CLIM:
-                newlims = (self._clims[0], max(self._clims[0], c))
-            if self.model:
-                self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
+            if self._grabbed in [Grabbable.LEFT_CLIM, Grabbable.RIGHT_CLIM]:
+                # determine new contrast limits
+                if self._grabbed is Grabbable.LEFT_CLIM:
+                    newlims = [min(self._clims[1], c), self._clims[1]]
+                else:  # RIGHT_CLIM
+                    newlims = [self._clims[0], max(self._clims[0], c)]
+                # Update model
+                if self.model:
+                    # The model may impose bounds on the contrast limits
+                    if min_bound := self.model.clim_bounds[0]:
+                        newlims[0] = max(newlims[0], min_bound)
+                    if max_bound := self.model.clim_bounds[1]:
+                        newlims[1] = min(newlims[1], max_bound)
+                    # Set clims
+                    self.model.clims = ClimsManual(min=newlims[0], max=newlims[1])
             return False
 
         if self._grabbed is Grabbable.GAMMA:
@@ -380,20 +456,30 @@ class VispyHistogramCanvas(HistogramCanvas):
         x, y = self.node_tform.map(pos)[:2]
         return x, y
 
-    def _resize(self) -> None:
+    def _resize(
+        self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None
+    ) -> None:
+        if x is None:
+            # User specified
+            x = self._range if self._vertical else self._domain
+        if x is None and self._bin_edges is not None:
+            # Data-specified
+            x = (self._bin_edges[0], self._bin_edges[-1])
+
+        if y is None:
+            # User specified
+            y = self._domain if self._vertical else self._range
+        if y is None:
+            # Data-specified
+            y = (0, self._handle_transform.scale[0 if self._vertical else 1])
+
         self.plot.camera.set_range(
-            x=self._range if self._vertical else self._domain,
-            y=self._domain if self._vertical else self._range,
+            x=x,
+            y=y,
             # FIXME: Bitten by https://github.com/vispy/vispy/issues/1483
             # It's pretty visible in logarithmic mode
             margin=1e-30,
         )
-        if self._vertical:
-            scale = 0.98 * self.plot.xaxis.axis.domain[1]
-            self._handle_transform.scale = (scale, 1)
-        else:
-            scale = 0.98 * self.plot.yaxis.axis.domain[1]
-            self._handle_transform.scale = (1, scale)
 
     def setVisible(self, visible: bool) -> None: ...
 

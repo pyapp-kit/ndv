@@ -15,8 +15,17 @@ jobs:
   check-manifest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: pipx run check-manifest
+
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv run pyright
 
   test:
     name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
@@ -85,9 +94,9 @@ jobs:
             canvas: pygfx
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
@@ -154,9 +163,9 @@ jobs:
         python-version: ["3.10", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
       - uses: pyvista/setup-headless-display-action@main
@@ -193,8 +202,8 @@ jobs:
   test-docs:
     runs-on: macos-latest # nicer screenshots
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
       - name: 📚 Build docs
         run: uv run --group docs mkdocs build --strict
       - uses: actions/upload-artifact@v4
@@ -213,7 +222,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 

@@ -144,6 +144,11 @@ class MouseEventFilter(QObject):
                     if cursor := receiver.get_cursor(mme):
                         self.set_cursor(cursor)
                     receiver.mouseMoved.emit(mme)
+                elif etype == QEvent.Type.MouseButtonDblClick:
+                    self.active_button = btn
+                    mpe = MousePressEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
+                    intercept |= receiver.on_mouse_double_press(mpe)
+                    receiver.mouseDoublePressed.emit(mpe)
                 elif etype == QEvent.Type.MouseButtonPress:
                     self.active_button = btn
                     mpe = MousePressEvent(x=pos.x(), y=pos.y(), btn=self.active_button)
@@ -156,4 +161,7 @@ class MouseEventFilter(QObject):
                     self.active_button = MouseButton.NONE
                     intercept |= receiver.on_mouse_release(mre)
                     receiver.mouseReleased.emit(mre)
+            elif qevent.type() == QEvent.Type.Leave:
+                intercept |= receiver.on_mouse_leave()
+                receiver.mouseLeft.emit()
         return intercept

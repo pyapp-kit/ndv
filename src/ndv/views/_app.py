@@ -4,12 +4,13 @@ import importlib.util
 import os
 import sys
 from enum import Enum
-from functools import cache, wraps
+from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from concurrent.futures import Future
+    from typing import Literal
 
     from IPython.core.interactiveshell import InteractiveShell
     from typing_extensions import ParamSpec, TypeVar
@@ -26,6 +27,9 @@ GUI_ENV_VAR = "NDV_GUI_FRONTEND"
 
 CANVAS_ENV_VAR = "NDV_CANVAS_BACKEND"
 """Preferred canvas backend. If not set, the first available canvas backend is used."""
+
+_APP: NDVApp | None = None
+"""Singleton instance of the current (GUI) application. Once set it shouldn't change."""
 
 
 class GuiFrontend(str, Enum):
@@ -171,7 +175,6 @@ def _load_app(module: str, cls_name: str) -> NDVApp:
     return cast("NDVApp", cls())
 
 
-@cache  # not allowed to change
 def ndv_app() -> NDVApp:
     """Return the active [`GuiFrontend`][ndv.views.GuiFrontend].
 
@@ -179,8 +182,13 @@ def ndv_app() -> NDVApp:
     known GUI providers are tried in order until one is found that is either already
     running, or available.
     """
+    global _APP
+    if _APP is not None:
+        return _APP
+
     running = list(_running_apps())
 
+    # Try 1: Load a frontend explicitly requested by the user
     requested = os.getenv(GUI_ENV_VAR, "").lower()
     valid = {x.value for x in GuiFrontend}
     if requested:
@@ -189,22 +197,24 @@ def ndv_app() -> NDVApp:
                 f"Invalid GUI frontend: {requested!r}. Valid options: {valid}"
             )
         # ensure the app is created for explicitly requested frontends
-        app = _load_app(*GUI_PROVIDERS[GuiFrontend(requested)])
-        app.create_app()
-        return app
+        _APP = _load_app(*GUI_PROVIDERS[GuiFrontend(requested)])
+        _APP.create_app()
+        return _APP
 
+    # Try 2: Utilize an existing, running app
     for key, provider in GUI_PROVIDERS.items():
         if key in running:
-            app = _load_app(*provider)
-            app.create_app()
-            return app
+            _APP = _load_app(*provider)
+            _APP.create_app()
+            return _APP
 
+    # Try 3: Load an existing app
     errors: list[tuple[str, BaseException]] = []
     for key, provider in GUI_PROVIDERS.items():
         try:
-            app = _load_app(*provider)
-            app.create_app()
-            return app
+            _APP = _load_app(*provider)
+            _APP.create_app()
+            return _APP
         except Exception as e:
             errors.append((key, e))
 
@@ -214,12 +224,32 @@ def ndv_app() -> NDVApp:
     )
 
 
+def set_canvas_backend(backend: Literal["pygfx", "vispy"] | None = None) -> None:
+    """Sets the preferred canvas backend. Cannot be set after the GUI is running."""
+    if _APP:
+        raise RuntimeError("Cannot change the backend once the app is running")
+    if backend is None:
+        os.environ.pop(CANVAS_ENV_VAR)
+    else:
+        os.environ[CANVAS_ENV_VAR] = CanvasBackend(backend).value  # validate
+
+
+def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None = None) -> None:
+    """Sets the preferred GUI backend. Cannot be set after the GUI is running."""
+    if _APP:
+        raise RuntimeError("Cannot change the backend once the app is running")
+    if backend is None:
+        os.environ.pop(GUI_ENV_VAR)
+    else:
+        os.environ[GUI_ENV_VAR] = GuiFrontend(backend).value  # validate
+
+
 def gui_frontend() -> GuiFrontend:
     # possibly temporary hack to get the current frontend as an enum, for back-compat
     return MOD_TO_KEY[ndv_app().__module__]
 
 
-def canvas_backend(requested: str | None) -> CanvasBackend:
+def canvas_backend(requested: str | None = None) -> CanvasBackend:
     """Return the preferred canvas backend.
 
     This is determined first by the NDV_CANVAS_BACKEND environment variable, after which
@@ -307,6 +337,11 @@ def call_later(msec: int, func: Callable[[], None]) -> None:
         The function to call.
     """
     ndv_app().call_later(msec, func)
+
+
+def process_events() -> None:
+    """Force processing of events for the application."""
+    ndv_app().process_events()
 
 
 def run_app() -> None:

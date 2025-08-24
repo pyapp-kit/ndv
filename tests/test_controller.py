@@ -138,7 +138,7 @@ def test_controller() -> None:
 
 @no_type_check
 @_patch_views
-def test_canvas() -> None:
+def test_canvas_interaction() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.empty(SHAPE)
     ctrl = ArrayViewer()
@@ -148,15 +148,53 @@ def test_canvas() -> None:
     mock_view = ctrl._view
     ctrl.data = data
 
+    ctrl._add_histogram(None)
+    mock_histogram = ctrl._histograms[None]
+
     # clicking the reset zoom button calls set_range on the canvas
     ctrl._on_view_reset_zoom_clicked()
     mock_canvas.set_range.assert_called_once_with()
 
-    # hovering on the canvas updates the hover info in the view
+    # hovering on the image updates the hover info in the view
     mock_canvas.canvas_to_world.return_value = (1, 2, 3)
     ctrl._on_canvas_mouse_moved(MouseMoveEvent(1, 2))
     mock_canvas.canvas_to_world.assert_called_once_with((1, 2))
     mock_view.set_hover_info.assert_called_once_with("[2, 1] 0")
+    mock_histogram.highlight.assert_called_once_with(0)
+
+    mock_canvas.reset_mock()
+    mock_view.reset_mock()
+    mock_histogram.reset_mock()
+
+    # updating the image also updates the hover info in the view
+    # NB Since the image handle is a mock, the data won't be updated.
+    ctrl.data = np.empty(SHAPE, dtype=np.uint8)
+    # FIXME: These methods are actually called twice, both within
+    # _fully_synchronize_view. The first time is on
+    # ArrayViewer._on_view_current_index_change, and the second on
+    # ArrayViewer._request_data
+    mock_view.set_hover_info.assert_called_with("[2, 1] 0")
+    mock_histogram.highlight.assert_called_with(0)
+
+    mock_canvas.reset_mock()
+    mock_view.reset_mock()
+    mock_histogram.reset_mock()
+
+    # hovering off the image clears the hover info in the view
+    mock_canvas.canvas_to_world.return_value = (-1, -1, 3)
+    ctrl._on_canvas_mouse_moved(MouseMoveEvent(-1, -1))
+    mock_canvas.canvas_to_world.assert_called_once_with((-1, -1))
+    mock_view.set_hover_info.assert_called_once_with("")
+    mock_histogram.highlight.assert_called_once_with(None)
+
+    mock_canvas.reset_mock()
+    mock_view.reset_mock()
+    mock_histogram.reset_mock()
+
+    # leaving the canvas clears the hover info as well
+    ctrl._on_canvas_mouse_left()
+    mock_view.set_hover_info.assert_called_once_with("")
+    mock_histogram.highlight.assert_called_once_with(None)
 
 
 @no_type_check
