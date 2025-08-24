@@ -265,7 +265,7 @@ class ValidatedEventedDict(MutableMapping[_KT, _VT]):
         # define function that creates new instance during assignment
         # passing in the validator functions.
         def _new(*args: Any, **kwargs: Any) -> ValidatedEventedDict[_KT, _VT]:
-            return cls(  # type: ignore
+            return cls(  # type: ignore[call-overload,no-any-return]
                 *args,
                 key_validator=validate_key,
                 value_validator=validate_value,

@@ -94,7 +94,7 @@ def test_interaction(model: LUTModel, histogram: VispyHistogramCanvas) -> None:
     histogram.set_clims((left, right))
 
     def world_to_canvas(x: float, y: float) -> tuple[float, float]:
-        return tuple(histogram.node_tform.imap((x, y))[:2])  # type: ignore
+        return tuple(histogram.node_tform.imap((x, y))[:2])  # pyright: ignore[reportReturnType]
 
     # Test cursors
     x, y = world_to_canvas((left + right) / 2, 0.5)

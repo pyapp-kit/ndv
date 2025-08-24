@@ -3,7 +3,7 @@ from __future__ import annotations
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Callable
 
-from qtpy.QtCore import (  # type: ignore
+from qtpy.QtCore import (  # type: ignore[attr-defined]
     QCoreApplication,
     QMetaObject,
     QObject,

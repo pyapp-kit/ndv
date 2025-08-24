@@ -7,9 +7,11 @@ gabrieldp
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import wx
+
+SliderEvent = cast("int", wx.EVT_SLIDER.typeId)  # type: ignore[attr-defined]
 
 
 def fraction_to_value(fraction: float, min_value: float, max_value: float) -> float:
@@ -88,7 +90,7 @@ class SliderThumb:
         self.value = value
 
     def PostEvent(self) -> None:
-        event = wx.PyCommandEvent(wx.EVT_SLIDER.typeId, self.parent.GetId())  # type: ignore
+        event = wx.PyCommandEvent(SliderEvent, self.parent.GetId())
         event.SetEventObject(self.parent)
         wx.PostEvent(self.parent.GetEventHandler(), event)
 
@@ -96,7 +98,8 @@ class SliderThumb:
         return self.parent.border_width + int(self.size[0] / 2)
 
     def GetMax(self) -> int:
-        parent_w = int(self.parent.GetSize().GetWidth())  # type: ignore [attr-defined]
+        size = cast("wx.Size", self.parent.GetSize())
+        parent_w = int(size.GetWidth())
         return parent_w - self.parent.border_width - int(self.size[0] / 2)
 
     def IsMouseOver(self, mouse_pos: wx.Point) -> bool:

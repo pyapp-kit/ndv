@@ -404,9 +404,9 @@ class WxLutView(LutView):
         btn = self._wxwidget.log_btn
         if btn.GetValue():
             btn.SetValue(False)
-            event = wx.PyCommandEvent(ToggleBtnEvent, btn.GetId())  # type: ignore
-            event.SetEventObject(btn)
-            wx.PostEvent(btn.GetEventHandler(), event)
+            _event = wx.PyCommandEvent(ToggleBtnEvent, btn.GetId())
+            _event.SetEventObject(btn)
+            wx.PostEvent(btn.GetEventHandler(), _event)
         if hist := self.histogram:
             hist.set_range()
 
@@ -417,7 +417,7 @@ class WxLutView(LutView):
             widget = widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
         # FIXME: Rendercanvas may make this unnecessary
-        if (parent := widget.GetParent()) and parent is not self:  # type: ignore
+        if parent := widget.GetParent():
             widget.Reparent(self._wxwidget)  # Reparent widget to this frame
             wx.CallAfter(parent.Destroy)
             widget.Show()

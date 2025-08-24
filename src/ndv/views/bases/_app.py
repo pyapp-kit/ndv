@@ -89,7 +89,7 @@ class NDVApp:
         if hasattr(sys, "_original_excepthook_"):
             # don't install the excepthook more than once
             return
-        sys._original_excepthook_ = sys.excepthook  # type: ignore
+        sys._original_excepthook_ = sys.excepthook  # type: ignore[attr-defined]
         sys.excepthook = ndv_excepthook
 
     def process_events(self) -> None:

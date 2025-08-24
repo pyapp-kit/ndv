@@ -164,7 +164,7 @@ class DataWrapper(Generic[ArrayT], ABC):
     def dtype(self) -> np.dtype:
         """Return the dtype for the data."""
         try:
-            return np.dtype(self._data.dtype)  # type: ignore
+            return np.dtype(self._data.dtype)  # type: ignore[attr-defined]
         except AttributeError as e:
             raise NotImplementedError(
                 "`dtype` property not properly implemented for DataWrapper of type: "

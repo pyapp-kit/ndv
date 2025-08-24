@@ -146,8 +146,8 @@ def generate_screenshots(script: Path) -> Iterable[tuple[bytes, Mode]]:
 
     def _start_app(*_: Any) -> QCoreApplication:
         if (app := QApplication.instance()) is None:
-            QApplication._APP = app = original_new(*_)  # type: ignore
-            QApplication.__init__(app, [])  # type: ignore
+            QApplication._APP = app = original_new(*_)  # type: ignore[attr-defined]
+            QApplication.__init__(app, [])  # type: ignore[arg-type]
         return app
 
     patch_app = patch.object(QApplication, "__new__", _start_app)

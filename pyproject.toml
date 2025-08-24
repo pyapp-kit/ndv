@@ -64,7 +64,7 @@ pyside = [
     "superqt[iconify,pyside6] >=0.7.2,<0.7.5",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
-    "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
+    "numpy >=1.23,<2; sys_platform == 'win32'",                            # needed for pyside6.6
     "pyside6 >=6.4",
     "pyside6 >=6.6; python_version >= '3.12' and sys_platform == 'win32'",
     "pyside6 >=6.7; python_version >= '3.12' and sys_platform != 'win32'",
@@ -149,19 +149,20 @@ unsafe-fixes = true
 [tool.ruff.lint]
 pydocstyle = { convention = "numpy" }
 select = [
-    "E",    # style errors
-    "W",    # style warnings
-    "F",    # flakes
-    "D",    # pydocstyle
-    "D417", # Missing argument descriptions in Docstrings
-    "I",    # isort
-    "UP",   # pyupgrade
-    "C4",   # flake8-comprehensions
-    "B",    # flake8-bugbear
-    "A001", # flake8-builtins
-    "RUF",  # ruff-specific rules
-    "TC",   # flake8-type-checking
-    "TID",  # flake8-tidy-imports
+    "E",      # style errors
+    "W",      # style warnings
+    "F",      # flakes
+    "D",      # pydocstyle
+    "D417",   # Missing argument descriptions in Docstrings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "C4",     # flake8-comprehensions
+    "B",      # flake8-bugbear
+    "A001",   # flake8-builtins
+    "RUF",    # ruff-specific rules
+    "TC",     # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    "PGH003", # no blanket type: ignore
 ]
 ignore = [
     "D401", # First line should be in imperative mood

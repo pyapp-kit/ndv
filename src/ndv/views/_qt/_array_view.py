@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
-from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore
+from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore[attr-defined]
 from qtpy.QtGui import QCursor, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,

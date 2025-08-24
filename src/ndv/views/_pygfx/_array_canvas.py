@@ -25,7 +25,6 @@ from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import Union
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
@@ -34,7 +33,7 @@ if TYPE_CHECKING:
     from wgpu.gui.qt import QWgpuCanvas
     from wgpu.gui.wx import WxWgpuCanvas
 
-    WgpuCanvas: TypeAlias = Union[QWgpuCanvas, JupyterWgpuCanvas, WxWgpuCanvas]
+    WgpuCanvas: TypeAlias = "QWgpuCanvas | JupyterWgpuCanvas | WxWgpuCanvas"
 
 
 def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
