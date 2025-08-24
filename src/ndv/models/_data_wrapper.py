@@ -1,5 +1,6 @@
 """In this module, we provide built-in support for many array types."""
 
+# pyright: reportMissingImports=none
 from __future__ import annotations
 
 import json
@@ -19,7 +20,7 @@ from ._ring_buffer import RingBuffer
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
-    from typing import Any, TypeAlias, TypeGuard
+    from typing import Any, Union
 
     import dask.array.core as da
     import numpy.typing as npt
@@ -30,8 +31,9 @@ if TYPE_CHECKING:
     import torch
     import xarray as xr
     from pydantic import GetCoreSchemaHandler
+    from typing_extensions import TypeAlias, TypeGuard
 
-    Index: TypeAlias = int | slice
+    Index: TypeAlias = Union[int, slice]
 
 
 class SupportsIndexing(Protocol):
@@ -162,7 +164,7 @@ class DataWrapper(Generic[ArrayT], ABC):
     def dtype(self) -> np.dtype:
         """Return the dtype for the data."""
         try:
-            return np.dtype(self._data.dtype)  # type: ignore
+            return np.dtype(self._data.dtype)  # type: ignore[attr-defined]
         except AttributeError as e:
             raise NotImplementedError(
                 "`dtype` property not properly implemented for DataWrapper of type: "

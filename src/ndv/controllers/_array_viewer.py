@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
     from typing import Any, Unpack
 
+    import numpy.typing as npt
+
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
@@ -278,7 +280,7 @@ class ArrayViewer:
         self._histograms[channel] = hist
 
     def _update_channel_dtype(
-        self, channel: ChannelKey, dtype: np.typing.DTypeLike | None = None
+        self, channel: ChannelKey, dtype: npt.DTypeLike | None = None
     ) -> None:
         if not (ctrl := self._lut_controllers.get(channel, None)):
             return

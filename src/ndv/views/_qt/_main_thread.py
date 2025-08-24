@@ -3,7 +3,14 @@ from __future__ import annotations
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Callable
 
-from qtpy.QtCore import QCoreApplication, QMetaObject, QObject, Qt, QThread, Slot
+from qtpy.QtCore import (  # type: ignore[attr-defined]
+    QCoreApplication,
+    QMetaObject,
+    QObject,
+    Qt,
+    QThread,
+    Slot,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
@@ -58,7 +65,7 @@ def call_in_main_thread(
         invoker = MainThreadInvoker()
         invoker.moveToThread(_APP_THREAD)
         _INVOKERS.add(invoker)
-        return invoker.invoke(func, *args, **kwargs)
+        return invoker.invoke(func, *args, **kwargs)  # type: ignore[no-any-return]
 
     future: Future[T] = Future()
     future.set_result(func(*args, **kwargs))

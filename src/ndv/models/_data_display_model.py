@@ -77,7 +77,7 @@ class _ArrayDataDisplayModel(NDVModel):
         The data wrapper. Provides the actual data to be displayed
     """
 
-    display: ArrayDisplayModel = Field(default_factory=ArrayDisplayModel)
+    display: ArrayDisplayModel = Field(default_factory=lambda: ArrayDisplayModel())
     data_wrapper: Optional[DataWrapper] = None
 
     def model_post_init(self, __context: Any) -> None:

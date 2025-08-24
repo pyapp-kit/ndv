@@ -30,7 +30,7 @@ def test_array_options(viewer: QtArrayView) -> None:
     qlut = viewer._luts[None]._qwidget
     dims_wdg = viewer._qwidget.dims_sliders
     assert dims_wdg._sliders
-    play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rPLAY_BTN).widget()  # type: ignore
+    play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rPLAY_BTN).widget()  # type: ignore[union-attr]
 
     assert qwdg.ndims_btn.isVisible()
     viewer._viewer_model.show_3d_button = False
@@ -79,7 +79,7 @@ def test_play_btn(viewer: QtArrayView, qtbot: QtBot) -> None:
     """Test the play button functionality on the array view."""
     dims_wdg = viewer._qwidget.dims_sliders
     assert dims_wdg._sliders
-    play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rPLAY_BTN).widget()  # type: ignore
+    play_btn = dims_wdg._layout.itemAtPosition(1, dims_wdg._rPLAY_BTN).widget()  # type: ignore[union-attr]
     assert isinstance(play_btn, PlayButton)
     play_btn._show_fps_dialog()
     play_btn._popup.accept()

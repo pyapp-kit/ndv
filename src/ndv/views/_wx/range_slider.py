@@ -7,9 +7,11 @@ gabrieldp
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import wx
+
+SliderEvent = cast("int", wx.EVT_SLIDER.typeId)  # type: ignore[attr-defined]
 
 
 def fraction_to_value(fraction: float, min_value: float, max_value: float) -> float:
@@ -53,7 +55,7 @@ class SliderThumb:
         max_value = self.parent.GetMax()
         fraction = value_to_fraction(self.value, min_value, max_value)
         low = int(fraction_to_value(fraction, min_x, max_x))
-        high = int(parent_size[1] / 2 + 1)
+        high = int(parent_size.GetHeight() / 2 + 1)  # type: ignore [attr-defined]
         return low, high
 
     def SetPosition(self, pos: tuple[int, int]) -> None:
@@ -88,7 +90,7 @@ class SliderThumb:
         self.value = value
 
     def PostEvent(self) -> None:
-        event = wx.PyCommandEvent(wx.EVT_SLIDER.typeId, self.parent.GetId())
+        event = wx.PyCommandEvent(SliderEvent, self.parent.GetId())
         event.SetEventObject(self.parent)
         wx.PostEvent(self.parent.GetEventHandler(), event)
 
@@ -96,13 +98,14 @@ class SliderThumb:
         return self.parent.border_width + int(self.size[0] / 2)
 
     def GetMax(self) -> int:
-        parent_w = int(self.parent.GetSize()[0])
+        size = cast("wx.Size", self.parent.GetSize())
+        parent_w = int(size.GetWidth())
         return parent_w - self.parent.border_width - int(self.size[0] / 2)
 
     def IsMouseOver(self, mouse_pos: wx.Point) -> bool:
         in_hitbox = True
         my_pos = self.GetPosition()
-        for i_coord, mouse_coord in enumerate(mouse_pos):
+        for i_coord, mouse_coord in enumerate((mouse_pos.x, mouse_pos.y)):
             boundary_low = my_pos[i_coord] - self.size[i_coord] / 2
             boundary_high = my_pos[i_coord] + self.size[i_coord] / 2
             in_hitbox = in_hitbox and (boundary_low <= mouse_coord <= boundary_high)
@@ -144,6 +147,10 @@ class SliderThumb:
         )
 
 
+DEFAULT_POSITION = wx.Point(-1, -1)
+DEFAULT_SIZE = wx.Size(-1, -1)
+
+
 class RangeSlider(wx.Panel):
     def __init__(
         self,
@@ -153,8 +160,8 @@ class RangeSlider(wx.Panel):
         highValue: int | None = None,
         minValue: int = 0,
         maxValue: int = 100,
-        pos: wx.Point = wx.DefaultPosition,
-        size: wx.Size = wx.DefaultSize,
+        pos: wx.Point = DEFAULT_POSITION,
+        size: wx.Size = DEFAULT_SIZE,
         style: int = wx.SL_HORIZONTAL,
         validator: wx.Validator = wx.DefaultValidator,
         name: str = "rangeSlider",
@@ -164,7 +171,7 @@ class RangeSlider(wx.Panel):
         if validator != wx.DefaultValidator:
             raise NotImplementedError("Validator not implemented")
         super().__init__(parent=parent, id=id, pos=pos, size=size, name=name)
-        self.SetMinSize(size=(max(50, size[0]), max(26, size[1])))
+        self.SetMinSize(size=(max(50, size.GetWidth()), max(26, size.GetHeight())))
         if minValue > maxValue:
             minValue, maxValue = maxValue, minValue
         self.min_value = minValue
@@ -203,20 +210,22 @@ class RangeSlider(wx.Panel):
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
         self.Bind(wx.EVT_SIZE, self.OnResize)
 
-    def Enable(self, enable: bool = True) -> None:
+    def Enable(self, enable: bool = True) -> bool:
         super().Enable(enable)
         self.Refresh()
+        return True
 
-    def Disable(self) -> None:
+    def Disable(self) -> bool:
         super().Disable()
         self.Refresh()
+        return True
 
     def SetValueFromMousePosition(self, click_pos: wx.Point) -> None:
         for thumb in self.thumbs.values():
             if thumb.dragged:
-                thumb.SetPosition(click_pos)
+                thumb.SetPosition((click_pos.x, click_pos.y))
 
-    def OnMouseDown(self, evt: wx.Event) -> None:
+    def OnMouseDown(self, evt: wx.MouseEvent) -> None:
         if not self.IsEnabled():
             return
         click_pos = evt.GetPosition()
@@ -229,7 +238,7 @@ class RangeSlider(wx.Panel):
         self.CaptureMouse()
         self.Refresh()
 
-    def OnMouseUp(self, evt: wx.Event) -> None:
+    def OnMouseUp(self, evt: wx.MouseEvent) -> None:
         if not self.IsEnabled():
             return
         self.SetValueFromMousePosition(evt.GetPosition())
@@ -239,13 +248,13 @@ class RangeSlider(wx.Panel):
             self.ReleaseMouse()
         self.Refresh()
 
-    def OnMouseLost(self, evt: wx.Event) -> None:
+    def OnMouseLost(self, evt: wx.MouseEvent) -> None:
         for thumb in self.thumbs.values():
             thumb.dragged = False
             thumb.mouse_over = False
         self.Refresh()
 
-    def OnMouseMotion(self, evt: wx.Event) -> None:
+    def OnMouseMotion(self, evt: wx.MouseEvent) -> None:
         if not self.IsEnabled():
             return
         refresh_needed = False
@@ -262,7 +271,7 @@ class RangeSlider(wx.Panel):
         if refresh_needed:
             self.Refresh()
 
-    def OnMouseEnter(self, evt: wx.Event) -> None:
+    def OnMouseEnter(self, evt: wx.MouseEvent) -> None:
         if not self.IsEnabled():
             return
         mouse_pos = evt.GetPosition()
@@ -283,7 +292,8 @@ class RangeSlider(wx.Panel):
         self.Refresh()
 
     def OnPaint(self, evt: wx.Event) -> None:
-        w, h = self.GetSize()
+        sz = self.GetSize()
+        w, h = sz.GetWidth(), sz.GetHeight()  # type: ignore [attr-defined]
         # BufferedPaintDC should reduce flickering
         dc = wx.BufferedPaintDC(self)
         background_brush = wx.Brush(self.GetBackgroundColour(), wx.SOLID)

@@ -10,8 +10,6 @@ import cmap
 import psygnal
 import wx
 import wx.adv
-import wx.lib.newevent
-import wx.svg
 from psygnal import EmissionInfo, Signal
 from pyconify import svg_path
 
@@ -29,6 +27,11 @@ if TYPE_CHECKING:
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
+
+
+ToggleBtnEvent = cast("int", wx.EVT_TOGGLEBUTTON.typeId)  # type: ignore[attr-defined]
+SliderEvent = cast("int", wx.EVT_SLIDER.typeId)  # type: ignore[attr-defined]
+CheckboxEvent = cast("int", wx.EVT_CHECKBOX.typeId)  # type: ignore[attr-defined]
 
 
 class _WxSpinner(wx.Panel):
@@ -172,7 +175,7 @@ class _LutChannelSelector(wx.Panel):
     def _on_dropdown_clicked(self, evt: wx.CommandEvent) -> None:
         """Show the dropdown checklist."""
         # Position the popup below the button
-        btn_size = self._dropdown_btn.GetSize()
+        btn_size = cast("wx.Size", self._dropdown_btn.GetSize())
         btn_pos = self._dropdown_btn.GetPosition()
         popup_pos = self.ClientToScreen(
             wx.Point(btn_pos.x, btn_pos.y + btn_size.height)
@@ -231,7 +234,7 @@ class _LutChannelSelector(wx.Panel):
         lut_view.set_display(display)
         visible_checkbox = lut_view._wxwidget.visible
         visible_checkbox.SetValue(display)
-        event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, visible_checkbox.GetId())
+        event = wx.CommandEvent(CheckboxEvent, visible_checkbox.GetId())
         event.SetEventObject(visible_checkbox)
         wx.PostEvent(visible_checkbox.GetEventHandler(), event)
 
@@ -355,7 +358,7 @@ class WxLutView(LutView):
 
     def _on_cmap_changed(self, event: wx.CommandEvent) -> None:
         if self._model:
-            self._model.cmap = self._wxwidget.cmap.GetValue()
+            self._model.cmap = cmap.Colormap(self._wxwidget.cmap.GetValue())
 
     def _on_clims_changed(self, event: wx.CommandEvent) -> None:
         if self._model:
@@ -365,8 +368,8 @@ class WxLutView(LutView):
     def _on_autoscale_rclick(self, event: wx.CommandEvent) -> None:
         btn = event.GetEventObject()
         pos = btn.ClientToScreen((0, 0))
-        sz = btn.GetSize()
-        self._wxwidget.auto_popup.Position(pos, (0, sz[1]))
+        sz = cast("wx.Size", btn.GetSize())
+        self._wxwidget.auto_popup.Position(pos, (0, sz.GetHeight()))
         self._wxwidget.auto_popup.Popup()
 
     def _on_autoscale_tail_changed(self, event: wx.CommandEvent) -> None:
@@ -401,9 +404,9 @@ class WxLutView(LutView):
         btn = self._wxwidget.log_btn
         if btn.GetValue():
             btn.SetValue(False)
-            event = wx.PyCommandEvent(wx.EVT_TOGGLEBUTTON.typeId, btn.GetId())
-            event.SetEventObject(btn)
-            wx.PostEvent(btn.GetEventHandler(), event)
+            _event = wx.PyCommandEvent(ToggleBtnEvent, btn.GetId())
+            _event.SetEventObject(btn)
+            wx.PostEvent(btn.GetEventHandler(), _event)
         if hist := self.histogram:
             hist.set_range()
 
@@ -411,10 +414,10 @@ class WxLutView(LutView):
         widget = cast("wx.Window", histogram.frontend_widget())
         # FIXME: pygfx backend needs this to be widget._subwidget
         if hasattr(widget, "_subwidget"):
-            widget = widget._subwidget
+            widget = widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
         # FIXME: Rendercanvas may make this unnecessary
-        if (parent := widget.GetParent()) and parent is not self:
+        if parent := widget.GetParent():
             widget.Reparent(self._wxwidget)  # Reparent widget to this frame
             wx.CallAfter(parent.Destroy)
             widget.Show()
@@ -463,7 +466,7 @@ class WxLutView(LutView):
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         # Block signals from changing clims
-        with wx.EventBlocker(self._wxwidget.clims, wx.EVT_SLIDER.typeId):
+        with wx.EventBlocker(self._wxwidget.clims, SliderEvent):
             self._wxwidget.clims.SetValue(*clims)
             wx.SafeYield()
 
@@ -575,12 +578,12 @@ class _WxDimsSliders(wx.Panel):
 
 
 class _WxArrayViewer(wx.Frame):
-    def __init__(self, canvas_widget: wx.Window, parent: wx.Window = None):
+    def __init__(self, canvas_widget: wx.Window, parent: wx.Window | None = None):
         super().__init__(parent)
 
         # FIXME: pygfx backend needs this to be canvas_widget._subwidget
         if hasattr(canvas_widget, "_subwidget"):
-            canvas_widget = canvas_widget._subwidget
+            canvas_widget = canvas_widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
         if (parent := canvas_widget.GetParent()) and parent is not self:
             canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
@@ -705,7 +708,7 @@ class WxArrayView(ArrayView):
         canvas_widget: wx.Window,
         data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
-        parent: wx.Window = None,
+        parent: wx.Window | None = None,
     ) -> None:
         self._data_model = data_model
         self._viewer_model = viewer_model
@@ -792,10 +795,10 @@ class WxArrayView(ArrayView):
         return view
 
     # TODO: Fix type
-    def add_histogram(self, channel: ChannelKey, canvas: HistogramCanvas) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: HistogramCanvas) -> None:
         if lut := self._luts.get(channel, None):
             # Add the histogram widget on the LUT
-            lut._add_histogram(canvas)
+            lut._add_histogram(widget)
         self._wxwidget.Layout()
 
     def remove_lut_view(self, lut: LutView) -> None:
@@ -823,7 +826,7 @@ class WxArrayView(ArrayView):
         self._wxwidget.Layout()
 
     def hide_sliders(
-        self, axes_to_hide: Container[Hashable], show_remainder: bool = True
+        self, axes_to_hide: Container[Hashable], *, show_remainder: bool = True
     ) -> None:
         self._wxwidget.dims_sliders.hide_dimensions(axes_to_hide, show_remainder)
         self._wxwidget.Layout()
@@ -834,11 +837,11 @@ class WxArrayView(ArrayView):
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
         self._wxwidget.dims_sliders.set_current_index(value)
 
-    def set_data_info(self, text: str) -> None:
-        self._wxwidget._data_info_label.SetLabel(text)
+    def set_data_info(self, data_info: str) -> None:
+        self._wxwidget._data_info_label.SetLabel(data_info)
 
-    def set_hover_info(self, text: str) -> None:
-        self._wxwidget._hover_info_label.SetLabel(text)
+    def set_hover_info(self, hover_info: str) -> None:
+        self._wxwidget._hover_info_label.SetLabel(hover_info)
 
     def set_channel_mode(self, mode: ChannelMode) -> None:
         self._wxwidget.channel_mode_combo.SetValue(mode)
