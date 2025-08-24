@@ -204,7 +204,9 @@ class ArrayDisplayModel(NDVModel):
         # prevent channel_axis from being in visible_axes
         if self.channel_axis in self.visible_axes:
             warnings.warn(
-                "Channel_axis cannot be in visible_axes. Setting channel_axis to None.",
+                f"Channel_axis {self.channel_axis!r} "
+                f"cannot be in visible_axes {self.visible_axes!r}. "
+                "Setting channel_axis to None.",
                 UserWarning,
                 stacklevel=2,
             )

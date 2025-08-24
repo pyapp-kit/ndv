@@ -75,8 +75,10 @@ class ArrayViewer:
                 stacklevel=2,
             )
 
-        self._data_model = _ArrayDataDisplayModel(display=display_model)
-        self._set_data_wrapper(wrapper)
+        self._data_model = _ArrayDataDisplayModel(
+            display=display_model, data_wrapper=wrapper
+        )
+        self._connect_datawrapper(None, wrapper)
 
         self._viewer_model = ArrayViewerModel.model_validate(viewer_options or {})
         self._viewer_model.events.interaction_mode.connect(
@@ -174,20 +176,22 @@ class ArrayViewer:
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
-        self._set_data_wrapper(data)
-        self._fully_synchronize_view()
-
-    def _set_data_wrapper(self, data: Any | None) -> None:
-        """Set new datawrapper and hook up events."""
         _new = None if data is None else DataWrapper.create(data)
         self._data_model.data_wrapper, old = _new, self._data_model.data_wrapper
+        self._connect_datawrapper(old, _new)
+        self._fully_synchronize_view()
+
+    def _connect_datawrapper(
+        self, old: DataWrapper | None, new: DataWrapper | None
+    ) -> None:
+        """Set new datawrapper and hook up events."""
         if old is not None:
             with suppress(Exception):
                 old.data_changed.disconnect(self._request_data)
                 old.dims_changed.disconnect(self._fully_synchronize_view)
-        if _new is not None:
-            _new.data_changed.connect(self._request_data)
-            _new.dims_changed.connect(self._fully_synchronize_view)
+        if new is not None:
+            new.data_changed.connect(self._request_data)
+            new.dims_changed.connect(self._fully_synchronize_view)
 
     @property
     def roi(self) -> RectangularROIModel | None:

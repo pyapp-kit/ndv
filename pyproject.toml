@@ -141,6 +141,8 @@ ndv = { workspace = true }
 line-length = 88
 target-version = "py39"
 src = ["src"]
+fix = true
+unsafe-fixes = true
 
 # https://docs.astral.sh/ruff/rules
 [tool.ruff.lint]

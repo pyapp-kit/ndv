@@ -17,7 +17,7 @@ from pydantic import Field
 from ndv._types import ChannelKey
 from ndv.views import _app
 
-from ._array_display_model import ArrayDisplayModel, ChannelMode, TwoOrThreeAxisTuple
+from ._array_display_model import ArrayDisplayModel, ChannelMode
 from ._base_model import NDVModel
 from ._data_wrapper import DataWrapper
 
@@ -84,7 +84,16 @@ class _ArrayDataDisplayModel(NDVModel):
         # connect the channel mode change signal to the channel axis guessing method
         self.display.events.channel_mode.connect(self._on_channel_mode_change)
         # initial model synchronization
+        self._inject_channel_axis()
         self._on_channel_mode_change()
+
+    def _inject_channel_axis(self) -> None:
+        if (
+            self.display.channel_axis is None
+            and (wrapper := self.data_wrapper) is not None
+            and (guess := wrapper.guess_channel_axis()) not in self.normed_visible_axes
+        ):
+            self.display.channel_axis = guess
 
     def _on_channel_mode_change(self) -> None:
         # TODO: Refactor into separate methods?
@@ -92,27 +101,13 @@ class _ArrayDataDisplayModel(NDVModel):
         if mode == ChannelMode.GRAYSCALE:
             self.display.channel_axis = None
         elif mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}:
-            if self.data_wrapper is not None:
-                guess = self.data_wrapper.guess_channel_axis()
-                # only use the guess if it's not already in the visible axes
-                self.display.channel_axis = (
-                    None if guess in self.normed_visible_axes else guess
-                )
+            self._inject_channel_axis()
         elif mode == ChannelMode.RGBA:
             if self.data_wrapper is not None and self.display.channel_axis is None:
                 # Coerce image to RGB
                 if len(self.normed_visible_axes) == 3:
                     raise Exception("")
-                guess = self.data_wrapper.guess_channel_axis()
-                self.display.channel_axis = guess
-                # FIXME? going back another ChannelMode retains these changes
-                if guess in self.normed_visible_axes:
-                    dims = list(self.data_wrapper.sizes().keys())
-                    dims.remove(guess)
-                    new_visible_axes = dims[-self.display.n_visible_axes :]
-                    self.display.visible_axes = cast(
-                        "TwoOrThreeAxisTuple", tuple(new_visible_axes)
-                    )
+                self._inject_channel_axis()
 
     # Properties for normalized data access -----------------------------------------
     # these all use positive integers as axis keys
