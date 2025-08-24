@@ -61,12 +61,13 @@ pyqt = [
 ]
 pyside = [
     # defer to superqt's pyside6 restrictions
-    "superqt[iconify,pyside6] >=0.7.2",
+    "superqt[iconify,pyside6] >=0.7.2,<0.7.5",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
     "numpy >=1.23,<2; sys_platform == 'win32'", # needed for pyside6.6
     "pyside6 >=6.4",
-    "pyside6 >=6.6; python_version >= '3.12'",
+    "pyside6 >=6.6; python_version >= '3.12' and sys_platform == 'win32'",
+    "pyside6 >=6.7; python_version >= '3.12' and sys_platform != 'win32'",
     "qtpy >=2",
 ]
 wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
@@ -101,7 +102,7 @@ array-libs = [
     "zarr >2,<3",
 ]
 test = ["pytest >=8", "pytest-cov >=6"]
-testqt = [{ include-group = "test" }, "pytest-qt >=4.4"]
+testqt = [{ include-group = "test" }, "pytest-qt ==4.4.0"]
 dev = [
     { include-group = "testqt" },
     # omitting wxpython from dev env for now
