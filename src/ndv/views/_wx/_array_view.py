@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
 ToggleBtnEvent = cast("int", wx.EVT_TOGGLEBUTTON.typeId)  # type: ignore[attr-defined]
 SliderEvent = cast("int", wx.EVT_SLIDER.typeId)  # type: ignore[attr-defined]
+CheckboxEvent = cast("int", wx.EVT_CHECKBOX.typeId)  # type: ignore[attr-defined]
 
 
 class _WxSpinner(wx.Panel):
@@ -174,7 +175,7 @@ class _LutChannelSelector(wx.Panel):
     def _on_dropdown_clicked(self, evt: wx.CommandEvent) -> None:
         """Show the dropdown checklist."""
         # Position the popup below the button
-        btn_size = self._dropdown_btn.GetSize()
+        btn_size = cast("wx.Size", self._dropdown_btn.GetSize())
         btn_pos = self._dropdown_btn.GetPosition()
         popup_pos = self.ClientToScreen(
             wx.Point(btn_pos.x, btn_pos.y + btn_size.height)
@@ -233,7 +234,7 @@ class _LutChannelSelector(wx.Panel):
         lut_view.set_display(display)
         visible_checkbox = lut_view._wxwidget.visible
         visible_checkbox.SetValue(display)
-        event = wx.CommandEvent(wx.EVT_CHECKBOX.typeId, visible_checkbox.GetId())
+        event = wx.CommandEvent(CheckboxEvent, visible_checkbox.GetId())
         event.SetEventObject(visible_checkbox)
         wx.PostEvent(visible_checkbox.GetEventHandler(), event)
 

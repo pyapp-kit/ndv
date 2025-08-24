@@ -86,6 +86,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
 def test_display_options_visibility(wxapp: wx.App, viewer: WxArrayView) -> None:
     # display options button should appear only after thresh is reached
     # -2 to account for add_lut_view(None) in fixture
+    ch = 0
     for ch in range(viewer._wxwidget._toolbar_display_thresh - 2):
         viewer.add_lut_view(ch)
 
