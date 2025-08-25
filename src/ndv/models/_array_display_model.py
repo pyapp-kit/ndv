@@ -2,10 +2,11 @@
 
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, Union, cast
 
+import numpy as np
 from cmap import Colormap
-from pydantic import Field, computed_field, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from typing_extensions import Self, TypeAlias
 
 from ndv._types import AxisKey, ChannelKey, Slice
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
     from typing import Callable  # noqa: F401  # used for mkdocstrings
 
     import cmap
-    import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
+    import numpy.typing as npt  # used for mkdocstrings
 
     from ._lut_model import AutoscaleType
 
@@ -43,6 +44,9 @@ if TYPE_CHECKING:
         reducers: Mapping["AxisKey | None", ReducerType]
         luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
         default_lut: "LUTModel | LutModelKwargs"
+
+        scale: "tuple[float, float, float] | npt.ArrayLike"
+        # translate: tuple[float, float, float] | npt.ArrayLike
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
@@ -189,6 +193,10 @@ class ArrayDisplayModel(NDVModel):
         default_factory=lambda k: (-3, -2) if k.get("channel_axis") == -1 else (-2, -1)
     )
 
+    # z, y, x scale and translation
+    scale: tuple[float, float, float] = Field(default=(1, 1, 1))
+    # translate: tuple[float, float, float] = Field(default=(0, 0, 0))
+
     # map of index along channel axis to LUTModel object
     luts: LutMap = Field(default_factory=_default_luts)
     default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
@@ -198,6 +206,24 @@ class ArrayDisplayModel(NDVModel):
     def n_visible_axes(self) -> Literal[2, 3]:
         """Number of dims is derived from the length of `visible_axes`."""
         return cast("Literal[2, 3]", len(self.visible_axes))
+
+    @property
+    def transform(self) -> np.ndarray:
+        """Return the current transformation matrix."""
+        tform = np.diag((*self.scale[::-1], 1))
+        # tform[:3, 3] = self.translate[::-1]  # Set the translation part of the matrix
+        return tform
+
+    @transform.setter
+    def transform(self, matrix: np.ndarray) -> None:
+        ary = np.asarray(matrix)
+        if ary.shape != (4, 4):
+            raise ValueError("Transform matrix must be 4x4.")
+        # Decompose the matrix into scale and translation
+        # Note: this assumes a proper affine transformation matrix
+        self.scale = tuple(np.sqrt(np.sum(ary[:3, i] ** 2)) for i in range(3))[::-1]
+        # Extract translation
+        # self.translate = tuple(ary[:3, 3])
 
     @model_validator(mode="after")
     def _validate_model(self) -> "Self":
@@ -212,3 +238,11 @@ class ArrayDisplayModel(NDVModel):
             )
             self.channel_axis = None
         return self
+
+    @field_validator("scale", mode="before")
+    @classmethod
+    def _validate_scale(cls, v: Any) -> Any:
+        v = tuple(v) if not isinstance(v, tuple) else v
+        if len(v) == 2:
+            v = (1, *v)  # assume z scale of 1 if only 2 provided
+        return v
