@@ -18,6 +18,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
+        env:
+          UV_PYTHON: "3.13"
         with:
           enable-cache: true
 
