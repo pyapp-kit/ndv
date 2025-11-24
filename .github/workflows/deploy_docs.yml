@@ -53,3 +53,5 @@ jobs:
 
       # - name: Update default release docs
       #   run: mike set-default --push latest
+      #   env:
+      #     UV_PYTHON: "3.13"
