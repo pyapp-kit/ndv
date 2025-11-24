@@ -201,6 +201,8 @@ jobs:
   # make sure we can build docs without error
   test-docs:
     runs-on: macos-latest # nicer screenshots
+    env:
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v6
