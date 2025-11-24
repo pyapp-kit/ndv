@@ -18,8 +18,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
-        env:
-          UV_PYTHON: "3.13"
         with:
           enable-cache: true
 
@@ -44,12 +42,14 @@ jobs:
           fi
         env:
           DOCS_DEV: false
+          UV_PYTHON: "3.13"
 
       - name: Deploy dev docs
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: uv run --group docs mike deploy --push --update-aliases dev
         env:
           DOCS_DEV: true
+          UV_PYTHON: "3.13"
 
       # - name: Update default release docs
       #   run: mike set-default --push latest
