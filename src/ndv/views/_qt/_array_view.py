@@ -908,7 +908,7 @@ class QtArrayView(ArrayView):
             self._qwidget._progress_spinner.setVisible(value)
         if sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            new, old = info.args
+            _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._qwidget.add_roi_btn.setChecked(False)
         elif sig_name == "show_histogram_button":
