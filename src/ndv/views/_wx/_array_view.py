@@ -867,7 +867,7 @@ class WxArrayView(ArrayView):
             self._wxwidget._top_info.Layout()
         elif sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            new, old = info.args
+            _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._wxwidget.add_roi_btn.SetValue(False)
         elif sig_name == "show_histogram_button":

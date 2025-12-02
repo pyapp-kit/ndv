@@ -649,7 +649,7 @@ class JupyterArrayView(ArrayView):
             self._progress_spinner.layout.display = "flex" if value else "none"
         elif sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            new, old = info.args
+            _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._add_roi_btn.value = False
         elif sig_name == "show_histogram_button":
