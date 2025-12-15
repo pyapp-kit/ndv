@@ -84,7 +84,7 @@ jobs:
             python-version: "3.13"
             gui: pyqt
             canvas: pygfx
-          - os: macos-13
+          - os: macos-15
             gui: wxpython
             python-version: "3.9"
             canvas: vispy
