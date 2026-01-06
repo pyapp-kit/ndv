@@ -569,7 +569,7 @@
 </span><span id=__span-0-164>    <span class=k>return</span> <span class=n>res</span>
 </span></code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=ndv.models.RingBufferWrapper class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">RingBufferWrapper</span> <a href=#ndv.models.RingBufferWrapper class=headerlink title="Permanent link">#</a></h2> <div class="language-python doc-signature highlight"><pre><span></span><code><span id=__span-0-1><span class=nf>RingBufferWrapper</span><span class=p>(</span>
 </span><span id=__span-0-2>    <span class=n>max_capacity</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/functions.html#int>int</a></span> <span class=o>|</span> <span class=n><a class="autorefs autorefs-internal" title=ndv.models._ring_buffer.RingBuffer href=#ndv.models.RingBuffer>RingBuffer</a></span><span class=p>,</span>
-</span><span id=__span-0-3>    <span class=n>dtype</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=numpy.typing.DTypeLike href=https://numpy.org/doc/stable/reference/typing.html#numpy.typing.DTypeLike>DTypeLike</a></span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-3>    <span class=n>dtype</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" title=numpy.typing.DTypeLike href=https://numpy.org/doc/stable/reference/typing.html#numpy.typing.DTypeLike>DTypeLike</a></span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-4>    <span class=o>*</span><span class=p>,</span>
 </span><span id=__span-0-5>    <span class=n>allow_overwrite</span><span class=p>:</span> <span class=n><a class="autorefs autorefs-external" href=https://docs.python.org/3/library/functions.html#bool>bool</a></span> <span class=o>=</span> <span class=kc>True</span><span class=p>,</span>
 </span><span id=__span-0-6><span class=p>)</span>
@@ -596,7 +596,7 @@
 <span class=normal>533</span></pre></div></td><td class=code><div><pre><span></span><code><span id=__span-0-513><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
 </span><span id=__span-0-514>    <span class=bp>self</span><span class=p>,</span>
 </span><span id=__span-0-515>    <span class=n>max_capacity</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=n>RingBuffer</span><span class=p>,</span>
-</span><span id=__span-0-516>    <span class=n>dtype</span><span class=p>:</span> <span class=n>npt</span><span class=o>.</span><span class=n>DTypeLike</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+</span><span id=__span-0-516>    <span class=n>dtype</span><span class=p>:</span> <span class=n>npt</span><span class=o>.</span><span class=n>DTypeLike</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 </span><span id=__span-0-517>    <span class=o>*</span><span class=p>,</span>
 </span><span id=__span-0-518>    <span class=n>allow_overwrite</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>,</span>
 </span><span id=__span-0-519><span class=p>):</span>
