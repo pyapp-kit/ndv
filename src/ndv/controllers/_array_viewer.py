@@ -294,6 +294,41 @@ class ArrayViewer:
             iinfo = np.iinfo(dtype)
             ctrl.lut_model.clim_bounds = (iinfo.min, iinfo.max)
 
+    def _get_channel_name_from_coords(self, key: ChannelKey) -> str:
+        """Get channel name from data wrapper coords if available.
+
+        For data sources with semantic coordinates (e.g., xarray with labeled
+        channel dimensions), this extracts the coordinate value for the given
+        channel key.
+
+        Parameters
+        ----------
+        key : ChannelKey
+            The channel key (typically an integer index).
+
+        Returns
+        -------
+        str
+            The channel name from coords, or empty string if not available.
+        """
+        if key is None or key == "RGB":
+            return ""
+        wrapper = self._data_model.data_wrapper
+        if wrapper is None:
+            return ""
+        ch_axis = self._data_model.display.channel_axis
+        if ch_axis is None:
+            return ""
+        coords = wrapper.coords
+        if ch_axis in coords:
+            coord_values = coords[ch_axis]
+            if isinstance(key, int) and 0 <= key < len(coord_values):
+                coord_val = coord_values[key]
+                # Only use the coord value if it's not just the index
+                if coord_val != key:
+                    return str(coord_val)
+        return ""
+
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
     ) -> None:
@@ -614,6 +649,11 @@ class ArrayViewer:
                     views=lut_views,
                 )
                 self._update_channel_dtype(key)
+
+                # Auto-extract channel name from coords if not already set
+                if not model.name:
+                    if auto_name := self._get_channel_name_from_coords(key):
+                        model.name = auto_name
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel

@@ -449,3 +449,114 @@ def test_rgb_display_magic() -> None:
 
     rgba_data = np.ones((1, 2, 3, 4, 4), dtype=np.uint8)
     assert_rgb_magic_works(rgba_data)
+
+
+def test_lut_model_name() -> None:
+    """Test that LUTModel has a name field."""
+    lut = LUTModel()
+    assert lut.name == ""
+
+    lut = LUTModel(name="DAPI")
+    assert lut.name == "DAPI"
+
+    # Test that name can be set after creation
+    lut.name = "GFP"
+    assert lut.name == "GFP"
+
+
+@pytest.mark.usefixtures("any_app")
+def test_channel_controller_name() -> None:
+    """Test that ChannelController uses LUTModel.name for display name."""
+    mock_view = MagicMock(spec=LutView)
+
+    # Test default name (falls back to key)
+    lut = LUTModel()
+    ctrl = ChannelController(key=0, lut_model=lut, views=[mock_view])
+    ctrl.synchronize()
+    mock_view.set_channel_name.assert_called_with("0")
+
+    # Test with custom name
+    lut.name = "DAPI"
+    mock_view.reset_mock()
+    ctrl.synchronize()
+    mock_view.set_channel_name.assert_called_with("DAPI")
+
+    # Test that name change event propagates
+    mock_view.reset_mock()
+    lut.name = "GFP"
+    mock_view.set_channel_name.assert_called_with("GFP")
+
+
+@no_type_check
+@_patch_views
+def test_channel_name_manual_override() -> None:
+    """Test that manually set channel names take precedence."""
+    ctrl = ArrayViewer()
+    ctrl._async = False
+
+    # Create data and set channel mode to composite
+    data = np.zeros((3, 10, 10), dtype=np.uint8)
+    ctrl.display_model.channel_mode = ChannelMode.COMPOSITE
+
+    # Pre-configure channel names via luts
+    ctrl.display_model.luts[0] = LUTModel(name="DAPI")
+    ctrl.display_model.luts[1] = LUTModel(name="GFP")
+
+    ctrl.data = data
+
+    # Verify names were preserved
+    assert ctrl.display_model.luts[0].name == "DAPI"
+    assert ctrl.display_model.luts[1].name == "GFP"
+
+
+@no_type_check
+@_patch_views
+def test_channel_name_auto_extract_from_xarray() -> None:
+    """Test that channel names are auto-extracted from xarray coords."""
+    pytest.importorskip("xarray")
+    import xarray as xr
+
+    ctrl = ArrayViewer()
+    ctrl._async = False
+
+    # Create xarray with labeled channel coordinates
+    data = xr.DataArray(
+        np.zeros((3, 10, 10), dtype=np.uint8),
+        dims=["channel", "y", "x"],
+        coords={"channel": ["DAPI", "GFP", "RFP"]},
+    )
+    ctrl.display_model.channel_mode = ChannelMode.COMPOSITE
+    ctrl.data = data
+
+    # Verify names were auto-extracted
+    assert ctrl.display_model.luts[0].name == "DAPI"
+    assert ctrl.display_model.luts[1].name == "GFP"
+    assert ctrl.display_model.luts[2].name == "RFP"
+
+
+@no_type_check
+@_patch_views
+def test_channel_name_manual_override_xarray() -> None:
+    """Test that manual names override xarray coords."""
+    pytest.importorskip("xarray")
+    import xarray as xr
+
+    ctrl = ArrayViewer()
+    ctrl._async = False
+
+    # Pre-configure a channel name
+    ctrl.display_model.luts[0] = LUTModel(name="Custom")
+    ctrl.display_model.channel_mode = ChannelMode.COMPOSITE
+
+    # Create xarray with labeled channel coordinates
+    data = xr.DataArray(
+        np.zeros((3, 10, 10), dtype=np.uint8),
+        dims=["channel", "y", "x"],
+        coords={"channel": ["DAPI", "GFP", "RFP"]},
+    )
+    ctrl.data = data
+
+    # Manual name should be preserved, others auto-extracted
+    assert ctrl.display_model.luts[0].name == "Custom"
+    assert ctrl.display_model.luts[1].name == "GFP"
+    assert ctrl.display_model.luts[2].name == "RFP"

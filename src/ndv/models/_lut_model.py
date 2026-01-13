@@ -173,6 +173,10 @@ class LUTModel(NDVModel):
         Optional extrema for limiting the range of the contrast limits
     gamma : float
         Gamma applied to the data before applying the colormap. By default, `1.0`.
+    name : str
+        Display name for this channel. If empty, the channel key (index) is used.
+        For data sources with semantic coordinates (e.g., xarray), names are
+        auto-extracted from coords unless manually overridden.
     """
 
     visible: bool = True
@@ -180,6 +184,7 @@ class LUTModel(NDVModel):
     clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
     clim_bounds: tuple[Optional[float], Optional[float]] = (None, None)
     gamma: float = 1.0
+    name: str = ""
 
     @model_validator(mode="before")
     def _validate_model(cls, v: Any) -> Any:
