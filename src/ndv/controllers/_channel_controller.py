@@ -30,6 +30,7 @@ class ChannelController:
         self.lut_views: list[LutView] = []
         self.lut_model = lut_model
         self.lut_model.events.clims.connect(self._auto_scale)
+        self.lut_model.events.name.connect(self._on_name_changed)
         self.handles: list[ImageHandle] = []
 
         for v in views:
@@ -45,10 +46,25 @@ class ChannelController:
     def synchronize(self, *views: LutView) -> None:
         """Aligns all views against the backing model."""
         _views: Iterable[LutView] = views or self.lut_views
-        name = str(self.key) if self.key is not None else ""
+        name = self._get_display_name()
         for view in _views:
             view.synchronize()
             view.set_channel_name(name)
+
+    def _get_display_name(self) -> str:
+        """Get the display name for this channel.
+
+        Returns the model's name if set, otherwise falls back to the channel key.
+        """
+        if self.lut_model.name:
+            return self.lut_model.name
+        return str(self.key) if self.key is not None else ""
+
+    def _on_name_changed(self, name: str) -> None:
+        """Update views when channel name changes."""
+        display_name = self._get_display_name()
+        for view in self.lut_views:
+            view.set_channel_name(display_name)
 
     def update_texture_data(self, data: np.ndarray) -> None:
         """Update the data in the image handle."""
