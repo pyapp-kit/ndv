@@ -34,7 +34,7 @@ from superqt import (
 )
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
-from superqt.utils import signals_blocked
+from superqt.utils import ensure_main_thread, signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
@@ -836,6 +836,7 @@ class QtArrayView(ArrayView):
         """Update sliders with the given coordinate ranges."""
         self._qwidget.dims_sliders.create_sliders(coords)
 
+    @ensure_main_thread  # type: ignore[untyped-decorator]
     def hide_sliders(
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = True
     ) -> None:
