@@ -1,5 +1,38 @@
 # Changelog
 
+## [v0.4.1](https://github.com/pyapp-kit/ndv/tree/v0.4.1) (2026-02-07)
+
+[Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.4.0...v0.4.1)
+
+**Implemented enhancements:**
+
+- feat: Auto-find `dims` and `coords` on arrays that support it [\#228](https://github.com/pyapp-kit/ndv/pull/228) ([tlambert03](https://github.com/tlambert03))
+
+**Fixed bugs:**
+
+- fix: ensure hide\_sliders runs on the main thread [\#229](https://github.com/pyapp-kit/ndv/pull/229) ([tlambert03](https://github.com/tlambert03))
+- fix: update hover on new data [\#202](https://github.com/pyapp-kit/ndv/pull/202) ([gselzer](https://github.com/gselzer))
+- fix: fix composite mode on init [\#200](https://github.com/pyapp-kit/ndv/pull/200) ([tlambert03](https://github.com/tlambert03))
+
+**Merged pull requests:**
+
+- ci\(pre-commit.ci\): autoupdate [\#227](https://github.com/pyapp-kit/ndv/pull/227) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- ci\(dependabot\): bump the actions group with 2 updates [\#226](https://github.com/pyapp-kit/ndv/pull/226) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ci\(pre-commit.ci\): autoupdate [\#224](https://github.com/pyapp-kit/ndv/pull/224) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- ci\(dependabot\): bump actions/upload-artifact from 4 to 6 [\#222](https://github.com/pyapp-kit/ndv/pull/222) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Actually deploy docs on 3.13 [\#221](https://github.com/pyapp-kit/ndv/pull/221) ([gselzer](https://github.com/gselzer))
+- Also deploy docs on 3.13 [\#220](https://github.com/pyapp-kit/ndv/pull/220) ([gselzer](https://github.com/gselzer))
+- ci\(dependabot\): bump actions/checkout from 5 to 6 [\#219](https://github.com/pyapp-kit/ndv/pull/219) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ci\(pre-commit.ci\): autoupdate [\#215](https://github.com/pyapp-kit/ndv/pull/215) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- ci\(dependabot\): bump actions/checkout from 4 to 5 [\#214](https://github.com/pyapp-kit/ndv/pull/214) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Revert "feat: Purge ArrayDataDisplayModel from ArrayViews \(\#196\)" [\#212](https://github.com/pyapp-kit/ndv/pull/212) ([tlambert03](https://github.com/tlambert03))
+- ci\(dependabot\): bump actions/checkout from 4 to 5 [\#210](https://github.com/pyapp-kit/ndv/pull/210) ([dependabot[bot]](https://github.com/apps/dependabot))
+- ci\(pre-commit.ci\): autoupdate [\#208](https://github.com/pyapp-kit/ndv/pull/208) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- ci\(pre-commit.ci\): autoupdate [\#206](https://github.com/pyapp-kit/ndv/pull/206) ([pre-commit-ci[bot]](https://github.com/apps/pre-commit-ci))
+- chore: update lockfile [\#204](https://github.com/pyapp-kit/ndv/pull/204) ([tlambert03](https://github.com/tlambert03))
+- Better gui for many channels \(wx-specific\) [\#195](https://github.com/pyapp-kit/ndv/pull/195) ([gnodar01](https://github.com/gnodar01))
+- refactor: lots of typing updates, add pyright tests on CI [\#185](https://github.com/pyapp-kit/ndv/pull/185) ([tlambert03](https://github.com/tlambert03))
+
 ## [v0.4.0](https://github.com/pyapp-kit/ndv/tree/v0.4.0) (2025-05-21)
 
 [Full Changelog](https://github.com/pyapp-kit/ndv/compare/v0.3.1...v0.4.0)
