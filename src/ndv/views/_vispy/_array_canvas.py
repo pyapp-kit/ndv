@@ -13,6 +13,7 @@ import vispy.color
 import vispy.scene
 from vispy import scene, visuals
 from vispy.util.quaternion import Quaternion
+from vispy.visuals.transforms import MatrixTransform
 
 from ndv._types import (
     CursorType,
@@ -97,10 +98,10 @@ class VispyImageHandle(ImageHandle):
         self._visual.cmap = cmap.to_vispy()
 
     def transform(self) -> np.ndarray:
-        raise NotImplementedError
+        return self._visual.transform.matrix  # type: ignore [no-any-return]
 
     def set_transform(self, transform: np.ndarray) -> None:
-        raise NotImplementedError
+        self._visual.transform = MatrixTransform(transform.T)
 
     def start_move(self, pos: Sequence[float]) -> None:
         pass
