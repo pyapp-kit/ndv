@@ -20,5 +20,4 @@ try:
 except ImportError:
     raise ImportError("Please `pip install zarr aiohttp` to run this example")
 
-
-ndv.imshow(zarr_arr["s4"], current_index={1: 30}, visible_axes=(0, 2))
+ndv.imshow(zarr_arr["s4"].astype("uint16"), current_index={1: 30}, visible_axes=(0, 2))
