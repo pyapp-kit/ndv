@@ -22,16 +22,16 @@ if TYPE_CHECKING:
     import cmap
     import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
 
-    from ._lut_model import AutoscaleType
+    from ._lut_model import ClimsType
 
     class LutModelKwargs(TypedDict, total=False):
         """Keyword arguments for `LUTModel`."""
 
         visible: bool
         cmap: "cmap.Colormap | cmap._colormap.ColorStopsLike"
-        clims: "tuple[float, float] | None"
+        clims: "ClimsType | dict | tuple[float, float] | None"
         gamma: float
-        autoscale: AutoscaleType
+        name: str
 
     class ArrayDisplayModelKwargs(TypedDict, total=False):
         """Keyword arguments for `ArrayDisplayModel`."""

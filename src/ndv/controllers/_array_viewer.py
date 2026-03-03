@@ -300,16 +300,6 @@ class ArrayViewer:
         For data sources with semantic coordinates (e.g., xarray with labeled
         channel dimensions), this extracts the coordinate value for the given
         channel key.
-
-        Parameters
-        ----------
-        key : ChannelKey
-            The channel key (typically an integer index).
-
-        Returns
-        -------
-        str
-            The channel name from coords, or empty string if not available.
         """
         if key is None or key == "RGB":
             return ""
