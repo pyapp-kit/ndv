@@ -82,6 +82,7 @@ class LutView(Viewable):
             self._model.events.cmap.disconnect(self.set_colormap)
             self._model.events.gamma.disconnect(self.set_gamma)
             self._model.events.visible.disconnect(self.set_channel_visible)
+            self._model.events.name.disconnect(self.set_channel_name)
 
         # Connect new model
         self._model = model
@@ -91,6 +92,7 @@ class LutView(Viewable):
             self._model.events.cmap.connect(self.set_colormap)
             self._model.events.gamma.connect(self.set_gamma)
             self._model.events.visible.connect(self.set_channel_visible)
+            self._model.events.name.connect(self.set_channel_name)
 
         self.synchronize()
 
@@ -102,3 +104,5 @@ class LutView(Viewable):
             self.set_colormap(model.cmap)
             self.set_gamma(model.gamma)
             self.set_channel_visible(model.visible)
+            if model.name:
+                self.set_channel_name(model.name)

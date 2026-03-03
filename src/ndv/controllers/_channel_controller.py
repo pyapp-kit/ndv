@@ -30,7 +30,6 @@ class ChannelController:
         self.lut_views: list[LutView] = []
         self.lut_model = lut_model
         self.lut_model.events.clims.connect(self._auto_scale)
-        self.lut_model.events.name.connect(self._on_name_changed)
         self.handles: list[ImageHandle] = []
 
         for v in views:
@@ -59,12 +58,6 @@ class ChannelController:
         if self.lut_model.name:
             return self.lut_model.name
         return str(self.key) if self.key is not None else ""
-
-    def _on_name_changed(self, name: str) -> None:
-        """Update views when channel name changes."""
-        display_name = self._get_display_name()
-        for view in self.lut_views:
-            view.set_channel_name(display_name)
 
     def update_texture_data(self, data: np.ndarray) -> None:
         """Update the data in the image handle."""

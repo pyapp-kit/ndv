@@ -471,6 +471,7 @@ def test_channel_controller_name() -> None:
 
     # Test default name (falls back to key)
     lut = LUTModel()
+    lut.events.name.connect(mock_view.set_channel_name)
     ctrl = ChannelController(key=0, lut_model=lut, views=[mock_view])
     ctrl.synchronize()
     mock_view.set_channel_name.assert_called_with("0")
@@ -484,7 +485,7 @@ def test_channel_controller_name() -> None:
     # Test that name change event propagates
     mock_view.reset_mock()
     lut.name = "GFP"
-    mock_view.set_channel_name.assert_called_with("GFP")
+    mock_view.set_channel_name.assert_called_with("GFP", "DAPI")
 
 
 @no_type_check
