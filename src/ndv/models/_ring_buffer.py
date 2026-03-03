@@ -229,7 +229,7 @@ class RingBuffer(Sequence):
 
     # numpy compatibility
     def __array__(
-        self, dtype: npt.DTypeLike = None, copy: bool | None = None
+        self, dtype: npt.DTypeLike | None = None, copy: bool | None = None
     ) -> np.ndarray:
         if copy is False:
             warnings.warn(

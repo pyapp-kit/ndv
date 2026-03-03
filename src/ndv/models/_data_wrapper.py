@@ -510,10 +510,12 @@ class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
 class RingBufferWrapper(DataWrapper[RingBuffer]):
     """Wrapper for ring buffer objects."""
 
+    _ring: RingBuffer
+
     def __init__(
         self,
         max_capacity: int | RingBuffer,
-        dtype: npt.DTypeLike = None,
+        dtype: npt.DTypeLike | None = None,
         *,
         allow_overwrite: bool = True,
     ):
