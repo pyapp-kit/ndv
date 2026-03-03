@@ -129,12 +129,17 @@ class DataWrapper(Generic[ArrayT], ABC):
     @property
     def dims(self) -> tuple[Hashable, ...]:
         """Return the dimension labels for the data."""
+        if hasattr(self._data, "dims"):
+            return tuple(self._data.dims)
         # type ignore is asserted in the __init__ method
         return tuple(range(len(self._data.shape)))  # type: ignore [attr-defined]
 
     @property
     def coords(self) -> Mapping[Hashable, Sequence]:
         """Return the coordinates for the data."""
+        if hasattr(self._data, "coords") and isinstance(self._data.coords, Mapping):
+            return self._data.coords
+
         dims = self.dims
         # type ignore is asserted in the __init__ method
         return {i: range(s) for i, s in zip(dims, self._data.shape)}  # type: ignore [attr-defined]
@@ -398,16 +403,6 @@ class CLArrayWrapper(DataWrapper["cl_array.Array"]):
 
 class XarrayWrapper(DataWrapper["xr.DataArray"]):
     """Wrapper for xarray DataArray objects."""
-
-    @property
-    def dims(self) -> tuple[Hashable, ...]:
-        """Return the dimension labels for the data."""
-        return tuple(self._data.dims)
-
-    @property
-    def coords(self) -> Mapping[Hashable, Sequence]:
-        """Return the coordinates for the data."""
-        return self.data.coords  # type: ignore [no-any-return]
 
     @classmethod
     def supports(cls, obj: Any) -> TypeGuard[xr.DataArray]:
