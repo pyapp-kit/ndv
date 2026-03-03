@@ -188,10 +188,10 @@ class ArrayViewer:
         if old is not None:
             with suppress(Exception):
                 old.data_changed.disconnect(self._request_data)
-                old.dims_changed.disconnect(self._fully_synchronize_view)
+                old.dims_changed.disconnect(self._on_dims_changed)
         if new is not None:
             new.data_changed.connect(self._request_data)
-            new.dims_changed.connect(self._fully_synchronize_view)
+            new.dims_changed.connect(self._on_dims_changed)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -360,6 +360,16 @@ class ArrayViewer:
             for lut_ctr in self._lut_controllers.values():
                 lut_ctr.synchronize()
         self._synchronize_roi()
+
+    def _on_dims_changed(self) -> None:
+        """Update sliders and info when dimension sizes change."""
+        if (wrapper := self._data_model.data_wrapper) is None:
+            return
+        with self._view.currentIndexChanged.blocked():
+            self._view.create_sliders(wrapper.coords)
+        self._update_visible_sliders()
+        self._on_view_current_index_changed()
+        self._view.set_data_info(wrapper.summary_info())
 
     def _synchronize_roi(self) -> None:
         """Fully re-synchronize the ROI view with the model."""

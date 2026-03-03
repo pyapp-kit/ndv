@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
 from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore[attr-defined]
-from qtpy.QtGui import QCursor, QMouseEvent, QMovie
+from qtpy.QtGui import QCursor, QFont, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -470,9 +470,12 @@ class DimRow(QObject):
         self.play_btn.toggled.connect(self.set_animated)
         self.label = QLabel(str(axis))
         self.out_of = QLabel(f"/ {len(_coords) - 1}")
-        self.out_of.setStyleSheet("margin: 0 0 2px 0;")  # hack
+        self.out_of.setStyleSheet("margin: 0 0 1px 0;")  # hack
 
         self._timer_id: int | None = None
+        mono = QFont("Courier", 12)
+        self.index_label.setFont(mono)
+        self.out_of.setFont(mono)
 
     def set_fps(self, fps: float) -> None:
         self.play_btn.spin.setValue(fps)
@@ -578,10 +581,18 @@ class _QDimsSliders(QWidget):
         if (sr := self._getSliderRow(slider)) is None:
             return
 
-        # Update the total label for the given row
+        # Update the total and index label widths for the given row
         item = self._layout.itemAtPosition(sr, self._rTOT)
         if item and (label := item.widget()):
-            cast("QLabel", label).setText(f"/ {total}")
+            n_chars = len(str(total))
+            label = cast("QLabel", label)
+            label.setText(f"/ {total}")
+            fm = label.fontMetrics()
+            wide = fm.horizontalAdvance(f"/ {'8' * n_chars}") + 6
+            label.setFixedWidth(wide)
+            idx_item = self._layout.itemAtPosition(sr, self._rINDEX)
+            if idx_item and (idx_label := idx_item.widget()):
+                idx_label.setFixedWidth(wide)
 
     def setRowVisible(self, slider: QWidget, visible: bool) -> None:
         if (sr := self._getSliderRow(slider)) is None:
