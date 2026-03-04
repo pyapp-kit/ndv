@@ -171,12 +171,12 @@ class ArrayViewer:
 
     @property
     def data_wrapper(self) -> Any:
-        """Return data being displayed."""
+        """Return the data wrapper object being used to interface with the data."""
         return self._data_wrapper
 
     @property
     def data(self) -> Any:
-        """Return data being displayed."""
+        """Return data being displayed (the actual data, not the wrapper)."""
         if self._data_wrapper is None:
             return None  # pragma: no cover
         # returning the actual data, not the wrapper
@@ -190,18 +190,6 @@ class ArrayViewer:
         self._data_wrapper = _new
         self._connect_datawrapper(old, _new)
         self._fully_synchronize_view()
-
-    def _connect_datawrapper(
-        self, old: DataWrapper | None, new: DataWrapper | None
-    ) -> None:
-        """Set new datawrapper and hook up events."""
-        if old is not None:
-            with suppress(Exception):
-                old.data_changed.disconnect(self._request_data)
-                old.dims_changed.disconnect(self._on_dims_changed)
-        if new is not None:
-            new.data_changed.connect(self._request_data)
-            new.dims_changed.connect(self._on_dims_changed)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -246,6 +234,18 @@ class ArrayViewer:
         return ArrayViewer(self._data_wrapper, display_model=self.display_model)
 
     # --------------------- PRIVATE ------------------------------------------
+
+    def _connect_datawrapper(
+        self, old: DataWrapper | None, new: DataWrapper | None
+    ) -> None:
+        """Set new datawrapper and hook up events."""
+        if old is not None:
+            with suppress(Exception):
+                old.data_changed.disconnect(self._request_data)
+                old.dims_changed.disconnect(self._on_dims_changed)
+        if new is not None:
+            new.data_changed.connect(self._request_data)
+            new.dims_changed.connect(self._on_dims_changed)
 
     @staticmethod
     def _default_display_model(
