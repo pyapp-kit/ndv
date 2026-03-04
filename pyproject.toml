@@ -113,14 +113,13 @@ dev = [
     "ipython>=8.18.1",
     "mypy>=1.14.1",
     "pdbpp>=0.10.3 ; sys_platform != 'win32'",
-    "pre-commit>=4.1.0",
+    "prek>=0.3.4",
+    "pydevd",
+    "pyright>=1.1.404",
+    "pytest-xdist>=3.8.0",
     "rich>=13.9.4",
     "ruff>=0.9.4",
-    "pyright>=1.1.404",
     "types-wxpython",
-    "pydevd",
-    "pytest-xdist>=3.8.0",
-    "prek>=0.3.4",
 ]
 docs = [
     "mkdocs >=1.6.1",
