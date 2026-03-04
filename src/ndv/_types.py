@@ -6,10 +6,9 @@ from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
 from functools import cache
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypeAlias, cast
 
 from pydantic import PlainSerializer, PlainValidator
-from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from qtpy.QtCore import Qt

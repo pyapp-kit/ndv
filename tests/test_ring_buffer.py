@@ -179,7 +179,7 @@ def test_iter() -> None:
     rb = RingBuffer(5)
     for i in range(5):
         rb.append(i)
-    for i, j in zip(rb, range(5)):
+    for i, j in zip(rb, range(5), strict=False):
         assert i == j
 
 

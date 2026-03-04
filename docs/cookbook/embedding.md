@@ -30,17 +30,3 @@ each one.
 ````
 
 {{ screenshot: examples/cookbook/multi_ndv.py }}
-
-## A minimal microscope dashboard using `openwfs`
-
-You can use `ndv` to take an external image source (i.e. a widefield camera) and
-show its content in real-time in a custom widget embedding `ArrayViewer`. The
-script below uses [`openwfs`](https://github.com/IvoVellekoop/openwfs) to
-generate synthetic images of a sample and continuously update the view, and
-allows to move the field of view over the X and Y axis.
-
-````python title="examples/cookbook/microscope_dashboard.py"
---8<-- "examples/cookbook/microscope_dashboard.py"
-````
-
-{{ screenshot: examples/cookbook/microscope_dashboard.py }}
