@@ -736,7 +736,7 @@ class _QArrayViewer(QWidget):
         )
         self._btn_layout = self.luts.btn_row
         self._btn_layout.setParent(None)
-        self.luts.expand()
+        self.luts.expand(animate=False)
 
         # button to change number of displayed dimensions
         self.ndims_btn = _DimToggleButton(self)
