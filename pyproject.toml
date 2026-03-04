@@ -38,9 +38,9 @@ classifiers = [
 dependencies = [
     "cmap >=0.3",
     "numpy >=1.23",
-    "psygnal >=0.10",
-    "pydantic >=2.9",
-    "typing_extensions >= 4.0",
+    "psygnal >=0.12",
+    "pydantic >=2.10",
+    "typing_extensions >= 4.10",
 ]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
@@ -52,12 +52,7 @@ jupyter = [
     "jupyter_rfb >=0.3.3",
     "glfw >=2.4",
 ]
-pyqt = [
-    "pyqt6 >=6.4,!=6.6",
-    "pyqt6 >=6.5.3; python_version >= '3.12'",
-    "qtpy >=2",
-    "superqt[iconify] >=0.7.2",
-]
+pyqt = ["pyqt6 >=6.7", "qtpy >=2", "superqt[iconify] >=0.7.2"]
 pyside = [
     # defer to superqt's pyside6 restrictions
     "superqt[iconify,pyside6] >=0.7.2,<0.7.5",
@@ -112,14 +107,14 @@ dev = [
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",
     "mypy>=1.14.1",
-    "pdbpp>=0.10.3 ; sys_platform != 'win32'",
+    "pdbpp>=0.12.1 ; sys_platform != 'win32'",
     "prek>=0.3.4",
-    "pydevd",
+    "pydevd>=3.4.1",
     "pyright>=1.1.404",
     "pytest-xdist>=3.8.0",
     "rich>=13.9.4",
     "ruff>=0.9.4",
-    "types-wxpython",
+    "types-wxpython>=0.9.7",
 ]
 docs = [
     "mkdocs >=1.6.1",
