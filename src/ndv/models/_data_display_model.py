@@ -9,7 +9,7 @@ from collections.abc import (
 )
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 
 import numpy as np
 from pydantic import Field
@@ -33,9 +33,9 @@ class DataRequest:
     """Request object for data slicing."""
 
     wrapper: DataWrapper = field(repr=False)
-    index: Mapping[int, Union[int, slice]]
+    index: Mapping[int, int | slice]
     visible_axes: tuple[int, ...]
-    channel_axis: Optional[int]
+    channel_axis: int | None
     channel_mode: ChannelMode
 
 
@@ -49,7 +49,7 @@ class DataResponse:
     # mapping of channel_key -> data
     n_visible_axes: int
     data: Mapping[ChannelKey, np.ndarray] = field(repr=False)
-    request: Optional[DataRequest] = None
+    request: DataRequest | None = None
 
 
 # NOTE: nobody particularly likes this class.  It does important stuff, but we're
@@ -78,7 +78,7 @@ class _ArrayDataDisplayModel(NDVModel):
     """
 
     display: ArrayDisplayModel = Field(default_factory=lambda: ArrayDisplayModel())
-    data_wrapper: Optional[DataWrapper] = None
+    data_wrapper: DataWrapper | None = None
 
     def model_post_init(self, __context: Any) -> None:
         # connect the channel mode change signal to the channel axis guessing method
@@ -133,7 +133,7 @@ class _ArrayDataDisplayModel(NDVModel):
         )
 
     @property
-    def normed_current_index(self) -> Mapping[int, Union[int, slice]]:
+    def normed_current_index(self) -> Mapping[int, int | slice]:
         """Return the current index with positive integer axis keys.
 
         This method has to handle cases where the the model current index is expressed
@@ -149,7 +149,7 @@ class _ArrayDataDisplayModel(NDVModel):
         """
         wrapper = self._ensure_wrapper()
 
-        output: MutableMapping[int, Union[int, slice]] = {}
+        output: MutableMapping[int, int | slice] = {}
         rev_map: dict[Hashable, Hashable] = {}
         to_remove: list[Hashable] = []
 

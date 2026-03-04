@@ -2,11 +2,11 @@
 
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict, cast
 
 from cmap import Colormap
 from pydantic import Field, computed_field, model_validator
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self
 
 from ndv._types import AxisKey, ChannelKey, Slice
 
@@ -16,8 +16,11 @@ from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping  # noqa: F401 # used for mkdocstrings
-    from typing import Callable  # noqa: F401  # used for mkdocstrings
+    from collections.abc import (  # noqa: F401 # used for mkdocstrings
+        Callable,  # used for mkdocstrings
+        Hashable,
+        Mapping,
+    )
 
     import cmap
     import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
@@ -37,24 +40,24 @@ if TYPE_CHECKING:
         """Keyword arguments for `ArrayDisplayModel`."""
 
         visible_axes: "tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]"
-        current_index: Mapping[AxisKey, Union[int, slice]]
+        current_index: Mapping[AxisKey, int | slice]
         channel_mode: 'ChannelMode | Literal["grayscale", "composite", "color", "rgba"]'
-        channel_axis: Optional[AxisKey]
+        channel_axis: AxisKey | None
         reducers: Mapping["AxisKey | None", ReducerType]
         luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
         default_lut: "LUTModel | LutModelKwargs"
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
-IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]
+IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
 # map of index along channel axis to LUTModel object
 LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
-Reducers: TypeAlias = ValidatedEventedDict[Union[AxisKey, None], ReducerType]
+Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
 # used for visible_axes
-TwoOrThreeAxisTuple: TypeAlias = Union[
-    tuple[AxisKey, AxisKey, AxisKey], tuple[AxisKey, AxisKey]
-]
+TwoOrThreeAxisTuple: TypeAlias = (
+    tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
+)
 
 
 def _default_luts() -> LutMap:
@@ -183,7 +186,7 @@ class ArrayDisplayModel(NDVModel):
     default_reducer: ReducerType = "numpy.max"  # type: ignore [assignment]  # FIXME
 
     channel_mode: ChannelMode = ChannelMode.GRAYSCALE
-    channel_axis: Optional[AxisKey] = None
+    channel_axis: AxisKey | None = None
     # must come after channel_axis, since it is used to set default visible_axes
     visible_axes: TwoOrThreeAxisTuple = Field(
         default_factory=lambda k: (-3, -2) if k.get("channel_axis") == -1 else (-2, -1)

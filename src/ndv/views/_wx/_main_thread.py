@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from concurrent.futures import Future
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import wx
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from typing_extensions import ParamSpec, TypeVar
 
     T = TypeVar("T")
