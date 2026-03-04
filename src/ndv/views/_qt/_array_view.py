@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
 from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore[attr-defined]
-from qtpy.QtGui import QCursor, QFont, QMouseEvent, QMovie
+from qtpy.QtGui import QCursor, QFontDatabase, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -472,7 +472,8 @@ class DimRow(QObject):
         self.out_of.setStyleSheet("margin: 0 0 1px 0;")  # hack
 
         self._timer_id: int | None = None
-        mono = QFont("Courier", 12)
+        mono = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        mono.setPointSize(12)
         self.index_label.setFont(mono)
         self.out_of.setFont(mono)
 
