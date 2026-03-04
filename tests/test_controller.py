@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Callable, cast, no_type_check
+from typing import TYPE_CHECKING, Any, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
@@ -26,6 +26,9 @@ from ndv.views import _app, gui_frontend
 from ndv.views.bases import ArrayView, LutView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases._graphics._canvas_elements import ImageHandle
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 try:
     from qtpy import API_NAME

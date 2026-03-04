@@ -32,7 +32,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       UV_PYTHON: ${{ matrix.python-version }}
-      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
@@ -71,11 +70,6 @@ jobs:
             python-version: "3.13"
             gui: jupyter
             canvas: pygfx
-          # pyside6 is struggling with 3.9
-          - os: ubuntu-latest
-            python-version: "3.9"
-            gui: pyqt
-            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.11"
             gui: pyqt
@@ -84,14 +78,7 @@ jobs:
             python-version: "3.13"
             gui: pyqt
             canvas: pygfx
-          - os: macos-15
-            gui: wxpython
-            python-version: "3.9"
-            canvas: vispy
-          - os: windows-latest
-            gui: jupyter
-            python-version: "3.9"
-            canvas: pygfx
+
 
     steps:
       - uses: actions/checkout@v6
@@ -156,7 +143,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       UV_PYTHON: ${{ matrix.python-version }}
-      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:

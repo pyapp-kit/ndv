@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import wx
 from wx import (
@@ -19,6 +19,7 @@ from ndv.views.bases._app import NDVApp
 from ._main_thread import call_in_main_thread
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from concurrent.futures import Future
 
     from ndv.views.bases import ArrayView

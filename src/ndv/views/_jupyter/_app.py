@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from types import MethodType
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from jupyter_rfb import RemoteFrameBuffer
 
@@ -15,6 +15,8 @@ from ndv._types import (
 from ndv.views.bases._app import NDVApp
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ndv.views.bases import ArrayView
     from ndv.views.bases._graphics._mouseable import Mouseable
 

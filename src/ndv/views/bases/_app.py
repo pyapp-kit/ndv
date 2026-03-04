@@ -8,9 +8,10 @@ from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import suppress
 from functools import cache
 from threading import Timer
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
     import pydevd
