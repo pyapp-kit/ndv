@@ -85,6 +85,9 @@ def test_interaction() -> None:
         # gamma=2,
     )
     histogram = PyGFXHistogramCanvas()
+    # Show the canvas so get_logical_size() returns the actual size
+    # (rendercanvas >=2.6 returns (1, 1) before the widget is shown)
+    histogram._canvas.show()
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10

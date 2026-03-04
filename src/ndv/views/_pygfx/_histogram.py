@@ -126,8 +126,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
 
-        self._renderer.blend_mode = "ordered1"
-
         # Note that we split the view up into multiple scenes, each with their
         # own camera and renderer.
         #

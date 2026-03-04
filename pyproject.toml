@@ -120,6 +120,8 @@ dev = [
     "pyright>=1.1.404",
     "types-wxpython",
     "pydevd",
+    "pytest-xdist>=3.8.0",
+    "prek>=0.3.4",
 ]
 docs = [
     "mkdocs >=1.6.1",

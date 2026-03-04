@@ -387,7 +387,6 @@ class GfxArrayCanvas(ArrayCanvas):
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None
@@ -451,7 +450,7 @@ class GfxArrayCanvas(ArrayCanvas):
         image = pygfx.Image(
             pygfx.Geometry(grid=tex),
             # depth_test=False for additive-like blending
-            pygfx.ImageBasicMaterial(depth_test=False),
+            pygfx.ImageBasicMaterial(depth_test=False, alpha_mode="add"),
         )
         self._scene.add(image)
 
@@ -476,7 +475,9 @@ class GfxArrayCanvas(ArrayCanvas):
         vol = pygfx.Volume(
             pygfx.Geometry(grid=tex),
             # depth_test=False for additive-like blending
-            pygfx.VolumeRayMaterial(interpolation="nearest", depth_test=False),
+            pygfx.VolumeRayMaterial(
+                interpolation="nearest", depth_test=False, alpha_mode="add"
+            ),
         )
         self._scene.add(vol)
 
