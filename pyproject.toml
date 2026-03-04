@@ -19,7 +19,7 @@ name = "ndv"
 dynamic = ["version"]
 description = "Simple, fast-loading, n-dimensional array viewer, with minimal dependencies."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "BSD-3-Clause" }
 authors = [
     { name = "Talley Lambert", email = "talley.lambert@gmail.com" },
@@ -29,7 +29,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -74,7 +73,7 @@ wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
-pygfx = ["pygfx>=0.8.0"]
+pygfx = ["pygfx~=0.16", "rendercanvas~=2.6", "wgpu~=0.31"]
 
 # ready to go bundles with pygfx
 qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
