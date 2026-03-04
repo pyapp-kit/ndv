@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from ._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping, MutableMapping
+    from collections.abc import Hashable, Mapping
 
     import numpy as np
 
@@ -19,21 +18,10 @@ if TYPE_CHECKING:
     from ._array_display_model import ArrayDisplayModel
     from ._data_wrapper import DataWrapper
 
-__all__ = [
-    "DataRequest",
-    "DataResponse",
-    "ResolvedDisplayState",
-    "build_slice_requests",
-    "process_request",
-    "resolve",
-]
-
-SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
-
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, **SLOTS)
+@dataclass(frozen=True, slots=True)
 class DataRequest:
     """Request object for data slicing."""
 
@@ -44,7 +32,7 @@ class DataRequest:
     channel_mode: ChannelMode
 
 
-@dataclass(frozen=True, **SLOTS)
+@dataclass(frozen=True, slots=True)
 class DataResponse:
     """Response object for data requests."""
 
@@ -53,7 +41,7 @@ class DataResponse:
     request: DataRequest | None = None
 
 
-@dataclass(frozen=True, **SLOTS)
+@dataclass(frozen=True, slots=True)
 class ResolvedDisplayState:
     """Frozen snapshot of resolved display state.
 
@@ -119,33 +107,29 @@ def _norm_current_index(
     by giving priority to non-integer keys and logging a warning.
     Does NOT mutate the model.
     """
-    output: MutableMapping[int, int | slice] = {}
-    rev_map: dict[int, Hashable] = {}
+    output: dict[int, int | slice] = {}
+    source_key: dict[int, Hashable] = {}  # tracks which original key wrote each entry
 
     for key, val in model.current_index.items():
-        normed_key = wrapper.normalize_axis_key(key)
-        if normed_key in output:
-            was_already_normed = normed_key == key
-            if was_already_normed:
-                original_key = rev_map[normed_key]
-            else:
-                original_key = key
-
+        normed = wrapper.normalize_axis_key(key)
+        if normed in output:
+            # prefer named keys (e.g. "Z") over raw integer keys
+            is_raw_int = normed == key
+            winner = source_key[normed] if is_raw_int else key
             logger.warning(
                 "Axis key %r normalized to %r, which is also in current_index. "
                 "Using %r value.",
-                original_key,
-                normed_key,
-                original_key,
+                winner,
+                normed,
+                winner,
             )
-            if was_already_normed:
-                # priority goes to NON-normed keys (e.g. "Z" over 0)
+            if is_raw_int:
                 continue
 
-        output[normed_key] = val
-        rev_map[normed_key] = key
+        output[normed] = val
+        source_key[normed] = key
 
-    return dict(output)
+    return output
 
 
 def _norm_data_coords(wrapper: DataWrapper) -> dict[int, tuple]:
@@ -163,23 +147,13 @@ def _compute_hidden_sliders(
     wrapper: DataWrapper,
 ) -> frozenset[Hashable]:
     """Compute the set of slider keys to hide."""
-    hidden_indices: set[int] = set(visible_axes)
-
+    hidden: set[int] = set(visible_axes)
     if channel_mode.is_multichannel() and channel_axis is not None:
-        hidden_indices.add(channel_axis)
-
+        hidden.add(channel_axis)
     # hide singleton axes
-    for ax, coord in data_coords.items():
-        if len(coord) < 2:
-            hidden_indices.add(ax)
-
-    # also add non-normalized dim names so sliders are hidden
-    # regardless of how they were expressed
-    hidden_sliders: set[Hashable] = set(hidden_indices)
-    for hidden in list(hidden_indices):
-        hidden_sliders.add(wrapper.dims[hidden])
-
-    return frozenset(hidden_sliders)
+    hidden.update(ax for ax, coord in data_coords.items() if len(coord) < 2)
+    # include dim names so sliders hide regardless of key form
+    return frozenset(hidden | {wrapper.dims[ax] for ax in hidden})
 
 
 def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplayState:
@@ -255,11 +229,11 @@ def process_request(req: DataRequest) -> DataResponse:
 
     if req.channel_mode == ChannelMode.RGBA:
         data_response["RGB"] = data.transpose(*t_dims).squeeze()
-    elif req.channel_axis is None:
+    elif ch_ax is None:
         data_response[None] = data.transpose(*t_dims).squeeze()
     else:
-        for i in range(data.shape[req.channel_axis]):
-            ch_keepdims = (slice(None),) * cast("int", ch_ax) + (i,) + (None,)
+        for i in range(data.shape[ch_ax]):
+            ch_keepdims = (slice(None),) * ch_ax + (i,) + (None,)
             ch_data = data[ch_keepdims]
             data_response[i] = ch_data.transpose(*t_dims).squeeze()
 
