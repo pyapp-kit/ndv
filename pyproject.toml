@@ -7,19 +7,13 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 source = "vcs"
 
-# read more about configuring hatch at:
-# https://hatch.pypa.io/latest/config/build/
-[tool.hatch.build.targets.wheel]
-only-include = ["src"]
-sources = ["src"]
-
 # https://peps.python.org/pep-0621/
 [project]
 name = "ndv"
 dynamic = ["version"]
 description = "Simple, fast-loading, n-dimensional array viewer, with minimal dependencies."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "BSD-3-Clause" }
 authors = [
     { name = "Talley Lambert", email = "talley.lambert@gmail.com" },
@@ -29,7 +23,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -39,9 +32,9 @@ classifiers = [
 dependencies = [
     "cmap >=0.3",
     "numpy >=1.23",
-    "psygnal >=0.10",
-    "pydantic >=2.9",
-    "typing_extensions >= 4.0",
+    "psygnal >=0.12",
+    "pydantic >=2.10",
+    "typing_extensions >= 4.10",
 ]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
@@ -53,12 +46,7 @@ jupyter = [
     "jupyter_rfb >=0.3.3",
     "glfw >=2.4",
 ]
-pyqt = [
-    "pyqt6 >=6.4,!=6.6",
-    "pyqt6 >=6.5.3; python_version >= '3.12'",
-    "qtpy >=2",
-    "superqt[iconify] >=0.7.2",
-]
+pyqt = ["pyqt6 >=6.7", "qtpy >=2", "superqt[iconify] >=0.7.2"]
 pyside = [
     # defer to superqt's pyside6 restrictions
     "superqt[iconify,pyside6] >=0.7.2,<0.7.5",
@@ -74,7 +62,7 @@ wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
-pygfx = ["pygfx>=0.8.0"]
+pygfx = ["pygfx==0.9.0", "rendercanvas ==2.0.1", "wgpu==0.19.3"]
 
 # ready to go bundles with pygfx
 qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
@@ -113,13 +101,14 @@ dev = [
     "ipykernel>=6.29.5",
     "ipython>=8.18.1",
     "mypy>=1.14.1",
-    "pdbpp>=0.10.3 ; sys_platform != 'win32'",
-    "pre-commit>=4.1.0",
+    "pdbpp>=0.12.1 ; sys_platform != 'win32'",
+    "prek>=0.3.4",
+    "pydevd>=3.4.1",
+    "pyright>=1.1.404",
+    "pytest-xdist>=3.8.0",
     "rich>=13.9.4",
     "ruff>=0.9.4",
-    "pyright>=1.1.404",
-    "types-wxpython",
-    "pydevd",
+    "types-wxpython>=0.9.7",
 ]
 docs = [
     "mkdocs >=1.6.1",
@@ -140,7 +129,7 @@ ndv = { workspace = true }
 # https://docs.astral.sh/ruff
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py310"
 src = ["src"]
 fix = true
 unsafe-fixes = true
