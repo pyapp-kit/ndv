@@ -3145,6 +3145,14 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+io = [
+    { name = "imageio", extra = ["tifffile"] },
+    { name = "tensorstore", version = "0.1.69", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "tensorstore", version = "0.1.71", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "zarr", version = "2.18.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "zarr", version = "2.18.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "zarr", version = "2.18.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
 jup = [
     { name = "glfw" },
     { name = "imageio", extra = ["tifffile"] },
@@ -3152,6 +3160,11 @@ jup = [
     { name = "jupyter" },
     { name = "jupyter-rfb" },
     { name = "pygfx" },
+    { name = "tensorstore", version = "0.1.69", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "tensorstore", version = "0.1.71", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "zarr", version = "2.18.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "zarr", version = "2.18.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "zarr", version = "2.18.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 jupyter = [
     { name = "glfw" },
@@ -3180,6 +3193,11 @@ qt = [
     { name = "pyqt6" },
     { name = "qtpy" },
     { name = "superqt", extra = ["iconify"] },
+    { name = "tensorstore", version = "0.1.69", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "tensorstore", version = "0.1.71", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "zarr", version = "2.18.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "zarr", version = "2.18.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "zarr", version = "2.18.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 vispy = [
     { name = "pyopengl" },
@@ -3189,7 +3207,12 @@ wx = [
     { name = "imageio", extra = ["tifffile"] },
     { name = "pyconify" },
     { name = "pygfx" },
+    { name = "tensorstore", version = "0.1.69", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "tensorstore", version = "0.1.71", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "wxpython" },
+    { name = "zarr", version = "2.18.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "zarr", version = "2.18.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "zarr", version = "2.18.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 wxpython = [
     { name = "pyconify" },
@@ -3262,6 +3285,7 @@ requires-dist = [
     { name = "cmap", specifier = ">=0.3" },
     { name = "glfw", marker = "extra == 'jup'", specifier = ">=2.4" },
     { name = "glfw", marker = "extra == 'jupyter'", specifier = ">=2.4" },
+    { name = "imageio", extras = ["tifffile"], marker = "extra == 'io'", specifier = ">=2.20" },
     { name = "imageio", extras = ["tifffile"], marker = "extra == 'jup'", specifier = ">=2.20" },
     { name = "imageio", extras = ["tifffile"], marker = "extra == 'qt'", specifier = ">=2.20" },
     { name = "imageio", extras = ["tifffile"], marker = "extra == 'wx'", specifier = ">=2.20" },
@@ -3296,12 +3320,20 @@ requires-dist = [
     { name = "superqt", extras = ["iconify"], marker = "extra == 'pyqt'", specifier = ">=0.7.2" },
     { name = "superqt", extras = ["iconify"], marker = "extra == 'qt'", specifier = ">=0.7.2" },
     { name = "superqt", extras = ["iconify", "pyside6"], marker = "extra == 'pyside'", specifier = ">=0.7.2,<0.7.5" },
+    { name = "tensorstore", marker = "extra == 'io'", specifier = ">=0.1.69,!=0.1.72" },
+    { name = "tensorstore", marker = "extra == 'jup'", specifier = ">=0.1.69,!=0.1.72" },
+    { name = "tensorstore", marker = "extra == 'qt'", specifier = ">=0.1.69,!=0.1.72" },
+    { name = "tensorstore", marker = "extra == 'wx'", specifier = ">=0.1.69,!=0.1.72" },
     { name = "typing-extensions", specifier = ">=4.0" },
     { name = "vispy", marker = "extra == 'vispy'", specifier = ">=0.14.3" },
     { name = "wxpython", marker = "extra == 'wx'", specifier = ">=4.2.2" },
     { name = "wxpython", marker = "extra == 'wxpython'", specifier = ">=4.2.2" },
+    { name = "zarr", marker = "extra == 'io'", specifier = ">2,<3" },
+    { name = "zarr", marker = "extra == 'jup'", specifier = ">2,<3" },
+    { name = "zarr", marker = "extra == 'qt'", specifier = ">2,<3" },
+    { name = "zarr", marker = "extra == 'wx'", specifier = ">2,<3" },
 ]
-provides-extras = ["jup", "jupyter", "pygfx", "pyqt", "pyside", "qt", "vispy", "wx", "wxpython"]
+provides-extras = ["io", "jup", "jupyter", "pygfx", "pyqt", "pyside", "qt", "vispy", "wx", "wxpython"]
 
 [package.metadata.requires-dev]
 array-libs = [

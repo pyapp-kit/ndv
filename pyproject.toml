@@ -44,6 +44,9 @@ dependencies = [
     "typing_extensions >= 4.0",
 ]
 
+[project.scripts]
+ndv = "ndv.cli:main"
+
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
@@ -76,10 +79,13 @@ wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
 pygfx = ["pygfx>=0.8.0"]
 
+# opinionated image reading support
+io = ["imageio[tifffile] >=2.20", "zarr >2,<3", "tensorstore>=0.1.69,!=0.1.72"]
+
 # ready to go bundles with pygfx
-qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
-jup = ["ndv[pygfx,jupyter]", "imageio[tifffile] >=2.20"]
-wx = ["ndv[pygfx,wxpython]", "imageio[tifffile] >=2.20"]
+qt = ["ndv[pygfx,pyqt,io]"]
+jup = ["ndv[pygfx,jupyter,io]"]
+wx = ["ndv[pygfx,wxpython,io]"]
 
 
 [project.urls]
