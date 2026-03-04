@@ -23,11 +23,19 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
 
         return rendercanvas.jupyter.JupyterRenderCanvas  # type: ignore[no-any-return]
     if frontend == GuiFrontend.WX:
-        # ...still not working
-        # import rendercanvas.wx
-        # return rendercanvas.wx.WxRenderWidget
-        from wgpu.gui.wx import WxWgpuCanvas
+        import rendercanvas.wx
+        import wx
 
-        return WxWgpuCanvas  # type: ignore[no-any-return]
+        class WxRenderWidget(rendercanvas.wx.WxRenderWidget):
+            """Ensure the widget always has a parent to avoid segfaults."""
+
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                if "parent" not in kwargs and (not args or args[0] is None):
+                    # wx.Window segfaults on Reparent if created without
+                    # a parent, so use a temporary hidden frame.
+                    kwargs["parent"] = wx.Frame(None)
+                super().__init__(*args, **kwargs)
+
+        return WxRenderWidget
 
     raise ValueError(f"Unsupported frontend: {frontend}")  # pragma: no cover

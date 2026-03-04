@@ -346,6 +346,7 @@ def process_events() -> None:
 
 def run_app() -> None:
     """Start the active GUI application event loop."""
+    print("running")
     ndv_app().run()
 
 
