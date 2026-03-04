@@ -95,7 +95,10 @@ class ArrayViewer:
 
         app = _app.gui_frontend()
 
-        # whether to fetch data asynchronously
+        # whether to fetch data asynchronously.  Not publicly exposed yet...
+        # but can use 'NDV_SYNCHRONOUS' env var to set globally
+        # jupyter doesn't need async because it's already async (in that the
+        # GUI is already running in JS)
         NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
         self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
         # set of futures for data requests
@@ -105,6 +108,7 @@ class ArrayViewer:
         self._future_generations: dict[Future, int] = {}
 
         # mapping of channel keys to their respective controllers
+        # where None is the default channel
         self._lut_controllers: dict[ChannelKey, ChannelController] = {}
 
         # get and create the front-end and canvas classes
@@ -174,6 +178,7 @@ class ArrayViewer:
         """Return data being displayed."""
         if self._data_wrapper is None:
             return None  # pragma: no cover
+        # returning the actual data, not the wrapper
         return self._data_wrapper.data
 
     @data.setter
@@ -205,9 +210,11 @@ class ArrayViewer:
     @roi.setter
     def roi(self, roi_model: RectangularROIModel | None) -> None:
         """Set ROI being displayed."""
+        # Disconnect old model
         if self._roi_model is not None:
             self._set_roi_model_connected(self._roi_model, False)
 
+        # Connect new model
         if isinstance(roi_model, tuple):
             self._roi_model = RectangularROIModel(bounding_box=roi_model)
         else:
@@ -229,7 +236,12 @@ class ArrayViewer:
         self._view.set_visible(False)
 
     def clone(self) -> ArrayViewer:
-        """Return a new ArrayViewer instance with the same data and display model."""
+        """Return a new ArrayViewer instance with the same data and display model.
+
+        Currently, this is a shallow copy.  Modifying one viewer will affect the state
+        of the other.
+        """
+        # TODO: provide deep_copy option
         return ArrayViewer(self._data_wrapper, display_model=self.display_model)
 
     # --------------------- PRIVATE ------------------------------------------
@@ -238,7 +250,12 @@ class ArrayViewer:
     def _default_display_model(
         data: None | DataWrapper, **kwargs: Unpack[ArrayDisplayModelKwargs]
     ) -> ArrayDisplayModel:
-        """Create a default ArrayDisplayModel when none is provided."""
+        """
+        Creates a default ArrayDisplayModel when none is provided by the user.
+
+        All magical setup goes here.
+        """
+        # Can't do any magic with no data
         if data is None:
             return ArrayDisplayModel(**kwargs)
 
@@ -281,15 +298,20 @@ class ArrayViewer:
             self._ensure_channel_axis()
 
     def _add_histogram(self, channel: ChannelKey = None) -> None:
-        histogram_cls = _app.get_histogram_canvas_class()
+        histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
         if ctrl := self._lut_controllers.get(channel, None):
+            # Add histogram to ArrayView for display
             self._view.add_histogram(channel, hist)
+            # Add histogram to channel controller for updates
             ctrl.add_lut_view(hist)
+            # Compute histogram from the (first) image handle.
+            # TODO: Compute histogram from all image handles
             if handles := ctrl.handles:
                 data = handles[0].data()
                 counts, edges = _calc_hist_bins(data)
                 hist.set_data(counts, edges)
+            # Reset camera view (accounting for data)
             hist.set_range()
 
         self._histograms[channel] = hist
@@ -312,21 +334,33 @@ class ArrayViewer:
     def _set_model_connected(
         self, model: ArrayDisplayModel, connect: bool = True
     ) -> None:
-        """Connect or disconnect the model to/from the viewer."""
+        """Connect or disconnect the model to/from the viewer.
+
+        We do this in a single method so that we are sure to connect and disconnect
+        the same events in the same order.  (but it's kinda ugly)
+        """
         _connect = "connect" if connect else "disconnect"
 
         for obj, callback in [
             (model.events.visible_axes, self._on_model_visible_axes_changed),
             (model.events.channel_axis, self._on_model_channel_axis_changed),
+            # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._on_model_current_index_changed),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
+            # TODO: lut values themselves are mutable evented objects...
+            # so we need to connect to their events as well
+            # (model.luts.value_changed, ...),
         ]:
             getattr(obj, _connect)(callback)
 
     def _set_roi_model_connected(
         self, model: RectangularROIModel, connect: bool = True
     ) -> None:
-        """Connect or disconnect the ROI model."""
+        """Connect or disconnect the model to/from the viewer.
+
+        We do this in a single method so that we are sure to connect and disconnect
+        the same events in the same order.  (but it's kinda ugly)
+        """
         _connect = "connect" if connect else "disconnect"
 
         for obj, callback in [
@@ -427,6 +461,7 @@ class ArrayViewer:
             self._view.hide_sliders(self._resolved.hidden_sliders, show_remainder=True)
             if cur_index := self._display_model.current_index:
                 self._view.set_current_index(cur_index)
+            # reconcile view sliders with model
             self._on_view_current_index_changed()
             self._view.set_data_info(self._resolved.summary_info)
             self._clear_canvas()
@@ -475,23 +510,32 @@ class ArrayViewer:
 
     def _on_interaction_mode_changed(self, mode: InteractionMode) -> None:
         if mode == InteractionMode.CREATE_ROI:
+            # Create ROI model if needed to store ROI state
             if self.roi is None:
                 self.roi = RectangularROIModel(visible=False)
+
+            # Create a new ROI
             self._create_roi_view()
 
     def _create_roi_view(self) -> None:
+        # Remove old ROI view
+        # TODO: Enable multiple ROIs
         if self._roi_view:
             self._roi_view.remove()
 
+        # Create new ROI view
         self._roi_view = self._canvas.add_bounding_box()
+        # Connect view signals
         self._roi_view.boundingBoxChanged.connect(
             self._on_roi_view_bounding_box_changed
         )
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
+            # self._view.remove_lut_view(lut_ctrl.lut_view)
             while lut_ctrl.handles:
                 lut_ctrl.handles.pop().remove()
+        # do we need to cleanup the lut views themselves?
 
     # ------------------ View callbacks ------------------
 
@@ -538,6 +582,7 @@ class ArrayViewer:
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
         self._highlight_pos = (int(x), int(y))
 
+        # update highlight display
         channel_values = self._get_values_at_world_point(*self._highlight_pos)
         self._highlight_values(channel_values, self._highlight_pos)
 
@@ -557,10 +602,13 @@ class ArrayViewer:
         canvas_pos: tuple[float, float] | None = None,
     ) -> None:
         """Highlights the given values for each channel."""
+        # Update highlight each histogram. If the histogram channel is not present
+        # in channel_values, the highlight will be set to None (i.e. hidden)
         for ch, hist in self._histograms.items():
             hist.highlight(channel_values.get(ch, None))
 
         if not channel_values:
+            # clear hover info if no values found
             self._view.set_hover_info("")
         else:
             if canvas_pos is not None:
@@ -584,7 +632,11 @@ class ArrayViewer:
     # 5. when the future resolves, `_on_data_response_ready` draws the response.
 
     def _request_data(self) -> None:
-        """Fetch and update the displayed data."""
+        """Fetch and update the displayed data.
+
+        This is called (frequently) when anything changes that requires a redraw.
+        It fetches the current data slice from the model and updates the image handle.
+        """
         if not self._data_wrapper:
             return  # pragma: no cover
 
@@ -608,11 +660,11 @@ class ArrayViewer:
             self._viewer_model.show_progress_spinner = True
 
     def _is_idle(self) -> bool:
-        """Return True if no futures are running."""
+        """Return True if no futures are running. Used for testing, and debugging."""
         return all(f.done() for f in self._futures)
 
     def _join(self) -> None:
-        """Block until all futures are done."""
+        """Block until all futures are done. Used for testing, and debugging."""
         for future in self._futures:
             future.result()
 
@@ -625,6 +677,9 @@ class ArrayViewer:
 
     @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
+        # NOTE: removing the reference to the last future here is important
+        # because the future has a reference to this widget in its _done_callbacks
+        # which will prevent the widget from being garbage collected if the future
         self._futures.discard(future)
         gen = self._future_generations.pop(future, -1)
         if not self._futures:
@@ -648,6 +703,8 @@ class ArrayViewer:
                 elif key in self._display_model.luts:
                     model = self._display_model.luts[key]
                 else:
+                    # we received a new channel key that has not been set in the model
+                    # so we create a new LUT model for it
                     model = self._display_model.luts[key] = LUTModel()
 
                 lut_views = [self._view.add_lut_view(key)]
@@ -661,6 +718,7 @@ class ArrayViewer:
                 self._update_channel_dtype(key)
 
             if not lut_ctrl.handles:
+                # we don't yet have any handles for this channel
                 if response.n_visible_axes == 2:
                     handle = self._canvas.add_image(data)
                     lut_ctrl.add_handle(handle)
@@ -672,15 +730,19 @@ class ArrayViewer:
                 lut_ctrl.update_texture_data(data)
 
             if hist := self._histograms.get(key, None):
+                # TODO: once data comes in in chunks, we'll need a proper stateful
+                # stats object that calculates the histogram incrementally
                 counts, bin_edges = _calc_hist_bins(data)
                 hist.set_data(counts, bin_edges)
 
         self._canvas.refresh()
+        # update highlight display
         if self._highlight_pos is not None:
             channel_values = self._get_values_at_world_point(*self._highlight_pos)
             self._highlight_values(channel_values, self._highlight_pos)
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
+        # TODO: handle 3D data
         if (x < 0 or y < 0) or len(
             self._resolved.visible_axes
         ) != 2:  # pragma: no cover
@@ -689,6 +751,7 @@ class ArrayViewer:
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
             if (value := ctrl.get_value_at_index((y, x))) is not None:
+                # Handle RGB
                 if key == "RGB" and isinstance(value, np.ndarray):
                     values["R"] = value[0]
                     values["G"] = value[1]
