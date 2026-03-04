@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from concurrent.futures import Future
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -12,6 +13,7 @@ from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
     DataResponse,
+    ResolvedDisplayState,
     build_slice_requests,
     process_request,
     resolve,
@@ -21,7 +23,6 @@ from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
 
 if TYPE_CHECKING:
-    from concurrent.futures import Future
     from typing import Any, Unpack
 
     import numpy.typing as npt
@@ -288,14 +289,12 @@ class ArrayViewer:
         """Handle channel axis side-effects of mode changes."""
         if mode == ChannelMode.GRAYSCALE:
             self._display_model.channel_axis = None
-        elif mode == ChannelMode.RGBA:
-            if len(self._display_model.visible_axes) > 2:
-                warnings.warn("Cannot use RGBA mode with 3D view", stacklevel=2)
-                self._display_model.channel_mode = ChannelMode.GRAYSCALE
-                return
-            self._ensure_channel_axis()
-        else:
-            self._ensure_channel_axis()
+            return
+        if mode == ChannelMode.RGBA and len(self._display_model.visible_axes) > 2:
+            warnings.warn("Cannot use RGBA mode with 3D view", stacklevel=2)
+            self._display_model.channel_mode = ChannelMode.GRAYSCALE
+            return
+        self._ensure_channel_axis()
 
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
@@ -342,10 +341,10 @@ class ArrayViewer:
         _connect = "connect" if connect else "disconnect"
 
         for obj, callback in [
-            (model.events.visible_axes, self._on_model_visible_axes_changed),
-            (model.events.channel_axis, self._on_model_channel_axis_changed),
+            (model.events.visible_axes, self._re_resolve),
+            (model.events.channel_axis, self._re_resolve),
             # the current_index attribute itself is immutable
-            (model.current_index.value_changed, self._on_model_current_index_changed),
+            (model.current_index.value_changed, self._re_resolve),
             (model.events.channel_mode, self._on_model_channel_mode_changed),
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
@@ -390,18 +389,9 @@ class ArrayViewer:
             self._resolving = False
 
     def _apply_changes(
-        self,
-        old: object,
-        new: object,
+        self, old: ResolvedDisplayState, new: ResolvedDisplayState
     ) -> None:
         """Apply diff between old and new resolved state to the view."""
-        from ndv.models._resolve import ResolvedDisplayState
-
-        if not isinstance(old, ResolvedDisplayState):
-            return
-        if not isinstance(new, ResolvedDisplayState):
-            return
-
         with self._view.currentIndexChanged.blocked():
             if old.channel_mode != new.channel_mode:
                 self._view.set_channel_mode(new.channel_mode)
@@ -484,15 +474,6 @@ class ArrayViewer:
         if self.roi is not None:
             self._on_roi_model_bounding_box_changed(self.roi.bounding_box)
             self._on_roi_model_visible_changed(self.roi.visible)
-
-    def _on_model_visible_axes_changed(self) -> None:
-        self._re_resolve()
-
-    def _on_model_channel_axis_changed(self) -> None:
-        self._re_resolve()
-
-    def _on_model_current_index_changed(self) -> None:
-        self._re_resolve()
 
     def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._reconcile_channel_mode(mode)
@@ -645,12 +626,11 @@ class ArrayViewer:
         gen = self._request_generation
 
         for req in build_slice_requests(self._resolved, self._data_wrapper):
+            future: Future[DataResponse]
             if self._async:
-                future: Future[DataResponse] = _app.submit_task(process_request, req)
+                future = _app.submit_task(process_request, req)
             else:
-                from concurrent.futures import Future as _Future
-
-                future = _Future()
+                future = Future()
                 future.set_result(process_request(req))
             self._futures.add(future)
             self._future_generations[future] = gen
@@ -743,9 +723,8 @@ class ArrayViewer:
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
-        if (x < 0 or y < 0) or len(
-            self._resolved.visible_axes
-        ) != 2:  # pragma: no cover
+        n_vis = len(self._resolved.visible_axes)
+        if x < 0 or y < 0 or n_vis != 2:  # pragma: no cover
             return {}
 
         values: dict[ChannelKey, float] = {}
