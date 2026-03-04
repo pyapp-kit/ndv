@@ -31,7 +31,8 @@ classifiers = [
 ]
 dependencies = [
     "cmap >=0.3",
-    "numpy >=1.23",
+    "numpy >=2.1.0; python_version >= '3.13'",
+    "numpy >=1.26.0; python_version >= '3.12'",
     "psygnal >=0.12",
     "pydantic >=2.10",
     "typing_extensions >= 4.10",
@@ -52,7 +53,7 @@ pyside = [
     "superqt[iconify,pyside6] >=0.7.2,<0.7.5",
     # https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 ==6.6.3; sys_platform == 'win32'",
-    "numpy >=1.23,<2; sys_platform == 'win32'",                            # needed for pyside6.6
+    "numpy >=1.23,<2; sys_platform == 'win32' and python_version < '3.13'",                            # needed for pyside6.6
     "pyside6 >=6.4",
     "pyside6 >=6.6; python_version >= '3.12' and sys_platform == 'win32'",
     "pyside6 >=6.7; python_version >= '3.12' and sys_platform != 'win32'",
@@ -79,7 +80,6 @@ array-libs = [
     "aiohttp>=3.11.11",
     "dask[array]>=2024.8.0",
     "jax[cpu]>=0.4.30",
-    "numpy>=1.23",
     "pooch>=1.8.2",
     "pyopencl>=2025.1",
     "pyopencl[pocl]>=2025.1 ; sys_platform == 'linux'",
