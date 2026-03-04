@@ -285,17 +285,6 @@ class ArrayViewer:
                 if normed_guess not in normed_vis:
                     self._display_model.channel_axis = guess
 
-    def _reconcile_channel_mode(self, mode: ChannelMode) -> None:
-        """Handle channel axis side-effects of mode changes."""
-        if mode == ChannelMode.GRAYSCALE:
-            self._display_model.channel_axis = None
-            return
-        if mode == ChannelMode.RGBA and len(self._display_model.visible_axes) > 2:
-            warnings.warn("Cannot use RGBA mode with 3D view", stacklevel=2)
-            self._display_model.channel_mode = ChannelMode.GRAYSCALE
-            return
-        self._ensure_channel_axis()
-
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
@@ -343,9 +332,8 @@ class ArrayViewer:
         for obj, callback in [
             (model.events.visible_axes, self._re_resolve),
             (model.events.channel_axis, self._re_resolve),
-            # the current_index attribute itself is immutable
             (model.current_index.value_changed, self._re_resolve),
-            (model.events.channel_mode, self._on_model_channel_mode_changed),
+            (model.events.channel_mode, self._re_resolve),
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
             # (model.luts.value_changed, ...),
@@ -378,10 +366,12 @@ class ArrayViewer:
 
     def _re_resolve(self) -> None:
         """Resolve display state and apply changes."""
+        # guard against nested calls (_ensure_channel_axis may mutate the model)
         if self._resolving or self._data_wrapper is None:
             return
         self._resolving = True
         try:
+            self._ensure_channel_axis()
             old = self._resolved
             self._resolved = resolve(self._display_model, self._data_wrapper)
             self._apply_changes(old, self._resolved)
@@ -436,12 +426,12 @@ class ArrayViewer:
         # Always push channel mode, even without data
         self._view.set_channel_mode(self._display_model.channel_mode)
         if self._data_wrapper is not None:
-            # Reconcile channel axis for the current mode before resolving.
+            # Guess channel_axis from data if the current mode needs one.
             # Use the _resolving guard to prevent nested re-resolves from
-            # the channel_axis/channel_mode changes that _reconcile triggers.
+            # any model mutations that _ensure_channel_axis triggers.
             self._resolving = True
             try:
-                self._reconcile_channel_mode(self._display_model.channel_mode)
+                self._ensure_channel_axis()
             finally:
                 self._resolving = False
             with self._view.currentIndexChanged.blocked():
@@ -474,10 +464,6 @@ class ArrayViewer:
         if self.roi is not None:
             self._on_roi_model_bounding_box_changed(self.roi.bounding_box)
             self._on_roi_model_visible_changed(self.roi.visible)
-
-    def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
-        self._reconcile_channel_mode(mode)
-        self._re_resolve()
 
     def _on_roi_model_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]

@@ -214,4 +214,17 @@ class ArrayDisplayModel(NDVModel):
                 stacklevel=2,
             )
             self.channel_axis = None
+
+        # GRAYSCALE mode has no channel axis
+        if self.channel_mode == ChannelMode.GRAYSCALE and self.channel_axis is not None:
+            self.channel_axis = None
+
+        # RGBA mode is not supported with 3D views
+        if self.channel_mode == ChannelMode.RGBA and len(self.visible_axes) > 2:
+            warnings.warn(
+                "Cannot use RGBA mode with 3D view",
+                stacklevel=2,
+            )
+            self.channel_mode = ChannelMode.GRAYSCALE
+
         return self
