@@ -185,7 +185,7 @@ ignore_missing_imports = true
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
 [tool.pyright]
 include = ["src"]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 enableExperimentalFeatures = true
 # reportMissingImports = false
 reportOptionalMemberAccess = "none"

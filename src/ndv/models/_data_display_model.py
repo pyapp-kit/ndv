@@ -1,5 +1,4 @@
 import logging
-import sys
 from collections.abc import (
     Hashable,
     Iterator,
@@ -23,12 +22,11 @@ from ._data_wrapper import DataWrapper
 
 __all__ = ["DataRequest", "DataResponse", "_ArrayDataDisplayModel"]
 
-SLOTS = {"slots": True} if sys.version_info >= (3, 10) else {}
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, **SLOTS)
+@dataclass(frozen=True, slots=True)
 class DataRequest:
     """Request object for data slicing."""
 
@@ -39,7 +37,7 @@ class DataRequest:
     channel_mode: ChannelMode
 
 
-@dataclass(frozen=True, **SLOTS)
+@dataclass(frozen=True, slots=True)
 class DataResponse:
     """Response object for data requests.
 
