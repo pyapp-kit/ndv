@@ -269,21 +269,26 @@ class ArrayViewer:
         return ArrayDisplayModel(**kwargs)
 
     def _ensure_channel_axis(self) -> None:
-        """Guess and set channel_axis if mode requires it and it's not set."""
-        if self._display_model.channel_axis is None and self._data_wrapper is not None:
-            guess = self._data_wrapper.guess_channel_axis()
-            if guess is not None:
-                # check it's not in visible_axes
-                try:
-                    normed_guess = self._data_wrapper.normalize_axis_key(guess)
-                except Exception:
-                    return
-                normed_vis = tuple(
-                    self._data_wrapper.normalize_axis_key(ax)
-                    for ax in self._display_model.visible_axes
-                )
-                if normed_guess not in normed_vis:
-                    self._display_model.channel_axis = guess
+        """Guess and set channel_axis if a multichannel mode needs one."""
+        if (
+            self._display_model.channel_mode == ChannelMode.GRAYSCALE
+            or self._display_model.channel_axis is not None
+            or self._data_wrapper is None
+        ):
+            return
+        guess = self._data_wrapper.guess_channel_axis()
+        if guess is not None:
+            # check it's not in visible_axes
+            try:
+                normed_guess = self._data_wrapper.normalize_axis_key(guess)
+            except Exception:
+                return
+            normed_vis = tuple(
+                self._data_wrapper.normalize_axis_key(ax)
+                for ax in self._display_model.visible_axes
+            )
+            if normed_guess not in normed_vis:
+                self._display_model.channel_axis = guess
 
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
@@ -426,7 +431,7 @@ class ArrayViewer:
         # Always push channel mode, even without data
         self._view.set_channel_mode(self._display_model.channel_mode)
         if self._data_wrapper is not None:
-            # Guess channel_axis from data if the current mode needs one.
+            # Guess channel_axis from data if needed before resolving.
             # Use the _resolving guard to prevent nested re-resolves from
             # any model mutations that _ensure_channel_axis triggers.
             self._resolving = True
