@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Callable, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
 
 import cmap as _cmap
@@ -24,11 +24,11 @@ from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROI
 from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
+    from typing import TypeAlias
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
-    from typing_extensions import TypeAlias
     from wgpu.gui.jupyter import JupyterWgpuCanvas
     from wgpu.gui.qt import QWgpuCanvas
     from wgpu.gui.wx import WxWgpuCanvas

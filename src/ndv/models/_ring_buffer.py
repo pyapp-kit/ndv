@@ -37,7 +37,8 @@ import numpy as np
 from psygnal import Signal
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, SupportsIndex
+    from collections.abc import Callable
+    from typing import Any, SupportsIndex
 
     import numpy.typing as npt
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from qtpy.QtCore import QEvent, QObject, Qt, QTimer
 from qtpy.QtGui import QMouseEvent
@@ -17,7 +17,7 @@ from ndv._types import (
 from ndv.views.bases._app import NDVApp
 
 if TYPE_CHECKING:
-    from collections.abc import Container
+    from collections.abc import Callable, Container
     from concurrent.futures import Future
 
     from ndv.views.bases import ArrayView

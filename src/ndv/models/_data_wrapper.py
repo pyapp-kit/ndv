@@ -20,7 +20,7 @@ from ._ring_buffer import RingBuffer
 
 if TYPE_CHECKING:
     from collections.abc import Container, Iterator
-    from typing import Any, Union
+    from typing import Any, TypeAlias, TypeGuard
 
     import dask.array.core as da
     import numpy.typing as npt
@@ -31,9 +31,8 @@ if TYPE_CHECKING:
     import torch
     import xarray as xr
     from pydantic import GetCoreSchemaHandler
-    from typing_extensions import TypeAlias, TypeGuard
 
-    Index: TypeAlias = Union[int, slice]
+    Index: TypeAlias = int | slice
 
 
 class SupportsIndexing(Protocol):
@@ -142,7 +141,7 @@ class DataWrapper(Generic[ArrayT], ABC):
 
         dims = self.dims
         # type ignore is asserted in the __init__ method
-        return {i: range(s) for i, s in zip(dims, self._data.shape)}  # type: ignore [attr-defined]
+        return {i: range(s) for i, s in zip(dims, self._data.shape, strict=False)}  # type: ignore [attr-defined]
 
     def isel(self, index: Mapping[int, int | slice]) -> np.ndarray:
         """Return a slice of the data as a numpy array.
@@ -440,7 +439,8 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
         else:
             self._dims = tuple(range(len(self._data.domain)))
         self._coords: Mapping[Hashable, Sequence] = {
-            i: range(s) for i, s in zip(self._dims, self._data.domain.shape)
+            i: range(s)
+            for i, s in zip(self._dims, self._data.domain.shape, strict=False)
         }
 
     @property
@@ -459,7 +459,7 @@ class TensorstoreWrapper(DataWrapper["ts.TensorStore"]):
         return self._coords
 
     def sizes(self) -> Mapping[Hashable, int]:
-        return dict(zip(self._dims, self._data.domain.shape))
+        return dict(zip(self._dims, self._data.domain.shape, strict=False))
 
     def isel(self, indexers: Mapping[int, int | slice]) -> np.ndarray:
         if not indexers:
@@ -484,7 +484,7 @@ class TorchTensorWrapper(DataWrapper["torch.Tensor"]):
     @property
     def coords(self) -> Mapping[Hashable, Sequence]:
         dims = self.dims
-        return {i: range(s) for i, s in zip(dims, self.data.shape)}
+        return {i: range(s) for i, s in zip(dims, self.data.shape, strict=False)}
 
     @property
     def dims(self) -> tuple[Hashable, ...]:

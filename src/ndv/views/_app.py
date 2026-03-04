@@ -5,10 +5,10 @@ import os
 import sys
 from enum import Enum
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from concurrent.futures import Future
     from typing import Literal
 

@@ -1,12 +1,11 @@
-from collections.abc import Sequence
-from typing import Any, Callable, Protocol, SupportsIndex, Union, cast
+from collections.abc import Callable, Sequence
+from typing import Any, Protocol, SupportsIndex, TypeAlias, cast
 
 import numpy as np
 import numpy.typing as npt
 from pydantic_core import core_schema
-from typing_extensions import TypeAlias
 
-_ShapeLike: TypeAlias = Union[SupportsIndex, Sequence[SupportsIndex]]
+_ShapeLike: TypeAlias = SupportsIndex | Sequence[SupportsIndex]
 
 
 class Reducer(Protocol):
@@ -42,7 +41,7 @@ def _str_to_callable(obj: Any) -> Callable:
     return cast("Callable", obj)
 
 
-def _callable_to_str(obj: Union[str, Callable]) -> str:
+def _callable_to_str(obj: str | Callable) -> str:
     """Serialize a callable to a string."""
     if isinstance(obj, str):
         return obj

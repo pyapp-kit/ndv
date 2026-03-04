@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, MutableMapping
+from collections.abc import Callable, Iterable, Iterator, MutableMapping
 from contextlib import suppress
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Protocol,
     TypeVar,
     cast,

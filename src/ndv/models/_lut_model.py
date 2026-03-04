@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Annotated, Any, Callable, Literal, Optional, Union
+from collections.abc import Callable
+from typing import Annotated, Any, Literal, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
@@ -13,20 +14,19 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from typing_extensions import TypeAlias
 
 from ._base_model import NDVModel
 
-AutoscaleType: TypeAlias = Union[
-    Callable[[npt.ArrayLike], tuple[float, float]], tuple[float, float], bool
-]
+AutoscaleType: TypeAlias = (
+    Callable[[npt.ArrayLike], tuple[float, float]] | tuple[float, float] | bool
+)
 
 
 class ClimPolicy(BaseModel, ABC):
     """ABC for contrast limit policies."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    _cached_clims: Optional[tuple[float, float]] = PrivateAttr(None)
+    _cached_clims: tuple[float, float] | None = PrivateAttr(None)
 
     @abstractmethod
     def get_limits(self, image: npt.NDArray) -> tuple[float, float]:
@@ -37,7 +37,7 @@ class ClimPolicy(BaseModel, ABC):
         return value
 
     @property
-    def cached_clims(self) -> Optional[tuple[float, float]]:
+    def cached_clims(self) -> tuple[float, float] | None:
         """Return the last calculated clims."""
         return self._cached_clims
 
@@ -124,7 +124,7 @@ class ClimsStdDev(ClimPolicy):
 
     clim_type: Literal["stddev"] = "stddev"
     n_stdev: Annotated[float, Gt(0)] = 2  # number of standard deviations
-    center: Optional[float] = None  # None means center around the mean
+    center: float | None = None  # None means center around the mean
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         center = float(np.nanmean(data) if self.center is None else self.center)
@@ -149,7 +149,7 @@ class ClimsStdDev(ClimPolicy):
 #         return self.func(data)
 
 
-ClimsType = Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
+ClimsType: TypeAlias = ClimsManual | ClimsPercentile | ClimsStdDev | ClimsMinMax
 
 
 class LUTModel(NDVModel):
@@ -178,7 +178,7 @@ class LUTModel(NDVModel):
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
     clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
-    clim_bounds: tuple[Optional[float], Optional[float]] = (None, None)
+    clim_bounds: tuple[float | None, float | None] = (None, None)
     gamma: float = 1.0
 
     @model_validator(mode="before")
