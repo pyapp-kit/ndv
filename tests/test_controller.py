@@ -79,7 +79,7 @@ def test_controller() -> None:
 
     data = np.empty(SHAPE)
     ctrl.data = data
-    wrapper = ctrl._data_model.data_wrapper
+    wrapper = ctrl._data_wrapper
 
     # showing the controller shows the view
     ctrl.show()
@@ -117,10 +117,9 @@ def test_controller() -> None:
     ctrl._on_view_current_index_changed()
     assert model.current_index == idx
 
-    # when the view sets 3 dimensions, the model is updated
-    mock_view.visible_axes.return_value = (0, -2, -1)
-    ctrl._on_view_visible_axes_changed()
-    assert model.visible_axes == (0, -2, -1)
+    # when the view requests 3 dimensions, the model is updated
+    ctrl._on_view_ndim_toggle_requested(True)
+    assert len(model.visible_axes) == 3
 
     # when the view changes the channel mode, the model is updated
     assert model.channel_mode == ChannelMode.GRAYSCALE
@@ -247,18 +246,13 @@ def test_array_viewer_with_app() -> None:
     viewer._view.set_current_index(index)
     index_mock.assert_not_called()
 
-    # test_setting 3D
+    # test_setting 3D via model
     assert viewer.display_model.visible_axes == (-2, -1)
     visax_mock = Mock()
     viewer.display_model.events.visible_axes.connect(visax_mock)
-    viewer._view.set_visible_axes((0, -2, -1))
-
-    # FIXME:
-    # calling set_visible_axes on wx during testing is not triggering the
-    # _on_ndims_toggled callback... and I don't know enough about wx yet to know why.
-    if gui_frontend() != _app.GuiFrontend.WX:
-        visax_mock.assert_called_once()
-        assert viewer.display_model.visible_axes == (0, -2, -1)
+    viewer.display_model.visible_axes = (0, -2, -1)
+    visax_mock.assert_called_once()
+    assert viewer.display_model.visible_axes == (0, -2, -1)
 
 
 @pytest.mark.usefixtures("any_app")

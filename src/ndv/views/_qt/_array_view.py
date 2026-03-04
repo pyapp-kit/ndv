@@ -50,7 +50,6 @@ if TYPE_CHECKING:
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
@@ -795,10 +794,8 @@ class QtArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: QWidget,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
-        self._data_model = data_model
         self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         # Mapping of channel key to LutViews
@@ -863,29 +860,16 @@ class QtArrayView(ArrayView):
         self._qwidget.dims_sliders.set_current_index(value)
 
     def _on_ndims_toggled(self, is_3d: bool) -> None:
-        if len(self._visible_axes) > 2:
-            if not is_3d:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                sld = reversed(self._qwidget.dims_sliders._sliders)
-                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
         self._qwidget.dims_sliders.stop_animations()
-        self.visibleAxesChanged.emit()
+        self.ndimToggleRequested.emit(is_3d)
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet
 
     def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
         self._visible_axes = tuple(axes)
-        self._qwidget.ndims_btn.setChecked(len(axes) > 2)
+        with signals_blocked(self._qwidget.ndims_btn):
+            self._qwidget.ndims_btn.setChecked(len(axes) > 2)
 
     def set_data_info(self, data_info: str) -> None:
         """Set the data info text, above the canvas."""
