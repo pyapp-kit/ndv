@@ -87,7 +87,20 @@ def test_interaction() -> None:
     histogram = PyGFXHistogramCanvas()
     # Show the canvas so get_logical_size() returns the actual size
     # (rendercanvas >=2.6 returns (1, 1) before the widget is shown)
-    histogram._canvas.show()
+    if hasattr(histogram._canvas, "show"):
+        histogram._canvas.show()
+    else:
+        # hack
+        # the jupyter canvas lost it's show() method...
+        # unclear what the common API is now...
+        histogram._canvas.handle_event(
+            {
+                "event_type": "resize",
+                "width": 640,
+                "height": 480,
+                "pixel_ratio": 1.0,
+            }
+        )
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10
