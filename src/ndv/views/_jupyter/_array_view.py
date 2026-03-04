@@ -318,7 +318,10 @@ class JupyterLutView(LutView):
                 self._auto_clim.upper_tail.value = 100 - policy.max_percentile
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
+        name = cmap.name.split(":")[-1]
+        if name not in self._cmap.options:
+            self._cmap.options = (*self._cmap.options, name)
+        self._cmap.value = name
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         # block self._clims.observe, otherwise autoscale will be forced off
