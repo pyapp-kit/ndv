@@ -423,26 +423,23 @@ class ArrayViewer:
     # ------------------ Model callbacks ------------------
 
     def _fully_synchronize_view(self) -> None:
-        """Fully re-synchronize the view with the model."""
-        # Always push channel mode, even without data
+        """Reset and re-synchronize everything from scratch."""
+        # Push channel mode even without data (e.g. display_model set before data)
         self._view.set_channel_mode(self._display_model.channel_mode)
+
+        self._resolved = EMPTY_STATE
         if self._data_wrapper is not None:
             with self._view.currentIndexChanged.blocked():
                 self._view.create_sliders(self._data_wrapper.coords)
-            self._resolved = resolve(self._display_model, self._data_wrapper)
-            self._view.set_visible_axes(self._resolved.visible_axes)
-            self._view.hide_sliders(self._resolved.hidden_sliders, show_remainder=True)
-            if cur_index := self._display_model.current_index:
-                self._view.set_current_index(cur_index)
-            # reconcile view sliders with model
+            # Reconcile view with model BEFORE resolving, so current_index
+            # includes slider defaults for newly created sliders
             self._on_view_current_index_changed()
-            self._view.set_data_info(self._resolved.summary_info)
-            self._clear_canvas()
-            self._request_data()
-            for lut_ctr in self._lut_controllers.values():
-                lut_ctr.synchronize()
-            self._update_channel_names(self._resolved.channel_names)
-            self._canvas.set_scales(self._resolved.visible_scales)
+        self._re_resolve()
+
+        for lut_ctr in self._lut_controllers.values():
+            lut_ctr.synchronize()
+        self._update_channel_names(self._resolved.channel_names)
+        self._canvas.set_scales(self._resolved.visible_scales)
         self._synchronize_roi()
 
     def _on_dims_changed(self) -> None:
@@ -451,6 +448,7 @@ class ArrayViewer:
             return
         with self._view.currentIndexChanged.blocked():
             self._view.create_sliders(self._data_wrapper.coords)
+        self._on_view_current_index_changed()
         self._re_resolve()
 
     def _synchronize_roi(self) -> None:
