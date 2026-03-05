@@ -80,7 +80,7 @@ back the full env)
 Use `UV_PYTHON` or `-p` to specify a different python version.
 
 ```bash
-UV_PYTHON=3.10 uv run --exact --no-dev --extra=pygfx --group=pyqt pytest
+uv run -p 3.10 --exact --no-dev --extra=pygfx --group=pyqt pytest
 ```
 
 ### Testing with minimum dependency versions
