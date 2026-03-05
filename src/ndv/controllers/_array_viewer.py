@@ -169,7 +169,7 @@ class ArrayViewer:
         self._fully_synchronize_view()
 
     @property
-    def resolved(self) -> ResolvedDisplayState:
+    def resolved_state(self) -> ResolvedDisplayState:
         """Return the current resolved display state."""
         return self._resolved
 

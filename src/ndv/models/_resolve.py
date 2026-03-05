@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING
 
 from ._array_display_model import ChannelMode
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping
+    from collections.abc import Hashable, Iterable, Mapping
 
     import numpy as np
 
@@ -71,6 +71,20 @@ class ResolvedDisplayState:
 
     def __hash__(self) -> int:
         return id(self)
+
+    def __rich_repr__(self) -> Iterable[tuple[str, object]]:
+        for _field in fields(self):
+            if _field.name == "data_coords":
+                # return truncated data_coords for readability
+                yield (
+                    _field.name,
+                    {
+                        k: v if len(v) <= 5 else ((*v[:2], "...", *v[-2:]))
+                        for k, v in getattr(self, _field.name).items()
+                    },
+                )
+            else:
+                yield _field.name, getattr(self, _field.name)
 
 
 EMPTY_STATE = ResolvedDisplayState(
