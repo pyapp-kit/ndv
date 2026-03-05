@@ -94,8 +94,9 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
-          rc=$?; [ $rc -eq 139 ] && echo "::warning::Process exited with SIGSEGV (139) during teardown" || exit $rc
+          uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes || rc=$?
+          if [ "${rc:-0}" -ne 0 ] && [ "${rc:-0}" -ne 139 ]; then exit $rc; fi
+          [ "${rc:-0}" -eq 139 ] && echo "::warning::Process exited with SIGSEGV (139) during teardown"
 
       - name: Upload coverage
         uses: actions/upload-artifact@v6
