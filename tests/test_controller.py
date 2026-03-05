@@ -483,9 +483,8 @@ def test_stale_response_discard() -> None:
     future: Future[DataResponse] = Future()
     future.set_result(old_response)
 
-    ctrl._request_generation = 2
-    ctrl._futures.add(future)
-    ctrl._future_generations[future] = 1  # old generation
+    ctrl._current_gen = 2
+    ctrl._futures[future] = 1  # old generation
 
     ctrl._on_data_response_ready(future)
 

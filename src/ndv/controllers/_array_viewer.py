@@ -4,6 +4,7 @@ import os
 import warnings
 from concurrent.futures import Future
 from contextlib import suppress
+from itertools import count
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
@@ -102,11 +103,10 @@ class ArrayViewer:
         # GUI is already running in JS)
         NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
         self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
-        # set of futures for data requests
-        self._futures: set[Future[DataResponse]] = set()
-        # generation counter for stale-response protection
-        self._request_generation: int = 0
-        self._future_generations: dict[Future, int] = {}
+        # maps pending futures to their request generation (for stale detection)
+        self._gen_counter = count()
+        self._current_gen: int = 0
+        self._futures: dict[Future[DataResponse], int] = {}
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -613,8 +613,7 @@ class ArrayViewer:
             return  # pragma: no cover
 
         self._cancel_futures()
-        self._request_generation += 1
-        gen = self._request_generation
+        self._current_gen = gen = next(self._gen_counter)
 
         for req in build_slice_requests(self._resolved, self._data_wrapper):
             future: Future[DataResponse]
@@ -623,8 +622,7 @@ class ArrayViewer:
             else:
                 future = Future()
                 future.set_result(process_request(req))
-            self._futures.add(future)
-            self._future_generations[future] = gen
+            self._futures[future] = gen
             future.add_done_callback(self._on_data_response_ready)
 
         if self._futures:
@@ -641,8 +639,7 @@ class ArrayViewer:
 
     def _cancel_futures(self) -> None:
         while self._futures:
-            f = self._futures.pop()
-            self._future_generations.pop(f, None)
+            f, _ = self._futures.popitem()
             f.cancel()
         self._viewer_model.show_progress_spinner = False
 
@@ -651,12 +648,11 @@ class ArrayViewer:
         # NOTE: removing the reference to the last future here is important
         # because the future has a reference to this widget in its _done_callbacks
         # which will prevent the widget from being garbage collected if the future
-        self._futures.discard(future)
-        gen = self._future_generations.pop(future, -1)
+        gen = self._futures.pop(future, -1)
         if not self._futures:
             self._viewer_model.show_progress_spinner = False
 
-        if future.cancelled() or gen != self._request_generation:
+        if future.cancelled() or gen != self._current_gen:
             return
 
         try:
