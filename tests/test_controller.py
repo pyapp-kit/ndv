@@ -43,15 +43,22 @@ IS_PYSIDE6 = API_NAME == "PySide6"
 IS_PYGFX = _app.canvas_backend(None) == "pygfx"
 
 
+def _make_img_handle() -> MagicMock:
+    handle = MagicMock(spec=ImageHandle)
+    handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
+    return handle
+
+
+def _make_vol_handle() -> MagicMock:
+    handle = MagicMock(spec=ImageHandle)
+    handle.data.return_value = np.zeros((10, 10, 10)).astype(np.uint8)
+    return handle
+
+
 def _get_mock_canvas(*_: Any) -> ArrayCanvas:
     mock = MagicMock(spec=ArrayCanvas)
-    img_handle = MagicMock(spec=ImageHandle)
-    img_handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
-    mock.add_image.return_value = img_handle
-
-    vol_handle = MagicMock(spec=ImageHandle)
-    vol_handle.data.return_value = np.zeros((10, 10, 10)).astype(np.uint8)
-    mock.add_volume.return_value = vol_handle
+    mock.add_image.side_effect = lambda *a, **k: _make_img_handle()
+    mock.add_volume.side_effect = lambda *a, **k: _make_vol_handle()
     return mock
 
 
@@ -61,8 +68,7 @@ def _get_mock_hist_canvas() -> HistogramCanvas:
 
 def _get_mock_view(*_: Any) -> ArrayView:
     mock = MagicMock(spec=ArrayView)
-    lut_mock = MagicMock(spec=LutView)
-    mock.add_lut_view.return_value = lut_mock
+    mock.add_lut_view.side_effect = lambda *a, **k: MagicMock(spec=LutView)
     return mock
 
 
