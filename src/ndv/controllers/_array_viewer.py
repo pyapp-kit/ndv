@@ -101,6 +101,21 @@ class ArrayViewer:
         # where None is the default channel
         self._lut_controllers: dict[ChannelKey, ChannelController] = {}
 
+        # Thread-safe initialization: queue GUI-sensitive operations to main thread
+        init_future = _app.ndv_app().call_in_main_thread(self._init_gui_components)
+        # Block until GUI components are initialized
+        init_future.result()
+
+        if self._data_model.data_wrapper is not None:
+            # Queue view synchronization to main thread as well
+            # since it involves GUI operations
+            sync_future = _app.ndv_app().call_in_main_thread(
+                self._fully_synchronize_view
+            )
+            sync_future.result()
+
+    def _init_gui_components(self) -> None:
+        """Initialize GUI components that must be created on the main thread."""
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
         canvas_cls = _app.get_array_canvas_class()
@@ -126,9 +141,6 @@ class ArrayViewer:
         self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
-
-        if self._data_model.data_wrapper is not None:
-            self._fully_synchronize_view()
 
     # -------------- public attributes and methods -------------------------
 
@@ -216,15 +228,22 @@ class ArrayViewer:
 
     def show(self) -> None:
         """Show the viewer."""
-        self._view.set_visible(True)
+        # Queue GUI operation to main thread to ensure thread safety
+        show_future = _app.ndv_app().call_in_main_thread(self._view.set_visible, True)
+        # Block until operation completes to maintain synchronous behavior
+        show_future.result()
 
     def hide(self) -> None:
         """Hide the viewer."""
-        self._view.set_visible(False)
+        # Queue GUI operation to main thread to ensure thread safety
+        hide_future = _app.ndv_app().call_in_main_thread(self._view.set_visible, False)
+        hide_future.result()
 
     def close(self) -> None:
         """Close the viewer."""
-        self._view.set_visible(False)
+        # Queue GUI operation to main thread to ensure thread safety
+        close_future = _app.ndv_app().call_in_main_thread(self._view.set_visible, False)
+        close_future.result()
 
     def clone(self) -> ArrayViewer:
         """Return a new ArrayViewer instance with the same data and display model.
