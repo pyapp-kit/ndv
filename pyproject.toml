@@ -62,7 +62,7 @@ pyside = [
 wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
-vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
+vispy = ["vispy>=0.16", "pyopengl >=3.1"]
 pygfx = ["pygfx==0.9.0", "rendercanvas ==2.0.1", "wgpu==0.19.3"]
 
 # ready to go bundles with pygfx
@@ -90,12 +90,17 @@ array-libs = [
     "zarr >2,<3",
 ]
 test = ["pytest >=8", "pytest-cov >=6"]
-testqt = [{ include-group = "test" }, "pytest-qt >=4.4.0"]
+testqt = [{ include-group = "test" }, "pytest-qt >=4.5.0"]
+# per-GUI groups: each brings the GUI deps + correct test deps
+pyqt = [{ include-group = "testqt" }, "ndv[pyqt]"]
+pyside = [{ include-group = "testqt" }, "ndv[pyside]"]
+jupyter = [{ include-group = "test" }, "ndv[jupyter]"]
+wxpython = [{ include-group = "test" }, "ndv[wxpython]"]
 dev = [
     { include-group = "testqt" },
     # omitting wxpython from dev env for now
     # because `uv sync && pytest hangs` on a wx test in the "full" env
-    # use `make test extras=wx,[pygfx|vispy] isolated=1` to test
+    # use `uv run --exact --no-dev --isolated ...` to test
     "ndv[vispy,pygfx,pyqt,jupyter]",
     "imageio[tifffile] >=2.20",
     "ipykernel>=6.29.5",
