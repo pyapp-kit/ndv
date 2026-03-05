@@ -169,11 +169,6 @@ class ArrayViewer:
         self._fully_synchronize_view()
 
     @property
-    def resolved_state(self) -> ResolvedDisplayState:
-        """Return the current resolved display state."""
-        return self._resolved
-
-    @property
     def data_wrapper(self) -> Any:
         """Return the data wrapper object being used to interface with the data."""
         return self._data_wrapper
