@@ -682,6 +682,7 @@ class ArrayViewer:
                 elif response.n_visible_axes == 3:
                     handle = self._canvas.add_volume(data)
                     lut_ctrl.add_handle(handle)
+                self._canvas.set_scales(self._resolved.visible_scales)
 
             else:
                 lut_ctrl.update_texture_data(data)
@@ -701,7 +702,7 @@ class ArrayViewer:
     def _get_values_at_world_point(self, x: float, y: float) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
         n_vis = len(self._resolved.visible_axes)
-        if x < 0 or y < 0 or n_vis != 2:  # pragma: no cover
+        if n_vis != 2:  # pragma: no cover
             return {}
 
         # map world coordinates back to data pixel indices using scales
@@ -714,6 +715,9 @@ class ArrayViewer:
             data_y = int(y / sy) if sy != 0 else int(y)
         else:
             data_x, data_y = int(x), int(y)
+
+        if data_x < 0 or data_y < 0:
+            return {}
 
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():

@@ -541,6 +541,88 @@ def test_channel_names_in_lut_views() -> None:
 
 @no_type_check
 @_patch_views
+def test_scales_applied_after_async_data_response() -> None:
+    """Scales must be applied after handles are created in async data response.
+
+    Regression: set_scales() in _apply_changes() runs before handles exist in
+    async mode, so first paint is unscaled unless scales are re-applied after
+    handle creation in _on_data_response_ready().
+    """
+    ctrl = ArrayViewer(display_model=ArrayDisplayModel(scales={-2: 0.5, -1: 2.0}))
+    mock_canvas = ctrl._canvas
+
+    # Set up data wrapper and resolve state without triggering data fetch
+    ctrl._data_wrapper = DataWrapper.create(np.empty((10, 100, 200)))
+    ctrl._resolved = resolve(ctrl._display_model, ctrl._data_wrapper)
+    mock_canvas.set_scales.reset_mock()
+
+    # Simulate the async data response arriving (creates handles)
+    response = DataResponse(
+        n_visible_axes=2, data={None: np.zeros((100, 200), dtype=np.uint8)}
+    )
+    future: Future[DataResponse] = Future()
+    future.set_result(response)
+    ctrl._futures[future] = ctrl._current_gen
+    ctrl._on_data_response_ready(future)
+
+    # set_scales must be called AFTER handles are created
+    mock_canvas.set_scales.assert_called()
+    last_scales = mock_canvas.set_scales.call_args[0][0]
+    assert last_scales == (0.5, 2.0)
+
+
+@no_type_check
+@_patch_views
+def test_hover_with_scaled_axes() -> None:
+    """Hover correctly maps world coords to data indices with non-unit scales.
+
+    With scales (sy=0.5, sx=2.0), world coord (4.0, 3.0) should map to
+    data indices: data_x = 4.0/2.0 = 2, data_y = 3.0/0.5 = 6.
+    The controller should sample data[6, 2], not data[3, 4].
+    """
+    ctrl = ArrayViewer(scales={-2: 0.5, -1: 2.0})
+    ctrl._async = False
+    ctrl.data = np.zeros((10, 20), dtype=np.uint8)
+
+    # Spy on the ChannelController.get_value_at_index to capture the index
+    for lut_ctrl in ctrl._lut_controllers.values():
+        lut_ctrl.get_value_at_index = Mock(wraps=lut_ctrl.get_value_at_index)
+
+    ctrl._get_values_at_world_point(4.0, 3.0)
+
+    for lut_ctrl in ctrl._lut_controllers.values():
+        lut_ctrl.get_value_at_index.assert_called_once_with((6, 2))
+
+
+@no_type_check
+@_patch_views
+def test_hover_with_negative_scales() -> None:
+    """Hover should work with negative scales (descending coordinates).
+
+    Regression: _get_values_at_world_point rejects negative world coordinates,
+    but negative scales produce negative world coords for valid data positions.
+    """
+    ctrl = ArrayViewer(scales={-2: -1.0, -1: 1.0})
+    ctrl._async = False
+    ctrl.data = np.ones((5, 10), dtype=np.uint8)
+
+    mock_canvas = ctrl._canvas
+    mock_view = ctrl._view
+
+    # With scale_y=-1.0, valid world y coords are negative (e.g. y=-2.0 -> row 2)
+    mock_canvas.canvas_to_world.return_value = (3.0, -2.0, 0)
+
+    vals = ctrl._get_values_at_world_point(3.0, -2.0)
+    assert vals, f"expected values, scales={ctrl._resolved.visible_scales}"
+
+    ctrl._on_canvas_mouse_moved(MouseMoveEvent(100, 100))
+    hover_call = mock_view.set_hover_info.call_args[0][0]
+    # Should show valid data, not empty string (which means hover was rejected)
+    assert hover_call != ""
+
+
+@no_type_check
+@_patch_views
 def test_data_replacement_with_stale_index() -> None:
     """Replacing data with fewer dims should not crash due to stale current_index."""
     # Start with 4D data — axes 0, 1, 2, 3 are all valid

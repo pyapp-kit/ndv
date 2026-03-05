@@ -2,10 +2,10 @@
 
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeAlias, TypedDict, cast
 
 from cmap import Colormap
-from pydantic import Field, computed_field, model_validator
+from pydantic import BeforeValidator, Field, computed_field, model_validator
 from typing_extensions import Self
 
 from ndv._types import AxisKey, ChannelKey, Slice
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         Callable,  # used for mkdocstrings
         Hashable,
         Mapping,
+        Sequence,
     )
 
     import cmap
@@ -46,8 +47,14 @@ if TYPE_CHECKING:
         reducers: Mapping["AxisKey | None", ReducerType]
         luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
         default_lut: "LUTModel | LutModelKwargs"
-        scales: Mapping[AxisKey, float]
-        channel_names: Mapping[ChannelKey, str]
+        scales: Mapping[AxisKey, float] | Sequence[float]
+        channel_names: Mapping[int, str] | Sequence[str]
+
+
+def _seq_to_dict(v: Any) -> Any:
+    if isinstance(v, (list, tuple)):
+        return dict(enumerate(v))
+    return v
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
@@ -57,9 +64,13 @@ LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
 # map of axis to scale factor
-ScalesMap: TypeAlias = ValidatedEventedDict[AxisKey, float]
-# map of channel key to display name
-ChannelNamesMap: TypeAlias = ValidatedEventedDict[ChannelKey, str]
+ScalesMap: TypeAlias = Annotated[
+    ValidatedEventedDict[AxisKey, float], BeforeValidator(_seq_to_dict)
+]
+# map of channel index to display name
+ChannelNamesMap: TypeAlias = Annotated[
+    ValidatedEventedDict[int, str], BeforeValidator(_seq_to_dict)
+]
 # used for visible_axes
 TwoOrThreeAxisTuple: TypeAlias = (
     tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
