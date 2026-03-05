@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
@@ -18,8 +19,10 @@ from ndv._types import (
 )
 from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
+from ndv.models import DataWrapper
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
+from ndv.models._resolve import DataResponse, resolve
 from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app, gui_frontend
@@ -82,7 +85,7 @@ def test_controller() -> None:
 
     data = np.empty(SHAPE)
     ctrl.data = data
-    wrapper = ctrl._data_model.data_wrapper
+    wrapper = ctrl._data_wrapper
 
     # showing the controller shows the view
     ctrl.show()
@@ -108,9 +111,8 @@ def test_controller() -> None:
     mock_view.hide_sliders.reset_mock()
     model.channel_mode = "composite"
     mock_view.set_channel_mode.assert_called_with(ChannelMode.COMPOSITE)
-    mock_view.hide_sliders.assert_called_once_with(
-        {0, 3, model.channel_axis}, show_remainder=True
-    )
+    # axis 1 is guessed as channel_axis by resolve() (not stored on model)
+    mock_view.hide_sliders.assert_called_once_with({0, 1, 3}, show_remainder=True)
     model.channel_mode = ChannelMode.GRAYSCALE
     mock_view.hide_sliders.assert_called_with({0, 3}, show_remainder=True)
 
@@ -120,10 +122,9 @@ def test_controller() -> None:
     ctrl._on_view_current_index_changed()
     assert model.current_index == idx
 
-    # when the view sets 3 dimensions, the model is updated
-    mock_view.visible_axes.return_value = (0, -2, -1)
-    ctrl._on_view_visible_axes_changed()
-    assert model.visible_axes == (0, -2, -1)
+    # when the view requests 3 dimensions, the model is updated
+    ctrl._on_view_ndim_toggle_requested(True)
+    assert len(model.visible_axes) == 3
 
     # when the view changes the channel mode, the model is updated
     assert model.channel_mode == ChannelMode.GRAYSCALE
@@ -250,18 +251,13 @@ def test_array_viewer_with_app() -> None:
     viewer._view.set_current_index(index)
     index_mock.assert_not_called()
 
-    # test_setting 3D
+    # test_setting 3D via model
     assert viewer.display_model.visible_axes == (-2, -1)
     visax_mock = Mock()
     viewer.display_model.events.visible_axes.connect(visax_mock)
-    viewer._view.set_visible_axes((0, -2, -1))
-
-    # FIXME:
-    # calling set_visible_axes on wx during testing is not triggering the
-    # _on_ndims_toggled callback... and I don't know enough about wx yet to know why.
-    if gui_frontend() != _app.GuiFrontend.WX:
-        visax_mock.assert_called_once()
-        assert viewer.display_model.visible_axes == (0, -2, -1)
+    viewer.display_model.visible_axes = (0, -2, -1)
+    visax_mock.assert_called_once()
+    assert viewer.display_model.visible_axes == (0, -2, -1)
 
 
 @pytest.mark.usefixtures("any_app")
@@ -452,3 +448,72 @@ def test_rgb_display_magic() -> None:
 
     rgba_data = np.ones((1, 2, 3, 4, 4), dtype=np.uint8)
     assert_rgb_magic_works(rgba_data)
+
+
+def test_resolve_is_pure() -> None:
+    """Test that resolve() does not mutate the input model."""
+    wrapper = DataWrapper.create(np.empty((2, 3, 4, 5)))
+    model = ArrayDisplayModel()
+    model.current_index.assign({0: 7, -4: 1})
+    before = dict(model.current_index)
+
+    resolved = resolve(model, wrapper)
+
+    # model should be untouched
+    assert dict(model.current_index) == before
+    # resolved normalizes -4 → 0, so duplicate key picked the non-int value
+    assert resolved.current_index[0] == 1
+
+
+@no_type_check
+@_patch_views
+def test_stale_response_discard() -> None:
+    """Test that responses from old request generations are discarded."""
+    ctrl = ArrayViewer()
+
+    # simulate a stale response from generation 1 when we're on generation 2
+    old_response = DataResponse(n_visible_axes=2, data={None: np.zeros((8, 8))})
+    future = Future()
+    future.set_result(old_response)
+    ctrl._current_gen = 2
+    ctrl._futures[future] = 1  # old generation
+
+    ctrl._on_data_response_ready(future)
+
+    # stale response should be ignored — no LUT controllers created, no refresh
+    assert len(ctrl._lut_controllers) == 0
+    ctrl._canvas.refresh.assert_not_called()
+
+
+@no_type_check
+@_patch_views
+def test_rgba_3d_fallback_warns() -> None:
+    """Test that RGBA mode with 3D view reverts to GRAYSCALE with a warning."""
+    ctrl = ArrayViewer(np.zeros((10, 4, 10, 10)))
+    ctrl.display_model.visible_axes = (0, 2, 3)
+
+    with pytest.warns(UserWarning, match="Cannot use RGBA mode with 3D view"):
+        ctrl.display_model.channel_mode = ChannelMode.RGBA
+
+    assert ctrl.display_model.channel_mode == ChannelMode.GRAYSCALE
+
+
+@no_type_check
+@_patch_views
+def test_data_replacement_with_stale_index() -> None:
+    """Replacing data with fewer dims should not crash due to stale current_index."""
+    # Start with 4D data — axes 0, 1, 2, 3 are all valid
+    ctrl = ArrayViewer(np.empty((10, 3, 64, 64)))
+    ctrl._async = False
+
+    # Set an index on axis 3 (valid for 4D data)
+    ctrl.display_model.current_index[3] = 1
+
+    # Replace with 3D data — axis 3 no longer exists.
+    # _norm_current_index calls normalize_axis_key(3) which will raise IndexError
+    # because the new data only has 3 dims (valid axes: 0, 1, 2).
+    ctrl.data = np.empty((20, 32, 32))
+
+    # Should not have raised. The viewer should be in a usable state.
+    ctrl._request_data()
+    ctrl._join()

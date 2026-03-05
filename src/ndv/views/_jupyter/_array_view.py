@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -319,7 +318,10 @@ class JupyterLutView(LutView):
                 self._auto_clim.upper_tail.value = 100 - policy.max_percentile
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
+        name = cmap.name.split(":")[-1]
+        if name not in self._cmap.options:
+            self._cmap.options = (*self._cmap.options, name)
+        self._cmap.value = name
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         # block self._clims.observe, otherwise autoscale will be forced off
@@ -384,13 +386,11 @@ class JupyterArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: _jupyter_rfb.CanvasBackend,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
-        self._data_model = data_model
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
         self._luts: dict[ChannelKey, JupyterLutView] = {}
@@ -616,25 +616,11 @@ class JupyterArrayView(ArrayView):
 
     def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
         self._visible_axes = tuple(axes)
-        self._ndims_btn.value = len(axes) == 3
+        with notifications_blocked(self._ndims_btn):
+            self._ndims_btn.value = len(axes) > 2
 
     def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
-        if len(self._visible_axes) > 2:
-            if not change["new"]:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                z_ax = next(
-                    ax for ax in reversed(self._sliders) if ax not in self._visible_axes
-                )
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
-        self.visibleAxesChanged.emit()
+        self.ndimToggleRequested.emit(change["new"])
 
     def _on_reset_zoom_clicked(self, change: dict[str, Any]) -> None:
         self.resetZoomClicked.emit()

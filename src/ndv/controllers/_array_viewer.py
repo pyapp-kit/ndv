@@ -2,21 +2,28 @@ from __future__ import annotations
 
 import os
 import warnings
+from concurrent.futures import Future
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, cast
+from itertools import count
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
-from ndv.models._data_display_model import DataResponse, _ArrayDataDisplayModel
+from ndv.models._resolve import (
+    EMPTY_STATE,
+    DataResponse,
+    ResolvedDisplayState,
+    build_slice_requests,
+    process_request,
+    resolve,
+)
 from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable
-    from concurrent.futures import Future
     from typing import Any, Unpack
 
     import numpy.typing as npt
@@ -31,7 +38,7 @@ if TYPE_CHECKING:
 class ArrayViewer:
     """Viewer dedicated to displaying a single n-dimensional array.
 
-    This wraps a model and sview into a single object, and defines the
+    This wraps a model and view into a single object, and defines the
     public API.
 
     !!! tip "See also"
@@ -75,9 +82,10 @@ class ArrayViewer:
                 stacklevel=2,
             )
 
-        self._data_model = _ArrayDataDisplayModel(
-            display=display_model, data_wrapper=wrapper
-        )
+        self._display_model = display_model
+        self._data_wrapper: DataWrapper | None = wrapper
+        self._resolved = EMPTY_STATE
+
         self._connect_datawrapper(None, wrapper)
 
         self._viewer_model = ArrayViewerModel.model_validate(viewer_options or {})
@@ -94,8 +102,10 @@ class ArrayViewer:
         # GUI is already running in JS)
         NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
         self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
-        # set of futures for data requests
-        self._futures: set[Future[DataResponse]] = set()
+        # maps pending futures to their request generation (for stale detection)
+        self._gen_counter = count()
+        self._current_gen: int = 0
+        self._futures: dict[Future[DataResponse], int] = {}
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -108,26 +118,24 @@ class ArrayViewer:
 
         # TODO: Is this necessary?
         self._histograms: dict[ChannelKey, HistogramCanvas] = {}
-        self._view = frontend_cls(
-            self._canvas.frontend_widget(), self._data_model, self._viewer_model
-        )
+        self._view = frontend_cls(self._canvas.frontend_widget(), self._viewer_model)
 
         self._roi_view: RectangularROIHandle | None = None
 
-        self._set_model_connected(self._data_model.display)
-        self._canvas.set_ndim(self.display_model.n_visible_axes)
+        self._set_model_connected(self._display_model)
+        self._canvas.set_ndim(self._display_model.n_visible_axes)
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
-        self._view.visibleAxesChanged.connect(self._on_view_visible_axes_changed)
+        self._view.ndimToggleRequested.connect(self._on_view_ndim_toggle_requested)
 
         self._highlight_pos: tuple[int, int] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
-        if self._data_model.data_wrapper is not None:
+        if self._data_wrapper is not None:
             self._fully_synchronize_view()
 
     # -------------- public attributes and methods -------------------------
@@ -148,50 +156,39 @@ class ArrayViewer:
     @property
     def display_model(self) -> ArrayDisplayModel:
         """Return the current ArrayDisplayModel."""
-        return self._data_model.display
+        return self._display_model
 
     @display_model.setter
     def display_model(self, model: ArrayDisplayModel) -> None:
         """Set the ArrayDisplayModel."""
         if not isinstance(model, ArrayDisplayModel):  # pragma: no cover
             raise TypeError("model must be an ArrayDisplayModel")
-        self._set_model_connected(self._data_model.display, False)
-        self._data_model.display = model
-        self._set_model_connected(self._data_model.display)
+        self._set_model_connected(self._display_model, False)
+        self._display_model = model
+        self._set_model_connected(self._display_model)
         self._fully_synchronize_view()
 
     @property
     def data_wrapper(self) -> Any:
-        """Return data being displayed."""
-        return self._data_model.data_wrapper
+        """Return the data wrapper object being used to interface with the data."""
+        return self._data_wrapper
 
     @property
     def data(self) -> Any:
-        """Return data being displayed."""
-        if self._data_model.data_wrapper is None:
+        """Return data being displayed (the actual data, not the wrapper)."""
+        if self._data_wrapper is None:
             return None  # pragma: no cover
         # returning the actual data, not the wrapper
-        return self._data_model.data_wrapper.data
+        return self._data_wrapper.data
 
     @data.setter
     def data(self, data: Any) -> None:
         """Set the data to be displayed."""
         _new = None if data is None else DataWrapper.create(data)
-        self._data_model.data_wrapper, old = _new, self._data_model.data_wrapper
+        old = self._data_wrapper
+        self._data_wrapper = _new
         self._connect_datawrapper(old, _new)
         self._fully_synchronize_view()
-
-    def _connect_datawrapper(
-        self, old: DataWrapper | None, new: DataWrapper | None
-    ) -> None:
-        """Set new datawrapper and hook up events."""
-        if old is not None:
-            with suppress(Exception):
-                old.data_changed.disconnect(self._request_data)
-                old.dims_changed.disconnect(self._on_dims_changed)
-        if new is not None:
-            new.data_changed.connect(self._request_data)
-            new.dims_changed.connect(self._on_dims_changed)
 
     @property
     def roi(self) -> RectangularROIModel | None:
@@ -233,11 +230,21 @@ class ArrayViewer:
         of the other.
         """
         # TODO: provide deep_copy option
-        return ArrayViewer(
-            self._data_model.data_wrapper, display_model=self.display_model
-        )
+        return ArrayViewer(self._data_wrapper, display_model=self.display_model)
 
     # --------------------- PRIVATE ------------------------------------------
+
+    def _connect_datawrapper(
+        self, old: DataWrapper | None, new: DataWrapper | None
+    ) -> None:
+        """Set new datawrapper and hook up events."""
+        if old is not None:
+            with suppress(Exception):
+                old.data_changed.disconnect(self._request_data)
+                old.dims_changed.disconnect(self._on_dims_changed)
+        if new is not None:
+            new.data_changed.connect(self._request_data)
+            new.dims_changed.connect(self._on_dims_changed)
 
     @staticmethod
     def _default_display_model(
@@ -285,9 +292,9 @@ class ArrayViewer:
         if not (ctrl := self._lut_controllers.get(channel, None)):
             return
         if dtype is None:
-            if (wrapper := self._data_model.data_wrapper) is None:
+            if self._data_wrapper is None:
                 return
-            dtype = wrapper.dtype
+            dtype = self._data_wrapper.dtype
         else:
             dtype = np.dtype(dtype)
         if dtype.kind in "iu":
@@ -305,11 +312,10 @@ class ArrayViewer:
         _connect = "connect" if connect else "disconnect"
 
         for obj, callback in [
-            (model.events.visible_axes, self._on_model_visible_axes_changed),
-            (model.events.channel_axis, self._on_model_channel_axis_changed),
-            # the current_index attribute itself is immutable
-            (model.current_index.value_changed, self._on_model_current_index_changed),
-            (model.events.channel_mode, self._on_model_channel_mode_changed),
+            (model.events.visible_axes, self._re_resolve),
+            (model.events.channel_axis, self._re_resolve),
+            (model.current_index.value_changed, self._re_resolve),
+            (model.events.channel_mode, self._re_resolve),
             # TODO: lut values themselves are mutable evented objects...
             # so we need to connect to their events as well
             # (model.luts.value_changed, ...),
@@ -338,68 +344,48 @@ class ArrayViewer:
             if self._roi_view:
                 self._roi_view.remove()
 
-    # ------------------ Model callbacks ------------------
+    # ------------------ Resolve / Apply ------------------
 
-    def _fully_synchronize_view(self) -> None:
-        """Fully re-synchronize the view with the model."""
-        display_model = self._data_model.display
-        self._view.set_channel_mode(display_model.channel_mode)
-        if (wrapper := self._data_model.data_wrapper) is not None:
-            with self._view.currentIndexChanged.blocked():
-                self._view.create_sliders(wrapper.coords)
-            self._view.set_visible_axes(self._data_model.normed_visible_axes)
-            self._update_visible_sliders()
-            if cur_index := display_model.current_index:
-                self._view.set_current_index(cur_index)
-            # reconcile view sliders with model
-            self._on_view_current_index_changed()
-            self._view.set_data_info(wrapper.summary_info())
-
-            self._clear_canvas()
-            self._request_data()
-            for lut_ctr in self._lut_controllers.values():
-                lut_ctr.synchronize()
-        self._synchronize_roi()
-
-    def _on_dims_changed(self) -> None:
-        """Update sliders and info when dimension sizes change."""
-        if (wrapper := self._data_model.data_wrapper) is None:
+    def _re_resolve(self) -> None:
+        """Resolve display state and apply changes."""
+        if self._data_wrapper is None:
             return
+        old = self._resolved
+        self._resolved = resolve(self._display_model, self._data_wrapper)
+        self._apply_changes(old, self._resolved)
+
+    def _apply_changes(
+        self, old: ResolvedDisplayState, new: ResolvedDisplayState
+    ) -> None:
+        """Apply diff between old and new resolved state to the view."""
         with self._view.currentIndexChanged.blocked():
-            self._view.create_sliders(wrapper.coords)
-        self._update_visible_sliders()
-        self._on_view_current_index_changed()
-        self._view.set_data_info(wrapper.summary_info())
+            if old.channel_mode != new.channel_mode:
+                self._view.set_channel_mode(new.channel_mode)
+                self._update_lut_visibility(new.channel_mode)
+            if old.visible_axes != new.visible_axes:
+                self._view.set_visible_axes(new.visible_axes)
+                ndim = len(new.visible_axes)
+                self._canvas.set_ndim(cast("Literal[2, 3]", ndim))
+                self._clear_canvas()
+            if old.hidden_sliders != new.hidden_sliders:
+                self._view.hide_sliders(new.hidden_sliders, show_remainder=True)
+            if old.current_index != new.current_index:
+                self._view.set_current_index(self._display_model.current_index)
 
-    def _synchronize_roi(self) -> None:
-        """Fully re-synchronize the ROI view with the model."""
-        if self.roi is not None:
-            self._on_roi_model_bounding_box_changed(self.roi.bounding_box)
-            self._on_roi_model_visible_changed(self.roi.visible)
+        needs_data = (
+            old.visible_axes != new.visible_axes
+            or old.channel_axis != new.channel_axis
+            or old.channel_mode != new.channel_mode
+            or old.current_index != new.current_index
+        )
+        if needs_data:
+            self._request_data()
 
-    def _on_model_visible_axes_changed(self) -> None:
-        self._view.set_visible_axes(self._data_model.normed_visible_axes)
-        self._update_visible_sliders()
-        self._clear_canvas()
-        self._canvas.set_ndim(self.display_model.n_visible_axes)
-        self._request_data()
+        if old.summary_info != new.summary_info:
+            self._view.set_data_info(new.summary_info)
 
-    def _on_model_channel_axis_changed(self) -> None:
-        self._request_data()
-
-    def _on_model_current_index_changed(self) -> None:
-        value = self._data_model.display.current_index
-        self._view.set_current_index(value)
-        self._request_data()
-
-    def _on_model_channel_mode_changed(self, mode: ChannelMode) -> None:
-        # When the channel view changes, two things must be done:
-        self._view.set_channel_mode(mode)
-        # 1. A slider must be shown for each axis that is not a:
-        # (a) channel axis
-        # (b) visible axis
-        self._update_visible_sliders()
-        # 2. LutViews must be updated:
+    def _update_lut_visibility(self, mode: ChannelMode) -> None:
+        """Update LUT view visibility based on channel mode."""
         for lut_ctrl in self._lut_controllers.values():
             for view in lut_ctrl.lut_views:
                 if lut_ctrl.key is None:
@@ -408,9 +394,41 @@ class ArrayViewer:
                     view.set_visible(mode == ChannelMode.RGBA)
                 else:
                     view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
-        # redraw
-        self._clear_canvas()
-        self._request_data()
+
+    # ------------------ Model callbacks ------------------
+
+    def _fully_synchronize_view(self) -> None:
+        """Reset and re-synchronize everything from scratch."""
+        # Push channel mode even without data (e.g. display_model set before data)
+        self._view.set_channel_mode(self._display_model.channel_mode)
+
+        self._resolved = EMPTY_STATE
+        if self._data_wrapper is not None:
+            with self._view.currentIndexChanged.blocked():
+                self._view.create_sliders(self._data_wrapper.coords)
+            # Reconcile view with model BEFORE resolving, so current_index
+            # includes slider defaults for newly created sliders
+            self._on_view_current_index_changed()
+        self._re_resolve()
+
+        for lut_ctr in self._lut_controllers.values():
+            lut_ctr.synchronize()
+        self._synchronize_roi()
+
+    def _on_dims_changed(self) -> None:
+        """Update sliders and info when dimension sizes change."""
+        if self._data_wrapper is None:
+            return
+        with self._view.currentIndexChanged.blocked():
+            self._view.create_sliders(self._data_wrapper.coords)
+        self._on_view_current_index_changed()
+        self._re_resolve()
+
+    def _synchronize_roi(self) -> None:
+        """Fully re-synchronize the ROI view with the model."""
+        if self.roi is not None:
+            self._on_roi_model_bounding_box_changed(self.roi.bounding_box)
+            self._on_roi_model_visible_changed(self.roi.visible)
 
     def _on_roi_model_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]
@@ -455,11 +473,31 @@ class ArrayViewer:
 
     def _on_view_current_index_changed(self) -> None:
         """Update the model when slider value changes."""
-        self._data_model.display.current_index.update(self._view.current_index())
+        self._display_model.current_index.update(self._view.current_index())
 
-    def _on_view_visible_axes_changed(self) -> None:
-        """Update the model when the visible axes change."""
-        self.display_model.visible_axes = self._view.visible_axes()  # type: ignore [assignment]
+    def _on_view_ndim_toggle_requested(self, is_3d: bool) -> None:
+        """Handle ndim toggle from view."""
+        if self._data_wrapper is None:
+            return
+        current = self._resolved.visible_axes
+        if not current:
+            return
+        if is_3d and len(current) == 2:
+            z_ax = self._data_wrapper.guess_z_axis()
+            if z_ax is None or z_ax in current:
+                z_ax = next(
+                    (
+                        ax
+                        for ax in reversed(self._resolved.data_coords)
+                        if ax not in current
+                    ),
+                    None,
+                )
+            if z_ax is None:
+                return
+            self._display_model.visible_axes = (z_ax, *current)
+        elif not is_3d and len(current) > 2:
+            self._display_model.visible_axes = current[-2:]  # type: ignore[assignment]
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
@@ -486,7 +524,7 @@ class ArrayViewer:
         self._highlight_values({}, self._highlight_pos)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
-        self._data_model.display.channel_mode = mode
+        self._display_model.channel_mode = mode
 
     # ------------------ Helper methods ------------------
 
@@ -512,42 +550,17 @@ class ArrayViewer:
 
             vals = []
             for ch, value in channel_values.items():
-                # restrict to 2 decimal places, but remove trailing zeros
                 fval = f"{value:.2f}".rstrip("0").rstrip(".")
                 fch = f"{ch}: " if ch is not None else ""
                 vals.append(f"{fch}{fval}")
 
             self._view.set_hover_info(pos + ",".join(vals))
 
-    def _update_visible_sliders(self) -> None:
-        """Update which sliders are visible based on the current data and model."""
-        if self._data_model.data_wrapper is None:
-            return
-        hidden_indices: set[int] = set(self._data_model.normed_visible_axes)
-        if self._data_model.display.channel_mode.is_multichannel():
-            if (ch := self._data_model.normed_channel_axis) is not None:
-                hidden_indices.add(ch)
-
-        # hide singleton axes
-        for ax, coord in self._data_model.normed_data_coords.items():
-            if len(coord) < 2:
-                hidden_indices.add(ax)
-
-        # here we look into the *non*-normalized wrapper.dims names
-        # and add those to the hidden indices as well (so that sliders are hidden
-        # regardless of the form in which they were expressed in the model)
-        hidden_sliders: set[Hashable] = set(hidden_indices)
-        if wrapper := self._data_model.data_wrapper:
-            for hidden in list(hidden_indices):
-                hidden_sliders.add(wrapper.dims[hidden])
-
-        self._view.hide_sliders(hidden_sliders, show_remainder=True)
-
     # The request cycle looks like this:
     # 1. something changes on the model requiring new data
     # 2. _request_data is called
-    # 3. _data_model.request_sliced_data returns a list of futures
-    # 4. each future is connected to `_on_data_response_ready` and stored.
+    # 3. build_slice_requests returns request objects
+    # 4. each request is submitted as a future
     # 5. when the future resolves, `_on_data_response_ready` draws the response.
 
     def _request_data(self) -> None:
@@ -556,12 +569,20 @@ class ArrayViewer:
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
         """
-        if not self._data_model.data_wrapper:
+        if not self._data_wrapper:
             return  # pragma: no cover
 
         self._cancel_futures()
-        for future in self._data_model.request_sliced_data(self._async):
-            self._futures.add(future)
+        self._current_gen = gen = next(self._gen_counter)
+
+        for req in build_slice_requests(self._resolved, self._data_wrapper):
+            future: Future[DataResponse]
+            if self._async:
+                future = _app.submit_task(process_request, req)
+            else:
+                future = Future()
+                future.set_result(process_request(req))
+            self._futures[future] = gen
             future.add_done_callback(self._on_data_response_ready)
 
         if self._futures:
@@ -578,20 +599,19 @@ class ArrayViewer:
 
     def _cancel_futures(self) -> None:
         while self._futures:
-            self._futures.pop().cancel()
-        self._futures.clear()
+            f, _ = self._futures.popitem()
+            f.cancel()
         self._viewer_model.show_progress_spinner = False
 
     @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
-        # NOTE: removing the reference to the last future here is important
-        # because the future has a reference to this widget in its _done_callbacks
-        # which will prevent the widget from being garbage collected if the future
-        self._futures.discard(future)
+        # NOTE: popping the future is important because it holds a reference to
+        # this controller in _done_callbacks, which would prevent GC otherwise.
+        gen = self._futures.pop(future, -1)
         if not self._futures:
             self._viewer_model.show_progress_spinner = False
 
-        if future.cancelled():
+        if future.cancelled() or gen != self._current_gen:
             return
 
         try:
@@ -600,20 +620,18 @@ class ArrayViewer:
             warnings.warn(f"Error fetching data: {e}", stacklevel=2)
             return
 
-        display_model = self._data_model.display
         for key, data in response.data.items():
             if data.size == 0:
-                # no data for this channel
                 continue
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
-                    model = display_model.default_lut
-                elif key in display_model.luts:
-                    model = display_model.luts[key]
+                    model = self._display_model.default_lut
+                elif key in self._display_model.luts:
+                    model = self._display_model.luts[key]
                 else:
                     # we received a new channel key that has not been set in the model
                     # so we create a new LUT model for it
-                    model = display_model.luts[key] = LUTModel()
+                    model = self._display_model.luts[key] = LUTModel()
 
                 lut_views = [self._view.add_lut_view(key)]
                 if hist := self._histograms.get(key, None):
@@ -651,9 +669,8 @@ class ArrayViewer:
 
     def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
-        if (
-            x < 0 or y < 0
-        ) or self._data_model.display.n_visible_axes != 2:  # pragma: no cover
+        n_vis = len(self._resolved.visible_axes)
+        if x < 0 or y < 0 or n_vis != 2:  # pragma: no cover
             return {}
 
         values: dict[ChannelKey, float] = {}

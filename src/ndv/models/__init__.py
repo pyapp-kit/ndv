@@ -11,6 +11,7 @@ from ._lut_model import (
     ClimsStdDev,
     LUTModel,
 )
+from ._resolve import ResolvedDisplayState
 from ._ring_buffer import RingBuffer
 from ._roi_model import RectangularROIModel
 from ._viewer_model import ArrayViewerModel
@@ -28,6 +29,7 @@ __all__ = [
     "LUTModel",
     "NDVModel",
     "RectangularROIModel",
+    "ResolvedDisplayState",
     "RingBuffer",
     "RingBufferWrapper",
 ]
