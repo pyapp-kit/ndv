@@ -36,8 +36,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # using 3.12 as main current version, until 3.13 support
-        # is ubiquitous in upstream dependencies
         python-version: ["3.10", "3.12"]
         gui: [pyside, pyqt, jupyter, wxpython]
         canvas: [vispy, pygfx]
@@ -50,8 +48,6 @@ jobs:
             os: ubuntu-latest
             gui: pyside
             canvas: vispy
-          - python-version: "3.10"
-            gui: pyside
           # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
@@ -79,14 +75,11 @@ jobs:
             gui: pyqt
             canvas: pygfx
 
-
     steps:
       - uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-
       - uses: pyvista/setup-headless-display-action@main
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
@@ -95,49 +88,44 @@ jobs:
         run: |
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
-
-      - name: 🧪 Test (attempt 1)
-        id: test1
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
-
-      - name: 🧪 Test (attempt 2)
-        if: steps.test1.outcome == 'failure'
-        id: test2
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
-
-      - name: 🧪 Test (attempt 3)
-        if: steps.test2.outcome == 'failure'
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
-
-      - name: 🧪 Test min dependencies (attempt 1)
-        id: min1
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
-
-      - name: 🧪 Test min dependencies (attempt 2)
-        if: steps.min1.outcome == 'failure'
-        id: min2
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
-
-      - name: 🧪 Test min dependencies (attempt 3)
-        if: steps.min2.outcome == 'failure'
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
-
+      - name: Test
+        run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
       - name: Upload coverage
         uses: actions/upload-artifact@v6
         with:
           name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}
           path: ./.coverage*
           include-hidden-files: true
+
+  test-min-deps:
+    name: min-deps py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+        gui: [pyqt, jupyter]
+        canvas: [vispy, pygfx]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@main
+        with:
+          qt: ${{ matrix.gui == 'pyqt' }}
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        if: matrix.canvas == 'pygfx'
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+      - name: Test min deps
+        run: >
+          uv run --exact --no-dev --resolution=lowest-direct
+            --extra=${{ matrix.canvas }} --group=${{ matrix.gui }}
+            pytest --color=yes
 
   test-array-libs:
     runs-on: ubuntu-latest
@@ -150,8 +138,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - uses: pyvista/setup-headless-display-action@main
@@ -159,17 +146,8 @@ jobs:
           qt: true
       - name: Install llvmpipe and lavapipe for offscreen canvas
         run: sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
-
-      - name: 🧪 Test (attempt 1)
-        id: test1
-        continue-on-error: true
-        run: make test extras="pyqt,pygfx" groups="array-libs" cov=1
-
-      - name: 🧪 Test (attempt 2)
-        if: steps.test1.outcome == 'failure'
-        id: test2
-        run: make test extras="pyqt,pygfx" groups="array-libs" cov=1 verbose=1
-
+      - name: Test
+        run: uv run --exact --no-dev --extra=pygfx --group=pyqt --group=array-libs coverage run -p -m pytest --color=yes
       - name: Upload coverage
         uses: actions/upload-artifact@v6
         with:
