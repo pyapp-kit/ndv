@@ -92,10 +92,29 @@ def _norm_visible_axes(
 
 
 def _norm_channel_axis(model: ArrayDisplayModel, wrapper: DataWrapper) -> int | None:
-    """Return channel_axis as a positive integer, or None."""
-    if model.channel_axis is None:
+    """Return channel_axis as a positive integer, or None.
+
+    If the model has no channel_axis but is in a multichannel mode,
+    guess one from the wrapper (avoiding visible axes).
+    """
+    if model.channel_axis is not None:
+        return wrapper.normalize_axis_key(model.channel_axis)
+
+    guess = wrapper.guess_channel_axis()
+    if guess is None:
         return None
-    return wrapper.normalize_axis_key(model.channel_axis)
+
+    try:
+        normed_guess = wrapper.normalize_axis_key(guess)
+    except Exception:
+        return None
+
+    # don't use a visible axis as the channel axis
+    normed_vis = tuple(wrapper.normalize_axis_key(ax) for ax in model.visible_axes)
+    if normed_guess in normed_vis:
+        return None
+
+    return normed_guess
 
 
 def _norm_current_index(

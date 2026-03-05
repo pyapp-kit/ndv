@@ -111,9 +111,8 @@ def test_controller() -> None:
     mock_view.hide_sliders.reset_mock()
     model.channel_mode = "composite"
     mock_view.set_channel_mode.assert_called_with(ChannelMode.COMPOSITE)
-    mock_view.hide_sliders.assert_called_once_with(
-        {0, 3, model.channel_axis}, show_remainder=True
-    )
+    # axis 1 is guessed as channel_axis by resolve() (not stored on model)
+    mock_view.hide_sliders.assert_called_once_with({0, 1, 3}, show_remainder=True)
     model.channel_mode = ChannelMode.GRAYSCALE
     mock_view.hide_sliders.assert_called_with({0, 3}, show_remainder=True)
 

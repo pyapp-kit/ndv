@@ -85,7 +85,6 @@ class ArrayViewer:
         self._display_model = display_model
         self._data_wrapper: DataWrapper | None = wrapper
         self._resolved = EMPTY_STATE
-        self._resolving = False
 
         self._connect_datawrapper(None, wrapper)
 
@@ -168,6 +167,11 @@ class ArrayViewer:
         self._display_model = model
         self._set_model_connected(self._display_model)
         self._fully_synchronize_view()
+
+    @property
+    def resolved(self) -> ResolvedDisplayState:
+        """Return the current resolved display state."""
+        return self._resolved
 
     @property
     def data_wrapper(self) -> Any:
@@ -268,28 +272,6 @@ class ArrayViewer:
                 kwargs["channel_mode"] = "rgba"
         return ArrayDisplayModel(**kwargs)
 
-    def _ensure_channel_axis(self) -> None:
-        """Guess and set channel_axis if a multichannel mode needs one."""
-        if (
-            self._display_model.channel_mode == ChannelMode.GRAYSCALE
-            or self._display_model.channel_axis is not None
-            or self._data_wrapper is None
-        ):
-            return
-        guess = self._data_wrapper.guess_channel_axis()
-        if guess is not None:
-            # check it's not in visible_axes
-            try:
-                normed_guess = self._data_wrapper.normalize_axis_key(guess)
-            except Exception:
-                return
-            normed_vis = tuple(
-                self._data_wrapper.normalize_axis_key(ax)
-                for ax in self._display_model.visible_axes
-            )
-            if normed_guess not in normed_vis:
-                self._display_model.channel_axis = guess
-
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
@@ -371,17 +353,11 @@ class ArrayViewer:
 
     def _re_resolve(self) -> None:
         """Resolve display state and apply changes."""
-        # guard against nested calls (_ensure_channel_axis may mutate the model)
-        if self._resolving or self._data_wrapper is None:
+        if self._data_wrapper is None:
             return
-        self._resolving = True
-        try:
-            self._ensure_channel_axis()
-            old = self._resolved
-            self._resolved = resolve(self._display_model, self._data_wrapper)
-            self._apply_changes(old, self._resolved)
-        finally:
-            self._resolving = False
+        old = self._resolved
+        self._resolved = resolve(self._display_model, self._data_wrapper)
+        self._apply_changes(old, self._resolved)
 
     def _apply_changes(
         self, old: ResolvedDisplayState, new: ResolvedDisplayState
@@ -431,14 +407,6 @@ class ArrayViewer:
         # Always push channel mode, even without data
         self._view.set_channel_mode(self._display_model.channel_mode)
         if self._data_wrapper is not None:
-            # Guess channel_axis from data if needed before resolving.
-            # Use the _resolving guard to prevent nested re-resolves from
-            # any model mutations that _ensure_channel_axis triggers.
-            self._resolving = True
-            try:
-                self._ensure_channel_axis()
-            finally:
-                self._resolving = False
             with self._view.currentIndexChanged.blocked():
                 self._view.create_sliders(self._data_wrapper.coords)
             self._resolved = resolve(self._display_model, self._data_wrapper)
