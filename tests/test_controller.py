@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
 
@@ -18,8 +19,10 @@ from ndv._types import (
 )
 from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
+from ndv.models import DataWrapper
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
+from ndv.models._resolve import DataResponse, resolve
 from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app, gui_frontend
@@ -450,11 +453,7 @@ def test_rgb_display_magic() -> None:
 
 def test_resolve_is_pure() -> None:
     """Test that resolve() does not mutate the input model."""
-    from ndv.models import DataWrapper
-    from ndv.models._resolve import resolve
-
-    data = np.empty((2, 3, 4, 5))
-    wrapper = DataWrapper.create(data)
+    wrapper = DataWrapper.create(np.empty((2, 3, 4, 5)))
     model = ArrayDisplayModel()
     model.current_index.assign({0: 7, -4: 1})
     before = dict(model.current_index)
@@ -471,18 +470,12 @@ def test_resolve_is_pure() -> None:
 @_patch_views
 def test_stale_response_discard() -> None:
     """Test that responses from old request generations are discarded."""
-    from concurrent.futures import Future
-
-    from ndv.models._resolve import DataResponse
-
     ctrl = ArrayViewer()
-    ctrl._canvas.reset_mock()
 
     # simulate a stale response from generation 1 when we're on generation 2
     old_response = DataResponse(n_visible_axes=2, data={None: np.zeros((8, 8))})
-    future: Future[DataResponse] = Future()
+    future = Future()
     future.set_result(old_response)
-
     ctrl._current_gen = 2
     ctrl._futures[future] = 1  # old generation
 

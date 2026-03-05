@@ -645,9 +645,8 @@ class ArrayViewer:
 
     @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
-        # NOTE: removing the reference to the last future here is important
-        # because the future has a reference to this widget in its _done_callbacks
-        # which will prevent the widget from being garbage collected if the future
+        # NOTE: popping the future is important because it holds a reference to
+        # this controller in _done_callbacks, which would prevent GC otherwise.
         gen = self._futures.pop(future, -1)
         if not self._futures:
             self._viewer_model.show_progress_spinner = False
