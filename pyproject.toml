@@ -62,7 +62,7 @@ pyside = [
 wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
-vispy = ["vispy>=0.14.3", "pyopengl >=3.1"]
+vispy = ["vispy>=0.15.2", "pyopengl >=3.1"]
 pygfx = ["pygfx==0.9.0", "rendercanvas ==2.0.1", "wgpu==0.19.3"]
 
 # ready to go bundles with pygfx
