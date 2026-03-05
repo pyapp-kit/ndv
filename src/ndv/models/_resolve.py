@@ -43,9 +43,24 @@ class DataResponse:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedDisplayState:
-    """Frozen snapshot of resolved display state.
+    """Frozen snapshot of resolved display state (ArrayDisplayModel + DataWrapper).
 
-    Produced by resolve(). Used for diffing in _apply_changes().
+    At any given time, the viewer's display state is influenced by both the current
+    ArrayDisplayModel (e.g. which axes are visible, channel mode, current_index), which
+    is mutable and can be updated by the user, and the DataWrapper, which has awareness
+    of the underlying data (e.g. dimension names, coordinates, metadata).
+
+    The term "resolution" here refers to the process of taking the user's "intentions",
+    as expressed in the `ArrayDisplayModel`, and *resolving* them against the reality of
+    the data, as represented by the DataWrapper.  This includes normalizing axis keys to
+    positive integers, injecting values derived from the data (e.g. guessing a channel
+    axis or inferring coordinates), and computing derived state.
+
+    The output of that resolution process is this `ResolvedDisplayState`, which is a
+    deterministic, immutable, hashable snapshot of the display state that can be used
+    for diffing and driving the actual data slicing and visualization logic.
+
+    Produced by `resolve()`. Used for diffing in `ArrayViewer._apply_changes()`.
     """
 
     visible_axes: tuple[int, ...]
