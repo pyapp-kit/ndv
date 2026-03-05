@@ -36,7 +36,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.13"]
         gui: [pyside, pyqt, jupyter, wxpython]
         canvas: [vispy, pygfx]
         exclude:
@@ -44,7 +44,7 @@ jobs:
           - python-version: "3.10"
             gui: pyside
           # this one always segfaults
-          - python-version: "3.12"
+          - python-version: "3.13"
             os: ubuntu-latest
             gui: pyside
             canvas: vispy
@@ -56,14 +56,13 @@ jobs:
             python-version: "3.10"
 
         include:
-          # test a couple more python variants, without
-          # full os/gui/canvas matrix coverage
+          # spot-check a few more python versions
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.12"
             gui: jupyter
             canvas: vispy
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.12"
             gui: jupyter
             canvas: pygfx
           - os: ubuntu-latest
@@ -71,8 +70,12 @@ jobs:
             gui: pyqt
             canvas: vispy
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.12"
             gui: pyqt
+            canvas: pygfx
+          - os: ubuntu-latest
+            python-version: "3.14"
+            gui: jupyter
             canvas: pygfx
 
     steps:
@@ -105,7 +108,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.13"]
         gui: [pyqt, jupyter]
         canvas: [vispy, pygfx]
     steps:
@@ -122,10 +125,7 @@ jobs:
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
       - name: Test min deps
-        run: >
-          uv run --exact --no-dev --resolution=lowest-direct
-            --extra=${{ matrix.canvas }} --group=${{ matrix.gui }}
-            pytest --color=yes
+        run: uv run --exact --no-dev --resolution=lowest-direct --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} pytest --color=yes
 
   test-array-libs:
     runs-on: ubuntu-latest
@@ -134,7 +134,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.13"]
 
     steps:
       - uses: actions/checkout@v6
