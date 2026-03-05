@@ -446,3 +446,62 @@ def test_rgb_display_magic() -> None:
 
     rgba_data = np.ones((1, 2, 3, 4, 4), dtype=np.uint8)
     assert_rgb_magic_works(rgba_data)
+
+
+def test_resolve_is_pure() -> None:
+    """Test that resolve() does not mutate the input model."""
+    from ndv.models import DataWrapper
+    from ndv.models._resolve import resolve
+
+    data = np.empty((2, 3, 4, 5))
+    wrapper = DataWrapper.create(data)
+    model = ArrayDisplayModel()
+    model.current_index.assign({0: 7, -4: 1})
+    before = dict(model.current_index)
+
+    resolved = resolve(model, wrapper)
+
+    # model should be untouched
+    assert dict(model.current_index) == before
+    # resolved normalizes -4 → 0, so duplicate key picked the non-int value
+    assert resolved.current_index[0] == 1
+
+
+@no_type_check
+@_patch_views
+def test_stale_response_discard() -> None:
+    """Test that responses from old request generations are discarded."""
+    from concurrent.futures import Future
+
+    from ndv.models._resolve import DataResponse
+
+    ctrl = ArrayViewer()
+    ctrl._canvas.reset_mock()
+
+    # simulate a stale response from generation 1 when we're on generation 2
+    old_response = DataResponse(n_visible_axes=2, data={None: np.zeros((8, 8))})
+    future: Future[DataResponse] = Future()
+    future.set_result(old_response)
+
+    ctrl._request_generation = 2
+    ctrl._futures.add(future)
+    ctrl._future_generations[future] = 1  # old generation
+
+    ctrl._on_data_response_ready(future)
+
+    # stale response should be ignored — no LUT controllers created, no refresh
+    assert len(ctrl._lut_controllers) == 0
+    ctrl._canvas.refresh.assert_not_called()
+
+
+@no_type_check
+@_patch_views
+def test_rgba_3d_fallback_warns() -> None:
+    """Test that RGBA mode with 3D view reverts to GRAYSCALE with a warning."""
+    ctrl = ArrayViewer(np.zeros((10, 4, 10, 10)))
+    ctrl.display_model.visible_axes = (0, 2, 3)
+
+    with pytest.warns(UserWarning, match="Cannot use RGBA mode with 3D view"):
+        ctrl.display_model.channel_mode = ChannelMode.RGBA
+
+    assert ctrl.display_model.channel_mode == ChannelMode.GRAYSCALE
