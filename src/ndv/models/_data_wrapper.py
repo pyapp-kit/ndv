@@ -319,7 +319,9 @@ class DataWrapper(Generic[ArrayT], ABC):
         coords = self.coords.get(dim, None)
         if coords is None:
             return {}
-        return {i: str(v) for i, v in enumerate(coords)}
+        return {
+            i: str(v.item() if hasattr(v, "item") else v) for i, v in enumerate(coords)
+        }
 
     def axis_scales(self) -> dict[Hashable, float]:
         """Return per-axis scale factors from coordinate spacing."""
