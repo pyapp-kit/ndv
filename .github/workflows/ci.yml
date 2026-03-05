@@ -93,10 +93,7 @@ jobs:
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
       - name: Test
         shell: bash
-        run: |
-          uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes || rc=$?
-          if [ "${rc:-0}" -ne 0 ] && [ "${rc:-0}" -ne 139 ]; then exit $rc; fi
-          if [ "${rc:-0}" -eq 139 ]; then echo "::warning::Process exited with SIGSEGV (139) during teardown"; fi
+        run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
 
       - name: Upload coverage
         uses: actions/upload-artifact@v6
