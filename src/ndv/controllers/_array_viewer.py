@@ -406,11 +406,11 @@ class ArrayViewer:
         if self._data_wrapper is not None:
             with self._view.currentIndexChanged.blocked():
                 self._view.create_sliders(self._data_wrapper.coords)
+            # Reconcile view with model BEFORE resolving, so current_index
+            # includes slider defaults for newly created sliders
+            self._on_view_current_index_changed()
         self._re_resolve()
 
-        # After slider creation, reconcile view positions back to model
-        if self._data_wrapper is not None:
-            self._on_view_current_index_changed()
         for lut_ctr in self._lut_controllers.values():
             lut_ctr.synchronize()
         self._synchronize_roi()
@@ -421,8 +421,8 @@ class ArrayViewer:
             return
         with self._view.currentIndexChanged.blocked():
             self._view.create_sliders(self._data_wrapper.coords)
-        self._re_resolve()
         self._on_view_current_index_changed()
+        self._re_resolve()
 
     def _synchronize_roi(self) -> None:
         """Fully re-synchronize the ROI view with the model."""
