@@ -398,6 +398,24 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created = ReferenceType(roi)
         return roi
 
+    def set_scales(self, scales: tuple[float, ...]) -> None:
+        """Set per-visible-axis scale factors for rendering."""
+        if not scales:
+            return
+        # scales are in data order (slowest-to-fastest, e.g. ZYX)
+        # vispy images use row,col -> y,x mapping, so reverse for XY
+        vis_scales = list(reversed(scales))
+        # pad to 3 components
+        while len(vis_scales) < 3:
+            vis_scales.append(1.0)
+        sx, sy, sz = vis_scales[0], vis_scales[1], vis_scales[2]
+        for child in self._view.scene.children:
+            if isinstance(child, (visuals.ImageVisual, visuals.VolumeVisual)):
+                child.transform = vispy.visuals.transforms.STTransform(
+                    scale=(sx, sy, sz)
+                )
+        self.set_range()
+
     def set_range(
         self,
         x: tuple[float, float] | None = None,

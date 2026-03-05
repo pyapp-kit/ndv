@@ -46,6 +46,8 @@ if TYPE_CHECKING:
         reducers: Mapping["AxisKey | None", ReducerType]
         luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
         default_lut: "LUTModel | LutModelKwargs"
+        scales: Mapping[AxisKey, float]
+        channel_names: Mapping[ChannelKey, str]
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
@@ -54,6 +56,10 @@ IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
 LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
+# map of axis to scale factor
+ScalesMap: TypeAlias = ValidatedEventedDict[AxisKey, float]
+# map of channel key to display name
+ChannelNamesMap: TypeAlias = ValidatedEventedDict[ChannelKey, str]
 # used for visible_axes
 TwoOrThreeAxisTuple: TypeAlias = (
     tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
@@ -195,6 +201,11 @@ class ArrayDisplayModel(NDVModel):
     # map of index along channel axis to LUTModel object
     luts: LutMap = Field(default_factory=_default_luts)
     default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
+
+    # per-axis scale factors (e.g. physical pixel size)
+    scales: ScalesMap = Field(default_factory=ScalesMap, frozen=True)
+    # per-channel display names
+    channel_names: ChannelNamesMap = Field(default_factory=ChannelNamesMap, frozen=True)
 
     @computed_field  # type: ignore [prop-decorator]
     @property

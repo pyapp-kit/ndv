@@ -311,6 +311,34 @@ class DataWrapper(Generic[ArrayT], ABC):
                 ) from e
             raise IndexError(f"Axis label {axis} not found in data dimensions") from e
 
+    def channel_names(self, channel_axis: int | None) -> dict[int, str]:
+        """Return channel display names from data metadata."""
+        if channel_axis is None:
+            return {}
+        dim = self.dims[channel_axis]
+        coords = self.coords.get(dim, None)
+        if coords is None:
+            return {}
+        return {i: str(v) for i, v in enumerate(coords)}
+
+    def axis_scales(self) -> dict[Hashable, float]:
+        """Return per-axis scale factors from coordinate spacing."""
+        scales: dict[Hashable, float] = {}
+        for dim in self.dims:
+            coord = self.coords.get(dim)
+            if coord is None or len(coord) < 2:
+                continue
+            try:
+                values = [float(v) for v in coord]
+            except (TypeError, ValueError):
+                continue
+            if any(not np.isfinite(v) for v in values):
+                continue
+            diffs = [values[i + 1] - values[i] for i in range(len(values) - 1)]
+            if all(abs(d - diffs[0]) < 1e-10 for d in diffs):
+                scales[dim] = diffs[0]
+        return scales
+
     def clear_cache(self) -> None:
         """Clear any cached properties."""
         if hasattr(self, "axis_map"):

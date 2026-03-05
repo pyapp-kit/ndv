@@ -500,6 +500,41 @@ def test_rgba_3d_fallback_warns() -> None:
 
 @no_type_check
 @_patch_views
+def test_set_scales_called_on_apply() -> None:
+    """set_scales is called on the canvas when scales change."""
+    ctrl = ArrayViewer(np.empty((3, 100, 200)))
+    ctrl._async = False
+    mock_canvas = ctrl._canvas
+
+    mock_canvas.set_scales.reset_mock()
+    ctrl.display_model.scales[1] = 0.5
+    mock_canvas.set_scales.assert_called()
+    args = mock_canvas.set_scales.call_args[0][0]
+    assert args[0] == 0.5  # axis 1
+
+
+@no_type_check
+@_patch_views
+def test_channel_names_in_lut_views() -> None:
+    """Channel names are pushed to LUT views."""
+    ctrl = ArrayViewer(
+        np.empty((3, 10, 10)),
+        channel_axis=0,
+        channel_mode="composite",
+        channel_names={0: "DAPI", 1: "GFP", 2: "mCherry"},
+    )
+    ctrl._async = False
+    ctrl._join()
+
+    for key, lut_ctrl in ctrl._lut_controllers.items():
+        if isinstance(key, int):
+            expected = {0: "DAPI", 1: "GFP", 2: "mCherry"}[key]
+            for view in lut_ctrl.lut_views:
+                view.set_channel_name.assert_called_with(expected)
+
+
+@no_type_check
+@_patch_views
 def test_data_replacement_with_stale_index() -> None:
     """Replacing data with fewer dims should not crash due to stale current_index."""
     # Start with 4D data — axes 0, 1, 2, 3 are all valid
