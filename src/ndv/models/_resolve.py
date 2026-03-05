@@ -101,8 +101,15 @@ EMPTY_STATE = ResolvedDisplayState(
 def _norm_visible_axes(
     model: ArrayDisplayModel, wrapper: DataWrapper
 ) -> tuple[int, ...]:
-    """Return visible_axes as positive integers."""
-    return tuple(wrapper.normalize_axis_key(ax) for ax in model.visible_axes)
+    """Return visible_axes as positive integers.
+
+    Falls back to the last N dims if any axis is stale.
+    """
+    try:
+        return tuple(wrapper.normalize_axis_key(ax) for ax in model.visible_axes)
+    except (IndexError, KeyError):
+        n = min(len(model.visible_axes), len(wrapper.dims))
+        return tuple(range(len(wrapper.dims) - n, len(wrapper.dims)))
 
 
 def _norm_channel_axis(model: ArrayDisplayModel, wrapper: DataWrapper) -> int | None:
@@ -112,7 +119,10 @@ def _norm_channel_axis(model: ArrayDisplayModel, wrapper: DataWrapper) -> int | 
     guess one from the wrapper (avoiding visible axes).
     """
     if model.channel_axis is not None:
-        return wrapper.normalize_axis_key(model.channel_axis)
+        try:
+            return wrapper.normalize_axis_key(model.channel_axis)
+        except (IndexError, KeyError):
+            return None  # stale channel_axis from previous data?
 
     guess = wrapper.guess_channel_axis()
     if guess is None:
@@ -124,7 +134,7 @@ def _norm_channel_axis(model: ArrayDisplayModel, wrapper: DataWrapper) -> int | 
         return None
 
     # don't use a visible axis as the channel axis
-    normed_vis = tuple(wrapper.normalize_axis_key(ax) for ax in model.visible_axes)
+    normed_vis = _norm_visible_axes(model, wrapper)
     if normed_guess in normed_vis:
         return None
 
@@ -144,7 +154,10 @@ def _norm_current_index(
     source_key: dict[int, Hashable] = {}  # tracks which original key wrote each entry
 
     for key, val in model.current_index.items():
-        normed = wrapper.normalize_axis_key(key)
+        try:
+            normed = wrapper.normalize_axis_key(key)
+        except (IndexError, KeyError):
+            continue  # stale key from previous data
         if normed in output:
             # prefer named keys (e.g. "Z") over raw integer keys
             is_raw_int = normed == key

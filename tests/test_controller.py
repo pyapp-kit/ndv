@@ -496,3 +496,24 @@ def test_rgba_3d_fallback_warns() -> None:
         ctrl.display_model.channel_mode = ChannelMode.RGBA
 
     assert ctrl.display_model.channel_mode == ChannelMode.GRAYSCALE
+
+
+@no_type_check
+@_patch_views
+def test_data_replacement_with_stale_index() -> None:
+    """Replacing data with fewer dims should not crash due to stale current_index."""
+    # Start with 4D data — axes 0, 1, 2, 3 are all valid
+    ctrl = ArrayViewer(np.empty((10, 3, 64, 64)))
+    ctrl._async = False
+
+    # Set an index on axis 3 (valid for 4D data)
+    ctrl.display_model.current_index[3] = 1
+
+    # Replace with 3D data — axis 3 no longer exists.
+    # _norm_current_index calls normalize_axis_key(3) which will raise IndexError
+    # because the new data only has 3 dims (valid axes: 0, 1, 2).
+    ctrl.data = np.empty((20, 32, 32))
+
+    # Should not have raised. The viewer should be in a usable state.
+    ctrl._request_data()
+    ctrl._join()
