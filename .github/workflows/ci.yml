@@ -40,14 +40,10 @@ jobs:
         gui: [pyside, pyqt, jupyter, wxpython]
         canvas: [vispy, pygfx]
         exclude:
-          # unsolved intermittent segfaults on this combo
-          - python-version: "3.10"
-            gui: pyside
-          # this one always segfaults
-          - python-version: "3.13"
-            os: ubuntu-latest
-            gui: pyside
-            canvas: vispy
+          # for now, this combo segfaults too much to be worth the hassle of debugging
+          # when we unpin and update pygfx, reconsider
+          - gui: pyside
+            canvas: pygfx
           # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
@@ -92,8 +88,7 @@ jobs:
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
       - name: Test
-        shell: bash
-        run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
+        run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes -p no:faulthandler
 
       - name: Upload coverage
         uses: actions/upload-artifact@v6
