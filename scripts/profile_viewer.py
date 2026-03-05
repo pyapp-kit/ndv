@@ -125,9 +125,8 @@ def simulate_data_replacement(n: int = 10) -> None:
 @no_type_check
 def simulate_resolve_only(n: int = 500) -> None:
     """Benchmark resolve() in isolation."""
-    from ndv.models._resolve import resolve
-
     from ndv.models import ArrayDisplayModel, DataWrapper
+    from ndv.models._resolve import resolve
 
     wrapper = DataWrapper.create(np.zeros(SHAPE_2D, dtype=np.uint8))
     model = ArrayDisplayModel()
