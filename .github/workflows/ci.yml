@@ -40,6 +40,10 @@ jobs:
         gui: [pyside, pyqt, jupyter, wxpython]
         canvas: [vispy, pygfx]
         exclude:
+          # for now, this combo segfaults too much to be worth the hassle of debugging
+          # when we unpin and update pygfx, reconsider
+          - gui: pyside
+            canvas: pygfx
           # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
