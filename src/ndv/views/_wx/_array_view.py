@@ -587,6 +587,10 @@ class _WxArrayViewer(wx.Frame):
         if (parent := canvas_widget.GetParent()) and parent is not self:
             canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
             if parent:
+                # Close the rendercanvas wrapper before destroying it so
+                # rendercanvas removes it from its internal tracking loop.
+                if hasattr(parent, "close"):
+                    parent.close()
                 parent.Destroy()
             canvas_widget.Show()
 

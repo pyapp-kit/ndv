@@ -17,14 +17,9 @@ from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import TypeAlias
 
     import cmap
     import numpy.typing as npt
-    from wgpu.gui.jupyter import JupyterWgpuCanvas
-    from wgpu.gui.qt import QWgpuCanvas
-
-    WgpuCanvas: TypeAlias = "QWgpuCanvas | JupyterWgpuCanvas"
 
 MIN_GAMMA: np.float64 = np.float64(1e-6)
 
@@ -125,8 +120,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-
-        self._renderer.blend_mode = "ordered1"
 
         # Note that we split the view up into multiple scenes, each with their
         # own camera and renderer.

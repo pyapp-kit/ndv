@@ -23,11 +23,8 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
 
         return rendercanvas.jupyter.JupyterRenderCanvas  # type: ignore[no-any-return]
     if frontend == GuiFrontend.WX:
-        # ...still not working
-        # import rendercanvas.wx
-        # return rendercanvas.wx.WxRenderWidget
-        from wgpu.gui.wx import WxWgpuCanvas
+        import rendercanvas.wx
 
-        return WxWgpuCanvas  # type: ignore[no-any-return]
+        return rendercanvas.wx.WxRenderCanvas  # type: ignore[no-any-return]
 
     raise ValueError(f"Unsupported frontend: {frontend}")  # pragma: no cover
