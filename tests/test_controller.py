@@ -646,3 +646,15 @@ def test_data_replacement_with_stale_index() -> None:
     # Should not have raised. The viewer should be in a usable state.
     ctrl._request_data()
     ctrl._join()
+
+
+@no_type_check
+@_patch_views
+def test_user_current_index_preserved_on_init() -> None:
+    """User-provided current_index must not be overwritten by slider defaults."""
+    user_index = {0: 5}
+    ctrl = ArrayViewer(current_index=user_index)
+    ctrl._view.current_index.return_value = {0: 0, 1: 0}
+    ctrl._async = False
+    ctrl.data = np.empty((10, 3, 64, 64))
+    assert ctrl.display_model.current_index[0] == 5

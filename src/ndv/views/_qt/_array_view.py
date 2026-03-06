@@ -336,6 +336,12 @@ class QLutView(LutView):
 
     def set_channel_name(self, name: str) -> None:
         self._qwidget.visible.setText(name)
+        parent = self._qwidget.parent()
+        while parent is not None:
+            if isinstance(parent, _QArrayViewer):
+                parent._align_lut_names()
+                break
+            parent = parent.parent()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
         self._qwidget.auto_clim.setChecked(not policy.is_manual)
@@ -778,6 +784,15 @@ class _QArrayViewer(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(self.splitter)
 
+    def _align_lut_names(self) -> None:
+        """Set matching minimum widths on all LUT name checkboxes."""
+        lut_widgets = self.luts.findChildren(_QLUTWidget)
+        if not lut_widgets:
+            return
+        max_w = max(w.visible.sizeHint().width() for w in lut_widgets)
+        for w in lut_widgets:
+            w.visible.setMinimumWidth(max_w)
+
     def resizeEvent(self, a0: Any) -> None:
         # position at spinner the top right of the canvas_widget:
         canv, spinner = self._canvas_widget, self._progress_spinner
@@ -825,6 +840,7 @@ class QtArrayView(ArrayView):
 
         view.histogramRequested.connect(self.histogramRequested)
         self._qwidget.luts.addWidget(view.frontend_widget())
+        self._qwidget._align_lut_names()
         return view
 
     def remove_lut_view(self, view: LutView) -> None:
