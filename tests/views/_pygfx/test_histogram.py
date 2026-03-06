@@ -15,6 +15,15 @@ from ndv.models._lut_model import ClimsManual, LUTModel
 from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
 
 
+def _force_canvas_size(
+    canvas: PyGFXHistogramCanvas, w: int = 600, h: int = 600
+) -> None:
+    """Force the rendercanvas to report a valid size (needed before show)."""
+    rc = canvas._canvas
+    target = getattr(rc, "_subwidget", rc)
+    target._size_info.set_physical_size(w, h, 1.0)
+
+
 @pytest.mark.usefixtures("any_app")
 def test_hscroll() -> None:
     model = LUTModel(
@@ -23,6 +32,7 @@ def test_hscroll() -> None:
         # gamma=2,
     )
     histogram = PyGFXHistogramCanvas()
+    _force_canvas_size(histogram)
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10
@@ -85,6 +95,7 @@ def test_interaction() -> None:
         # gamma=2,
     )
     histogram = PyGFXHistogramCanvas()
+    _force_canvas_size(histogram)
     histogram.set_range(x=(0, 10), y=(0, 1))
     histogram.model = model
     left, right = 0, 10

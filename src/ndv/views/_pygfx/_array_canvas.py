@@ -25,15 +25,9 @@ from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from typing import TypeAlias
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
-    from wgpu.gui.jupyter import JupyterWgpuCanvas
-    from wgpu.gui.qt import QWgpuCanvas
-    from wgpu.gui.wx import WxWgpuCanvas
-
-    WgpuCanvas: TypeAlias = "QWgpuCanvas | JupyterWgpuCanvas | WxWgpuCanvas"
 
 
 def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
@@ -387,7 +381,6 @@ class GfxArrayCanvas(ArrayCanvas):
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
         self._camera: pygfx.Camera | None = None
@@ -450,8 +443,7 @@ class GfxArrayCanvas(ArrayCanvas):
         tex = pygfx.Texture(data, dim=2)
         image = pygfx.Image(
             pygfx.Geometry(grid=tex),
-            # depth_test=False for additive-like blending
-            pygfx.ImageBasicMaterial(depth_test=False),
+            pygfx.ImageBasicMaterial(depth_test=False, alpha_mode="add"),
         )
         self._scene.add(image)
 
@@ -475,8 +467,9 @@ class GfxArrayCanvas(ArrayCanvas):
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
             pygfx.Geometry(grid=tex),
-            # depth_test=False for additive-like blending
-            pygfx.VolumeRayMaterial(interpolation="nearest", depth_test=False),
+            pygfx.VolumeRayMaterial(
+                interpolation="nearest", depth_test=False, alpha_mode="add"
+            ),
         )
         self._scene.add(vol)
 
@@ -595,6 +588,15 @@ class GfxArrayCanvas(ArrayCanvas):
     def close(self) -> None:
         self._disconnect_mouse_events()
         self._canvas.close()
+        # Break reference cycles so the Qt widget can be garbage-collected.
+        # The controller registers event handlers on the renderer that capture
+        # the viewport in a closure, creating a ref cycle.
+        self._renderer._event_handlers.clear()
+        self._disconnect_mouse_events = None  # type: ignore[assignment]
+        self._renderer = None
+        self._canvas = None
+        if hasattr(self, "_controller"):
+            self._controller = None
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
         if self._selection:
