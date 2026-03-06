@@ -64,9 +64,7 @@ LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
 # map of axis to scale factor
-ScalesMap: TypeAlias = Annotated[
-    ValidatedEventedDict[AxisKey, float], BeforeValidator(_seq_to_dict)
-]
+ScalesMap: TypeAlias = ValidatedEventedDict[AxisKey, float]
 # map of channel index to display name
 ChannelNamesMap: TypeAlias = Annotated[
     ValidatedEventedDict[int, str], BeforeValidator(_seq_to_dict)
