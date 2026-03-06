@@ -431,7 +431,6 @@ class ArrayViewer:
         for lut_ctr in self._lut_controllers.values():
             lut_ctr.synchronize()
         self._update_channel_names(self._resolved.channel_names)
-        self._canvas.set_scales(self._resolved.visible_scales)
         self._synchronize_roi()
 
     def _on_dims_changed(self) -> None:

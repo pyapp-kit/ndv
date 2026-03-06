@@ -511,10 +511,13 @@ class GfxArrayCanvas(ArrayCanvas):
         while len(gfx_scales) < 3:
             gfx_scales.append(1.0)
         sx, sy, sz = gfx_scales[0], gfx_scales[1], gfx_scales[2]
+        has_visuals = False
         for child in self._scene.children:
             if isinstance(child, (pygfx.Image, pygfx.Volume)):
                 child.local.scale = (sx, sy, sz)
-        self.set_range()
+                has_visuals = True
+        if has_visuals:
+            self.set_range()
 
     def set_range(
         self,
