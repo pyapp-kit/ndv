@@ -227,15 +227,6 @@ class PyGFXHistogramCanvas(HistogramCanvas):
     def close(self) -> None:
         self._disconnect_mouse_events()
         self._canvas.close()
-        # Break reference cycles so the Qt widget can be garbage-collected.
-        # The controller registers event handlers on the renderer that capture
-        # the viewport in a closure, creating a ref cycle.
-        self._renderer._event_handlers.clear()
-        self._disconnect_mouse_events = None  # type: ignore[assignment]
-        self._renderer = None
-        self._controller = None  # type: ignore[assignment]
-        self._plot_view = None
-        self._canvas = None
 
     def _resize(
         self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None

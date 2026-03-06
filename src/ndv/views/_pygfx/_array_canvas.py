@@ -591,15 +591,6 @@ class GfxArrayCanvas(ArrayCanvas):
     def close(self) -> None:
         self._disconnect_mouse_events()
         self._canvas.close()
-        # Break reference cycles so the Qt widget can be garbage-collected.
-        # The controller registers event handlers on the renderer that capture
-        # the viewport in a closure, creating a ref cycle.
-        self._renderer._event_handlers.clear()
-        self._disconnect_mouse_events = None  # type: ignore[assignment]
-        self._renderer = None
-        self._canvas = None
-        if hasattr(self, "_controller"):
-            self._controller = None
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
         if self._selection:
