@@ -4,6 +4,7 @@ import gc
 import importlib
 import importlib.util
 import os
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -36,6 +37,13 @@ def asyncio_app() -> Iterator[AbstractEventLoop]:
 @pytest.fixture(scope="session")
 def wxapp() -> Iterator[wx.App]:
     import wx
+
+    # wx.App() hangs on macOS if a QApplication is already running, because both
+    # try to own the NSApplication singleton. Skip wx tests in that case.
+    for mod_name in ("PyQt5", "PySide2", "PySide6", "PyQt6"):
+        if mod := sys.modules.get(f"{mod_name}.QtWidgets"):
+            if (qapp := getattr(mod, "QApplication", None)) and qapp.instance():
+                pytest.skip("Qt already running. Cannot also test wx.")
 
     if (_wxapp := wx.App.Get()) is None:
         _wxapp = wx.App()
