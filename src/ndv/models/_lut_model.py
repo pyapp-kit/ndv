@@ -8,10 +8,10 @@ from annotated_types import Gt, Interval
 from cmap import Colormap
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     PrivateAttr,
-    field_validator,
     model_validator,
 )
 
@@ -149,7 +149,27 @@ class ClimsStdDev(ClimPolicy):
 #         return self.func(data)
 
 
-ClimsType: TypeAlias = ClimsManual | ClimsPercentile | ClimsStdDev | ClimsMinMax
+def _validate_clims(v: Any) -> Any:
+    if isinstance(v, str):
+        v = {"clim_type": v}
+    if v is None or (
+        isinstance(v, dict)
+        and v.get("min_percentile") == 0
+        and v.get("max_percentile") == 100
+    ):
+        return ClimsMinMax()
+    if isinstance(v, (tuple, list, np.ndarray)):
+        if len(v) == 2:
+            return ClimsManual(min=v[0], max=v[1])
+        raise ValueError("Clims sequence must have exactly 2 elements.")
+    return v
+
+
+ClimsType: TypeAlias = Annotated[
+    ClimsManual | ClimsPercentile | ClimsStdDev | ClimsMinMax,
+    BeforeValidator(_validate_clims),
+    # Field(discriminator="clim_type"),
+]
 
 
 class LUTModel(NDVModel):
@@ -157,6 +177,8 @@ class LUTModel(NDVModel):
 
     Attributes
     ----------
+    name : str
+        Display name for this channel. Empty string means no explicit name.
     visible : bool
         Whether to display this channel.
         NOTE: This has implications for data retrieval, as we may not want to request
@@ -175,9 +197,10 @@ class LUTModel(NDVModel):
         Gamma applied to the data before applying the colormap. By default, `1.0`.
     """
 
+    name: str = ""
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
-    clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
+    clims: ClimsType = Field(default_factory=ClimsMinMax)
     clim_bounds: tuple[float | None, float | None] = (None, None)
     gamma: float = 1.0
 
@@ -186,19 +209,4 @@ class LUTModel(NDVModel):
         # cast bare string/colormap inputs to cmap declaration
         if isinstance(v, (str, Colormap)):
             return {"cmap": v}
-        return v
-
-    @field_validator("clims", mode="before")
-    @classmethod
-    def _validate_clims(cls, v: ClimsType) -> ClimsType:
-        if v is None or (
-            isinstance(v, dict)
-            and v.get("min_percentile") == 0
-            and v.get("max_percentile") == 100
-        ):
-            return ClimsMinMax()
-        if isinstance(v, (tuple, list, np.ndarray)):
-            if len(v) == 2:
-                return ClimsManual(min=v[0], max=v[1])
-            raise ValueError("Clims sequence must have exactly 2 elements.")
         return v

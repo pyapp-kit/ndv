@@ -45,10 +45,8 @@ class ChannelController:
     def synchronize(self, *views: LutView) -> None:
         """Aligns all views against the backing model."""
         _views: Iterable[LutView] = views or self.lut_views
-        name = str(self.key) if self.key is not None else ""
         for view in _views:
             view.synchronize()
-            view.set_channel_name(name)
 
     def update_texture_data(self, data: np.ndarray) -> None:
         """Update the data in the image handle."""

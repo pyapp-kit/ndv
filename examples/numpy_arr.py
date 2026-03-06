@@ -18,5 +18,5 @@ viewer = ndv.imshow(
     img,
     current_index={0: 30},
     channel_mode="composite",
-    channel_names=["FITC", "DAPI"],
+    luts={0: {"name": "FITC"}, 1: {"name": "DAPI", "cmap": "magenta"}},
 )

@@ -4,8 +4,8 @@ import numpy as np
 
 from ndv.models._array_display_model import ArrayDisplayModel
 from ndv.models._data_wrapper import DataWrapper
+from ndv.models._lut_model import LUTModel
 from ndv.models._resolve import (
-    _resolve_channel_names,
     _resolve_visible_scales,
     resolve,
 )
@@ -93,8 +93,8 @@ def test_resolve_visible_scales_from_xarray() -> None:
     assert result[1] == 0.25
 
 
-def test_resolve_channel_names_user_overrides_data() -> None:
-    """User-set channel names take priority over data-derived names."""
+def test_data_wrapper_channel_names() -> None:
+    """Data-derived channel names come from coordinate labels."""
     xr = __import__("pytest").importorskip("xarray")
     da = xr.DataArray(
         np.empty((3, 10, 20)),
@@ -102,18 +102,14 @@ def test_resolve_channel_names_user_overrides_data() -> None:
         coords={"c": ["red", "green", "blue"]},
     )
     wrapper = DataWrapper.create(da)
-    model = ArrayDisplayModel(channel_names={0: "DAPI", 1: "GFP"})
-    result = _resolve_channel_names(model, wrapper, channel_axis=0)
-    assert result[0] == "DAPI"
-    assert result[1] == "GFP"
-    assert result[2] == "blue"  # data-derived, not overridden
+    result = wrapper.channel_names(channel_axis=0)
+    assert result == {0: "red", 1: "green", 2: "blue"}
 
 
-def test_resolve_channel_names_no_channel_axis() -> None:
+def test_data_wrapper_channel_names_no_axis() -> None:
     """No channel axis returns empty dict."""
     wrapper = DataWrapper.create(np.empty((10, 20)))
-    model = ArrayDisplayModel()
-    result = _resolve_channel_names(model, wrapper, channel_axis=None)
+    result = wrapper.channel_names(channel_axis=None)
     assert result == {}
 
 
@@ -158,18 +154,16 @@ def test_axis_scales_non_uniform_skipped() -> None:
     assert "x" not in scales
 
 
-def test_full_resolve_includes_scales_and_names() -> None:
-    """resolve() populates visible_scales and channel_names."""
+def test_full_resolve_includes_scales() -> None:
+    """resolve() populates visible_scales."""
     wrapper = DataWrapper.create(np.empty((3, 100, 200)))
     model = ArrayDisplayModel(
         channel_axis=0,
         channel_mode="composite",
         scales={1: 0.5, 2: 0.1},
-        channel_names={0: "DAPI", 1: "GFP", 2: "mCherry"},
     )
     resolved = resolve(model, wrapper)
     assert resolved.visible_scales == (0.5, 0.1)
-    assert resolved.channel_names == {0: "DAPI", 1: "GFP", 2: "mCherry"}
 
 
 def test_scale_change_triggers_equality_diff() -> None:
@@ -182,16 +176,52 @@ def test_scale_change_triggers_equality_diff() -> None:
     assert r1 != r2  # different scales
 
 
-def test_channel_names_change_no_equality_diff() -> None:
-    """Changing channel_names should NOT make two states unequal (cosmetic)."""
+def test_lut_names_dont_affect_resolved_equality() -> None:
+    """Lut names are view-local; they should not appear in resolved state."""
     wrapper = DataWrapper.create(np.empty((3, 100, 200)))
     model1 = ArrayDisplayModel(channel_axis=0, channel_mode="composite")
     model2 = ArrayDisplayModel(
         channel_axis=0,
         channel_mode="composite",
-        channel_names={0: "DAPI"},
+        luts={0: LUTModel(name="DAPI")},
     )
     r1 = resolve(model1, wrapper)
     r2 = resolve(model2, wrapper)
-    # channel_names is excluded from __eq__, so states should be equal
     assert r1 == r2
+    assert not hasattr(r1, "channel_names")
+
+
+def test_lut_view_name_resolution() -> None:
+    """LutView resolves display name from lut.name and fallback."""
+    from ndv.views.bases._lut_view import LutView
+
+    class ConcreteLutView(LutView):
+        def __init__(self) -> None:
+            self.last_name = ""
+
+        def set_channel_name(self, name: str) -> None:
+            self.last_name = name
+
+        def set_clim_policy(self, policy: object) -> None: ...
+        def set_colormap(self, cmap: object) -> None: ...
+        def set_clims(self, clims: tuple[float, float]) -> None: ...
+        def set_channel_visible(self, visible: bool) -> None: ...
+        def frontend_widget(self) -> None: ...
+        def set_visible(self, visible: bool) -> None: ...
+        def close(self) -> None: ...
+
+    view = ConcreteLutView()
+    lut = LUTModel()
+    view.model = lut
+
+    # fallback name is used when lut.name is empty
+    view.set_fallback_name("DAPI")
+    assert view.last_name == "DAPI"
+
+    # setting lut.name overrides the fallback
+    lut.name = "Custom"
+    assert view.last_name == "Custom"
+
+    # clearing lut.name reverts to fallback
+    lut.name = ""
+    assert view.last_name == "DAPI"
