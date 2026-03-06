@@ -196,11 +196,19 @@ def _norm_current_index(
         output[normed] = val
         source_key[normed] = key
 
-    # Fill in default (0) for any axis not specified by the model
-    for key in wrapper.coords:
+    # Fill in default (0) for any axis not specified by the model,
+    # and clamp integer values to valid coordinate ranges.
+    coords = wrapper.coords
+    for key in coords:
         ax = wrapper.normalize_axis_key(key)
         if ax not in output:
             output[ax] = 0
+        else:
+            val = output[ax]
+            if isinstance(val, int):
+                max_val = len(coords[key]) - 1
+                if val > max_val:
+                    output[ax] = max_val
 
     return output
 

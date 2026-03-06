@@ -439,7 +439,6 @@ class ArrayViewer:
             return
         with self._view.currentIndexChanged.blocked():
             self._view.create_sliders(self._data_wrapper.coords)
-        self._on_view_current_index_changed()
         self._re_resolve()
 
     def _synchronize_roi(self) -> None:
