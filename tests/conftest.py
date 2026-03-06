@@ -110,7 +110,6 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     # This is a known widget that is not cleaned up properly
     remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
     if len(remaining) > nbefore:
-        breakpoint()
         test_node = request.node
 
         test = f"{test_node.path.name}::{test_node.originalname}"

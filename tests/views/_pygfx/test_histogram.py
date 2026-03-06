@@ -15,6 +15,7 @@ from ndv.models._lut_model import ClimsManual, LUTModel
 from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
 
 
+# ugly hack
 def _force_canvas_size(
     canvas: PyGFXHistogramCanvas, w: int = 600, h: int = 600
 ) -> None:
