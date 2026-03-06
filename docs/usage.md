@@ -8,7 +8,10 @@ The simplest way to display an array is with [`imshow`][ndv.imshow]:
 import ndv
 
 data = ndv.data.cells3d()  # or any array-like object
-ndv.imshow(data)
+viewer = ndv.imshow(data)
+
+# later, if desired:
+viewer.display_model.current_index.update({0: 30})
 ```
 
 This opens a viewer window with sliders for navigating through dimensions,
@@ -56,7 +59,7 @@ scripted usage.
 ### Embedding in an application
 
 `ArrayViewer` can be embedded into an existing Qt or wxPython application.
-Use the [`widget`][ndv.ArrayViewer.widget] property to get the native widget
+Use the [`widget()`][ndv.ArrayViewer.widget] method to get the native widget
 and add it to your layout:
 
 ```python
@@ -92,6 +95,8 @@ display state. During resolution, things like negative axis indices get
 converted to positive ones, channel axes may be inferred if not specified,
 coordinate labels are pulled from the data, and missing information is
 filled in with sensible defaults.
+
+Conceptually, resolution looks like this:
 
 ```mermaid
 graph LR
@@ -163,6 +168,8 @@ If you don't specify a `channel_axis`, `ndv` will try to guess one from
 your data (using dimension names like `"channel"` or `"C"`, or falling back
 to the smallest dimension). For arrays whose last axis has length 3 or 4,
 `ndv` defaults to `"rgba"` mode automatically.
+For predictable behavior, especially with unusual shapes, set `channel_axis`
+explicitly.
 
 ### Lookup tables (LUTs)
 
@@ -231,9 +238,9 @@ values always take priority.
 The only requirement is that your object supports `__getitem__` (indexing)
 and has a `shape` attribute. If it does, `ndv` will wrap it automatically.
 
-For labeled array types that carry dimension names (`.dims`) or coordinates
-(`.coords`) (like xarray or tensorstore), `ndv` will extract and use that
-information for axis labels, channel names, and scale factors.
+For labeled array types (for example, xarray and tensorstore), `ndv` uses
+available dimension labels and coordinates when present for axis labels,
+channel names, and scale factors.
 
 ### Custom data types
 
