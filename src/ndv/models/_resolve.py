@@ -196,6 +196,12 @@ def _norm_current_index(
         output[normed] = val
         source_key[normed] = key
 
+    # Fill in default (0) for any axis not specified by the model
+    for key in wrapper.coords:
+        ax = wrapper.normalize_axis_key(key)
+        if ax not in output:
+            output[ax] = 0
+
     return output
 
 

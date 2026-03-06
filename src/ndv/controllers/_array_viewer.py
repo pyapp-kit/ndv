@@ -426,12 +426,6 @@ class ArrayViewer:
         if self._data_wrapper is not None:
             with self._view.currentIndexChanged.blocked():
                 self._view.create_sliders(self._data_wrapper.coords)
-            # Merge view slider defaults into model, but preserve any
-            # values the model already has (e.g. user-provided current_index)
-            view_index = self._view.current_index()
-            for k, v in view_index.items():
-                if k not in self._display_model.current_index:
-                    self._display_model.current_index[k] = v
         self._re_resolve()
 
         for lut_ctr in self._lut_controllers.values():
