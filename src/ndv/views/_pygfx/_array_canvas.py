@@ -25,15 +25,9 @@ from ._util import rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from typing import TypeAlias
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
-    from wgpu.gui.jupyter import JupyterWgpuCanvas
-    from wgpu.gui.qt import QWgpuCanvas
-    from wgpu.gui.wx import WxWgpuCanvas
-
-    WgpuCanvas: TypeAlias = "QWgpuCanvas | JupyterWgpuCanvas | WxWgpuCanvas"
 
 
 def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
@@ -387,9 +381,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
-        self._renderer.blend_mode = "additive"
 
         self._scene = pygfx.Scene()
+        self._scene.add(pygfx.Background(None, pygfx.BackgroundMaterial("black")))
         self._camera: pygfx.Camera | None = None
         self._ndim: Literal[2, 3] | None = None
 
@@ -397,6 +391,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._selection: CanvasElement | None = None
         # Maintain a weak reference to the last ROI created.
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
+
+        self._canvas.add_event_handler(lambda e: self.refresh(), "resize")
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -450,8 +446,7 @@ class GfxArrayCanvas(ArrayCanvas):
         tex = pygfx.Texture(data, dim=2)
         image = pygfx.Image(
             pygfx.Geometry(grid=tex),
-            # depth_test=False for additive-like blending
-            pygfx.ImageBasicMaterial(depth_test=False),
+            pygfx.ImageBasicMaterial(depth_test=False, alpha_mode="add"),
         )
         self._scene.add(image)
 
@@ -475,8 +470,9 @@ class GfxArrayCanvas(ArrayCanvas):
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
             pygfx.Geometry(grid=tex),
-            # depth_test=False for additive-like blending
-            pygfx.VolumeRayMaterial(interpolation="nearest", depth_test=False),
+            pygfx.VolumeRayMaterial(
+                interpolation="nearest", depth_test=False, alpha_mode="add"
+            ),
         )
         self._scene.add(vol)
 

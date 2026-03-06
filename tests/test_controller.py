@@ -319,6 +319,8 @@ def test_array_viewer_histogram() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_roi_controller() -> None:
     ctrl = ArrayViewer()
+    ctrl.show()
+    _app.process_events()
     roi = RectangularROIModel()
     viewer = ctrl._viewer_model
 
@@ -342,6 +344,7 @@ def test_roi_controller() -> None:
         (world_pos[0] + 1, world_pos[1] + 1),
     )
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
+    ctrl._canvas.close()
 
 
 @no_type_check
@@ -352,6 +355,8 @@ def test_roi_interaction() -> None:
         return
 
     ctrl = ArrayViewer()
+    ctrl.show()
+    _app.process_events()
     roi = RectangularROIModel()
     ctrl.roi = roi
     roi_view = ctrl._roi_view
@@ -428,6 +433,7 @@ def test_roi_interaction() -> None:
         (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
     )
     assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
+    ctrl._canvas.close()
 
 
 @pytest.mark.allow_leaks
