@@ -383,6 +383,7 @@ class GfxArrayCanvas(ArrayCanvas):
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
 
         self._scene = pygfx.Scene()
+        self._scene.add(pygfx.Background(None, pygfx.BackgroundMaterial("black")))
         self._camera: pygfx.Camera | None = None
         self._ndim: Literal[2, 3] | None = None
 
