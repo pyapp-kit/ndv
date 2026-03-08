@@ -62,6 +62,9 @@ class ArrayCanvas(GraphicsCanvas):
     @abstractmethod
     def add_bounding_box(self) -> RectangularROIHandle: ...
 
+    def set_scales(self, scales: tuple[float, ...]) -> None:
+        """Set per-visible-axis scale factors for rendering."""
+
 
 class HistogramCanvas(GraphicsCanvas, LutView):
     """A histogram-based view for LookUp Table (LUT) adjustment."""

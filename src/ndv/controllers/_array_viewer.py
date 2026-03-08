@@ -131,7 +131,7 @@ class ArrayViewer:
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.ndimToggleRequested.connect(self._on_view_ndim_toggle_requested)
 
-        self._highlight_pos: tuple[int, int] | None = None
+        self._highlight_pos: tuple[float, float] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
@@ -316,9 +316,8 @@ class ArrayViewer:
             (model.events.channel_axis, self._re_resolve),
             (model.current_index.value_changed, self._re_resolve),
             (model.events.channel_mode, self._re_resolve),
-            # TODO: lut values themselves are mutable evented objects...
-            # so we need to connect to their events as well
-            # (model.luts.value_changed, ...),
+            (model.scales.value_changed, self._re_resolve),
+            (model.luts.value_changed, self._re_resolve),
         ]:
             getattr(obj, _connect)(callback)
 
@@ -381,8 +380,35 @@ class ArrayViewer:
         if needs_data:
             self._request_data()
 
+        if old.visible_scales != new.visible_scales:
+            self._canvas.set_scales(new.visible_scales)
+
+        if old.channel_axis != new.channel_axis:
+            self._push_fallback_channel_names()
+
         if old.summary_info != new.summary_info:
             self._view.set_data_info(new.summary_info)
+
+    def _fallback_channel_name(self, key: ChannelKey) -> str:
+        """Compute the data-derived fallback name for a channel key."""
+        if self._data_wrapper is not None and isinstance(key, int):
+            names = self._data_wrapper.channel_names(self._resolved.channel_axis)
+            return names.get(key, str(key))
+        if key is None:
+            return ""
+        return str(key)
+
+    def _push_fallback_channel_names(self) -> None:
+        """Push data-derived fallback names to all LUT views.
+
+        This logic lives here, as opposed to the LutView or ChannelController, because
+        it's one of the few fields that can be resolved from either the model or the
+        data, and this is the layer that has access to both.
+        """
+        for key, ctrl in self._lut_controllers.items():
+            name = self._fallback_channel_name(key)
+            for view in ctrl.lut_views:
+                view.set_fallback_name(name)
 
     def _update_lut_visibility(self, mode: ChannelMode) -> None:
         """Update LUT view visibility based on channel mode."""
@@ -406,13 +432,11 @@ class ArrayViewer:
         if self._data_wrapper is not None:
             with self._view.currentIndexChanged.blocked():
                 self._view.create_sliders(self._data_wrapper.coords)
-            # Reconcile view with model BEFORE resolving, so current_index
-            # includes slider defaults for newly created sliders
-            self._on_view_current_index_changed()
         self._re_resolve()
 
         for lut_ctr in self._lut_controllers.values():
             lut_ctr.synchronize()
+        self._push_fallback_channel_names()
         self._synchronize_roi()
 
     def _on_dims_changed(self) -> None:
@@ -421,7 +445,6 @@ class ArrayViewer:
             return
         with self._view.currentIndexChanged.blocked():
             self._view.create_sliders(self._data_wrapper.coords)
-        self._on_view_current_index_changed()
         self._re_resolve()
 
     def _synchronize_roi(self) -> None:
@@ -512,7 +535,7 @@ class ArrayViewer:
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
-        self._highlight_pos = (int(x), int(y))
+        self._highlight_pos = (x, y)
 
         # update highlight display
         channel_values = self._get_values_at_world_point(*self._highlight_pos)
@@ -642,6 +665,9 @@ class ArrayViewer:
                     views=lut_views,
                 )
                 self._update_channel_dtype(key)
+                fallback = self._fallback_channel_name(key)
+                for v in lut_ctrl.lut_views:
+                    v.set_fallback_name(fallback)
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
@@ -651,6 +677,7 @@ class ArrayViewer:
                 elif response.n_visible_axes == 3:
                     handle = self._canvas.add_volume(data)
                     lut_ctrl.add_handle(handle)
+                self._canvas.set_scales(self._resolved.visible_scales)
 
             else:
                 lut_ctrl.update_texture_data(data)
@@ -667,15 +694,29 @@ class ArrayViewer:
             channel_values = self._get_values_at_world_point(*self._highlight_pos)
             self._highlight_values(channel_values, self._highlight_pos)
 
-    def _get_values_at_world_point(self, x: int, y: int) -> dict[ChannelKey, float]:
+    def _get_values_at_world_point(self, x: float, y: float) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
         n_vis = len(self._resolved.visible_axes)
-        if x < 0 or y < 0 or n_vis != 2:  # pragma: no cover
+        if n_vis != 2:  # pragma: no cover
+            return {}
+
+        # map world coordinates back to data pixel indices using scales
+        # world x corresponds to the fastest visible axis (last),
+        # world y corresponds to the second-fastest (second-to-last)
+        scales = self._resolved.visible_scales
+        if len(scales) >= 2:
+            sx, sy = scales[-1], scales[-2]
+            data_x = int(x / sx) if sx != 0 else int(x)
+            data_y = int(y / sy) if sy != 0 else int(y)
+        else:
+            data_x, data_y = int(x), int(y)
+
+        if data_x < 0 or data_y < 0:
             return {}
 
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
-            if (value := ctrl.get_value_at_index((y, x))) is not None:
+            if (value := ctrl.get_value_at_index((data_y, data_x))) is not None:
                 # Handle RGB
                 if key == "RGB" and isinstance(value, np.ndarray):
                     values["R"] = value[0]

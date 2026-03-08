@@ -398,6 +398,24 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created = ReferenceType(roi)
         return roi
 
+    def set_scales(self, scales: tuple[float, ...]) -> None:
+        """Set per-visible-axis scale factors for rendering."""
+        if not scales:
+            return
+        # scales are in data order (slowest-to-fastest, e.g. ZYX)
+        # vispy images use row,col -> y,x mapping, so reverse for XY
+        vis_scales = list(reversed(scales))
+        # pad to 3 components
+        while len(vis_scales) < 3:
+            vis_scales.append(1.0)
+        sx, sy, sz = vis_scales[0], vis_scales[1], vis_scales[2]
+        for child in self._view.scene.children:
+            if isinstance(child, (visuals.ImageVisual, visuals.VolumeVisual)):
+                child.transform = vispy.visuals.transforms.STTransform(
+                    scale=(sx, sy, sz)
+                )
+        self.set_range()
+
     def set_range(
         self,
         x: tuple[float, float] | None = None,
@@ -407,31 +425,40 @@ class VispyArrayCanvas(ArrayCanvas):
     ) -> None:
         """Update the range of the PanZoomCamera.
 
-        When called with no arguments, the range is set to the full extent of the data.
+        When called with no arguments, the range is set to the full extent of
+        the data, accounting for any STTransform scales on image visuals.
         """
-        # temporary
-        self._camera.set_range()
-        return
+        # Compute scaled bounds from image/volume visuals
+        has_images = False
         _x = [0.0, 0.0]
         _y = [0.0, 0.0]
         _z = [0.0, 0.0]
 
         for handle in self._elements.values():
             if isinstance(handle, VispyImageHandle):
-                shape = handle.data.shape
-                _x[1] = max(_x[1], shape[0])
-                _y[1] = max(_y[1], shape[1])
-                if len(shape) > 2:
-                    _z[1] = max(_z[1], shape[2])
-            elif isinstance(handle, VispyRectangle):
-                for v in handle.vertices:
-                    _x[0] = min(_x[0], v[0])
-                    _x[1] = max(_x[1], v[0])
-                    _y[0] = min(_y[0], v[1])
-                    _y[1] = max(_y[1], v[1])
-                    if len(v) > 2:
-                        _z[0] = min(_z[0], v[2])
-                        _z[1] = max(_z[1], v[2])
+                data = handle.data()
+                if data is None:
+                    continue
+                has_images = True
+                shape = data.shape
+                sx, sy, sz = 1.0, 1.0, 1.0
+                tform = handle._visual.transform
+                if isinstance(tform, vispy.visuals.transforms.STTransform):
+                    sx, sy, sz = tform.scale[:3]
+                if len(shape) == 3:
+                    # VolumeVisual: data (D,H,W) maps to scene (x=W, y=H, z=D)
+                    _x[1] = max(_x[1], shape[2] * sx)
+                    _y[1] = max(_y[1], shape[1] * sy)
+                    _z[1] = max(_z[1], shape[0] * sz)
+                else:
+                    # ImageVisual: data (H,W) maps to scene (x=W, y=H)
+                    _x[1] = max(_x[1], shape[1] * sx)
+                    _y[1] = max(_y[1], shape[0] * sy)
+
+        if not has_images:
+            # No image data — fall back to vispy's auto-detection
+            self._camera.set_range()
+            return
 
         x = cast("tuple[float, float]", _x) if x is None else x
         y = cast("tuple[float, float]", _y) if y is None else y
@@ -442,8 +469,10 @@ class VispyArrayCanvas(ArrayCanvas):
             self._camera._quaternion = DEFAULT_QUATERNION
         self._view.camera.set_range(x=x, y=y, z=z, margin=margin)
         if is_3d:
-            max_size = max(x[1], y[1], z[1])
-            self._camera.scale_factor = max_size + 6
+            # vispy computes scale_factor from the 3D diagonal, which over-zooms
+            # the initial top-down view. Override to match the 2D view extent.
+            xy_max = max(x[1] - x[0], y[1] - y[0])
+            self._camera.scale_factor = xy_max * (1 + 2 * margin)
 
     def canvas_to_world(
         self, pos_xy: tuple[float, float]

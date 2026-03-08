@@ -500,6 +500,25 @@ class GfxArrayCanvas(ArrayCanvas):
         self._last_roi_created = ref(roi)
         return roi
 
+    def set_scales(self, scales: tuple[float, ...]) -> None:
+        """Set per-visible-axis scale factors for rendering."""
+        if not scales:
+            return
+        # scales are in data order (slowest-to-fastest, e.g. ZYX)
+        # pygfx uses XYZ, so reverse
+        gfx_scales = list(reversed(scales))
+        # pad to 3 components
+        while len(gfx_scales) < 3:
+            gfx_scales.append(1.0)
+        sx, sy, sz = gfx_scales[0], gfx_scales[1], gfx_scales[2]
+        has_visuals = False
+        for child in self._scene.children:
+            if isinstance(child, (pygfx.Image, pygfx.Volume)):
+                child.local.scale = (sx, sy, sz)
+                has_visuals = True
+        if has_visuals:
+            self.set_range()
+
     def set_range(
         self,
         x: tuple[float, float] | None = None,

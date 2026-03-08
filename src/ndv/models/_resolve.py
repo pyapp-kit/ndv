@@ -70,6 +70,7 @@ class ResolvedDisplayState:
     data_coords: dict[int, tuple]
     hidden_sliders: frozenset[Hashable]
     summary_info: str
+    visible_scales: tuple[float, ...]
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ResolvedDisplayState):
@@ -81,6 +82,7 @@ class ResolvedDisplayState:
             and self.current_index == other.current_index
             and self.data_coords == other.data_coords
             and self.hidden_sliders == other.hidden_sliders
+            and self.visible_scales == other.visible_scales
             # summary_info excluded: metadata-only, should not trigger data fetch
         )
 
@@ -110,6 +112,7 @@ EMPTY_STATE = ResolvedDisplayState(
     data_coords={},
     hidden_sliders=frozenset(),
     summary_info="",
+    visible_scales=(),
 )
 
 
@@ -190,6 +193,20 @@ def _norm_current_index(
         output[normed] = val
         source_key[normed] = key
 
+    # Fill in default (0) for any axis not specified by the model,
+    # and clamp integer values to valid coordinate ranges.
+    coords = wrapper.coords
+    for key in coords:
+        ax = wrapper.normalize_axis_key(key)
+        if ax not in output:
+            output[ax] = 0
+        else:
+            val = output[ax]
+            if isinstance(val, int):
+                max_val = len(coords[key]) - 1
+                if val > max_val:
+                    output[ax] = max_val
+
     return output
 
 
@@ -198,6 +215,41 @@ def _norm_data_coords(wrapper: DataWrapper) -> dict[int, tuple]:
     return {
         wrapper.normalize_axis_key(d): tuple(wrapper.coords[d]) for d in wrapper.dims
     }
+
+
+def _resolve_visible_scales(
+    model: ArrayDisplayModel,
+    wrapper: DataWrapper,
+    visible_axes: tuple[int, ...],
+) -> tuple[float, ...]:
+    """Return scale factors aligned with visible_axes.
+
+    Priority: user explicit (model.scales) > data-derived > default (1.0).
+    """
+    data_scales = wrapper.axis_scales()
+    scales: list[float] = []
+    for ax in visible_axes:
+        # check user model.scales (try both positive int and dim label)
+        user_scale = None
+        for key in model.scales:
+            try:
+                if wrapper.normalize_axis_key(key) == ax:
+                    user_scale = model.scales[key]
+                    break
+            except (IndexError, KeyError):
+                continue
+        if user_scale is not None:
+            scales.append(user_scale)
+        else:
+            # try data-derived: axis_scales uses dim labels as keys
+            dim_label = wrapper.dims[ax]
+            if dim_label in data_scales:
+                scales.append(data_scales[dim_label])
+            elif ax in data_scales:
+                scales.append(data_scales[ax])
+            else:
+                scales.append(1.0)
+    return tuple(scales)
 
 
 def _compute_hidden_sliders(
@@ -230,6 +282,7 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
     hidden_sliders = _compute_hidden_sliders(
         visible_axes, channel_axis, model.channel_mode, data_coords, wrapper
     )
+    visible_scales = _resolve_visible_scales(model, wrapper, visible_axes)
 
     return ResolvedDisplayState(
         visible_axes=visible_axes,
@@ -239,6 +292,7 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
         data_coords=data_coords,
         hidden_sliders=hidden_sliders,
         summary_info=wrapper.summary_info(),
+        visible_scales=visible_scales,
     )
 
 
