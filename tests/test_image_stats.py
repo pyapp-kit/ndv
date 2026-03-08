@@ -9,7 +9,6 @@ from ndv.controllers._image_stats import (
     _percentile_from_counts,
     _stddev_from_counts,
     compute_image_stats,
-    resolve_significant_bits,
 )
 from ndv.models._lut_model import (
     ClimsManual,
@@ -17,39 +16,6 @@ from ndv.models._lut_model import (
     ClimsPercentile,
     ClimsStdDev,
 )
-
-# --- resolve_significant_bits ---
-
-
-def test_resolve_significant_bits_uint8():
-    data = np.array([0, 100, 200], dtype=np.uint8)
-    assert resolve_significant_bits(data) == 8
-
-
-def test_resolve_significant_bits_uint16_12bit():
-    data = np.array([0, 2000, 4000], dtype=np.uint16)
-    assert resolve_significant_bits(data) == 12
-
-
-def test_resolve_significant_bits_uint16_full():
-    data = np.array([0, 65535], dtype=np.uint16)
-    assert resolve_significant_bits(data) == 16
-
-
-def test_resolve_significant_bits_float():
-    data = np.array([0.0, 1.0], dtype=np.float32)
-    assert resolve_significant_bits(data) is None
-
-
-def test_resolve_significant_bits_empty():
-    data = np.array([], dtype=np.uint16)
-    assert resolve_significant_bits(data) == 16
-
-
-def test_resolve_significant_bits_all_zero():
-    data = np.zeros(100, dtype=np.uint16)
-    assert resolve_significant_bits(data) == 16
-
 
 # --- _compute_int_histogram ---
 
@@ -177,6 +143,15 @@ def test_percentile_float32():
     ref = tuple(np.nanpercentile(data, [5, 95]))
     assert stats.clims[0] == pytest.approx(ref[0], abs=0.05)
     assert stats.clims[1] == pytest.approx(ref[1], abs=0.05)
+
+
+def test_percentile_int16_negative_values_regression():
+    data = np.array([-5, -1, 0, 3], dtype=np.int16)
+    policy = ClimsPercentile(min_percentile=1, max_percentile=99)
+    stats = compute_image_stats(data, policy, need_histogram=False)
+    ref = tuple(np.nanpercentile(data, [1, 99]))
+    assert stats.clims[0] == pytest.approx(ref[0], abs=1.0)
+    assert stats.clims[1] == pytest.approx(ref[1], abs=1.0)
 
 
 # --- compute_image_stats: stddev ---

@@ -127,32 +127,16 @@ def _compute_int_histogram(
     nbins = 1 << bits  # 2^bits
     if data.dtype.kind == "u" and bits <= 16:
         counts = ihist.histogram(data, bits=bits)
+        bin_edges = np.arange(nbins + 1, dtype=np.float64) - 0.5
     else:
-        counts = np.bincount(data.ravel(), minlength=nbins)
+        iinfo = np.iinfo(data.dtype)
+        offset = -iinfo.min if iinfo.min < 0 else 0
+        shifted = data.astype(np.int64, copy=False).ravel() + offset
+        counts = np.bincount(shifted, minlength=nbins)
         if len(counts) > nbins:
             counts = counts[:nbins]
-    bin_edges = np.arange(nbins + 1, dtype=np.float64) - 0.5
+        bin_edges = np.arange(nbins + 1, dtype=np.float64) + iinfo.min - 0.5
     return counts, bin_edges
-
-
-def resolve_significant_bits(data: np.ndarray) -> int | None:
-    """Infer significant bits from integer data."""
-    if data.dtype.kind not in "iu":
-        return None
-    full_bits = data.dtype.itemsize * 8
-    if full_bits > 16:
-        return None
-    if data.size == 0:
-        return full_bits
-    dmax = int(data.max())
-    if dmax <= 0 or dmax >= np.iinfo(data.dtype).max:
-        return full_bits
-    inferred = int(np.log2(dmax)) + 1
-    # Round up to common bit depths
-    for common in (8, 10, 12, 14, 16):
-        if inferred <= common <= full_bits:
-            return common
-    return full_bits
 
 
 # --- helpers to derive clims from histogram counts ---

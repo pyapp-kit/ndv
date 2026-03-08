@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
-from ndv.controllers._image_stats import compute_image_stats, resolve_significant_bits
+from ndv.controllers._image_stats import compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -282,11 +282,12 @@ class ArrayViewer:
             if handles := ctrl.handles:
                 data = handles[0].data()
 
+                sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
                 stats = compute_image_stats(
                     data,
                     ctrl.lut_model.clims,
                     need_histogram=True,
-                    significant_bits=ctrl.significant_bits,
+                    significant_bits=sig_bits,
                 )
                 if stats.counts is not None and stats.bin_edges is not None:
                     hist.set_data(stats.counts, stats.bin_edges)
@@ -688,39 +689,25 @@ class ArrayViewer:
                     lut_ctrl.add_handle(handle)
                 self._canvas.set_scales(self._resolved.visible_scales)
 
-            else:
-                need_hist = key in self._histograms
-                sig_bits = self._resolve_significant_bits(lut_ctrl, data)
-                stats = lut_ctrl.update_texture_data(
-                    data,
-                    need_histogram=need_hist,
-                    significant_bits=sig_bits,
-                )
-                if (
-                    stats is not None
-                    and stats.counts is not None
-                    and stats.bin_edges is not None
-                ):
-                    if hist := self._histograms.get(key):
-                        hist.set_data(stats.counts, stats.bin_edges)
+            sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+            stats = lut_ctrl.update_texture_data(
+                data,
+                need_histogram=key in self._histograms,
+                significant_bits=sig_bits,
+            )
+            if (
+                stats is not None
+                and stats.counts is not None
+                and stats.bin_edges is not None
+                and (hist := self._histograms.get(key))
+            ):
+                hist.set_data(stats.counts, stats.bin_edges)
 
         self._canvas.refresh()
         # update highlight display
         if self._highlight_pos is not None:
             channel_values = self._get_values_at_world_point(*self._highlight_pos)
             self._highlight_values(channel_values, self._highlight_pos)
-
-    def _resolve_significant_bits(
-        self, lut_ctrl: ChannelController, data: np.ndarray
-    ) -> int | None:
-        """Resolve significant bits, caching per channel controller."""
-        if lut_ctrl.significant_bits is not None:
-            return lut_ctrl.significant_bits
-        bits = (
-            self._data_wrapper.significant_bits if self._data_wrapper else None
-        ) or resolve_significant_bits(data)
-        lut_ctrl.significant_bits = bits
-        return bits
 
     def _get_values_at_world_point(self, x: float, y: float) -> dict[ChannelKey, float]:
         # TODO: handle 3D data
