@@ -232,6 +232,30 @@ def test_histogram_controller() -> None:
     assert mock_histogram in ctrl._lut_controllers[None].lut_views
 
 
+@no_type_check
+@_patch_views
+def test_histogram_updates_on_first_draw() -> None:
+    """Histogram should update even when the first response creates the handle."""
+    ctrl = ArrayViewer()
+
+    ctrl._histograms[None] = hist = MagicMock(spec=HistogramCanvas)
+    ctrl._lut_controllers[None] = ChannelController(
+        key=None, lut_model=LUTModel(), views=[MagicMock(spec=LUTView), hist]
+    )
+
+    response = DataResponse(
+        n_visible_axes=2,
+        data={None: np.arange(100, dtype=np.uint8).reshape(10, 10)},
+    )
+    future: Future[DataResponse] = Future()
+    future.set_result(response)
+    ctrl._futures[future] = ctrl._current_gen
+
+    ctrl._on_data_response_ready(future)
+
+    hist.set_data.assert_called_once()
+
+
 @pytest.mark.usefixtures("any_app")
 def test_array_viewer_with_app() -> None:
     """Example usage of new mvc pattern."""

@@ -165,6 +165,11 @@ class DataWrapper(Generic[ArrayT], ABC):
         raise NotImplementedError("Saving as zarr is not supported for this data type")
 
     @property
+    def significant_bits(self) -> int | None:
+        """Number of significant bits per sample, if known from metadata."""
+        return None
+
+    @property
     def dtype(self) -> np.dtype:
         """Return the dtype for the data."""
         try:

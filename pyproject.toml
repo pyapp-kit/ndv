@@ -36,6 +36,7 @@ dependencies = [
     "psygnal >=0.12",
     "pydantic >=2.10",
     "typing_extensions >= 4.10",
+    "ihist>=0.1.3",
 ]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies

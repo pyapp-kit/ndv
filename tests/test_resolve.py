@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ndv.controllers._array_viewer import _calc_hist_bins
 from ndv.models import DataWrapper
 from ndv.models._array_display_model import ArrayDisplayModel
 from ndv.models._resolve import build_slice_requests, process_request, resolve
@@ -77,29 +76,3 @@ def test_resolved_index_clamps_negative_to_valid_range() -> None:
     resolved = resolve(model, wrapper)
     assert isinstance(resolved.current_index[0], int)
     assert resolved.current_index[0] >= 0
-
-
-@pytest.mark.parametrize(
-    "dtype",
-    [
-        np.float32,
-        np.float64,
-        np.int16,
-        np.int32,
-        np.int64,
-        np.int8,
-        np.uint8,
-        np.uint16,
-        np.uint32,
-        np.uint64,
-    ],
-)
-def test_calc_hist_bins_float32(dtype) -> None:
-    """_calc_hist_bins should return valid counts and edges for various dtypes."""
-    if np.issubdtype(dtype, np.floating):
-        data = np.random.rand(1000).astype(dtype) * 100
-    else:
-        data = np.random.randint(0, 100, size=(1000,), dtype=dtype)
-    counts, edges = _calc_hist_bins(data)
-    assert len(counts) > 0
-    assert len(edges) == len(counts) + 1

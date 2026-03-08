@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
+from ndv.controllers._image_stats import compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -280,8 +281,16 @@ class ArrayViewer:
             # TODO: Compute histogram from all image handles
             if handles := ctrl.handles:
                 data = handles[0].data()
-                counts, edges = _calc_hist_bins(data)
-                hist.set_data(counts, edges)
+
+                sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+                stats = compute_image_stats(
+                    data,
+                    ctrl.lut_model.clims,
+                    need_histogram=True,
+                    significant_bits=sig_bits,
+                )
+                if stats.counts is not None and stats.bin_edges is not None:
+                    hist.set_data(stats.counts, stats.bin_edges)
             # Reset camera view (accounting for data)
             hist.set_range()
 
@@ -680,14 +689,19 @@ class ArrayViewer:
                     lut_ctrl.add_handle(handle)
                 self._canvas.set_scales(self._resolved.visible_scales)
 
-            else:
-                lut_ctrl.update_texture_data(data)
-
-            if hist := self._histograms.get(key, None):
-                # TODO: once data comes in in chunks, we'll need a proper stateful
-                # stats object that calculates the histogram incrementally
-                counts, bin_edges = _calc_hist_bins(data)
-                hist.set_data(counts, bin_edges)
+            sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+            stats = lut_ctrl.update_texture_data(
+                data,
+                need_histogram=key in self._histograms,
+                significant_bits=sig_bits,
+            )
+            if (
+                stats is not None
+                and stats.counts is not None
+                and stats.bin_edges is not None
+                and (hist := self._histograms.get(key))
+            ):
+                hist.set_data(stats.counts, stats.bin_edges)
 
         self._canvas.refresh()
         # update highlight display
@@ -729,16 +743,3 @@ class ArrayViewer:
                     values[key] = cast("float", value)
 
         return values
-
-
-_MAX_BINS = 2**16  # 65536
-
-
-def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    if data.dtype.kind in "iu" and np.iinfo(data.dtype).max < _MAX_BINS:
-        maxval = np.iinfo(data.dtype).max
-        counts = np.bincount(data.flatten(), minlength=maxval + 1)
-        bin_edges = np.arange(maxval + 2) - 0.5
-    else:
-        counts, bin_edges = np.histogram(data.flatten(), bins="auto")
-    return counts, bin_edges
