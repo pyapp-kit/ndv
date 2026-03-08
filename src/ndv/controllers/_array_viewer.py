@@ -731,7 +731,10 @@ class ArrayViewer:
 
 
 def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    maxval = np.iinfo(data.dtype).max
-    counts = np.bincount(data.flatten(), minlength=maxval + 1)
-    bin_edges = np.arange(maxval + 2) - 0.5
+    if data.dtype.kind in "iu":
+        maxval = np.iinfo(data.dtype).max
+        counts = np.bincount(data.flatten(), minlength=maxval + 1)
+        bin_edges = np.arange(maxval + 2) - 0.5
+    else:
+        counts, bin_edges = np.histogram(data.flatten(), bins="auto")
     return counts, bin_edges
