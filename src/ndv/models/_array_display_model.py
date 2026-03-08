@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
     from ._lut_model import AutoscaleType
 
-    class LutModelKwargs(TypedDict, total=False):
+    class LUTModelKwargs(TypedDict, total=False):
         """Keyword arguments for `LUTModel`."""
 
         name: str
@@ -46,15 +46,15 @@ if TYPE_CHECKING:
         channel_mode: 'ChannelMode | Literal["grayscale", "composite", "color", "rgba"]'
         channel_axis: AxisKey | None
         reducers: Mapping["AxisKey | None", ReducerType]
-        luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
-        default_lut: "LUTModel | LutModelKwargs"
+        luts: Mapping["int | None", "LUTModel | LUTModelKwargs"]
+        default_lut: "LUTModel | LUTModelKwargs"
         scales: Mapping[AxisKey, float] | Sequence[float]
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
 IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
 # map of index along channel axis to LUTModel object
-LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
+LUTMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
 Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
 # map of axis to scale factor
@@ -68,7 +68,7 @@ TwoOrThreeAxisTuple: TypeAlias = (
 DEFAULT_LUT_COLORS = ("green", "magenta", "cyan", "red", "blue", "yellow")
 
 
-def _default_luts() -> LutMap:
+def _default_luts() -> LUTMap:
     return ValidatedEventedDict(
         (i, LUTModel(cmap=Colormap(color)))
         for i, color in enumerate(DEFAULT_LUT_COLORS)
@@ -201,7 +201,7 @@ class ArrayDisplayModel(NDVModel):
     )
 
     # map of index along channel axis to LUTModel object
-    luts: LutMap = Field(default_factory=_default_luts)
+    luts: LUTMap = Field(default_factory=_default_luts)
     default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
 
     # per-axis scale factors (e.g. physical pixel size)

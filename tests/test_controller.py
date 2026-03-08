@@ -26,7 +26,7 @@ from ndv.models._resolve import DataResponse, resolve
 from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app, gui_frontend
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
@@ -68,7 +68,7 @@ def _get_mock_hist_canvas() -> HistogramCanvas:
 
 def _get_mock_view(*_: Any) -> ArrayView:
     mock = MagicMock(spec=ArrayView)
-    mock.add_lut_view.side_effect = lambda *a, **k: MagicMock(spec=LutView)
+    mock.add_lut_view.side_effect = lambda *a, **k: MagicMock(spec=LUTView)
     return mock
 
 
@@ -282,7 +282,7 @@ def test_channel_autoscale() -> None:
     lut_model.clims = ClimsManual(min=1, max=2)
 
     # Ensure newly added lut views have the correct clims
-    mock_viewer = MagicMock(LutView)
+    mock_viewer = MagicMock(LUTView)
     ctrl.add_lut_view(mock_viewer)
     mock_viewer.set_clims.assert_called_once_with((1, 2))
 
@@ -445,7 +445,7 @@ def test_roi_interaction() -> None:
 @pytest.mark.allow_leaks
 @pytest.mark.usefixtures("any_app")
 def test_rgb_display_magic() -> None:
-    # FIXME: Something in the QLutView is causing leaked qt widgets here.
+    # FIXME: Something in the QLUTView is causing leaked qt widgets here.
     # Doesn't seem to be coming from the QRGBView...
     def assert_rgb_magic_works(rgb_data: np.ndarray) -> None:
         viewer = ArrayViewer(rgb_data)

@@ -7,7 +7,7 @@ from jupyter_rfb.widget import RemoteFrameBuffer
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
-from ndv.views._jupyter._array_view import JupyterLutView
+from ndv.views._jupyter._array_view import JupyterLUTView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
@@ -17,8 +17,8 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(model: LUTModel) -> JupyterLutView:
-    view = JupyterLutView(None)
+def view(model: LUTModel) -> JupyterLUTView:
+    view = JupyterLUTView(None)
     # Set the model
     assert view.model is None
     view.model = model
@@ -26,7 +26,7 @@ def view(model: LUTModel) -> JupyterLutView:
     return view
 
 
-def test_JupyterLutView_update_model(model: LUTModel, view: JupyterLutView) -> None:
+def test_JupyterLUTView_update_model(model: LUTModel, view: JupyterLUTView) -> None:
     """Ensures the view updates when the model is changed."""
 
     # Test modifying model.clims
@@ -54,7 +54,7 @@ def test_JupyterLutView_update_model(model: LUTModel, view: JupyterLutView) -> N
     assert view._cmap.value == new_name
 
 
-def test_JupyterLutView_update_view(model: LUTModel, view: JupyterLutView) -> None:
+def test_JupyterLUTView_update_view(model: LUTModel, view: JupyterLUTView) -> None:
     """Ensures the model updates when the view is changed."""
 
     new_visible = not model.visible
@@ -86,7 +86,7 @@ def test_JupyterLutView_update_view(model: LUTModel, view: JupyterLutView) -> No
     assert model.clims == ClimsManual(min=0, max=1)  # type:ignore[union-attr]
 
 
-def test_JupyterLutView_histogram_controls(view: JupyterLutView) -> None:
+def test_JupyterLUTView_histogram_controls(view: JupyterLUTView) -> None:
     # Mock up a histogram
     hist_mock = MagicMock(spec=HistogramCanvas)
     hist_frontend = RemoteFrameBuffer()
