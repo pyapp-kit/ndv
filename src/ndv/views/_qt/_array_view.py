@@ -844,6 +844,8 @@ class QtArrayView(ArrayView):
         return view
 
     def remove_lut_view(self, view: LUTView) -> None:
+        if view not in self._luts.values():
+            return
         self._qwidget.luts.removeWidget(cast("QLUTView", view).frontend_widget())
 
     def _on_channel_mode_changed(self, text: str) -> None:
