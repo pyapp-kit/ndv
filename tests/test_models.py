@@ -192,10 +192,10 @@ def test_lut_names_dont_affect_resolved_equality() -> None:
 
 
 def test_lut_view_name_resolution() -> None:
-    """LutView resolves display name from lut.name and fallback."""
-    from ndv.views.bases._lut_view import LutView
+    """LUTView resolves display name from lut.name and fallback."""
+    from ndv.views.bases._lut_view import LUTView
 
-    class ConcreteLutView(LutView):
+    class ConcreteLUTView(LUTView):
         def __init__(self) -> None:
             self.last_name = ""
 
@@ -210,7 +210,7 @@ def test_lut_view_name_resolution() -> None:
         def set_visible(self, visible: bool) -> None: ...
         def close(self) -> None: ...
 
-    view = ConcreteLutView()
+    view = ConcreteLUTView()
     lut = LUTModel()
     view.model = lut
 

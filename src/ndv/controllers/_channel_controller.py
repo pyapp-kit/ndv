@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from ndv._types import ChannelKey
     from ndv.models._lut_model import LUTModel
-    from ndv.views.bases import LutView
+    from ndv.views.bases import LUTView
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 
@@ -24,10 +24,10 @@ class ChannelController:
     """
 
     def __init__(
-        self, key: ChannelKey, lut_model: LUTModel, views: Sequence[LutView]
+        self, key: ChannelKey, lut_model: LUTModel, views: Sequence[LUTView]
     ) -> None:
         self.key = key
-        self.lut_views: list[LutView] = []
+        self.lut_views: list[LUTView] = []
         self.lut_model = lut_model
         self.lut_model.events.clims.connect(self._auto_scale)
         self.handles: list[ImageHandle] = []
@@ -35,16 +35,16 @@ class ChannelController:
         for v in views:
             self.add_lut_view(v)
 
-    def add_lut_view(self, view: LutView) -> None:
+    def add_lut_view(self, view: LUTView) -> None:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
         # TODO: Could probably reuse cached clims
         self._auto_scale()
 
-    def synchronize(self, *views: LutView) -> None:
+    def synchronize(self, *views: LUTView) -> None:
         """Aligns all views against the backing model."""
-        _views: Iterable[LutView] = views or self.lut_views
+        _views: Iterable[LUTView] = views or self.lut_views
         for view in _views:
             view.synchronize()
 

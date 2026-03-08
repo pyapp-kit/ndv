@@ -40,7 +40,7 @@ from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -300,7 +300,7 @@ class _QLUTWidget(QWidget):
         self._layout.addLayout(self.hist_layout)
 
 
-class QLutView(LutView):
+class QLUTView(LUTView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
@@ -445,7 +445,7 @@ class QLutView(LutView):
         self._qwidget.auto_popup.show_above_mouse()
 
 
-class QRGBView(QLutView):
+class QRGBView(QLUTView):
     def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__(channel)
         # Hide the cmap selector
@@ -814,8 +814,8 @@ class QtArrayView(ArrayView):
     ) -> None:
         self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
-        # Mapping of channel key to LutViews
-        self._luts: dict[ChannelKey, QLutView] = {}
+        # Mapping of channel key to LUTViews
+        self._luts: dict[ChannelKey, QLUTView] = {}
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
@@ -830,11 +830,11 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self, channel: ChannelKey) -> QLutView:
+    def add_lut_view(self, channel: ChannelKey) -> QLUTView:
         view = (
             QRGBView(channel)
             if channel == "RGB"
-            else QLutView(channel, self._viewer_model.default_luts)
+            else QLUTView(channel, self._viewer_model.default_luts)
         )
         self._luts[channel] = view
 
@@ -843,8 +843,8 @@ class QtArrayView(ArrayView):
         self._qwidget._align_lut_names()
         return view
 
-    def remove_lut_view(self, view: LutView) -> None:
-        self._qwidget.luts.removeWidget(cast("QLutView", view).frontend_widget())
+    def remove_lut_view(self, view: LUTView) -> None:
+        self._qwidget.luts.removeWidget(cast("QLUTView", view).frontend_widget())
 
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))

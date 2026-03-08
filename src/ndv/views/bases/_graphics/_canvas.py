@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ndv.views.bases._lut_view import LutView
+from ndv.views.bases._lut_view import LUTView
 from ndv.views.bases._view_base import Viewable
 
 from ._mouseable import Mouseable
@@ -66,7 +66,7 @@ class ArrayCanvas(GraphicsCanvas):
         """Set per-visible-axis scale factors for rendering."""
 
 
-class HistogramCanvas(GraphicsCanvas, LutView):
+class HistogramCanvas(GraphicsCanvas, LUTView):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
     def set_vertical(self, vertical: bool) -> None:
