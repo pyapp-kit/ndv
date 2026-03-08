@@ -39,7 +39,6 @@ class ChannelController:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
-        # TODO: Could probably reuse cached clims
         self._auto_scale()
 
     def synchronize(self, *views: LUTView) -> None:
@@ -86,7 +85,7 @@ class ChannelController:
     def _auto_scale(self) -> None:
         if self.lut_model and len(self.handles):
             policy = self.lut_model.clims
-            handle_clims = [policy.calc_clims(handle.data()) for handle in self.handles]
+            handle_clims = [policy.get_limits(handle.data()) for handle in self.handles]
             mi, ma = handle_clims[0]
             for clims in handle_clims[1:]:
                 mi = min(mi, clims[0])
