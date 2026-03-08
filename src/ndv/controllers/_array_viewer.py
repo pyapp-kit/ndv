@@ -24,9 +24,10 @@ from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
 
 if TYPE_CHECKING:
-    from typing import Any, Unpack
+    from typing import Any
 
     import numpy.typing as npt
+    from typing_extensions import Unpack
 
     from ndv._types import ChannelKey, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
@@ -730,8 +731,14 @@ class ArrayViewer:
         return values
 
 
+_MAX_BINS = 2**16  # 65536
+
+
 def _calc_hist_bins(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    maxval = np.iinfo(data.dtype).max
-    counts = np.bincount(data.flatten(), minlength=maxval + 1)
-    bin_edges = np.arange(maxval + 2) - 0.5
+    if data.dtype.kind in "iu" and np.iinfo(data.dtype).max < _MAX_BINS:
+        maxval = np.iinfo(data.dtype).max
+        counts = np.bincount(data.flatten(), minlength=maxval + 1)
+        bin_edges = np.arange(maxval + 2) - 0.5
+    else:
+        counts, bin_edges = np.histogram(data.flatten(), bins="auto")
     return counts, bin_edges

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING
 
@@ -34,7 +35,16 @@ class DataRequest:
 
 @dataclass(frozen=True, slots=True)
 class DataResponse:
-    """Response object for data requests."""
+    """Response object containing sliced, display-ready arrays.
+
+    Each array in `data` has its first `n_visible_axes` dimensions ordered
+    to match `request.visible_axes` (slowest-varying first).  All non-visible,
+    non-channel dimensions are collapsed.
+
+    Dimensionality contract:
+    - RGBA mode: each array has `n_visible_axes + 1` dims (trailing RGB/A).
+    - All other modes: each array has exactly `n_visible_axes` dims.
+    """
 
     n_visible_axes: int
     data: Mapping[ChannelKey, np.ndarray] = field(repr=False)
@@ -142,6 +152,9 @@ def _norm_channel_axis(model: ArrayDisplayModel, wrapper: DataWrapper) -> int | 
         except (IndexError, KeyError):
             return None  # stale channel_axis from previous data?
 
+    if model.channel_mode == ChannelMode.GRAYSCALE:
+        return None
+
     guess = wrapper.guess_channel_axis()
     if guess is None:
         return None
@@ -204,8 +217,8 @@ def _norm_current_index(
             val = output[ax]
             if isinstance(val, int):
                 max_val = len(coords[key]) - 1
-                if val > max_val:
-                    output[ax] = max_val
+                # clamp to valid coordinate range
+                output[ax] = max(0, min(val, max_val))
 
     return output
 
@@ -333,23 +346,32 @@ def build_slice_requests(
 
 
 def process_request(req: DataRequest) -> DataResponse:
-    """Process a data request and return the sliced data as a DataResponse."""
+    """Slice, transpose, and split data into display-ready arrays.
+
+    Visible axes are placed first (matching `req.visible_axes` order) and all
+    non-visible, non-channel dimensions are collapsed.  See `DataResponse` for
+    the dimensionality contract on the returned arrays.
+    """
     data = req.wrapper.isel(req.index)
 
     vis_ax = req.visible_axes
     t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
+    vis_shape = tuple(data.shape[ax] for ax in vis_ax)
 
     data_response: dict[ChannelKey, np.ndarray] = {}
     ch_ax = req.channel_axis
 
     if req.channel_mode == ChannelMode.RGBA:
-        data_response["RGB"] = data.transpose(*t_dims).squeeze()
+        transposed = data.transpose(*t_dims)
+        # Merge all non-visible dims into a single channel dim
+        ch_size = math.prod(transposed.shape[len(vis_ax) :])
+        data_response["RGB"] = transposed.reshape((*vis_shape, ch_size))
     elif ch_ax is None:
-        data_response[None] = data.transpose(*t_dims).squeeze()
+        data_response[None] = data.transpose(*t_dims).reshape(vis_shape)
     else:
         for i in range(data.shape[ch_ax]):
             ch_keepdims = (slice(None),) * ch_ax + (i,) + (None,)
             ch_data = data[ch_keepdims]
-            data_response[i] = ch_data.transpose(*t_dims).squeeze()
+            data_response[i] = ch_data.transpose(*t_dims).reshape(vis_shape)
 
     return DataResponse(n_visible_axes=len(vis_ax), data=data_response, request=req)
