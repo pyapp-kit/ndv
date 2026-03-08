@@ -234,7 +234,7 @@ def test_histogram_controller() -> None:
 
 @no_type_check
 @_patch_views
-def test_histogram_updates_on_first_response_with_existing_channel() -> None:
+def test_histogram_updates_on_first_draw() -> None:
     """Histogram should update even when the first response creates the handle."""
     ctrl = ArrayViewer()
 
