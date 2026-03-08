@@ -84,7 +84,6 @@ class ResolvedDisplayState:
             and self.hidden_sliders == other.hidden_sliders
             and self.visible_scales == other.visible_scales
             # summary_info excluded: metadata-only, should not trigger data fetch
-            # channel_names excluded: cosmetic-only, should not trigger data fetch
         )
 
     def __hash__(self) -> int:
