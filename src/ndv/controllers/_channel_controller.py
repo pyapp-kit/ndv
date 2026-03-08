@@ -3,6 +3,8 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from ndv.controllers._image_stats import ImageStats, compute_image_stats
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
@@ -31,6 +33,7 @@ class ChannelController:
         self.lut_model = lut_model
         self.lut_model.events.clims.connect(self._auto_scale)
         self.handles: list[ImageHandle] = []
+        self.significant_bits: int | None = None
 
         for v in views:
             self.add_lut_view(v)
@@ -48,16 +51,24 @@ class ChannelController:
         for view in _views:
             view.synchronize()
 
-    def update_texture_data(self, data: np.ndarray) -> None:
-        """Update the data in the image handle."""
-        # WIP:
-        # until we have a more sophisticated way to handle updating data
-        # for multiple handles, we'll just update the first one
+    def update_texture_data(
+        self,
+        data: np.ndarray,
+        *,
+        need_histogram: bool = False,
+        significant_bits: int | None = None,
+    ) -> ImageStats | None:
+        """Update the data in the image handle and compute stats."""
         if not (handles := self.handles):
-            return
-        handle = handles[0]
-        handle.set_data(data)
-        self._auto_scale()
+            return None
+        handles[0].set_data(data)
+        stats = compute_image_stats(
+            data, self.lut_model.clims, need_histogram, significant_bits
+        )
+        self.lut_model.clims._cached_clims = stats.clims
+        for view in self.lut_views:
+            view.set_clims(stats.clims)
+        return stats
 
     def add_handle(self, handle: ImageHandle) -> None:
         """Add an image texture handle to the controller."""

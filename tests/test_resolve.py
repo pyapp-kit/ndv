@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ndv.controllers._array_viewer import _calc_hist_bins
+from ndv.controllers._image_stats import _compute_histogram
 from ndv.models import DataWrapper
 from ndv.models._array_display_model import ArrayDisplayModel
 from ndv.models._resolve import build_slice_requests, process_request, resolve
@@ -95,11 +95,11 @@ def test_resolved_index_clamps_negative_to_valid_range() -> None:
     ],
 )
 def test_calc_hist_bins_float32(dtype) -> None:
-    """_calc_hist_bins should return valid counts and edges for various dtypes."""
+    """_compute_histogram should return valid counts and edges for various dtypes."""
     if np.issubdtype(dtype, np.floating):
         data = np.random.rand(1000).astype(dtype) * 100
     else:
         data = np.random.randint(0, 100, size=(1000,), dtype=dtype)
-    counts, edges = _calc_hist_bins(data)
+    counts, edges = _compute_histogram(data, significant_bits=None)
     assert len(counts) > 0
     assert len(edges) == len(counts) + 1
