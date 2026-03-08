@@ -648,6 +648,26 @@ def test_data_replacement_with_stale_index() -> None:
     ctrl._join()
 
 
+@pytest.mark.usefixtures("any_app")
+def test_remove_lut_view_with_non_gui_view() -> None:
+    """remove_lut_view should handle non-GUI LUTViews (e.g. ImageHandle).
+
+    See https://github.com/pyapp-kit/ndv/issues/138
+    For now, ArrayViews simply ignore attempts to remove LUT views that aren't found.
+    (just a guardrail... not a deeper architectural fix.)
+    """
+    viewer = ArrayViewer()
+    viewer.show()
+    viewer.data = np.random.randint(0, 255, size=(10, 10), dtype="uint8")
+    _app.process_events()
+
+    lut_ctrl = next(iter(viewer._lut_controllers.values()))
+    # lut_views contains both the GUI LUTView and the ImageHandle
+    for view in lut_ctrl.lut_views:
+        # This should not raise, even for non-GUI views like ImageHandle
+        viewer._view.remove_lut_view(view)
+
+
 @no_type_check
 @_patch_views
 def test_user_current_index_preserved_on_init() -> None:

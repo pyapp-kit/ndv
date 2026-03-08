@@ -562,6 +562,8 @@ class JupyterArrayView(ArrayView):
 
     def remove_lut_view(self, view: LUTView) -> None:
         """Remove a LUT view from the viewer."""
+        if view not in self._luts.values():
+            return
         view = cast("JupyterLUTView", view)
         layout = self._luts_box
         layout.children = tuple(

@@ -782,6 +782,9 @@ class WxArrayView(ArrayView):
         self._wxwidget.Layout()
 
     def remove_lut_view(self, lut: LUTView) -> None:
+        if lut not in self._luts.values():
+            return
+
         # Find the channel key for this LUT view
         channel_to_remove = next(
             (channel for channel, view in self._luts.items() if view == lut), None
