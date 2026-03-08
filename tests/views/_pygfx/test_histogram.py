@@ -21,7 +21,7 @@ def _force_canvas_size(
 ) -> None:
     """Force the rendercanvas to report a valid size (needed before show)."""
     rc = canvas._canvas
-    target = getattr(rc, "_subwidget", rc)
+    target = rc
     target._size_info.set_physical_size(w, h, 1.0)
 
 
