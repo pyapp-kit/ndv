@@ -6,16 +6,11 @@ Each test demonstrates a specific bug and is expected to FAIL until fixed.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from ndv.controllers._array_viewer import _calc_hist_bins
 from ndv.models import DataWrapper
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
-from ndv.models._resolve import (
-    build_slice_requests,
-    process_request,
-    resolve,
-)
+from ndv.models._resolve import build_slice_requests, process_request, resolve
 
 # =====================================================================
 # Bug 1: squeeze() in process_request removes singleton visible axes
@@ -222,9 +217,8 @@ def test_color_mode_data_keyed_by_channel_index() -> None:
 # =====================================================================
 
 
-@pytest.mark.xfail(reason="Design discussion: may be intentional")
 def test_grayscale_resolved_channel_axis_is_none() -> None:
-    """In GRAYSCALE mode, resolved channel_axis should arguably be None."""
+    """In GRAYSCALE mode, resolved channel_axis should be None."""
     data = np.ones((3, 10, 10), dtype=np.uint8)
     wrapper = DataWrapper.create(data)
     model = ArrayDisplayModel(channel_mode=ChannelMode.GRAYSCALE)
