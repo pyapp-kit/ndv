@@ -9,7 +9,6 @@ from wx import (
     EVT_LEFT_DOWN,
     EVT_LEFT_UP,
     EVT_MOTION,
-    EvtHandler,
     MouseEvent,
 )
 
@@ -66,13 +65,8 @@ class WxAppWrap(NDVApp):
     def filter_mouse_events(
         self, canvas: Any, receiver: Mouseable
     ) -> Callable[[], None]:
-        if not isinstance(canvas, EvtHandler):
-            raise TypeError(
-                f"Expected vispy canvas to be wx EvtHandler, got {type(canvas)}"
-            )
-
-        if hasattr(canvas, "_subwidget"):
-            canvas = canvas._subwidget  # pyright: ignore[reportAttributeAccessIssue]
+        if not isinstance(canvas, wx.Window):
+            raise TypeError(f"Expected canvas to be wx.Window, got {type(canvas)}")
 
         # TIP: event.Skip() allows the event to propagate to other handlers.
 

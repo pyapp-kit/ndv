@@ -412,12 +412,8 @@ class WxLUTView(LUTView):
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
         widget = cast("wx.Window", histogram.frontend_widget())
-        # FIXME: pygfx backend needs this to be widget._subwidget
-        if hasattr(widget, "_subwidget"):
-            widget = widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
-        # FIXME: Rendercanvas may make this unnecessary
-        if parent := widget.GetParent():
+        if (parent := widget.GetParent()) and parent is not self._wxwidget:
             widget.Reparent(self._wxwidget)  # Reparent widget to this frame
             wx.CallAfter(parent.Destroy)
             widget.Show()
@@ -583,18 +579,11 @@ class _WxArrayViewer(wx.Frame):
     def __init__(self, canvas_widget: wx.Window, parent: wx.Window | None = None):
         super().__init__(parent)
 
-        # FIXME: pygfx backend needs this to be canvas_widget._subwidget
-        if hasattr(canvas_widget, "_subwidget"):
-            canvas_widget = canvas_widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
-
-        if (parent := canvas_widget.GetParent()) and parent is not self:
-            canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
-            if parent:
-                # Close the rendercanvas wrapper before destroying it so
-                # rendercanvas removes it from its internal tracking loop.
-                if hasattr(parent, "close"):
-                    parent.close()
-                parent.Destroy()
+        if canvas_widget.GetParent() is not self:
+            old_parent = canvas_widget.GetParent()
+            canvas_widget.Reparent(self)
+            if old_parent is not None:
+                old_parent.Destroy()
             canvas_widget.Show()
 
         self._canvas = canvas_widget
