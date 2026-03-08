@@ -17,6 +17,7 @@ validation:
 nav:
   - Home: index.md
   - install.md
+  - usage.md
   - motivation.md
   - env_var.md
   - Cookbook:
@@ -91,7 +92,11 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.inlinehilite
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - toc:
       permalink: "#"
 
@@ -132,7 +137,7 @@ plugins:
             scoped_crossrefs: true
             separate_signature: true
             # show_bases: false
-            show_inheritance_diagram: true
+            # show_inheritance_diagram: true
             show_root_heading: true
             # show_root_full_path: false
             show_signature_annotations: true
