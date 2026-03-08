@@ -11,7 +11,6 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
-    PrivateAttr,
     model_validator,
 )
 
@@ -26,20 +25,10 @@ class ClimPolicy(BaseModel, ABC):
     """ABC for contrast limit policies."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    _cached_clims: tuple[float, float] | None = PrivateAttr(None)
 
     @abstractmethod
     def get_limits(self, image: npt.NDArray) -> tuple[float, float]:
         """Return the contrast limits for the given image."""
-
-    def calc_clims(self, image: npt.NDArray) -> tuple[float, float]:
-        self._cached_clims = value = self.get_limits(image)
-        return value
-
-    @property
-    def cached_clims(self) -> tuple[float, float] | None:
-        """Return the last calculated clims."""
-        return self._cached_clims
 
     @property
     def is_manual(self) -> bool:
