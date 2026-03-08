@@ -391,7 +391,7 @@ class ArrayViewer:
 
     def _fallback_channel_name(self, key: ChannelKey) -> str:
         """Compute the data-derived fallback name for a channel key."""
-        if isinstance(key, int) and self._data_wrapper is not None:
+        if self._data_wrapper is not None and isinstance(key, int):
             names = self._data_wrapper.channel_names(self._resolved.channel_axis)
             return names.get(key, str(key))
         if key is None:
@@ -399,7 +399,12 @@ class ArrayViewer:
         return str(key)
 
     def _push_fallback_channel_names(self) -> None:
-        """Push data-derived fallback names to all LUT views."""
+        """Push data-derived fallback names to all LUT views.
+
+        This logic lives here, as opposed to the LutView or ChannelController, because
+        it's one of the few fields that can be resolved from either the model or the
+        data, and this is the layer that has access to both.
+        """
         for key, ctrl in self._lut_controllers.items():
             name = self._fallback_channel_name(key)
             for view in ctrl.lut_views:
