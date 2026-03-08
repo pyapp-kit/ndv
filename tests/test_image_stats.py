@@ -45,8 +45,8 @@ def test_minmax_from_counts():
     counts = np.array([0, 0, 5, 3, 0, 2, 0])
     edges = np.arange(8, dtype=np.float64) - 0.5
     mi, ma = _minmax_from_counts(counts, edges)
-    assert mi == pytest.approx(1.5)
-    assert ma == pytest.approx(5.5)
+    assert mi == pytest.approx(2.0)
+    assert ma == pytest.approx(5.0)
 
 
 def test_minmax_from_counts_empty():

@@ -238,14 +238,14 @@ def test_histogram_updates_on_first_response_with_existing_channel() -> None:
     """Histogram should update even when the first response creates the handle."""
     ctrl = ArrayViewer()
 
-    lut_view = MagicMock(spec=LUTView)
-    hist = MagicMock(spec=HistogramCanvas)
-    lut_ctrl = ChannelController(key=None, lut_model=LUTModel(), views=[lut_view, hist])
-    ctrl._lut_controllers[None] = lut_ctrl
-    ctrl._histograms[None] = hist
+    ctrl._histograms[None] = hist = MagicMock(spec=HistogramCanvas)
+    ctrl._lut_controllers[None] = ChannelController(
+        key=None, lut_model=LUTModel(), views=[MagicMock(spec=LUTView), hist]
+    )
 
     response = DataResponse(
-        n_visible_axes=2, data={None: np.arange(100, dtype=np.uint8).reshape(10, 10)}
+        n_visible_axes=2,
+        data={None: np.arange(100, dtype=np.uint8).reshape(10, 10)},
     )
     future: Future[DataResponse] = Future()
     future.set_result(response)

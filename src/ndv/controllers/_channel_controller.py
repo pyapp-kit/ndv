@@ -34,6 +34,7 @@ class ChannelController:
         self.lut_model = lut_model
         self.lut_model.events.clims.connect(self._auto_scale)
         self.handles: list[ImageHandle] = []
+        self._last_clims: tuple[float, float] | None = None
 
         for v in views:
             self.add_lut_view(v)
@@ -42,7 +43,8 @@ class ChannelController:
         """Add a LUT view to the controller."""
         view.model = self.lut_model
         self.lut_views.append(view)
-        self._auto_scale()
+        if self._last_clims is not None:
+            view.set_clims(self._last_clims)
 
     def synchronize(self, *views: LUTView) -> None:
         """Aligns all views against the backing model."""
@@ -65,10 +67,12 @@ class ChannelController:
             return None
         handles[0].set_data(data)
         stats = compute_image_stats(
-            data, self.lut_model.clims, need_histogram, significant_bits
+            data,
+            self.lut_model.clims,
+            need_histogram=need_histogram,
+            significant_bits=significant_bits,
         )
-        for view in self.lut_views:
-            view.set_clims(stats.clims)
+        self._set_clims(stats.clims)
         return stats
 
     def add_handle(self, handle: ImageHandle) -> None:
@@ -95,14 +99,18 @@ class ChannelController:
             return handle.data()[idx]  # type: ignore [no-any-return]
         return None
 
-    def _auto_scale(self) -> None:
-        if self.lut_model and len(self.handles):
-            policy = self.lut_model.clims
-            handle_clims = [policy.get_limits(handle.data()) for handle in self.handles]
-            mi, ma = handle_clims[0]
-            for clims in handle_clims[1:]:
-                mi = min(mi, clims[0])
-                ma = max(ma, clims[1])
+    def _set_clims(self, clims: tuple[float, float]) -> None:
+        self._last_clims = clims
+        for view in self.lut_views:
+            view.set_clims(clims)
 
-            for view in self.lut_views:
-                view.set_clims((mi, ma))
+    def _auto_scale(self) -> None:
+        if self.lut_model and self.handles:
+            policy = self.lut_model.clims
+            all_clims = [
+                compute_image_stats(h.data(), policy, need_histogram=False).clims
+                for h in self.handles
+            ]
+            mi = min(c[0] for c in all_clims)
+            ma = max(c[1] for c in all_clims)
+            self._set_clims((mi, ma))

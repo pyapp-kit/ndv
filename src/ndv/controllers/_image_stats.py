@@ -33,7 +33,8 @@ class ImageStats:
 def compute_image_stats(
     data: np.ndarray,
     clim_policy: ClimPolicy,
-    need_histogram: bool,
+    *,
+    need_histogram: bool = False,
     significant_bits: int | None = None,
 ) -> ImageStats:
     """Compute histogram and/or contrast limits in a single optimized pass."""
@@ -148,7 +149,8 @@ def _minmax_from_counts(
     nonzero = np.nonzero(counts)[0]
     if len(nonzero) == 0:
         return _EMPTY
-    return (float(bin_edges[nonzero[0]]), float(bin_edges[nonzero[-1] + 1]))
+    centers = (bin_edges[:-1] + bin_edges[1:]) * 0.5
+    return (float(centers[nonzero[0]]), float(centers[nonzero[-1]]))
 
 
 def _percentile_from_counts(
