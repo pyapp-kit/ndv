@@ -58,6 +58,9 @@ class ChannelController:
         significant_bits: int | None = None,
     ) -> ImageStats | None:
         """Update the data in the image handle and compute stats."""
+        # WIP:
+        # until we have a more sophisticated way to handle updating data
+        # for multiple handles, we'll just update the first one
         if not (handles := self.handles):
             return None
         handles[0].set_data(data)
