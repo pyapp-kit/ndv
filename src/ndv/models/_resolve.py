@@ -217,8 +217,8 @@ def _norm_current_index(
             val = output[ax]
             if isinstance(val, int):
                 max_val = len(coords[key]) - 1
-                if val > max_val:
-                    output[ax] = max_val
+                # clamp to valid coordinate range
+                output[ax] = max(0, min(val, max_val))
 
     return output
 

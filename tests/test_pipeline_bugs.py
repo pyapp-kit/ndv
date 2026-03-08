@@ -116,9 +116,9 @@ def test_squeeze_all_singleton_visible_axes() -> None:
 
 def test_negative_index_produces_nonempty_data() -> None:
     """current_index={0: -1} should not produce empty data."""
-    data = np.arange(30).reshape(3, 10).astype(np.uint8)
+    data = np.arange(150).reshape(3, 5, 10).astype(np.uint8)
     wrapper = DataWrapper.create(data)
-    model = ArrayDisplayModel(visible_axes=(-1,) * 2)
+    model = ArrayDisplayModel(visible_axes=(-2, -1))
     model.current_index[0] = -1
 
     resolved = resolve(model, wrapper)
@@ -136,9 +136,9 @@ def test_negative_index_produces_nonempty_data() -> None:
 
 def test_resolved_index_clamps_negative_to_valid_range() -> None:
     """Negative index values should be clamped to [0, max_val]."""
-    data = np.ones((5, 10), dtype=np.uint8)
+    data = np.ones((5, 8, 10), dtype=np.uint8)
     wrapper = DataWrapper.create(data)
-    model = ArrayDisplayModel(visible_axes=(1,) * 2)
+    model = ArrayDisplayModel(visible_axes=(-2, -1))
     model.current_index[0] = -1
 
     resolved = resolve(model, wrapper)
