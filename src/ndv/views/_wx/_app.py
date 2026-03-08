@@ -12,7 +12,15 @@ from wx import (
     MouseEvent,
 )
 
-from ndv._types import MouseButton, MouseMoveEvent, MousePressEvent, MouseReleaseEvent
+from ndv._types import (
+    KeyCode,
+    KeyMod,
+    KeyPressEvent,
+    MouseButton,
+    MouseMoveEvent,
+    MousePressEvent,
+    MouseReleaseEvent,
+)
 from ndv.views.bases._app import NDVApp
 
 from ._main_thread import call_in_main_thread
@@ -23,6 +31,7 @@ if TYPE_CHECKING:
 
     from ndv.views.bases import ArrayView
     from ndv.views.bases._app import P, T
+    from ndv.views.bases._graphics._canvas import GraphicsCanvas
     from ndv.views.bases._graphics._mouseable import Mouseable
 
 _app = None
@@ -136,6 +145,43 @@ class WxAppWrap(NDVApp):
 
         return _unbind
 
+    def filter_key_events(
+        self, canvas: Any, receiver: GraphicsCanvas
+    ) -> Callable[[], None]:
+        if not isinstance(canvas, wx.Window):
+            raise TypeError(f"Expected canvas to be wx.Window, got {type(canvas)}")
+
+        def on_key_down(event: wx.KeyEvent) -> None:
+            key_code = event.GetKeyCode()
+            key: KeyCode | str
+            if key_code in _WX_KEY_MAP:
+                key = _WX_KEY_MAP[key_code]
+            else:
+                uchar = event.GetUnicodeKey()
+                if uchar != wx.WXK_NONE:
+                    key = chr(uchar)
+                else:
+                    event.Skip()
+                    return
+            mods = KeyMod.NONE
+            if event.ShiftDown():
+                mods |= KeyMod.SHIFT
+            if event.ControlDown():
+                mods |= KeyMod.CTRL
+            if event.AltDown():
+                mods |= KeyMod.ALT
+            if event.MetaDown():
+                mods |= KeyMod.META
+            receiver.keyPressed.emit(KeyPressEvent(key, mods))
+            event.Skip()
+
+        canvas.Bind(wx.EVT_KEY_DOWN, handler=on_key_down)
+
+        def _unbind() -> None:
+            canvas.Unbind(wx.EVT_KEY_DOWN, handler=on_key_down)
+
+        return _unbind
+
     def process_events(self) -> None:
         """Process events."""
         wx.SafeYield()
@@ -143,3 +189,14 @@ class WxAppWrap(NDVApp):
     def call_later(self, msec: int, func: Callable[[], None]) -> None:
         """Call `func` after `msec` milliseconds."""
         wx.CallLater(msec, func)
+
+
+_WX_KEY_MAP: dict[int, KeyCode] = {
+    wx.WXK_UP: KeyCode.UP,
+    wx.WXK_DOWN: KeyCode.DOWN,
+    wx.WXK_LEFT: KeyCode.LEFT,
+    wx.WXK_RIGHT: KeyCode.RIGHT,
+    wx.WXK_SPACE: KeyCode.SPACE,
+    wx.WXK_HOME: KeyCode.HOME,
+    wx.WXK_END: KeyCode.END,
+}

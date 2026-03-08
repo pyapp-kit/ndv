@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
+from ndv._keybindings import _DEFAULT_KEYBINDINGS, Action
 from ndv.controllers._channel_controller import ChannelController
 from ndv.controllers._image_stats import compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from typing_extensions import Unpack
 
-    from ndv._types import ChannelKey, MouseMoveEvent
+    from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
@@ -136,6 +137,9 @@ class ArrayViewer:
         self._highlight_pos: tuple[float, float] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
+
+        self._focused_slider_axis: AxisKey | None = None
+        self._canvas.keyPressed.connect(self._on_canvas_key_pressed)
 
         if self._data_wrapper is not None:
             self._fully_synchronize_view()
@@ -555,6 +559,59 @@ class ArrayViewer:
         """Respond to a mouse leaving the canvas in the view."""
         self._highlight_pos = None
         self._highlight_values({}, self._highlight_pos)
+
+    def _on_canvas_key_pressed(self, event: KeyPressEvent) -> None:
+        action = _DEFAULT_KEYBINDINGS.get((event.key, event.mods))
+        if action is Action.STEP_FORWARD:
+            self._step_focused_slider(1)
+        elif action is Action.STEP_BACKWARD:
+            self._step_focused_slider(-1)
+        elif action is Action.FOCUS_NEXT_AXIS:
+            self._cycle_focused_axis(1)
+        elif action is Action.FOCUS_PREV_AXIS:
+            self._cycle_focused_axis(-1)
+
+    def _steppable_axes(self) -> list[AxisKey]:
+        """Non-visible, non-hidden axes that have sliders."""
+        return [
+            ax
+            for ax in self._resolved.data_coords
+            if ax not in self._resolved.visible_axes
+            and ax not in self._resolved.hidden_sliders
+        ]
+
+    def _ensure_focused_axis(self) -> AxisKey | None:
+        """Ensure _focused_slider_axis is valid; default to last steppable."""
+        axes = self._steppable_axes()
+        if not axes:
+            return None
+        if self._focused_slider_axis not in axes:
+            self._focused_slider_axis = axes[-1]
+        return self._focused_slider_axis
+
+    def _step_focused_slider(self, delta: int) -> None:
+        axis = self._ensure_focused_axis()
+        if axis is None:
+            return
+        ax = cast("int", axis)
+        coords = self._resolved.data_coords[ax]
+        current = self._resolved.current_index.get(ax, 0)
+        if isinstance(current, slice):
+            return
+        new_val = max(0, min(current + delta, len(coords) - 1))
+        if new_val != current:
+            self._display_model.current_index[axis] = new_val
+
+    def _cycle_focused_axis(self, direction: int) -> None:
+        axes = self._steppable_axes()
+        if not axes:
+            return
+        current = self._ensure_focused_axis()
+        if current is None:
+            return
+        idx = axes.index(current)
+        new_idx = (idx + direction) % len(axes)
+        self._focused_slider_axis = axes[new_idx]
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._display_model.channel_mode = mode
