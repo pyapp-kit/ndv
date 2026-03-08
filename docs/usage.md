@@ -26,7 +26,7 @@ ndv.imshow(
     data,
     channel_mode="composite",
     channel_axis=1,
-    channel_names=["FITC", "DAPI"],
+    luts={0: {"name": "FITC"}, 1: {"name": "DAPI"}},
     current_index={0: 30},
 )
 ```
@@ -201,23 +201,46 @@ Contrast limits (`clims`) can be a manual `(min, max)` tuple, or an
 [autoscale policy][ndv.models.ClimPolicy] like `"minmax"`, `"percentile"`,
 or `"stddev"`.
 
-### Scales and channel names
+### Channel names
 
-You can provide per-axis scale factors (for physical pixel sizes) and
-per-channel display names:
+Each channel's display name is set via the `name` field in its
+[`LUTModel`][ndv.models.LUTModel]:
 
 ```python
 ndv.imshow(
     data,
     channel_mode="composite",
     channel_axis=1,
-    scales={-2: 0.65, -1: 0.65},         # microns per pixel
-    channel_names=["Membrane", "Nuclei"],  # or {0: "Membrane", 1: "Nuclei"}
+    luts={
+        0: {"name": "Membrane", "cmap": "green"},
+        1: {"name": "Nuclei", "cmap": "magenta"},
+    },
 )
 ```
 
-If your data provides this information natively (e.g. an `xarray.DataArray`
-with coordinate values), `ndv` will use it automatically — but explicit
+If your data provides channel names natively (e.g. coordinate values on an
+`xarray.DataArray`), `ndv` will use them as fallbacks — but names set
+explicitly in `luts` always take priority.
+
+### Scales
+
+You can provide per-axis scale factors (for physical pixel sizes):
+
+```python
+ndv.imshow(
+    data,
+    scales={-2: 0.65, -1: 0.65},  # microns per pixel
+)
+```
+
+Scales can also be provided as a sequence matching the array dimensions:
+
+```python
+ndv.imshow(data, scales=[1.0, 1.0, 0.65, 0.65])
+```
+
+If your data provides scale information natively (e.g. coordinate spacing
+in an `xarray.DataArray`), `ndv` will use it automatically — but explicit
 values always take priority.
 
 ## Supported Array Types
