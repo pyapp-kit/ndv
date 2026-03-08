@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-from ndv.controllers._image_stats import ImageStats, compute_image_stats
+from ndv.controllers._image_stats import compute_image_stats
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ndv._types import ChannelKey
+    from ndv.controllers._image_stats import ImageStats
     from ndv.models._lut_model import LUTModel
     from ndv.views.bases import LUTView
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
@@ -64,7 +65,6 @@ class ChannelController:
         stats = compute_image_stats(
             data, self.lut_model.clims, need_histogram, significant_bits
         )
-        self.lut_model.clims._cached_clims = stats.clims
         for view in self.lut_views:
             view.set_clims(stats.clims)
         return stats

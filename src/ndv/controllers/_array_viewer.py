@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
-from ndv.controllers._image_stats import compute_image_stats
+from ndv.controllers._image_stats import compute_image_stats, resolve_significant_bits
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -716,18 +716,10 @@ class ArrayViewer:
         """Resolve significant bits, caching per channel controller."""
         if lut_ctrl.significant_bits is not None:
             return lut_ctrl.significant_bits
-        # Try wrapper metadata first
-        if self._data_wrapper is not None:
-            bits = self._data_wrapper.significant_bits
-            if bits is not None:
-                lut_ctrl.significant_bits = bits
-                return bits
-        # Infer from data
-        from ndv.controllers._image_stats import resolve_significant_bits
-
-        bits = resolve_significant_bits(data)
-        if bits is not None:
-            lut_ctrl.significant_bits = bits
+        bits = (
+            self._data_wrapper.significant_bits if self._data_wrapper else None
+        ) or resolve_significant_bits(data)
+        lut_ctrl.significant_bits = bits
         return bits
 
     def _get_values_at_world_point(self, x: float, y: float) -> dict[ChannelKey, float]:
