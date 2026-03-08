@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import warnings
 from contextlib import suppress
 from pathlib import Path
@@ -478,6 +479,8 @@ class DimRow(QObject):
         self.out_of.setStyleSheet("margin: 0 0 1px 0;")  # hack
 
         self._timer_id: int | None = None
+        self._play_start_time: float = 0.0
+        self._play_start_frame: int = 0
         mono = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         mono.setPointSize(12)
         self.index_label.setFont(mono)
@@ -491,8 +494,11 @@ class DimRow(QObject):
         if animate:
             if self._timer_id is not None:
                 self.killTimer(self._timer_id)
-            interval = int(1000 / self.play_btn.spin.value())
-            self._timer_id = self.startTimer(interval)
+            fps = self.play_btn.spin.value()
+            interval = max(1, int(1000 / fps / 2))  # oversample ~2x
+            self._play_start_time = time.perf_counter()
+            self._play_start_frame = self.slider.value()
+            self._timer_id = self.startTimer(interval, Qt.TimerType.PreciseTimer)
             self.play_btn.setChecked(True)
         elif self._timer_id is not None:
             self.killTimer(self._timer_id)
@@ -501,14 +507,14 @@ class DimRow(QObject):
 
     def timerEvent(self, a0: Any) -> None:
         """Handle timer event for play button, move to the next frame."""
-        # TODO
-        # for now just increment the value by 1, but we should be able to
-        # take FPS into account better and skip additional frames if the timerEvent
-        # is delayed for some reason.
-        inc = 1
-        ival = self.slider.value()
-        ival = (ival + inc) % (self.slider.maximum() + 1)
-        self.slider.setValue(ival)
+        if self._timer_id is None or a0.timerId() != self._timer_id:
+            return
+        elapsed = time.perf_counter() - self._play_start_time
+        fps = self.play_btn.spin.value()
+        n_frames = self.slider.maximum() + 1
+        target = (self._play_start_frame + int(elapsed * fps)) % n_frames
+        if target != self.slider.value():
+            self.slider.setValue(target)
 
 
 class _QDimsSliders(QWidget):
