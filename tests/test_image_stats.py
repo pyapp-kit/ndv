@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from ndv.controllers._image_stats import (
+    _compute_histogram,
     _compute_int_histogram,
     _minmax_from_counts,
     _percentile_from_counts,
@@ -174,3 +175,30 @@ def test_significant_bits_passed_through() -> None:
     )
     assert stats.counts is not None
     assert stats.counts.shape == (4096,)
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        np.float16,
+        np.float32,
+        np.float64,
+        np.int8,
+        np.int16,
+        np.int32,
+        np.int64,
+        np.uint8,
+        np.uint16,
+        np.uint32,
+        np.uint64,
+    ],
+)
+def test_calc_hist_bins_float32(dtype) -> None:
+    """_compute_histogram should return valid counts and edges for various dtypes."""
+    if np.issubdtype(dtype, np.floating):
+        data = np.random.rand(1000).astype(dtype) * 100
+    else:
+        data = np.random.randint(0, 100, size=(1000,), dtype=dtype)
+    counts, edges = _compute_histogram(data, significant_bits=None)
+    assert len(counts) > 0
+    assert len(edges) == len(counts) + 1

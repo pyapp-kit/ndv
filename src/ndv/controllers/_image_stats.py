@@ -37,7 +37,42 @@ def compute_image_stats(
     need_histogram: bool = False,
     significant_bits: int | None = None,
 ) -> ImageStats:
-    """Compute histogram and/or contrast limits in a single optimized pass."""
+    """Compute histogram and/or contrast limits in a single optimized pass.
+
+    Called from two places in the controller layer:
+
+    - `ChannelController.update_texture_data`: on every new data response,
+      computes clims (and optionally a histogram) for the incoming slice.
+    - `ChannelController._auto_scale`: when the user changes the clim policy
+      (e.g. MinMax → Percentile), recomputes clims from existing handle data.
+
+    The function selects the cheapest computation path based on the policy and
+    whether a histogram is needed:
+
+    - ClimsManual: returns the manual values directly; only builds a histogram
+      if `need_histogram` is True.
+    - ClimsMinMax without histogram: uses `nanmin`/`nanmax` directly.
+    - ClimsStdDev on float data without histogram: uses `nanmean`/`nanstd`.
+    - All other cases: builds a histogram first (exact bincount for <=16-bit
+      integers via `ihist`, 256-bin `np.histogram` for floats), then derives
+      clims from the counts.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        The 2D or 3D image slice to analyze.
+    clim_policy : ClimPolicy
+        The contrast-limit policy to apply (ClimsManual, ClimsMinMax,
+        ClimsPercentile, or ClimsStdDev).
+    need_histogram : bool
+        If True, histogram counts and bin edges are included in the result
+        (for display in a histogram widget). If False, they are omitted to
+        avoid unnecessary work.
+    significant_bits : int or None
+        Number of significant bits per sample (e.g. 12 for 12-bit camera data
+        stored in uint16). Controls the number of histogram bins for integer
+        data. Only meaningful for unsigned dtypes.
+    """
     # Manual clims: skip expensive computation, only compute histogram if needed
     if isinstance(clim_policy, ClimsManual):
         counts, edges = (
