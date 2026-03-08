@@ -17,7 +17,7 @@ from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 
 from .range_slider import RangeSlider
 
@@ -82,7 +82,7 @@ class _LutChannelSelector(wx.Panel):
         # all channels displayed in view
         # if displayed, may or may not be visible, if not displayed, not visible
         self._displayed_channels: set[ChannelKey] = set(self._channels)
-        self._luts: dict[ChannelKey, WxLutView] = {}
+        self._luts: dict[ChannelKey, WxLUTView] = {}
 
         # Dropdown button with current selection
         self._dropdown_btn = wx.Button(
@@ -133,7 +133,7 @@ class _LutChannelSelector(wx.Panel):
         sizer.Add(self._selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
 
-    def add_channel(self, view: WxLutView) -> None:
+    def add_channel(self, view: WxLUTView) -> None:
         if (type(view.channel) is int) or (
             type(view.channel) is str and view.channel.isdigit()
         ):
@@ -324,7 +324,7 @@ class _WxLUTWidget(wx.Panel):
         self.Layout()
 
 
-class WxLutView(LutView):
+class WxLUTView(LUTView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
@@ -502,7 +502,7 @@ class WxLutView(LutView):
         self._wxwidget.Close()
 
 
-class WxRGBView(WxLutView):
+class WxRGBView(WxLUTView):
     def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__(parent, channel)
         self._wxwidget.cmap.Hide()
@@ -718,8 +718,8 @@ class WxArrayView(ArrayView):
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
-        # Mapping of channel key to LutViews
-        self._luts: dict[ChannelKey, WxLutView] = {}
+        # Mapping of channel key to LUTViews
+        self._luts: dict[ChannelKey, WxLUTView] = {}
         self._visible_axes: Sequence[AxisKey] = []
 
         wdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -762,12 +762,12 @@ class WxArrayView(ArrayView):
     def _lut_selector(self) -> _LutChannelSelector:
         return self._wxwidget.lut_selector
 
-    def add_lut_view(self, channel: ChannelKey) -> WxLutView:
+    def add_lut_view(self, channel: ChannelKey) -> WxLUTView:
         scrollwdg = self._lut_area()
         view = (
             WxRGBView(scrollwdg, channel)
             if channel == "RGB"
-            else WxLutView(scrollwdg, channel, self._viewer_model.default_luts)
+            else WxLUTView(scrollwdg, channel, self._viewer_model.default_luts)
         )
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
@@ -792,7 +792,7 @@ class WxArrayView(ArrayView):
             lut._add_histogram(widget)
         self._wxwidget.Layout()
 
-    def remove_lut_view(self, lut: LutView) -> None:
+    def remove_lut_view(self, lut: LUTView) -> None:
         # Find the channel key for this LUT view
         channel_to_remove = next(
             (channel for channel, view in self._luts.items() if view == lut), None

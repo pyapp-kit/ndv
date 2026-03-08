@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from psygnal import Signal
 
-from ndv.views.bases._lut_view import LutView
+from ndv.views.bases._lut_view import LUTView
 
 from ._mouseable import Mouseable
 
@@ -46,7 +46,7 @@ class CanvasElement(Mouseable):
         """Removes the element from the canvas."""
 
 
-class ImageHandle(CanvasElement, LutView):
+class ImageHandle(CanvasElement, LUTView):
     @abstractmethod
     def data(self) -> np.ndarray: ...
     @abstractmethod
@@ -64,7 +64,7 @@ class ImageHandle(CanvasElement, LutView):
     @abstractmethod
     def set_colormap(self, cmap: _cmap.Colormap) -> None: ...
 
-    # -- LutView methods -- #
+    # -- LUTView methods -- #
     def close(self) -> None:
         self.remove()
 

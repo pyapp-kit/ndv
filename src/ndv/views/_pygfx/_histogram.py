@@ -332,7 +332,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def set_visible(self, visible: bool) -> None: ...
 
-    # ------------- LutView Protocol methods ------------- #
+    # ------------- LUTView Protocol methods ------------- #
 
     def set_channel_name(self, name: str) -> None:
         # Nothing to do

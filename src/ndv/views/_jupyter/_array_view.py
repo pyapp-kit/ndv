@@ -13,7 +13,7 @@ from IPython.display import Javascript, display
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
@@ -149,7 +149,7 @@ class RightClickButton(widgets.ToggleButton):
         display(Javascript(js_code))  # type: ignore [no-untyped-call]
 
 
-class JupyterLutView(LutView):
+class JupyterLUTView(LUTView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
@@ -373,7 +373,7 @@ class JupyterLutView(LutView):
         self._histogram = histogram
 
 
-class JupyterRGBView(JupyterLutView):
+class JupyterRGBView(JupyterLUTView):
     def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__(channel)
         self._cmap.layout.display = "none"
@@ -393,7 +393,7 @@ class JupyterArrayView(ArrayView):
         # WIDGETS
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
-        self._luts: dict[ChannelKey, JupyterLutView] = {}
+        self._luts: dict[ChannelKey, JupyterLUTView] = {}
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
@@ -546,12 +546,12 @@ class JupyterArrayView(ArrayView):
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
+    def add_lut_view(self, channel: ChannelKey) -> JupyterLUTView:
         """Add a LUT view to the viewer."""
         wdg = (
             JupyterRGBView(channel)
             if channel == "RGB"
-            else JupyterLutView(channel, self._viewer_model.default_luts)
+            else JupyterLUTView(channel, self._viewer_model.default_luts)
         )
         layout = self._luts_box
         self._luts[channel] = wdg
@@ -560,9 +560,9 @@ class JupyterArrayView(ArrayView):
         layout.children = (*layout.children, wdg.layout)
         return wdg
 
-    def remove_lut_view(self, view: LutView) -> None:
+    def remove_lut_view(self, view: LUTView) -> None:
         """Remove a LUT view from the viewer."""
-        view = cast("JupyterLutView", view)
+        view = cast("JupyterLUTView", view)
         layout = self._luts_box
         layout.children = tuple(
             wdg for wdg in layout.children if wdg != view.frontend_widget()

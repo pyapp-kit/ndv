@@ -401,7 +401,7 @@ class ArrayViewer:
     def _push_fallback_channel_names(self) -> None:
         """Push data-derived fallback names to all LUT views.
 
-        This logic lives here, as opposed to the LutView or ChannelController, because
+        This logic lives here, as opposed to the LUTView or ChannelController, because
         it's one of the few fields that can be resolved from either the model or the
         data, and this is the layer that has access to both.
         """

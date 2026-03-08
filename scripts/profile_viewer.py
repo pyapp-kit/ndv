@@ -21,7 +21,7 @@ import numpy as np
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ChannelMode
 from ndv.views import _app
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 from ndv.views.bases._graphics._canvas import ArrayCanvas
 from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
@@ -48,7 +48,7 @@ def _get_mock_canvas(*_: Any) -> ArrayCanvas:
 
 def _get_mock_view(*_: Any) -> ArrayView:
     mock = MagicMock(spec=ArrayView)
-    lut = MagicMock(spec=LutView)
+    lut = MagicMock(spec=LUTView)
     mock.add_lut_view.return_value = lut
     return mock
 
