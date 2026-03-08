@@ -99,12 +99,11 @@ class MouseEventFilter(QObject):
     def mouse_btn(self, btn: Any) -> MouseButton:
         if btn == Qt.MouseButton.LeftButton:
             return MouseButton.LEFT
+        if btn == Qt.MouseButton.MiddleButton:
+            return MouseButton.MIDDLE
         if btn == Qt.MouseButton.RightButton:
             return MouseButton.RIGHT
-        if btn == Qt.MouseButton.NoButton:
-            return MouseButton.NONE
-
-        raise Exception(f"Qt mouse button {btn} is unknown")
+        return MouseButton.NONE
 
     def set_cursor(self, type: CursorType) -> None:
         self.canvas.setCursor(type.to_qt())

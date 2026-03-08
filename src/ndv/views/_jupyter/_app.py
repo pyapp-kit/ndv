@@ -50,16 +50,13 @@ class JupyterAppWrap(NDVApp):
 
     @staticmethod
     def mouse_btn(btn: Any) -> MouseButton:
-        if btn == 0:
-            return MouseButton.NONE
         if btn == 1:
             return MouseButton.LEFT
         if btn == 2:
             return MouseButton.RIGHT
         if btn == 3:
             return MouseButton.MIDDLE
-
-        raise Exception(f"Jupyter mouse button {btn} is unknown")
+        return MouseButton.NONE
 
     def filter_mouse_events(
         self, canvas: Any, receiver: Mouseable
