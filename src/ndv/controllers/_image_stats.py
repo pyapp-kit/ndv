@@ -124,7 +124,12 @@ def _compute_histogram(
 def _compute_int_histogram(
     data: np.ndarray, bits: int
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute histogram for integer data using ihist (uint8/uint16) or bincount."""
+    """Compute histogram for integer data using ihist (uint8/uint16) or bincount.
+
+    NOTE: The `bits` parameter (from significant_bits) is only meaningful for
+    unsigned data. For signed data, `bits` is always derived from the full dtype
+    width, so truncation cannot occur.
+    """
     nbins = 1 << bits  # 2^bits
     if data.dtype.kind == "u" and bits <= 16:
         counts = ihist.histogram(data, bits=bits)
