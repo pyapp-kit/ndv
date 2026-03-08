@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import numpy as np
 import pytest
 
@@ -236,17 +234,6 @@ def test_float_single_value():
 
 
 # --- ihist fallback ---
-
-
-def test_fallback_without_ihist():
-    """Ensure integer histogram works when ihist is not available."""
-    data = np.array([[0, 100, 255]], dtype=np.uint8)
-    with patch("ndv.controllers._image_stats._ihist", None):
-        counts, _edges = _compute_int_histogram(data, bits=8)
-    assert counts.shape == (256,)
-    assert counts[0] == 1
-    assert counts[100] == 1
-    assert counts[255] == 1
 
 
 def test_significant_bits_passed_through():

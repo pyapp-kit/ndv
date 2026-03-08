@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from ndv.controllers._channel_controller import ChannelController
+from ndv.controllers._image_stats import compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -280,7 +281,6 @@ class ArrayViewer:
             # TODO: Compute histogram from all image handles
             if handles := ctrl.handles:
                 data = handles[0].data()
-                from ndv.controllers._image_stats import compute_image_stats
 
                 stats = compute_image_stats(
                     data,

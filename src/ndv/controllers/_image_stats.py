@@ -5,15 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import ihist
 import numpy as np
+
+from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, ClimsStdDev
 
 if TYPE_CHECKING:
     from ndv.models._lut_model import ClimPolicy
-
-try:
-    import ihist as _ihist
-except ImportError:
-    _ihist = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,13 +30,6 @@ def compute_image_stats(
     significant_bits: int | None = None,
 ) -> ImageStats:
     """Compute histogram and/or contrast limits in a single optimized pass."""
-    from ndv.models._lut_model import (
-        ClimsManual,
-        ClimsMinMax,
-        ClimsPercentile,
-        ClimsStdDev,
-    )
-
     # Manual clims: skip expensive computation, only compute histogram if needed
     if isinstance(clim_policy, ClimsManual):
         clims = (clim_policy.min, clim_policy.max)
@@ -100,12 +91,6 @@ def _stats_for_small_int(
     significant_bits: int | None,
 ) -> ImageStats:
     """Optimized path for uint8/uint16 data using integer histograms."""
-    from ndv.models._lut_model import (
-        ClimsMinMax,
-        ClimsPercentile,
-        ClimsStdDev,
-    )
-
     # For minmax without histogram, direct nanmin/nanmax is fastest
     if isinstance(clim_policy, ClimsMinMax) and not need_histogram:
         clims = (float(np.nanmin(data)), float(np.nanmax(data)))
@@ -153,16 +138,14 @@ def _compute_histogram(
 def _compute_int_histogram(
     data: np.ndarray, bits: int
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute histogram for integer data using ihist or np.bincount."""
+    """Compute histogram for integer data using ihist (uint8/uint16) or bincount."""
     nbins = 1 << bits  # 2^bits
-
-    if _ihist is not None and data.dtype.kind == "u" and bits <= 16:
-        counts = _ihist.histogram(data, bits=bits)
+    if data.dtype.kind == "u" and bits <= 16:
+        counts = ihist.histogram(data, bits=bits)
     else:
         counts = np.bincount(data.ravel(), minlength=nbins)
         if len(counts) > nbins:
             counts = counts[:nbins]
-
     bin_edges = np.arange(nbins + 1, dtype=np.float64) - 0.5
     return counts, bin_edges
 

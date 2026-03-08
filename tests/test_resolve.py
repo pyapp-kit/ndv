@@ -82,12 +82,13 @@ def test_resolved_index_clamps_negative_to_valid_range() -> None:
 @pytest.mark.parametrize(
     "dtype",
     [
+        np.float16,
         np.float32,
         np.float64,
+        np.int8,
         np.int16,
         np.int32,
         np.int64,
-        np.int8,
         np.uint8,
         np.uint16,
         np.uint32,
