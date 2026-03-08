@@ -317,7 +317,9 @@ class DataWrapper(Generic[ArrayT], ABC):
             return {}
         dim = self.dims[channel_axis]
         coords = self.coords.get(dim, None)
-        if coords is None:
+        # range coords are not informative, so return empty dict in that case
+        # and let resolution logic fallback to generic channel naming
+        if coords is None or isinstance(coords, range):
             return {}
         return {
             i: str(v.item() if hasattr(v, "item") else v) for i, v in enumerate(coords)

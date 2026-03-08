@@ -527,22 +527,22 @@ def test_set_scales_called_on_apply() -> None:
 
 @no_type_check
 @_patch_views
-def test_channel_names_in_lut_views() -> None:
-    """Channel names are pushed to LUT views."""
+def test_fallback_channel_names_pushed() -> None:
+    """Fallback channel names are pushed to LUT views."""
     ctrl = ArrayViewer(
-        np.empty((3, 10, 10)),
-        channel_axis=0,
-        channel_mode="composite",
-        channel_names={0: "DAPI", 1: "GFP", 2: "mCherry"},
+        display_model=ArrayDisplayModel(
+            channel_axis=0,
+            channel_mode="composite",
+        ),
     )
     ctrl._async = False
-    ctrl._join()
+    ctrl.data = np.empty((3, 10, 10))
 
+    # fallback names default to str(key) for plain numpy arrays
     for key, lut_ctrl in ctrl._lut_controllers.items():
         if isinstance(key, int):
-            expected = {0: "DAPI", 1: "GFP", 2: "mCherry"}[key]
             for view in lut_ctrl.lut_views:
-                view.set_channel_name.assert_called_with(expected)
+                view.set_fallback_name.assert_called_with(str(key))
 
 
 @no_type_check

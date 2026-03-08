@@ -317,10 +317,7 @@ class ArrayViewer:
             (model.current_index.value_changed, self._re_resolve),
             (model.events.channel_mode, self._re_resolve),
             (model.scales.value_changed, self._re_resolve),
-            (model.channel_names.value_changed, self._re_resolve),
-            # TODO: lut values themselves are mutable evented objects...
-            # so we need to connect to their events as well
-            # (model.luts.value_changed, ...),
+            (model.luts.value_changed, self._re_resolve),
         ]:
             getattr(obj, _connect)(callback)
 
@@ -386,23 +383,32 @@ class ArrayViewer:
         if old.visible_scales != new.visible_scales:
             self._canvas.set_scales(new.visible_scales)
 
-        if old.channel_names != new.channel_names:
-            self._update_channel_names(new.channel_names)
+        if old.channel_axis != new.channel_axis:
+            self._push_fallback_channel_names()
 
         if old.summary_info != new.summary_info:
             self._view.set_data_info(new.summary_info)
 
-    def _update_channel_names(self, names: dict[int, str]) -> None:
-        """Push resolved channel names to LUT views."""
+    def _fallback_channel_name(self, key: ChannelKey) -> str:
+        """Compute the data-derived fallback name for a channel key."""
+        if self._data_wrapper is not None and isinstance(key, int):
+            names = self._data_wrapper.channel_names(self._resolved.channel_axis)
+            return names.get(key, str(key))
+        if key is None:
+            return ""
+        return str(key)
+
+    def _push_fallback_channel_names(self) -> None:
+        """Push data-derived fallback names to all LUT views.
+
+        This logic lives here, as opposed to the LutView or ChannelController, because
+        it's one of the few fields that can be resolved from either the model or the
+        data, and this is the layer that has access to both.
+        """
         for key, ctrl in self._lut_controllers.items():
-            if isinstance(key, int):
-                name = names.get(key, str(key))
-            elif key is None:
-                name = ""
-            else:
-                name = str(key)
+            name = self._fallback_channel_name(key)
             for view in ctrl.lut_views:
-                view.set_channel_name(name)
+                view.set_fallback_name(name)
 
     def _update_lut_visibility(self, mode: ChannelMode) -> None:
         """Update LUT view visibility based on channel mode."""
@@ -430,7 +436,7 @@ class ArrayViewer:
 
         for lut_ctr in self._lut_controllers.values():
             lut_ctr.synchronize()
-        self._update_channel_names(self._resolved.channel_names)
+        self._push_fallback_channel_names()
         self._synchronize_roi()
 
     def _on_dims_changed(self) -> None:
@@ -659,15 +665,9 @@ class ArrayViewer:
                     views=lut_views,
                 )
                 self._update_channel_dtype(key)
-                # apply resolved channel name for newly created controllers
-                if isinstance(key, int):
-                    ch_name = self._resolved.channel_names.get(key, str(key))
-                elif key is None:
-                    ch_name = ""
-                else:
-                    ch_name = str(key)
+                fallback = self._fallback_channel_name(key)
                 for v in lut_ctrl.lut_views:
-                    v.set_channel_name(ch_name)
+                    v.set_fallback_name(fallback)
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel

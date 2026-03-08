@@ -71,7 +71,6 @@ class ResolvedDisplayState:
     hidden_sliders: frozenset[Hashable]
     summary_info: str
     visible_scales: tuple[float, ...]
-    channel_names: dict[int, str]
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ResolvedDisplayState):
@@ -115,7 +114,6 @@ EMPTY_STATE = ResolvedDisplayState(
     hidden_sliders=frozenset(),
     summary_info="",
     visible_scales=(),
-    channel_names={},
 )
 
 
@@ -255,26 +253,6 @@ def _resolve_visible_scales(
     return tuple(scales)
 
 
-def _resolve_channel_names(
-    model: ArrayDisplayModel,
-    wrapper: DataWrapper,
-    channel_axis: int | None,
-) -> dict[int, str]:
-    """Return channel display names.
-
-    Priority: user explicit (model.channel_names) > data-derived.
-    Only includes channels with an explicit name.
-    """
-    data_names = wrapper.channel_names(channel_axis)
-    result: dict[int, str] = {}
-    # merge data-derived names first, then override with user names
-    result.update(data_names)
-    for key, name in model.channel_names.items():
-        if isinstance(key, int):
-            result[key] = name
-    return result
-
-
 def _compute_hidden_sliders(
     visible_axes: tuple[int, ...],
     channel_axis: int | None,
@@ -306,7 +284,6 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
         visible_axes, channel_axis, model.channel_mode, data_coords, wrapper
     )
     visible_scales = _resolve_visible_scales(model, wrapper, visible_axes)
-    channel_names = _resolve_channel_names(model, wrapper, channel_axis)
 
     return ResolvedDisplayState(
         visible_axes=visible_axes,
@@ -317,7 +294,6 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
         hidden_sliders=hidden_sliders,
         summary_info=wrapper.summary_info(),
         visible_scales=visible_scales,
-        channel_names=channel_names,
     )
 
 
