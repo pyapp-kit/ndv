@@ -338,6 +338,7 @@ class WxLutView(LutView):
         self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
         self.channel = channel
         self.histogram: HistogramCanvas | None = None
+        self._displayed = True  # whether shown in channel selector
 
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
@@ -479,20 +480,22 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMax(ma)
 
     def set_channel_visible(self, visible: bool) -> None:
-        self._wxwidget.visible.SetValue(visible and self._wxwidget.IsShown())
+        self._wxwidget.visible.SetValue(visible and self._displayed)
 
     def set_visible(self, visible: bool) -> None:
         if not visible:
             self._wxwidget.Hide()
-        elif self._wxwidget.IsShown():
+        elif self._displayed:
             self._wxwidget.Show()
 
     def set_display(self, display: bool) -> None:
         if not display:
+            self._displayed = False
             self._wxwidget.Hide()
             self._wxwidget.visible.SetValue(False)
             self._on_visible_changed(None)
-        elif not self._wxwidget.IsShown():
+        elif not self._displayed:
+            self._displayed = True
             self._wxwidget.Show()
 
     def close(self) -> None:

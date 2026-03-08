@@ -129,14 +129,42 @@ def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
     assert checklist.IsChecked(0)
     assert viewer._luts[0]._wxwidget.IsShown()
 
-    # channel_mode = viewer._wxwidget.channel_mode_combo
-    # viewer.set_channel_mode(ChannelMode.GRAYSCALE)
-    # _processEvent(wxapp, wx.EVT_COMBOBOX, channel_mode)
+    # Simulate what the controller does on mode change to grayscale:
+    # it calls set_visible(False) on all multi-channel LUTs
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(False)
+            assert not lut_view._wxwidget.IsShown()
 
-    ## all channels should be hidden
-    # for ch, lut_view in viewer._luts.items():
-    #    if type(ch) is int or (type(ch) is str and ch.isdigit()):
-    #        assert not lut_view._wxwidget.IsShown()
+    # Simulate switching back to composite: controller calls set_visible(True)
+    # All previously-displayed channels should reappear
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(True)
+            assert lut_view._wxwidget.IsShown(), (
+                f"Channel {ch} should be visible after set_visible(True)"
+            )
+
+    # Now test interaction with display selector:
+    # If a channel was deselected via the channel selector (set_display(False)),
+    # it should NOT reappear after a mode round-trip
+    viewer._luts[0].set_display(False)
+    assert not viewer._luts[0]._wxwidget.IsShown()
+
+    # Hide all (mode change to grayscale)
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(False)
+
+    # Show all (mode change back to composite)
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(True)
+
+    # Channel 0 was display-hidden, so it should stay hidden
+    assert not viewer._luts[0]._wxwidget.IsShown()
+    # Other channels should be visible
+    assert viewer._luts[1]._wxwidget.IsShown()
 
 
 def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
