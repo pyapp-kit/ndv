@@ -322,6 +322,11 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
     return ndv_app().filter_mouse_events(canvas, receiver)
 
 
+def filter_key_events(widget: Any, receiver: ArrayView) -> Callable[[], None]:
+    """Intercept key events on `widget` and emit `receiver.keyPressed`."""
+    return ndv_app().filter_key_events(widget, receiver)
+
+
 def call_later(msec: int, func: Callable[[], None]) -> None:
     """Call `func` after `msec` milliseconds.
 

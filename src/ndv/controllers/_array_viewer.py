@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
+from ndv._keybindings import handle_key_press
 from ndv.controllers._channel_controller import ChannelController
 from ndv.controllers._image_stats import compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from typing_extensions import Unpack
 
-    from ndv._types import ChannelKey, MouseMoveEvent
+    from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
@@ -137,6 +138,12 @@ class ArrayViewer:
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
+        self._focused_slider_axis: AxisKey | None = None
+        self._disconnect_key_events = _app.filter_key_events(
+            self._view.frontend_widget(), self._view
+        )
+        self._view.keyPressed.connect(self._on_key_pressed)
+
         if self._data_wrapper is not None:
             self._fully_synchronize_view()
 
@@ -223,6 +230,7 @@ class ArrayViewer:
 
     def close(self) -> None:
         """Close the viewer."""
+        self._disconnect_key_events()
         self._view.set_visible(False)
 
     def clone(self) -> ArrayViewer:
@@ -438,6 +446,7 @@ class ArrayViewer:
         # Push channel mode even without data (e.g. display_model set before data)
         self._view.set_channel_mode(self._display_model.channel_mode)
 
+        self._focused_slider_axis = None
         self._resolved = EMPTY_STATE
         if self._data_wrapper is not None:
             with self._view.currentIndexChanged.blocked():
@@ -555,6 +564,9 @@ class ArrayViewer:
         """Respond to a mouse leaving the canvas in the view."""
         self._highlight_pos = None
         self._highlight_values({}, self._highlight_pos)
+
+    def _on_key_pressed(self, event: KeyPressEvent) -> None:
+        handle_key_press(event, self)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._display_model.channel_mode = mode

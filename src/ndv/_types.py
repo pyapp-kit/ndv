@@ -90,6 +90,29 @@ class MouseReleaseEvent(NamedTuple):
     btn: MouseButton
 
 
+class KeyMod(IntFlag):
+    NONE = 0
+    SHIFT = auto()
+    CTRL = auto()
+    ALT = auto()
+    META = auto()
+
+
+class KeyCode(Enum):
+    UP = "up"
+    DOWN = "down"
+    LEFT = "left"
+    RIGHT = "right"
+    SPACE = "space"
+    HOME = "home"
+    END = "end"
+
+
+class KeyPressEvent(NamedTuple):
+    key: KeyCode | str
+    mods: KeyMod = KeyMod.NONE
+
+
 class CursorType(Enum):
     DEFAULT = "default"
     CROSS = "cross"

@@ -76,6 +76,7 @@ def _patch_views(f: Callable) -> Callable:
     f = patch.object(_app, "get_array_canvas_class", lambda: _get_mock_canvas)(f)
     f = patch.object(_app, "get_array_view_class", lambda: _get_mock_view)(f)
     f = patch.object(_app, "get_histogram_canvas_class", lambda: _get_mock_hist_canvas)(f)  # fmt: skip # noqa
+    f = patch.object(_app, "filter_key_events", lambda *a, **k: lambda: None)(f)
     return f
 
 
@@ -700,3 +701,65 @@ def test_user_current_index_preserved_on_init() -> None:
     ctrl._async = False
     ctrl.data = np.empty((10, 3, 64, 64))
     assert ctrl.display_model.current_index[0] == 5
+
+
+@no_type_check
+@_patch_views
+def test_keybinding_slice_navigation() -> None:
+    """Arrow keys step focused slider and cycle focused axis."""
+    from ndv._keybindings import _ensure_focused_axis
+    from ndv._types import KeyCode, KeyMod, KeyPressEvent
+
+    SHAPE = (5, 10, 128, 128)
+    ctrl = ArrayViewer()
+    ctrl._async = False
+    ctrl._view.current_index.return_value = {0: 0, 1: 0}
+    ctrl.data = np.empty(SHAPE)
+
+    # visible_axes should be (-2, -1) -> (2, 3) for 4D data
+    # steppable axes are 0 and 1
+    # default focused axis is the last steppable axis (1)
+    assert ctrl._focused_slider_axis is None  # not yet set
+    assert _ensure_focused_axis(ctrl) == 1
+    assert ctrl._focused_slider_axis == 1
+
+    def press(key: KeyCode | str, mods: KeyMod = KeyMod.NONE) -> None:
+        ctrl._on_key_pressed(KeyPressEvent(key, mods))
+
+    # RIGHT arrow steps forward on focused axis (1)
+    press(KeyCode.RIGHT)
+    assert ctrl.display_model.current_index[1] == 1
+
+    # Another RIGHT
+    press(KeyCode.RIGHT)
+    assert ctrl.display_model.current_index[1] == 2
+
+    # LEFT arrow steps backward
+    press(KeyCode.LEFT)
+    assert ctrl.display_model.current_index[1] == 1
+
+    # UP arrow cycles to previous axis (0)
+    press(KeyCode.UP)
+    assert ctrl._focused_slider_axis == 0
+
+    # RIGHT now steps axis 0
+    press(KeyCode.RIGHT)
+    assert ctrl.display_model.current_index[0] == 1
+
+    # DOWN cycles back to axis 1
+    press(KeyCode.DOWN)
+    assert ctrl._focused_slider_axis == 1
+
+    # LEFT doesn't go below 0
+    ctrl.display_model.current_index[1] = 0
+    press(KeyCode.LEFT)
+    assert ctrl.display_model.current_index[1] == 0
+
+    # RIGHT doesn't go above max
+    ctrl.display_model.current_index[1] = 9  # max for shape 10
+    press(KeyCode.RIGHT)
+    assert ctrl.display_model.current_index[1] == 9
+
+    # Unrecognized key does nothing
+    press("x")
+    assert ctrl.display_model.current_index[1] == 9

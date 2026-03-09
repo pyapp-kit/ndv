@@ -4,10 +4,14 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 from pytest import fixture
-from qtpy.QtWidgets import QWidget
+from qtpy.QtCore import QEvent, Qt
+from qtpy.QtGui import QKeyEvent
+from qtpy.QtWidgets import QApplication, QWidget
 
+from ndv._types import KeyCode, KeyMod, KeyPressEvent
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
+from ndv.views._qt._app import QtAppWrap
 from ndv.views._qt._array_view import PlayButton, QtArrayView
 
 if TYPE_CHECKING:
@@ -85,3 +89,39 @@ def test_play_btn(viewer: QtArrayView, qtbot: QtBot) -> None:
     with qtbot.waitSignal(dims_wdg.currentIndexChanged, timeout=1000):
         play_btn.click()
     play_btn.click()  # stop it
+
+
+def test_key_event_filter(qtbot: QtBot) -> None:
+    app = QtAppWrap()
+    view = QtArrayView(QWidget(), ArrayViewerModel())
+    qtbot.addWidget(view.frontend_widget())
+
+    received: list[KeyPressEvent] = []
+    view.keyPressed.connect(received.append)
+
+    disconnect = app.filter_key_events(view.frontend_widget(), view)
+
+    widget = view.frontend_widget()
+
+    # Simulate a Right arrow key press on the widget
+    event = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier
+    )
+    QApplication.sendEvent(widget, event)
+    assert len(received) == 1
+    assert received[0].key == KeyCode.RIGHT
+    assert received[0].mods == KeyMod.NONE
+
+    # Simulate Shift+Left
+    event = QKeyEvent(
+        QEvent.Type.KeyPress,
+        Qt.Key.Key_Left,
+        Qt.KeyboardModifier.ShiftModifier,
+    )
+    QApplication.sendEvent(widget, event)
+    assert len(received) == 2
+    assert received[1].key == KeyCode.LEFT
+    assert received[1].mods == KeyMod.SHIFT
+
+    # Cleanup
+    disconnect()

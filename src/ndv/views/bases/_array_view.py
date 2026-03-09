@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
 
+from ndv._types import KeyPressEvent
 from ndv.models._array_display_model import ChannelMode
 
 from ._view_base import Viewable
@@ -31,6 +32,7 @@ class ArrayView(Viewable):
     histogramRequested = Signal(int)
     ndimToggleRequested = Signal(bool)
     channelModeChanged = Signal(ChannelMode)
+    keyPressed = Signal(KeyPressEvent)
 
     @abstractmethod
     def __init__(
