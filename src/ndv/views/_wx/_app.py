@@ -8,8 +8,8 @@ from wx import (
     EVT_LEFT_DCLICK,
     EVT_LEFT_DOWN,
     EVT_LEFT_UP,
-    EVT_MOUSE_CAPTURE_LOST,
     EVT_MOTION,
+    EVT_MOUSE_CAPTURE_LOST,
     MouseEvent,
 )
 
