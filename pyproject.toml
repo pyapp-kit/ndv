@@ -61,7 +61,7 @@ wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 
 # Supported Canavs backends
 vispy = ["vispy>=0.16", "pyopengl >=3.1"]
-pygfx = ["pygfx>=0.16.0", "rendercanvas>=2.6.1", "wgpu>=0.31.0"]
+pygfx = ["pygfx>=0.16.0", "rendercanvas>=2.6.2", "wgpu>=0.31.0"]
 
 # ready to go bundles with pygfx
 qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
