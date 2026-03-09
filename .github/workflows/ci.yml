@@ -3,13 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
-    tags:
-      - "v*"
+    tags: [v*]
   pull_request:
   workflow_dispatch:
-  schedule:
-    # run every week (for --pre release tests)
-    - cron: "0 0 * * 0"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,38 +15,138 @@ jobs:
   check-manifest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: pipx run check-manifest
 
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv run pyright
+
   test:
-    uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
-    with:
-      os: ${{ matrix.os }}
-      python-version: ${{ matrix.python-version }}
-      coverage-upload: artifact
-      qt: pyqt6
+    name: ${{ matrix.os }} py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
+    runs-on: ${{ matrix.os }}
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.13"]
+        gui: [pyside, pyqt, jupyter, wxpython]
+        canvas: [vispy, pygfx]
         exclude:
+          # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
-            python-version: "3.11" # unknown CI segfault...
+            gui: wxpython
+          - os: macos-latest
+            gui: wxpython
+            python-version: "3.10"
+
+        include:
+          # spot-check a few more python versions
+          - os: ubuntu-latest
+            python-version: "3.12"
+            gui: jupyter
+            canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.12"
+            gui: jupyter
+            canvas: pygfx
+          - os: ubuntu-latest
+            python-version: "3.11"
+            gui: pyqt
+            canvas: vispy
+          - os: ubuntu-latest
+            python-version: "3.12"
+            gui: pyqt
+            canvas: pygfx
+          - os: ubuntu-latest
+            python-version: "3.14"
+            gui: jupyter
+            canvas: pygfx
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@main
+        with:
+          qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        if: matrix.os == 'ubuntu-latest' && matrix.canvas == 'pygfx'
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+      - name: Test
+        run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v6
+        with:
+          name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}
+          path: ./.coverage*
+          include-hidden-files: true
+
+  test-min-deps:
+    name: min-deps py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+        gui: [pyqt, jupyter]
+        canvas: [vispy, pygfx]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@main
+        with:
+          qt: ${{ matrix.gui == 'pyqt' }}
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        if: matrix.canvas == 'pygfx'
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+      - name: Test min deps
+        run: uv run --exact --no-dev --resolution=lowest-direct --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} pytest --color=yes
 
   test-array-libs:
-    uses: pyapp-kit/workflows/.github/workflows/test-pyrepo.yml@v2
-    with:
-      os: ${{ matrix.os }}
-      python-version: ${{ matrix.python-version }}
-      extras: "test,third_party_arrays"
-      coverage-upload: artifact
-      qt: pyqt6
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.9", "3.12"]
+        python-version: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@main
+        with:
+          qt: true
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        run: sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+      - name: Test
+        run: uv run --exact --no-dev --extra=pygfx --group=pyqt --group=array-libs coverage run -p -m pytest --color=yes
+      - name: Upload coverage
+        uses: actions/upload-artifact@v6
+        with:
+          name: covreport-py${{ matrix.python-version }}-array-libs
+          path: ./.coverage*
+          include-hidden-files: true
 
   upload_coverage:
     if: always()
@@ -58,6 +154,21 @@ jobs:
     uses: pyapp-kit/workflows/.github/workflows/upload-coverage.yml@v2
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
+
+  # make sure we can build docs without error
+  test-docs:
+    runs-on: macos-latest # nicer screenshots
+    env:
+      UV_PYTHON: "3.13"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - name: 📚 Build docs
+        run: uv run --group docs mkdocs build --strict
+      - uses: actions/upload-artifact@v6
+        with:
+          name: docs
+          path: site
 
   deploy:
     name: Deploy
@@ -70,12 +181,12 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 

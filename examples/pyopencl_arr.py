@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#     "ndv[pyqt,vispy]",
+#     "pyopencl",
+#     "siphash24",
+# ]
+# ///
 from __future__ import annotations
 
 try:

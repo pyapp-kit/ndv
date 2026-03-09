@@ -7,91 +7,158 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 source = "vcs"
 
-# read more about configuring hatch at:
-# https://hatch.pypa.io/latest/config/build/
-[tool.hatch.build.targets.wheel]
-only-include = ["src"]
-sources = ["src"]
-
 # https://peps.python.org/pep-0621/
 [project]
 name = "ndv"
 dynamic = ["version"]
-description = "simple nd image viewer"
+description = "Simple, fast-loading, n-dimensional array viewer, with minimal dependencies."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "Talley Lambert", email = "talley.lambert@gmail.com" }]
+authors = [
+    { name = "Talley Lambert", email = "talley.lambert@gmail.com" },
+    { name = "Gabriel Selzer", email = "gjselzer@wisc.edu" },
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
-dependencies = ["qtpy", "numpy", "superqt[cmap,iconify]"]
+dependencies = [
+    "cmap >=0.3",
+    "numpy >=2.1.0; python_version >= '3.13'",
+    "numpy >=1.26.0; python_version >= '3.12'",
+    "psygnal >=0.12",
+    "pydantic >=2.10",
+    "typing_extensions >= 4.10",
+    "ihist>=0.1.3",
+]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
-pyqt = ["pyqt6"]
-vispy = ["vispy", "pyopengl"]
-pyside = ["pyside6"]
-pygfx = ["pygfx"]
-third_party_arrays = [
-    "aiohttp",                                 # for zarr example
-    "jax[cpu]",
-    "pooch",                                   # for xarray example
-    "pyopencl[pocl]; sys_platform == 'linux'",
-    "sparse",
-    "tensorstore",
-    "numpy<2.0",                               # for tensorstore (at least)
-    "torch",
-    "xarray",
-    "zarr",
+# Supported GUI frontends
+jupyter = [
+    "ipywidgets >=8.0.5",
+    "jupyter >=1.1",
+    "jupyter_rfb >=0.3.3",
+    "glfw >=2.4",
 ]
-test = [
-    "ndv[vispy,pygfx]",
-    "dask[array]",
-    "imageio[tifffile]",
-    "pytest-cov",
-    "pytest-qt",
-    "pytest",
+pyqt = ["pyqt6 >=6.7", "qtpy >=2", "superqt[iconify] >=0.7.2"]
+pyside = [
+    # defer to superqt's pyside6 restrictions
+    "superqt[iconify,pyside6] >=0.8.0",
+    # note: still may need to fix windows https://github.com/pyapp-kit/ndv/issues/59
+    "pyside6 >=6.7",
+    "qtpy >=2",
 ]
-dev = ["ipython", "mypy", "pdbpp", "pre-commit", "rich", "ruff"]
+wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
+
+# Supported Canavs backends
+vispy = ["vispy>=0.16", "pyopengl >=3.1"]
+pygfx = ["pygfx>=0.16.0", "rendercanvas>=2.6.1", "wgpu>=0.31.0"]
+
+# ready to go bundles with pygfx
+qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
+jup = ["ndv[pygfx,jupyter]", "imageio[tifffile] >=2.20"]
+wx = ["ndv[pygfx,wxpython]", "imageio[tifffile] >=2.20"]
+
 
 [project.urls]
 homepage = "https://github.com/pyapp-kit/ndv"
 repository = "https://github.com/pyapp-kit/ndv"
 
+[dependency-groups]
+array-libs = [
+    "aiohttp>=3.11.11",
+    "dask[array]>=2024.8.0",
+    "jax[cpu]>=0.4.30",
+    "pooch>=1.8.2",
+    "pyopencl>=2025.1",
+    "pyopencl[pocl]>=2025.1 ; sys_platform == 'linux'",
+    "sparse>=0.15.5",
+    "tensorstore>=0.1.69",
+    "torch>=2.6.0",
+    "xarray>=2024.7.0",
+    "zarr >2,<3",
+]
+test = ["pytest >=8", "pytest-cov >=6"]
+testqt = [{ include-group = "test" }, "pytest-qt >=4.5.0"]
+# per-GUI groups: each brings the GUI deps + correct test deps
+pyqt = [{ include-group = "testqt" }, "ndv[pyqt]"]
+pyside = [{ include-group = "testqt" }, "ndv[pyside]"]
+jupyter = [{ include-group = "test" }, "ndv[jupyter]"]
+wxpython = [{ include-group = "test" }, "ndv[wxpython]"]
+dev = [
+    { include-group = "testqt" },
+    # omitting wxpython from dev env for now
+    # because `uv sync && pytest hangs` on a wx test in the "full" env
+    # use `uv run --exact --no-dev --isolated ...` to test
+    "ndv[vispy,pygfx,pyqt,jupyter]",
+    "imageio[tifffile] >=2.20",
+    "ipykernel>=6.29.5",
+    "ipython>=8.18.1",
+    "mypy>=1.14.1",
+    "pdbpp>=0.12.1 ; sys_platform != 'win32'",
+    "prek>=0.3.4",
+    "pydevd>=3.4.1",
+    "pyright>=1.1.404",
+    "pytest-xdist>=3.8.0",
+    "rich>=13.9.4",
+    "ruff>=0.9.4",
+    "types-wxpython>=0.9.7",
+]
+docs = [
+    "mkdocs >=1.6.1",
+    "mkdocs-api-autonav >=0.1.2",
+    "mkdocs-material >=9.5.49",
+    "mkdocs-minify-plugin >=0.8.0",
+    "mkdocs-spellcheck[codespell] ==1.1.0",
+    "mkdocstrings-python >=1.13.0",
+    "mike >=2.1.3",
+    "ruff>=0.9.4",
+    # EXAMPLES
+    "ndv[vispy,qt]",
+    "openwfs >=1.0.0",
+]
+[tool.uv.sources]
+ndv = { workspace = true }
+
 # https://docs.astral.sh/ruff
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py310"
 src = ["src"]
+fix = true
+unsafe-fixes = true
 
 # https://docs.astral.sh/ruff/rules
 [tool.ruff.lint]
 pydocstyle = { convention = "numpy" }
 select = [
-    "E",    # style errors
-    "W",    # style warnings
-    "F",    # flakes
-    "D",    # pydocstyle
-    "D417", # Missing argument descriptions in Docstrings
-    "I",    # isort
-    "UP",   # pyupgrade
-    "C4",   # flake8-comprehensions
-    "B",    # flake8-bugbear
-    "A001", # flake8-builtins
-    "RUF",  # ruff-specific rules
-    "TCH",  # flake8-type-checking
-    "TID",  # flake8-tidy-imports
+    "E",      # style errors
+    "W",      # style warnings
+    "F",      # flakes
+    "D",      # pydocstyle
+    "D417",   # Missing argument descriptions in Docstrings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "C4",     # flake8-comprehensions
+    "B",      # flake8-bugbear
+    "A001",   # flake8-builtins
+    "RUF",    # ruff-specific rules
+    "TC",     # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    "PGH003", # no blanket type: ignore
 ]
 ignore = [
     "D401", # First line should be in imperative mood
+    "D10",  # Missing docstring...
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -106,12 +173,34 @@ skip-magic-trailing-comma = false # default is false
 
 # https://mypy.readthedocs.io/en/stable/config_file.html
 [tool.mypy]
-files = "src/**/"
+files = "src/**/*.py"
 strict = true
 disallow_any_generics = false
 disallow_subclassing_any = false
 show_error_codes = true
 pretty = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
+ignore_missing_imports = true
+
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.10"
+enableExperimentalFeatures = true
+# reportMissingImports = false
+reportOptionalMemberAccess = "none"
+reportIncompatibleMethodOverride = "none"
+reportAttributeAccessIssue = "none"
+reportMissingModuleSource = "none"
+reportPrivateImportUsage = "none"
+reportMissingImports = "information"
+reportArgumentType = "none"               # because of pydantic
+reportCallIssue = "none"
+verboseOutput = true
+venv = ".venv"
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]
@@ -123,9 +212,12 @@ filterwarnings = [
     "ignore:Method has been garbage collected::superqt",
     # occasionally happens on linux CI with vispy
     "ignore:Got wrong number of dimensions",
-    # requires pygfx > 0.2.0
-    "ignore:This version of pygfx does not yet support additive blending",
     "ignore:Unable to import recommended hash",
+    # CI-only error on jupyter, vispy, macos
+    "ignore:.*Failed to find a suitable pixel format",
+    # unsolved python 3.10 warning on shutdown, either xarray or dask
+    "ignore:unclosed transport:ResourceWarning",
+    "ignore:Jupyter is migrating its paths",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
@@ -152,3 +244,6 @@ ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
 
 [tool.typos.default]
 extend-ignore-identifiers-re = ["(?i)nd2?.*", "(?i)ome", ".*ser_schema"]
+
+[tool.typos.files]
+extend-exclude = ["**/*.ipynb"]

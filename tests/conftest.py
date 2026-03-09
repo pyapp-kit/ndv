@@ -1,16 +1,86 @@
+from __future__ import annotations
+
 import gc
+import importlib
+import importlib.util
+import os
+import sys
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 
+from ndv.views import gui_frontend
+from ndv.views._app import GUI_ENV_VAR, GuiFrontend
+
 if TYPE_CHECKING:
+    from asyncio import AbstractEventLoop
+    from collections.abc import Iterator
+
+    import wx
     from pytest import FixtureRequest
     from qtpy.QtWidgets import QApplication
 
 
-@pytest.fixture(autouse=True)
-def find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None]:
+@pytest.fixture
+def asyncio_app() -> Iterator[AbstractEventLoop]:
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="session")
+def wxapp() -> Iterator[wx.App]:
+    import wx
+
+    # wx.App() hangs on macOS if a QApplication is already running, because both
+    # try to own the NSApplication singleton. Skip wx tests in that case.
+    for mod_name in ("PyQt5", "PySide2", "PySide6", "PyQt6"):
+        if mod := sys.modules.get(f"{mod_name}.QtWidgets"):
+            if (qapp := getattr(mod, "QApplication", None)) and qapp.instance():
+                pytest.skip("Qt already running. Cannot also test wx.")
+
+    if (_wxapp := wx.App.Get()) is None:
+        _wxapp = wx.App()
+    yield _wxapp
+
+
+@pytest.fixture
+def any_app(request: pytest.FixtureRequest) -> Iterator[Any]:
+    # this fixture will use the appropriate application depending on the env var
+    # NDV_GUI_FRONTEND='qt' pytest
+    # NDV_GUI_FRONTEND='jupyter' pytest
+    try:
+        frontend = gui_frontend()
+    except RuntimeError:
+        # if we don't find any frontend, and jupyter is available, use that
+        # since it requires very little setup
+        if importlib.util.find_spec("jupyter"):
+            os.environ[GUI_ENV_VAR] = "jupyter"
+
+        frontend = gui_frontend()
+
+    if frontend == GuiFrontend.QT:
+        app = request.getfixturevalue("qapp")
+        qtbot = request.getfixturevalue("qtbot")
+        with patch.object(app, "exec", lambda *_: app.processEvents()):
+            with _catch_qt_leaks(request, app):
+                yield app, qtbot
+    elif frontend == GuiFrontend.JUPYTER:
+        yield request.getfixturevalue("asyncio_app")
+    elif frontend == GuiFrontend.WX:
+        yield request.getfixturevalue("wxapp")
+    else:
+        raise RuntimeError("No GUI frontend found")
+
+
+@contextmanager
+def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[None]:
     """Run after each test to ensure no widgets have been left around.
 
     When this test fails, it means that a widget being tested has an issue closing
@@ -29,7 +99,24 @@ def find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None
     # if the test failed, don't worry about checking widgets
     if request.session.testsfailed - failures_before:
         return
-    remaining = qapp.topLevelWidgets()
+    allow: list[type] = []
+    try:
+        from vispy.app.backends._qt import CanvasBackendDesktop
+
+        allow.append(CanvasBackendDesktop)
+    except (ImportError, RuntimeError):
+        pass
+    try:
+        # This is a known widget that is not cleaned up properly
+        # but it's not clear how to fix it
+        from rendercanvas.qt import QRenderWidget
+
+        allow.append(QRenderWidget)
+    except (ImportError, RuntimeError):
+        pass
+
+    # This is a known widget that is not cleaned up properly
+    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
     if len(remaining) > nbefore:
         test_node = request.node
 
@@ -46,6 +133,8 @@ def find_leaks(request: "FixtureRequest", qapp: "QApplication") -> Iterator[None
             referrers = gc.get_referrers(widget)
             msg += "\n  Referrers:"
             for ref in referrers:
+                if ref is remaining:
+                    continue
                 msg += f"\n  -   {ref}, {id(ref):#x}"
 
         raise AssertionError(msg)
