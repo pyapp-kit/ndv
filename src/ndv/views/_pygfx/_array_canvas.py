@@ -30,6 +30,22 @@ if TYPE_CHECKING:
     from pygfx.resources import Texture
 
 
+def _destroy_pygfx_gpu_resources(world_obj: pygfx.WorldObject) -> None:
+    """Explicitly destroy wgpu GPU objects to free VRAM.
+
+    pygfx relies on Python GC to release wgpu objects, but wgpu's release()
+    alone doesn't free GPU memory on Metal — destroy() must be called first.
+    """
+    geo = getattr(world_obj, "geometry", None)
+    if geo is not None:
+        for attr in ("grid", "positions", "indices"):
+            resource = getattr(geo, attr, None)
+            wgpu_obj = getattr(resource, "_wgpu_object", None)
+            if wgpu_obj is not None:
+                with suppress(Exception):
+                    wgpu_obj.destroy()
+
+
 def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
     if bounding_box is None:
         return False
@@ -113,6 +129,10 @@ class PyGFXImageHandle(ImageHandle):
     def remove(self) -> None:
         if (par := self._image.parent) is not None:
             par.remove(self._image)
+        # Explicitly destroy wgpu GPU objects to free Metal VRAM.
+        # pygfx does not call destroy() on its own, relying on GC alone,
+        # but wgpu's release() doesn't free GPU memory without destroy().
+        _destroy_pygfx_gpu_resources(self._image)
         # Break strong references so the weak-keyed _elements entry and
         # associated GPU resources (Texture/Buffer) can be garbage-collected.
         self._image = None
