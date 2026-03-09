@@ -421,8 +421,6 @@ class GfxArrayCanvas(ArrayCanvas):
         # Maintain a weak reference to the last ROI created.
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
 
-        self._canvas.add_event_handler(lambda e: self.refresh(), "resize")
-
     def frontend_widget(self) -> Any:
         return self._canvas
 
