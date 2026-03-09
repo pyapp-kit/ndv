@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import gc
 import os
+import weakref
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 from unittest.mock import MagicMock, Mock, patch
@@ -808,3 +810,19 @@ def test_keybinding_zoom() -> None:
     ctrl._canvas.zoom.reset_mock()
     press("_", KeyMod.SHIFT)
     ctrl._canvas.zoom.assert_called_once_with(factor=1.5, center=(5.0, 5.0))
+
+
+@no_type_check
+@pytest.mark.usefixtures("any_app")
+def test_handle_gc_on_data_reassign() -> None:
+    """Image handles should be GC'd when viewer.data is reassigned."""
+    viewer = ArrayViewer(np.zeros((10, 10), dtype="uint8"))
+    viewer.show()
+
+    ctrl = next(iter(viewer._lut_controllers.values()))
+    handle_ref = weakref.ref(ctrl.handles[0])
+
+    viewer.data = np.zeros((10, 10), dtype="uint8")
+    gc.collect()
+
+    assert handle_ref() is None

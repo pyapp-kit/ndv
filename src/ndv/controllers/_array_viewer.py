@@ -508,7 +508,7 @@ class ArrayViewer:
         for lut_ctrl in self._lut_controllers.values():
             while lut_ctrl.handles:
                 handle = lut_ctrl.handles.pop()
-                # disconnect model signals so the handle can be garbage-collected
+                # disconnect model signals
                 handle.model = None
                 handle.remove()
                 # handles are also added as lut_views via add_handle();
