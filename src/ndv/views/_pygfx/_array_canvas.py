@@ -113,6 +113,11 @@ class PyGFXImageHandle(ImageHandle):
     def remove(self) -> None:
         if (par := self._image.parent) is not None:
             par.remove(self._image)
+        # Break strong references so the weak-keyed _elements entry and
+        # associated GPU resources (Texture/Buffer) can be garbage-collected.
+        self._image = None
+        self._grid = None
+        self._material = None
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None

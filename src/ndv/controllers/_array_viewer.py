@@ -506,10 +506,15 @@ class ArrayViewer:
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
-            # self._view.remove_lut_view(lut_ctrl.lut_view)
             while lut_ctrl.handles:
-                lut_ctrl.handles.pop().remove()
-        # do we need to cleanup the lut views themselves?
+                handle = lut_ctrl.handles.pop()
+                # disconnect model signals so the handle can be garbage-collected
+                handle.model = None
+                handle.remove()
+                # handles are also added as lut_views via add_handle();
+                # remove them so old GPU textures can be garbage-collected
+                with suppress(ValueError):
+                    lut_ctrl.lut_views.remove(handle)
 
     # ------------------ View callbacks ------------------
 

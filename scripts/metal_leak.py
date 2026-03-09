@@ -255,7 +255,7 @@ def _run_leak_test(backend: str) -> LeakProfiler:
     _process_events()
 
     # warmup: let caches, JIT, lazy init settle
-    for i in range(N_WARMUP):
+    for _i in range(N_WARMUP):
         viewer.data = np.random.randint(0, 10000, DATA_SHAPE, dtype=DATA_DTYPE)
         _process_events()
 
@@ -347,7 +347,8 @@ if __name__ == "__main__":
         ok = vram_slope < MAX_VRAM_GROWTH_MB_PER_ITER
         status = "PASS" if ok else "FAIL"
         print(
-            f"  [{status}] VRAM growth: {vram_slope:.2f} MB/iter (max: {MAX_VRAM_GROWTH_MB_PER_ITER})"
+            f"  [{status}] VRAM growth: {vram_slope:.2f} MB/iter "
+            f"(max: {MAX_VRAM_GROWTH_MB_PER_ITER})"
         )
         passed &= ok
 
@@ -359,7 +360,8 @@ if __name__ == "__main__":
         ok = slope < MAX_OBJECT_GROWTH_PER_ITER
         status = "PASS" if ok else "FAIL"
         print(
-            f"  [{status}] {tname} growth: {slope:.2f} objects/iter (max: {MAX_OBJECT_GROWTH_PER_ITER})"
+            f"  [{status}] {tname} growth: {slope:.2f} objects/iter "
+            f"(max: {MAX_OBJECT_GROWTH_PER_ITER})"
         )
         passed &= ok
 

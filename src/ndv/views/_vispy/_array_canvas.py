@@ -44,11 +44,13 @@ class VispyImageHandle(ImageHandle):
         self._visual = visual
         self._allowed_dims = {2, 3} if isinstance(visual, visuals.ImageVisual) else {3}
 
-    def data(self) -> np.ndarray:
+    def data(self) -> np.ndarray | None:
+        if self._visual is None:
+            return None
         try:
-            return self._visual._data  # type: ignore [no-any-return]
+            return self._visual._data
         except AttributeError:
-            return self._visual._last_data  # type: ignore [no-any-return]
+            return self._visual._last_data
 
     def set_data(self, data: np.ndarray) -> None:
         if data.ndim not in self._allowed_dims:
@@ -110,6 +112,9 @@ class VispyImageHandle(ImageHandle):
 
     def remove(self) -> None:
         self._visual.parent = None
+        # Break strong references so the weak-keyed _elements entry and
+        # associated GPU textures can be garbage-collected.
+        self._visual = None
 
     def get_cursor(self, event: MouseMoveEvent) -> CursorType | None:
         return None
