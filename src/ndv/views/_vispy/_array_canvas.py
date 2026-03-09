@@ -477,9 +477,8 @@ class VispyArrayCanvas(ArrayCanvas):
     def zoom(
         self, factor: float | tuple, center: tuple[float, float] | None = None
     ) -> None:
-        """Zoom in (or out) at the given center (canvas pixel coordinates)."""
-        world_center = self.canvas_to_world(center)[:2] if center else None
-        self._camera.zoom(factor=factor, center=world_center)
+        """Zoom in (or out) at the given center (world coordinates)."""
+        self._camera.zoom(factor=factor, center=center)
 
     def canvas_to_world(
         self, pos_xy: tuple[float, float]

@@ -39,7 +39,7 @@ class GraphicsCanvas(Viewable, Mouseable):
         factor: float | tuple,
         center: tuple[float, float] | None = None,
     ) -> None:
-        """Zoom in (or out) at the given center (canvas pixel coordinates)."""
+        """Zoom in (or out) at the given center (world coordinates)."""
 
     @abstractmethod
     def canvas_to_world(
