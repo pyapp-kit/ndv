@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
-from weakref import ReferenceType, WeakKeyDictionary, ref
+from weakref import ReferenceType, WeakValueDictionary, ref
 
 import cmap as _cmap
 import numpy as np
@@ -28,6 +28,22 @@ if TYPE_CHECKING:
 
     from pygfx.materials import ImageBasicMaterial
     from pygfx.resources import Texture
+
+
+def _destroy_pygfx_gpu_resources(world_obj: pygfx.WorldObject) -> None:
+    """Explicitly destroy wgpu GPU objects to free VRAM.
+
+    pygfx relies on Python GC to release wgpu objects, but wgpu's release()
+    alone doesn't free GPU memory on Metal — destroy() must be called first.
+    """
+    geo = getattr(world_obj, "geometry", None)
+    if geo is not None:
+        for attr in ("grid", "positions", "indices"):
+            resource = getattr(geo, attr, None)
+            wgpu_obj = getattr(resource, "_wgpu_object", None)
+            if wgpu_obj is not None:
+                with suppress(Exception):
+                    wgpu_obj.destroy()
 
 
 def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
@@ -113,6 +129,10 @@ class PyGFXImageHandle(ImageHandle):
     def remove(self) -> None:
         if (par := self._image.parent) is not None:
             par.remove(self._image)
+        # Explicitly destroy wgpu GPU objects to free Metal VRAM.
+        # pygfx does not call destroy() on its own, relying on GC alone,
+        # but wgpu's release() doesn't free GPU memory without destroy().
+        _destroy_pygfx_gpu_resources(self._image)
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
@@ -387,7 +407,16 @@ class GfxArrayCanvas(ArrayCanvas):
         self._camera: pygfx.Camera | None = None
         self._ndim: Literal[2, 3] | None = None
 
-        self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
+        # Maps pygfx WorldObjects (scene children) → CanvasElement handles.
+        # Entries are added by add_image/add_volume/add_bounding_box.
+        # Nobody explicitly removes entries: the controller owns handle
+        # lifetimes via ChannelController.handles/lut_views (for images) and
+        # _roi_view (for ROIs).  When the controller calls handle.remove()
+        # (in _clear_canvas) those refs are dropped, the handle is GC'd, and
+        # the WeakValueDictionary entry is automatically removed.
+        # NB: a WeakKeyDictionary would create a ref cycle here because
+        # each handle (value) holds a strong ref back to its WorldObject (key).
+        self._elements = WeakValueDictionary[pygfx.WorldObject, CanvasElement]()
         self._selection: CanvasElement | None = None
         # Maintain a weak reference to the last ROI created.
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
@@ -614,8 +643,8 @@ class GfxArrayCanvas(ArrayCanvas):
         pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
             bb = c.get_bounding_box()
-            if _is_inside(bb, pos):
-                elements.append(self._elements[c])
+            if _is_inside(bb, pos) and (elem := self._elements.get(c)) is not None:
+                elements.append(elem)
         return elements
 
     def set_visible(self, visible: bool) -> None:
