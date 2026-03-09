@@ -16,6 +16,14 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
             def sizeHint(self) -> QSize:
                 return QSize(self.width(), self.height())
 
+            def keyPressEvent(self, event: Any) -> None:
+                super().keyPressEvent(event)
+                event.ignore()  # pass event to parent for global shortcuts
+
+            def keyReleaseEvent(self, event: Any) -> None:
+                super().keyReleaseEvent(event)
+                event.ignore()  # pass event to parent for global shortcuts
+
         return QRenderWidget
 
     if frontend == GuiFrontend.JUPYTER:
