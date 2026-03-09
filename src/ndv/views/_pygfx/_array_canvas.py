@@ -560,7 +560,7 @@ class GfxArrayCanvas(ArrayCanvas):
             pz,
         )
         cam.zoom /= factor
-        self.refresh()
+        self._canvas.force_draw()
 
     def refresh(self) -> None:
         with suppress(AttributeError):
