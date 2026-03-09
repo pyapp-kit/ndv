@@ -678,6 +678,8 @@ class _WxArrayViewer(wx.Frame):
         self.Layout()
 
     def update_lut_scroll_size(self, *_: Any) -> None:
+        if not self or not self.luts_scroll:
+            return
         self.luts_scroll.Layout()
         total_size = self.luts.GetMinSize()
         total_height = total_size.GetHeight()
