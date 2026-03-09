@@ -45,9 +45,9 @@ def handle_key_press(event: KeyPressEvent, viewer: ArrayViewer) -> None:
     elif action is Action.FOCUS_PREV_AXIS:
         _cycle_focused_axis(viewer, -1)
     elif action is Action.ZOOM_IN:
-        viewer._canvas.zoom(factor=0.667, center=viewer._highlight_pos)
+        viewer._canvas.zoom(factor=1.5, center=viewer._mouse_canvas_pos)
     elif action is Action.ZOOM_OUT:
-        viewer._canvas.zoom(factor=1.5, center=viewer._highlight_pos)
+        viewer._canvas.zoom(factor=0.6667, center=viewer._mouse_canvas_pos)
 
 
 def _steppable_axes(viewer: ArrayViewer) -> list[AxisKey]:

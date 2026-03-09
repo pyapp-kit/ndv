@@ -135,6 +135,7 @@ class ArrayViewer:
         self._view.ndimToggleRequested.connect(self._on_view_ndim_toggle_requested)
 
         self._highlight_pos: tuple[float, float] | None = None
+        self._mouse_canvas_pos: tuple[float, float] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
@@ -553,6 +554,7 @@ class ArrayViewer:
 
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
+        self._mouse_canvas_pos = (event.x, event.y)
         x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
         self._highlight_pos = (x, y)
 
@@ -563,6 +565,7 @@ class ArrayViewer:
     def _on_canvas_mouse_left(self) -> None:
         """Respond to a mouse leaving the canvas in the view."""
         self._highlight_pos = None
+        self._mouse_canvas_pos = None
         self._highlight_values({}, self._highlight_pos)
 
     def _on_key_pressed(self, event: KeyPressEvent) -> None:
