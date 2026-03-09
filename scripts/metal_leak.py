@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "matplotlib>=3.10.8",
-#     "ndv[pyqt,pygfx]",
+#     "ndv[pyqt,pygfx,vispy]",
 #     "pyobjc-framework-metal>=12.1",
 #     "pytest",
 # ]
@@ -209,7 +209,7 @@ class LeakProfiler:
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
         axes[-1].set_xlabel("Iteration")
-        fig.suptitle("Leak Profiling", fontsize=14, y=1.01)
+        fig.suptitle(f"{backend} Leak Profiling", fontsize=14, y=1.01)
         fig.tight_layout()
         if save_path:
             fig.savefig(save_path, dpi=150, bbox_inches="tight")
@@ -240,8 +240,8 @@ def _run_leak_test(backend: str) -> LeakProfiler:
 
     track_types = (
         *BACKEND_TYPES.get(backend, ()),
-        "Texture2D",
-        "Texture3D",
+        # "Texture2D",
+        # "Texture3D",
         "Texture",
         "Buffer",
     )

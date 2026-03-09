@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
-from weakref import ReferenceType, WeakKeyDictionary, ref
+from weakref import ReferenceType, WeakValueDictionary, ref
 
 import cmap as _cmap
 import numpy as np
@@ -133,11 +133,6 @@ class PyGFXImageHandle(ImageHandle):
         # pygfx does not call destroy() on its own, relying on GC alone,
         # but wgpu's release() doesn't free GPU memory without destroy().
         _destroy_pygfx_gpu_resources(self._image)
-        # Break strong references so the weak-keyed _elements entry and
-        # associated GPU resources (Texture/Buffer) can be garbage-collected.
-        self._image = None
-        self._grid = None
-        self._material = None
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
         return None
@@ -412,7 +407,16 @@ class GfxArrayCanvas(ArrayCanvas):
         self._camera: pygfx.Camera | None = None
         self._ndim: Literal[2, 3] | None = None
 
-        self._elements = WeakKeyDictionary[pygfx.WorldObject, CanvasElement]()
+        # Maps pygfx WorldObjects (scene children) → CanvasElement handles.
+        # Entries are added by add_image/add_volume/add_bounding_box.
+        # Nobody explicitly removes entries: the controller owns handle
+        # lifetimes via ChannelController.handles/lut_views (for images) and
+        # _roi_view (for ROIs).  When the controller calls handle.remove()
+        # (in _clear_canvas) those refs are dropped, the handle is GC'd, and
+        # the WeakValueDictionary entry is automatically removed.
+        # NB: a WeakKeyDictionary would create a ref cycle here because
+        # each handle (value) holds a strong ref back to its WorldObject (key).
+        self._elements = WeakValueDictionary[pygfx.WorldObject, CanvasElement]()
         self._selection: CanvasElement | None = None
         # Maintain a weak reference to the last ROI created.
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
@@ -639,8 +643,8 @@ class GfxArrayCanvas(ArrayCanvas):
         pos = self.canvas_to_world((pos_xy[0], pos_xy[1]))
         for c in self._scene.children:
             bb = c.get_bounding_box()
-            if _is_inside(bb, pos):
-                elements.append(self._elements[c])
+            if _is_inside(bb, pos) and (elem := self._elements.get(c)) is not None:
+                elements.append(elem)
         return elements
 
     def set_visible(self, visible: bool) -> None:

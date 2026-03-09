@@ -4,7 +4,7 @@ from __future__ import annotations
 import warnings
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
-from weakref import ReferenceType, WeakKeyDictionary
+from weakref import ReferenceType, WeakValueDictionary
 
 import cmap as _cmap
 import numpy as np
@@ -44,9 +44,7 @@ class VispyImageHandle(ImageHandle):
         self._visual = visual
         self._allowed_dims = {2, 3} if isinstance(visual, visuals.ImageVisual) else {3}
 
-    def data(self) -> np.ndarray | None:
-        if self._visual is None:
-            return None
+    def data(self) -> np.ndarray:
         try:
             return self._visual._data
         except AttributeError:
@@ -112,9 +110,6 @@ class VispyImageHandle(ImageHandle):
 
     def remove(self) -> None:
         self._visual.parent = None
-        # Break strong references so the weak-keyed _elements entry and
-        # associated GPU textures can be garbage-collected.
-        self._visual = None
 
     def get_cursor(self, event: MouseMoveEvent) -> CursorType | None:
         return None
@@ -310,7 +305,16 @@ class VispyArrayCanvas(ArrayCanvas):
         self._view: scene.ViewBox = central_wdg.add_view()
         self._ndim: Literal[2, 3] | None = None
 
-        self._elements: WeakKeyDictionary = WeakKeyDictionary()
+        # Maps vispy visuals (scene children) → CanvasElement handles.
+        # Entries are added by add_image/add_volume/add_bounding_box.
+        # Nobody explicitly removes entries: the controller owns handle
+        # lifetimes via ChannelController.handles/lut_views (for images) and
+        # _roi_view (for ROIs).  When the controller calls handle.remove()
+        # (in _clear_canvas) those refs are dropped, the handle is GC'd, and
+        # the WeakValueDictionary entry is automatically removed.
+        # NB: a WeakKeyDictionary would create a ref cycle here because
+        # each handle (value) holds a strong ref back to its visual (key).
+        self._elements = WeakValueDictionary[scene.Node, CanvasElement]()
         self._selection: CanvasElement | None = None
         # Maintain weak reference to last ROI created
         self._last_roi_created: ReferenceType[VispyRectangle] | None = None
