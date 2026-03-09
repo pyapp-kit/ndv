@@ -9,6 +9,7 @@ from wx import (
     EVT_LEFT_DOWN,
     EVT_LEFT_UP,
     EVT_MOTION,
+    EVT_MOUSE_CAPTURE_LOST,
     MouseEvent,
 )
 
@@ -109,6 +110,10 @@ class WxAppWrap(NDVApp):
             if not receiver.on_mouse_press(mpe):
                 receiver.mousePressed.emit(mpe)
                 event.Skip()
+            # Capture mouse so we receive the button-up even if the cursor
+            # leaves the canvas (fixes stuck-pan on Windows).
+            if not canvas.HasCapture():
+                canvas.CaptureMouse()
 
         def on_mouse_double_press(event: MouseEvent) -> None:
             nonlocal active_button
@@ -119,6 +124,8 @@ class WxAppWrap(NDVApp):
             if not receiver.on_mouse_double_press(mpe):
                 receiver.mouseDoublePressed.emit(mpe)
                 event.Skip()
+            if not canvas.HasCapture():
+                canvas.CaptureMouse()
 
         def on_mouse_release(event: MouseEvent) -> None:
             nonlocal active_button
@@ -128,19 +135,29 @@ class WxAppWrap(NDVApp):
             if not receiver.on_mouse_release(mre):
                 receiver.mouseReleased.emit(mre)
                 event.Skip()
+            if canvas.HasCapture():
+                canvas.ReleaseMouse()
+
+        def on_mouse_capture_lost(event: wx.MouseCaptureLostEvent) -> None:
+            nonlocal active_button
+            active_button = MouseButton.NONE
 
         canvas.Bind(EVT_MOTION, handler=on_mouse_move)
         canvas.Bind(EVT_LEAVE_WINDOW, handler=on_mouse_leave)
         canvas.Bind(EVT_LEFT_DOWN, handler=on_mouse_press)
         canvas.Bind(EVT_LEFT_DCLICK, handler=on_mouse_double_press)
         canvas.Bind(EVT_LEFT_UP, handler=on_mouse_release)
+        canvas.Bind(EVT_MOUSE_CAPTURE_LOST, handler=on_mouse_capture_lost)
 
         def _unbind() -> None:
+            if canvas.HasCapture():
+                canvas.ReleaseMouse()
             canvas.Unbind(EVT_MOTION, handler=on_mouse_move)
             canvas.Unbind(EVT_LEAVE_WINDOW, handler=on_mouse_leave)
             canvas.Unbind(EVT_LEFT_DOWN, handler=on_mouse_press)
             canvas.Unbind(EVT_LEFT_DCLICK, handler=on_mouse_double_press)
             canvas.Unbind(EVT_LEFT_UP, handler=on_mouse_release)
+            canvas.Unbind(EVT_MOUSE_CAPTURE_LOST, handler=on_mouse_capture_lost)
 
         return _unbind
 
