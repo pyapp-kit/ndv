@@ -17,6 +17,8 @@ class Action(Enum):
     STEP_BACKWARD = auto()
     FOCUS_NEXT_AXIS = auto()
     FOCUS_PREV_AXIS = auto()
+    ZOOM_IN = auto()
+    ZOOM_OUT = auto()
 
 
 _DEFAULT_KEYBINDINGS: dict[tuple[KeyCode | str, KeyMod], Action] = {
@@ -24,6 +26,10 @@ _DEFAULT_KEYBINDINGS: dict[tuple[KeyCode | str, KeyMod], Action] = {
     (KeyCode.LEFT, KeyMod.NONE): Action.STEP_BACKWARD,
     (KeyCode.UP, KeyMod.NONE): Action.FOCUS_PREV_AXIS,
     (KeyCode.DOWN, KeyMod.NONE): Action.FOCUS_NEXT_AXIS,
+    ("+", KeyMod.SHIFT): Action.ZOOM_IN,
+    ("=", KeyMod.NONE): Action.ZOOM_IN,
+    ("-", KeyMod.NONE): Action.ZOOM_OUT,
+    ("_", KeyMod.SHIFT): Action.ZOOM_OUT,
 }
 
 
@@ -38,6 +44,10 @@ def handle_key_press(event: KeyPressEvent, viewer: ArrayViewer) -> None:
         _cycle_focused_axis(viewer, 1)
     elif action is Action.FOCUS_PREV_AXIS:
         _cycle_focused_axis(viewer, -1)
+    elif action is Action.ZOOM_IN and viewer._highlight_pos is not None:
+        viewer._canvas.zoom(factor=0.667, center=viewer._highlight_pos)
+    elif action is Action.ZOOM_OUT and viewer._highlight_pos is not None:
+        viewer._canvas.zoom(factor=1.5, center=viewer._highlight_pos)
 
 
 def _steppable_axes(viewer: ArrayViewer) -> list[AxisKey]:

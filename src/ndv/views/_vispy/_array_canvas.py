@@ -474,6 +474,10 @@ class VispyArrayCanvas(ArrayCanvas):
             xy_max = max(x[1] - x[0], y[1] - y[0])
             self._camera.scale_factor = xy_max * (1 + 2 * margin)
 
+    def zoom(self, factor: float | tuple, center: tuple[float, float] = (0, 0)) -> None:
+        """Zoom in (or out) at the given center (world coordinates)."""
+        self._camera.zoom(factor=factor, center=center)
+
     def canvas_to_world(
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:

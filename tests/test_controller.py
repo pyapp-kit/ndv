@@ -763,3 +763,48 @@ def test_keybinding_slice_navigation() -> None:
     # Unrecognized key does nothing
     press("x")
     assert ctrl.display_model.current_index[1] == 9
+
+
+@no_type_check
+@_patch_views
+def test_keybinding_zoom() -> None:
+    """Plus/minus keys should call canvas.zoom when mouse is over canvas."""
+    from ndv._types import KeyMod, KeyPressEvent
+
+    ctrl = ArrayViewer()
+    ctrl._async = False
+    ctrl.data = np.empty((10, 10))
+
+    def press(key: str, mods: KeyMod = KeyMod.NONE) -> None:
+        ctrl._on_key_pressed(KeyPressEvent(key, mods))
+
+    # When mouse is not over the canvas, zoom should not be called
+    assert ctrl._highlight_pos is None
+    ctrl._canvas.zoom.reset_mock()
+    press("=")
+    ctrl._canvas.zoom.assert_not_called()
+    press("-")
+    ctrl._canvas.zoom.assert_not_called()
+
+    # Simulate mouse over canvas
+    ctrl._highlight_pos = (5.0, 5.0)
+
+    # = key (zoom in)
+    ctrl._canvas.zoom.reset_mock()
+    press("=")
+    ctrl._canvas.zoom.assert_called_once_with(factor=0.667, center=(5.0, 5.0))
+
+    # - key (zoom out)
+    ctrl._canvas.zoom.reset_mock()
+    press("-")
+    ctrl._canvas.zoom.assert_called_once_with(factor=1.5, center=(5.0, 5.0))
+
+    # + (shift+=) should also zoom in
+    ctrl._canvas.zoom.reset_mock()
+    press("+", KeyMod.SHIFT)
+    ctrl._canvas.zoom.assert_called_once_with(factor=0.667, center=(5.0, 5.0))
+
+    # _ (shift+-) should also zoom out
+    ctrl._canvas.zoom.reset_mock()
+    press("_", KeyMod.SHIFT)
+    ctrl._canvas.zoom.assert_called_once_with(factor=1.5, center=(5.0, 5.0))
