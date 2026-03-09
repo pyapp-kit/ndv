@@ -46,9 +46,9 @@ class VispyImageHandle(ImageHandle):
 
     def data(self) -> np.ndarray:
         try:
-            return self._visual._data
+            return self._visual._data  # type: ignore [no-any-return]
         except AttributeError:
-            return self._visual._last_data
+            return self._visual._last_data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
         if data.ndim not in self._allowed_dims:
