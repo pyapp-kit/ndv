@@ -707,6 +707,7 @@ def test_user_current_index_preserved_on_init() -> None:
 @_patch_views
 def test_keybinding_slice_navigation() -> None:
     """Arrow keys step focused slider and cycle focused axis."""
+    from ndv._keybindings import _ensure_focused_axis
     from ndv._types import KeyCode, KeyMod, KeyPressEvent
 
     SHAPE = (5, 10, 128, 128)
@@ -719,11 +720,11 @@ def test_keybinding_slice_navigation() -> None:
     # steppable axes are 0 and 1
     # default focused axis is the last steppable axis (1)
     assert ctrl._focused_slider_axis is None  # not yet set
-    assert ctrl._ensure_focused_axis() == 1
+    assert _ensure_focused_axis(ctrl) == 1
     assert ctrl._focused_slider_axis == 1
 
     def press(key: KeyCode | str, mods: KeyMod = KeyMod.NONE) -> None:
-        ctrl._on_canvas_key_pressed(KeyPressEvent(key, mods))
+        ctrl._on_key_pressed(KeyPressEvent(key, mods))
 
     # RIGHT arrow steps forward on focused axis (1)
     press(KeyCode.RIGHT)
