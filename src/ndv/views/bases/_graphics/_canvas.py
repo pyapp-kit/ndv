@@ -4,9 +4,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
-from psygnal import Signal
 
-from ndv._types import KeyPressEvent
 from ndv.views.bases._lut_view import LUTView
 from ndv.views.bases._view_base import Viewable
 
@@ -21,7 +19,6 @@ if TYPE_CHECKING:
 
 
 class GraphicsCanvas(Viewable, Mouseable):
-    keyPressed = Signal(KeyPressEvent)
     """ABC for graphics canvas providers."""
 
     @abstractmethod

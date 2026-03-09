@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from ndv.views.bases import ArrayView
-    from ndv.views.bases._graphics._canvas import GraphicsCanvas
     from ndv.views.bases._graphics._mouseable import Mouseable
 
 
@@ -119,14 +118,16 @@ class JupyterAppWrap(NDVApp):
         return lambda: setattr(canvas, "handle_event", super_handle_event)
 
     def filter_key_events(
-        self, canvas: Any, receiver: GraphicsCanvas
+        self, widget: Any, canvas_widget: Any, receiver: ArrayView
     ) -> Callable[[], None]:
-        if not isinstance(canvas, RemoteFrameBuffer):
-            raise TypeError(
-                f"Expected canvas to be RemoteFrameBuffer, got {type(canvas)}"
-            )
+        # In Jupyter, key events must go through the RemoteFrameBuffer canvas
+        # (which uses a hidden <input> element to capture keys), not the
+        # ipywidgets container.
+        target = canvas_widget if canvas_widget is not None else widget
+        if not isinstance(target, RemoteFrameBuffer):
+            return lambda: None
 
-        super_handle_event = canvas.handle_event
+        super_handle_event = target.handle_event
 
         def handle_event(self: RemoteFrameBuffer, ev: dict) -> None:
             if ev["event_type"] == "key_down":
@@ -151,15 +152,8 @@ class JupyterAppWrap(NDVApp):
                 receiver.keyPressed.emit(KeyPressEvent(key, mods))
             super_handle_event(ev)
 
-        canvas.handle_event = MethodType(handle_event, canvas)
-
-        original_super = super_handle_event
-
-        def _restore() -> None:
-            # restore to the handler that was present before we patched
-            canvas.handle_event = original_super
-
-        return _restore
+        target.handle_event = MethodType(handle_event, target)
+        return lambda: setattr(target, "handle_event", super_handle_event)
 
 
 _JUPYTER_KEY_MAP: dict[str, KeyCode] = {

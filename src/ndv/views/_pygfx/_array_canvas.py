@@ -17,7 +17,7 @@ from ndv._types import (
     MouseReleaseEvent,
 )
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
-from ndv.views._app import filter_key_events, filter_mouse_events
+from ndv.views._app import filter_mouse_events
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
 
@@ -379,7 +379,6 @@ class GfxArrayCanvas(ArrayCanvas):
         # the returned function can be called to remove the filter, (and it also
         # closes on the event filter and keeps it in scope).
         self._disconnect_mouse_events = filter_mouse_events(self._canvas, self)
-        self._disconnect_key_events = filter_key_events(self._canvas, self)
 
         self._renderer = pygfx.renderers.WgpuRenderer(self._canvas)
 
@@ -610,7 +609,6 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def close(self) -> None:
         self._disconnect_mouse_events()
-        self._disconnect_key_events()
         self._canvas.close()
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:

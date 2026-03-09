@@ -139,7 +139,12 @@ class ArrayViewer:
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
 
         self._focused_slider_axis: AxisKey | None = None
-        self._canvas.keyPressed.connect(self._on_canvas_key_pressed)
+        self._disconnect_key_events = _app.filter_key_events(
+            self._view.frontend_widget(),
+            self._canvas.frontend_widget(),
+            self._view,
+        )
+        self._view.keyPressed.connect(self._on_canvas_key_pressed)
 
         if self._data_wrapper is not None:
             self._fully_synchronize_view()

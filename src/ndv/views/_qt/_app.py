@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 
     from ndv.views.bases import ArrayView
     from ndv.views.bases._app import P, T
-    from ndv.views.bases._graphics._canvas import GraphicsCanvas
     from ndv.views.bases._graphics._mouseable import Mouseable
 
 
@@ -85,14 +84,14 @@ class QtAppWrap(NDVApp):
         return lambda: canvas.removeEventFilter(f)
 
     def filter_key_events(
-        self, canvas: Any, receiver: GraphicsCanvas
+        self, widget: Any, canvas_widget: Any, receiver: ArrayView
     ) -> Callable[[], None]:
-        if not isinstance(canvas, QWidget):
-            raise TypeError(f"Expected canvas to be QWidget, got {type(canvas)}")
+        if not isinstance(widget, QWidget):
+            raise TypeError(f"Expected widget to be QWidget, got {type(widget)}")
 
-        f = KeyEventFilter(canvas, receiver)
-        canvas.installEventFilter(f)
-        return lambda: canvas.removeEventFilter(f)
+        f = KeyEventFilter(widget, receiver)
+        widget.installEventFilter(f)
+        return lambda: widget.removeEventFilter(f)
 
     def process_events(self) -> None:
         """Process events for the application."""
@@ -205,7 +204,7 @@ def _qt_mods_to_keymods(modifiers: Qt.KeyboardModifier) -> KeyMod:
 
 
 class KeyEventFilter(QObject):
-    def __init__(self, canvas: QWidget, receiver: GraphicsCanvas) -> None:
+    def __init__(self, canvas: QWidget, receiver: ArrayView) -> None:
         super().__init__()
         self.canvas = canvas
         self.receiver = receiver

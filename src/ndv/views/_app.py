@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 
     from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
     from ndv.views.bases._app import NDVApp
-    from ndv.views.bases._graphics._canvas import GraphicsCanvas
     from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
@@ -323,9 +322,11 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
     return ndv_app().filter_mouse_events(canvas, receiver)
 
 
-def filter_key_events(canvas: Any, receiver: GraphicsCanvas) -> Callable[[], None]:
-    """Intercept key events on `canvas` and emit `receiver.keyPressed`."""
-    return ndv_app().filter_key_events(canvas, receiver)
+def filter_key_events(
+    widget: Any, canvas_widget: Any, receiver: ArrayView
+) -> Callable[[], None]:
+    """Intercept key events on `widget` and emit `receiver.keyPressed`."""
+    return ndv_app().filter_key_events(widget, canvas_widget, receiver)
 
 
 def call_later(msec: int, func: Callable[[], None]) -> None:

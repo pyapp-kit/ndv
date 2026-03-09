@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
 
     from ndv.views.bases import ArrayView
-    from ndv.views.bases._graphics._canvas import GraphicsCanvas
     from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
@@ -54,9 +53,14 @@ class NDVApp:
         raise NotImplementedError
 
     def filter_key_events(
-        self, canvas: Any, receiver: GraphicsCanvas
+        self, widget: Any, canvas_widget: Any, receiver: ArrayView
     ) -> Callable[[], None]:
-        """Install key event filter on `canvas`, emitting `receiver.keyPressed`."""
+        """Install key event filter on `widget` or emitting `receiver.keyPressed`.
+
+        canvas_widget is also passed, mostly as a hack for Jupyter, where jupyter-rfb
+        has already done the hard-work of intercepting key events at the canvas level
+        and we just need to piggyback.
+        """
         raise NotImplementedError
 
     def call_in_main_thread(

@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 
     from ndv.views.bases import ArrayView
     from ndv.views.bases._app import P, T
-    from ndv.views.bases._graphics._canvas import GraphicsCanvas
     from ndv.views.bases._graphics._mouseable import Mouseable
 
 _app = None
@@ -146,10 +145,10 @@ class WxAppWrap(NDVApp):
         return _unbind
 
     def filter_key_events(
-        self, canvas: Any, receiver: GraphicsCanvas
+        self, widget: Any, canvas_widget: Any, receiver: ArrayView
     ) -> Callable[[], None]:
-        if not isinstance(canvas, wx.Window):
-            raise TypeError(f"Expected canvas to be wx.Window, got {type(canvas)}")
+        if not isinstance(widget, wx.Window):
+            raise TypeError(f"Expected widget to be wx.Window, got {type(widget)}")
 
         def on_key_down(event: wx.KeyEvent) -> None:
             key_code = event.GetKeyCode()
@@ -175,10 +174,10 @@ class WxAppWrap(NDVApp):
             receiver.keyPressed.emit(KeyPressEvent(key, mods))
             event.Skip()
 
-        canvas.Bind(wx.EVT_KEY_DOWN, handler=on_key_down)
+        widget.Bind(wx.EVT_CHAR_HOOK, handler=on_key_down)
 
         def _unbind() -> None:
-            canvas.Unbind(wx.EVT_KEY_DOWN, handler=on_key_down)
+            widget.Unbind(wx.EVT_CHAR_HOOK, handler=on_key_down)
 
         return _unbind
 
