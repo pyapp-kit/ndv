@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
@@ -547,12 +548,18 @@ class GfxArrayCanvas(ArrayCanvas):
             cam.zoom = 1 - margin
         self.refresh()
 
-    def zoom(self, factor: float | tuple, center: tuple | None = None) -> None:
-        """Zoom in (or out) at the given center."""
-        cam = self._camera
-        if cam is not None:
-            cam.zoom *= factor
-            self.refresh()
+    def zoom(
+        self, factor: float | tuple, center: tuple[float, float] | None = None
+    ) -> None:
+        """Zoom in (or out) at the given center (canvas pixel coordinates)."""
+        if self._controller is None:
+            return
+        delta = math.log2(1 / factor) if isinstance(factor, (int, float)) else 0
+        w, h = self._canvas.get_logical_size()
+        rect = (0, 0, w, h)
+        pos = center if center is not None else (w / 2, h / 2)
+        self._controller.zoom_to_point(delta, pos, rect)
+        self.refresh()
 
     def refresh(self) -> None:
         with suppress(AttributeError):
