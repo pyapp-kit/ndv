@@ -210,6 +210,7 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore:Method has been garbage collected::superqt",
+    "ignore:Error fetching icon:UserWarning",
     # occasionally happens on linux CI with vispy
     "ignore:Got wrong number of dimensions",
     "ignore:Unable to import recommended hash",
