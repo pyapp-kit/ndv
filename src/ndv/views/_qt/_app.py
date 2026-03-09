@@ -4,7 +4,7 @@ import sys
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from qtpy.QtCore import QEvent, QObject, Qt, QTimer
-from qtpy.QtGui import QMouseEvent
+from qtpy.QtGui import QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import QApplication, QWidget
 
 from ndv._types import (
@@ -87,7 +87,7 @@ class QtAppWrap(NDVApp):
         if not isinstance(widget, QWidget):
             raise TypeError(f"Expected widget to be QWidget, got {type(widget)}")
 
-        f = KeyEventFilter(widget, receiver)
+        f = KeyEventFilter(receiver)
         widget.installEventFilter(f)
         return lambda: widget.removeEventFilter(f)
 
@@ -202,34 +202,24 @@ def _qt_mods_to_keymods(modifiers: Qt.KeyboardModifier) -> KeyMod:
 
 
 class KeyEventFilter(QObject):
-    def __init__(self, canvas: QWidget, receiver: ArrayView) -> None:
+    def __init__(self, receiver: ArrayView) -> None:
         super().__init__()
-        self.canvas = canvas
         self.receiver = receiver
 
     def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
-        if qevent is None:
+        if qevent is None or qevent.type() != QEvent.Type.KeyPress:
             return False
 
-        try:
-            children: Container = self.canvas.children()
-        except RuntimeError:
-            return False
-
-        if obj is self.canvas or obj in children:
-            if qevent.type() == QEvent.Type.KeyPress:
-                from qtpy.QtGui import QKeyEvent
-
-                key_event = cast("QKeyEvent", qevent)
-                qt_key = key_event.key()
-                key: KeyCode | str
-                if qt_key in _QT_KEY_MAP:
-                    key = _QT_KEY_MAP[qt_key]
-                else:
-                    text = key_event.text()
-                    if not text:
-                        return False
-                    key = text
-                mods = _qt_mods_to_keymods(key_event.modifiers())
-                self.receiver.keyPressed.emit(KeyPressEvent(key, mods))
+        key_event = cast("QKeyEvent", qevent)
+        qt_key = key_event.key()
+        key: KeyCode | str
+        if qt_key in _QT_KEY_MAP:
+            key = _QT_KEY_MAP[qt_key]
+        else:
+            text = key_event.text()
+            if not text:
+                return False
+            key = text
+        mods = _qt_mods_to_keymods(key_event.modifiers())
+        self.receiver.keyPressed.emit(KeyPressEvent(key, mods))
         return False
