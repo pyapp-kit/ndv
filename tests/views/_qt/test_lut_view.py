@@ -72,10 +72,15 @@ def test_QLUTView_update_view(model: LUTModel, view: QLUTView) -> None:
     assert model.cmap == new_cmap
 
     # Test toggling auto_clim
-    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+    # Model starts as ClimsMinMax; synchronize checked the button (with signals
+    # blocked), so the model should NOT have been mutated to ClimsPercentile.
+    assert model.clims == ClimsMinMax()
+    assert view._qwidget.auto_clim.isChecked()
+    # Uncheck → manual
     view._qwidget.auto_clim.setChecked(False)
     mi, ma = view._qwidget.clims.value()
     assert model.clims == ClimsManual(min=mi, max=ma)
+    # Re-check → percentile
     view._qwidget.auto_clim.setChecked(True)
     assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
 

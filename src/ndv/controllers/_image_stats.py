@@ -167,7 +167,7 @@ def _compute_int_histogram(
     """
     nbins = 1 << bits  # 2^bits
     if data.dtype.kind == "u" and bits <= 16:
-        counts = ihist.histogram(data, bits=bits)
+        counts = ihist.histogram(data.ravel(), bits=bits)
         bin_edges = np.arange(nbins + 1, dtype=np.float64) - 0.5
     else:
         iinfo = np.iinfo(data.dtype)

@@ -345,7 +345,8 @@ class QLUTView(LUTView):
             parent = parent.parent()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._qwidget.auto_clim.setChecked(not policy.is_manual)
+        with signals_blocked(self._qwidget.auto_clim):
+            self._qwidget.auto_clim.setChecked(not policy.is_manual)
         if isinstance(policy, ClimsPercentile):
             self._qwidget.lower_tail.setValue(policy.min_percentile)
             self._qwidget.upper_tail.setValue(100 - policy.max_percentile)
