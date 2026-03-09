@@ -816,8 +816,9 @@ def test_keybinding_zoom() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_handle_gc_on_data_reassign() -> None:
     """Image handles should be GC'd when viewer.data is reassigned."""
-    viewer = ArrayViewer(np.zeros((10, 10), dtype="uint8"))
-    viewer.show()
+    viewer = ArrayViewer()
+    viewer._async = False
+    viewer.data = np.zeros((10, 10), dtype="uint8")
 
     ctrl = next(iter(viewer._lut_controllers.values()))
     handle_ref = weakref.ref(ctrl.handles[0])

@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import gc
+from typing import TYPE_CHECKING, cast
+
 import numpy as np
 import pytest
+import wgpu
 
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._pygfx._array_canvas import GfxArrayCanvas
+
+if TYPE_CHECKING:
+    from wgpu._diagnostics import ObjectCountDiagnostics
 
 
 def _force_canvas_size(canvas: GfxArrayCanvas, w: int = 600, h: int = 600) -> None:
@@ -48,5 +55,32 @@ def test_zoom_center() -> None:
     restored_pos = tuple(cam.local.position)
     assert restored_pos[:2] == pytest.approx(initial_pos[:2])
     assert cam.zoom == pytest.approx(initial_zoom)
+
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
+def test_no_gpu_memory_leak_on_remove() -> None:
+    """GPU resource memory should not grow when image handles are removed."""
+    canvas = GfxArrayCanvas(ArrayViewerModel())
+    _force_canvas_size(canvas)
+    canvas.set_ndim(2)
+
+    tracker = cast("ObjectCountDiagnostics", wgpu.diagnostics.object_counts).tracker
+
+    # create and remove an image to warm up
+    handle = canvas.add_image(np.zeros((64, 64), dtype=np.float32))
+    handle.remove()
+    gc.collect()
+
+    baseline = sum(tracker.amounts.values())
+
+    for _ in range(5):
+        handle = canvas.add_image(np.zeros((64, 64), dtype=np.float32))
+        handle.remove()
+        gc.collect()
+
+    # assert that no new GPU resources are still alive after the add/remove cycles
+    assert sum(tracker.amounts.values()) <= baseline
 
     canvas.close()
