@@ -445,6 +445,7 @@ class ArrayViewer:
         # Push channel mode even without data (e.g. display_model set before data)
         self._view.set_channel_mode(self._display_model.channel_mode)
 
+        self._focused_slider_axis = None
         self._resolved = EMPTY_STATE
         if self._data_wrapper is not None:
             with self._view.currentIndexChanged.blocked():
