@@ -547,22 +547,20 @@ class GfxArrayCanvas(ArrayCanvas):
             cam.zoom = 1 - margin
         self.refresh()
 
-    def zoom(
-        self, factor: float | tuple, center: tuple[float, float] | None = None
-    ) -> None:
+    def zoom(self, factor: float | tuple, center: tuple[float, float] = (0, 0)) -> None:
         """Zoom in (or out) at the given center (world coordinates)."""
-        cam = self._camera
-        if cam is not None:
-            if center is not None:
-                cx, cy = center
-                px, py, pz = cam.local.position
-                cam.local.position = (
-                    cx + (px - cx) * factor,
-                    cy + (py - cy) * factor,
-                    pz,
-                )
-            cam.zoom /= factor
-            self.refresh()
+        if (cam := self._camera) is None:
+            return
+
+        cx, cy = center
+        px, py, pz = cam.local.position
+        cam.local.position = (
+            cx + (px - cx) * factor,
+            cy + (py - cy) * factor,
+            pz,
+        )
+        cam.zoom /= factor
+        self.refresh()
 
     def refresh(self) -> None:
         with suppress(AttributeError):

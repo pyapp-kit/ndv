@@ -34,11 +34,7 @@ class GraphicsCanvas(Viewable, Mouseable):
         """Sets the bounds of the camera."""
         ...
 
-    def zoom(
-        self,
-        factor: float | tuple,
-        center: tuple[float, float] | None = None,
-    ) -> None:
+    def zoom(self, factor: float | tuple, center: tuple[float, float]) -> None:
         """Zoom in (or out) at the given center (world coordinates)."""
 
     @abstractmethod

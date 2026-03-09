@@ -44,9 +44,9 @@ def handle_key_press(event: KeyPressEvent, viewer: ArrayViewer) -> None:
         _cycle_focused_axis(viewer, 1)
     elif action is Action.FOCUS_PREV_AXIS:
         _cycle_focused_axis(viewer, -1)
-    elif action is Action.ZOOM_IN:
+    elif action is Action.ZOOM_IN and viewer._highlight_pos is not None:
         viewer._canvas.zoom(factor=0.667, center=viewer._highlight_pos)
-    elif action is Action.ZOOM_OUT:
+    elif action is Action.ZOOM_OUT and viewer._highlight_pos is not None:
         viewer._canvas.zoom(factor=1.5, center=viewer._highlight_pos)
 
 
