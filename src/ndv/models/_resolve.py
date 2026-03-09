@@ -353,8 +353,10 @@ def process_request(req: DataRequest) -> DataResponse:
     the dimensionality contract on the returned arrays.
     """
     data = req.wrapper.isel(req.index)
-
     vis_ax = req.visible_axes
+    if data.size == 0:
+        return DataResponse(n_visible_axes=len(vis_ax), data={}, request=req)
+
     t_dims = vis_ax + tuple(i for i in range(data.ndim) if i not in vis_ax)
     vis_shape = tuple(data.shape[ax] for ax in vis_ax)
 

@@ -667,7 +667,7 @@ class ArrayViewer:
         try:
             response = future.result()
         except Exception as e:
-            warnings.warn(f"Error fetching data: {e}", stacklevel=2)
+            warnings.warn(f"Error fetching data: {e}", stacklevel=1)
             return
 
         for key, data in response.data.items():
