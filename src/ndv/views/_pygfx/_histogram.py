@@ -128,6 +128,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # to a rectangle contained within the margins defined above.
         # This greatly simplifies the clipping of nodes on the plot.
         self._scene = pygfx.Scene()
+        self._scene.add(pygfx.Background(None, pygfx.BackgroundMaterial("black")))
         self._plot_view = pygfx.Viewport(self._renderer)
         self._controller = _Controller(register_events=self._plot_view)
         # increase zoom wheel gain
@@ -139,12 +140,14 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # pans and zooms, but it renders to a different rectangle than the
         # plot itself to avoid margin math.
         self._x_scene = pygfx.Scene()
+        self._x_scene.add(pygfx.Background(None, pygfx.BackgroundMaterial("black")))
         self._x_cam = _OrthographicCamera(maintain_aspect=False, width=1, height=1)
         self._controller.add_camera(self._x_cam, include_state={"x", "width"})
 
         # A third scene handles all static nodes (including the vertical axis).
         # It renders to the entire canvas.
         self._y_scene = pygfx.Scene()
+        self._y_scene.add(pygfx.Background(None, pygfx.BackgroundMaterial("black")))
         self._y_cam = pygfx.OrthographicCamera(maintain_aspect=False, width=1, height=1)
         self._y_cam.local.position = [0.5, 0.5, 0]
 
