@@ -451,7 +451,8 @@ class WxLUTView(LUTView):
         self._wxwidget.visible.SetLabel(name)
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._wxwidget.auto_clim.SetValue(not policy.is_manual)
+        with wx.EventBlocker(self._wxwidget.auto_clim, ToggleBtnEvent):
+            self._wxwidget.auto_clim.SetValue(not policy.is_manual)
         if isinstance(policy, ClimsPercentile):
             self._wxwidget.lower_tail.SetValue(policy.min_percentile)
             self._wxwidget.upper_tail.SetValue(100 - policy.max_percentile)
