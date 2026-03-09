@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from ._array_display_model import ArrayDisplayModel
     from ._data_wrapper import DataWrapper
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ndv")
 
 
 @dataclass(frozen=True, slots=True)

@@ -44,6 +44,7 @@ class SupportsIndexing(Protocol):
 ArrayT = TypeVar("ArrayT")
 NPArrayLike = TypeVar("NPArrayLike", bound=SupportsIndexing)
 _T = TypeVar("_T", bound=type)
+logger = logging.getLogger("ndv")
 
 
 def _recurse_subclasses(cls: _T) -> Iterator[_T]:
@@ -208,7 +209,7 @@ class DataWrapper(Generic[ArrayT], ABC):
         for subclass in sorted(_recurse_subclasses(cls), key=lambda x: x.PRIORITY):
             try:
                 if subclass.supports(data):
-                    logging.debug(f"Using {subclass.__name__} to wrap {type(data)}")
+                    logger.debug(f"Using {subclass.__name__} to wrap {type(data)}")
                     return subclass(data)
             except Exception as e:
                 warnings.warn(
