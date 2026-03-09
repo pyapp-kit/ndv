@@ -225,3 +225,31 @@ def test_none_all(wxapp: wx.App, viewer: WxArrayView) -> None:
     for ch, lut_view in viewer._luts.items():
         if type(ch) is int or (type(ch) is str and ch.isdigit()):
             assert lut_view._wxwidget.IsShown()
+
+
+def test_key_event_filter(wxapp: wx.App) -> None:
+    from ndv._types import KeyCode, KeyMod, KeyPressEvent
+    from ndv.views._wx._app import WxAppWrap
+
+    app = WxAppWrap()
+    view = WxArrayView(MagicMock(), ArrayViewerModel())
+    widget = view.frontend_widget()
+
+    received: list[KeyPressEvent] = []
+    view.keyPressed.connect(received.append)
+
+    disconnect = app.filter_key_events(widget, view)
+
+    # Simulate a Right arrow key press
+    event = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
+    event.SetKeyCode(wx.WXK_RIGHT)
+    wx.PostEvent(widget.GetEventHandler(), event)
+    evtLoop = wxapp.GetTraits().CreateEventLoop()
+    wx.EventLoopActivator(evtLoop)
+    evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
+
+    assert len(received) == 1
+    assert received[0].key == KeyCode.RIGHT
+    assert received[0].mods == KeyMod.NONE
+
+    disconnect()
