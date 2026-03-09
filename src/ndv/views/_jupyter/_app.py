@@ -117,14 +117,12 @@ class JupyterAppWrap(NDVApp):
         canvas.handle_event = MethodType(handle_event, canvas)
         return lambda: setattr(canvas, "handle_event", super_handle_event)
 
-    def filter_key_events(
-        self, widget: Any, canvas_widget: Any, receiver: ArrayView
-    ) -> Callable[[], None]:
+    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
         # In Jupyter, key events must go through the RemoteFrameBuffer canvas
         # (which uses a hidden <input> element to capture keys), not the
-        # ipywidgets container.
-        target = canvas_widget if canvas_widget is not None else widget
-        if not isinstance(target, RemoteFrameBuffer):
+        # ipywidgets container. Walk the widget tree to find it.
+        target = _find_rfb(widget)
+        if target is None:
             return lambda: None
 
         super_handle_event = target.handle_event
@@ -165,3 +163,13 @@ _JUPYTER_KEY_MAP: dict[str, KeyCode] = {
     "Home": KeyCode.HOME,
     "End": KeyCode.END,
 }
+
+
+def _find_rfb(widget: Any) -> RemoteFrameBuffer | None:
+    """Walk the ipywidgets tree to find a RemoteFrameBuffer child."""
+    if isinstance(widget, RemoteFrameBuffer):
+        return widget
+    for child in getattr(widget, "children", ()):
+        if found := _find_rfb(child):
+            return found
+    return None

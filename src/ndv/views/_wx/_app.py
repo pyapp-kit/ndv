@@ -144,9 +144,7 @@ class WxAppWrap(NDVApp):
 
         return _unbind
 
-    def filter_key_events(
-        self, widget: Any, canvas_widget: Any, receiver: ArrayView
-    ) -> Callable[[], None]:
+    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
         if not isinstance(widget, wx.Window):
             raise TypeError(f"Expected widget to be wx.Window, got {type(widget)}")
 

@@ -83,9 +83,7 @@ class QtAppWrap(NDVApp):
         canvas.installEventFilter(f)
         return lambda: canvas.removeEventFilter(f)
 
-    def filter_key_events(
-        self, widget: Any, canvas_widget: Any, receiver: ArrayView
-    ) -> Callable[[], None]:
+    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
         if not isinstance(widget, QWidget):
             raise TypeError(f"Expected widget to be QWidget, got {type(widget)}")
 

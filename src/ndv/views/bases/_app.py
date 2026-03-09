@@ -52,15 +52,8 @@ class NDVApp:
         """Install mouse event filter on `canvas`, redirecting events to `receiver`."""
         raise NotImplementedError
 
-    def filter_key_events(
-        self, widget: Any, canvas_widget: Any, receiver: ArrayView
-    ) -> Callable[[], None]:
-        """Install key event filter on `widget` or emitting `receiver.keyPressed`.
-
-        canvas_widget is also passed, mostly as a hack for Jupyter, where jupyter-rfb
-        has already done the hard-work of intercepting key events at the canvas level
-        and we just need to piggyback.
-        """
+    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
+        """Install key event filter on `widget`, emitting `receiver.keyPressed`."""
         raise NotImplementedError
 
     def call_in_main_thread(

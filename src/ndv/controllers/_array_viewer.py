@@ -140,9 +140,7 @@ class ArrayViewer:
 
         self._focused_slider_axis: AxisKey | None = None
         self._disconnect_key_events = _app.filter_key_events(
-            self._view.frontend_widget(),
-            self._canvas.frontend_widget(),
-            self._view,
+            self._view.frontend_widget(), self._view
         )
         self._view.keyPressed.connect(self._on_canvas_key_pressed)
 
