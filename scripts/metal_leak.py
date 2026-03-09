@@ -239,7 +239,7 @@ def _run_leak_test(backend: str) -> LeakProfiler:
     import ndv
 
     track_types = (
-        *BACKEND_TYPES.get(backend, ()),
+        # *BACKEND_TYPES.get(backend, ()),
         # "Texture2D",
         # "Texture3D",
         "Texture",
