@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import warnings
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from weakref import ReferenceType, WeakValueDictionary
 
 import cmap as _cmap
@@ -23,6 +23,8 @@ from ndv._types import (
 )
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
+from ndv.views._util import downsample_data
+from ndv.views._vispy._util import get_max_texture_sizes
 from ndv.views.bases import ArrayCanvas
 from ndv.views.bases._graphics._canvas_elements import (
     CanvasElement,
@@ -43,6 +45,8 @@ class VispyImageHandle(ImageHandle):
     def __init__(self, visual: visuals.ImageVisual | visuals.VolumeVisual) -> None:
         self._visual = visual
         self._allowed_dims = {2, 3} if isinstance(visual, visuals.ImageVisual) else {3}
+        # per-axis downsample strides applied to fit GPU texture limits
+        self._downsample_factors: tuple[int, ...] = ()
 
     def data(self) -> np.ndarray:
         try:
@@ -58,6 +62,13 @@ class VispyImageHandle(ImageHandle):
                 stacklevel=2,
             )
             return
+
+        data, downsample_factors = _downcast_and_downsample(
+            data,
+            three_d=isinstance(self._visual, visuals.VolumeVisual),
+            warn=False,
+        )
+        self._downsample_factors = downsample_factors
         self._visual.set_data(data)
 
     def visible(self) -> bool:
@@ -358,7 +369,7 @@ class VispyArrayCanvas(ArrayCanvas):
 
     def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
         """Add a new Image node to the scene."""
-        data = _downcast(data)
+        data, downsample_factors = _downcast_and_downsample(data, three_d=False)
         try:
             img = scene.visuals.Image(
                 data, parent=self._view.scene, texture_format="auto"
@@ -370,13 +381,14 @@ class VispyArrayCanvas(ArrayCanvas):
         img.set_gl_state("additive", depth_test=False)
         img.interactive = True
         handle = VispyImageHandle(img)
+        handle._downsample_factors = downsample_factors
         self._elements[img] = handle
         if data is not None:
             self.set_range()
         return handle
 
     def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
-        data = _downcast(data)
+        data, downsample_factors = _downcast_and_downsample(data, three_d=True)
         try:
             vol = scene.visuals.Volume(
                 data,
@@ -393,6 +405,7 @@ class VispyArrayCanvas(ArrayCanvas):
         vol.set_gl_state("additive", depth_test=False)
         vol.interactive = True
         handle = VispyImageHandle(vol)
+        handle._downsample_factors = downsample_factors
         self._elements[vol] = handle
         if data is not None:
             self.set_range()
@@ -418,11 +431,24 @@ class VispyArrayCanvas(ArrayCanvas):
         while len(vis_scales) < 3:
             vis_scales.append(1.0)
         sx, sy, sz = vis_scales[0], vis_scales[1], vis_scales[2]
-        for child in self._view.scene.children:
-            if isinstance(child, (visuals.ImageVisual, visuals.VolumeVisual)):
-                child.transform = vispy.visuals.transforms.STTransform(
-                    scale=(sx, sy, sz)
-                )
+        for handle in self._elements.values():
+            if not isinstance(handle, VispyImageHandle):
+                continue
+            child = handle._visual
+            if not isinstance(child, (visuals.ImageVisual, visuals.VolumeVisual)):
+                continue
+            _sx, _sy, _sz = sx, sy, sz
+            # compensate for downsampling so coordinates stay correct
+            # factors are in data order; scene order is (x, y, z) = reversed
+            factors = handle._downsample_factors
+            if factors and any(f > 1 for f in factors):
+                rev = list(reversed(factors))
+                _sx *= rev[0]
+                _sy *= rev[1] if len(rev) > 1 else 1
+                _sz *= rev[2] if len(rev) > 2 else 1
+            child.transform = vispy.visuals.transforms.STTransform(
+                scale=(_sx, _sy, _sz)
+            )
         self.set_range()
 
     def set_range(
@@ -561,13 +587,29 @@ class VispyArrayCanvas(ArrayCanvas):
         return CursorType.DEFAULT
 
 
-def _downcast(data: np.ndarray | None) -> np.ndarray | None:
+T = TypeVar("T", bound="np.ndarray | None")
+
+
+def _downcast(data: T) -> T:
     """Downcast >32bit data to 32bit."""
     # downcast to 32bit, preserving int/float
     if data is not None:
         if np.issubdtype(data.dtype, np.integer) and data.dtype.itemsize > 2:
             warnings.warn("Downcasting integer data to uint16.", stacklevel=2)
-            data = data.astype(np.uint16)
+            data = data.astype(np.uint16)  # type: ignore[assignment]
         elif np.issubdtype(data.dtype, np.floating) and data.dtype.itemsize > 4:
-            data = data.astype(np.float32)
+            data = data.astype(np.float32)  # type: ignore[assignment]
     return data
+
+
+def _downcast_and_downsample(
+    data: T, three_d: bool, warn: bool = True
+) -> tuple[T, tuple[int, ...]]:
+    """Downcast >32bit data to 32bit, and downsample GPU texture limits are exceeded."""
+    data = _downcast(data)
+    downsample_factors: tuple[int, ...] = ()
+    if data is not None:
+        maxd = get_max_texture_sizes()[1 if three_d else 0]
+        if maxd is not None:
+            data, downsample_factors = downsample_data(data, maxd, warn=warn)  # type: ignore[assignment]
+    return data, downsample_factors
