@@ -72,9 +72,10 @@ class PyGFXImageHandle(ImageHandle):
         return self._grid.data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
+        is_three_d = isinstance(self._image, pygfx.Volume)
         data, self._downsample_factors = _downcast_and_downsample(
             data,
-            three_d=isinstance(self._image, pygfx.Volume),
+            three_d=is_three_d,
             warn=False,
             copy=False,
         )
@@ -85,11 +86,11 @@ class PyGFXImageHandle(ImageHandle):
         # Otherwise, the size (and maybe number of dimensions) changed
         # - we need a new buffer
         else:
-            dim = 3 if isinstance(self._image, pygfx.Volume) else 2
+            dim = 3 if is_three_d else 2
             self._grid = pygfx.Texture(data, dim=dim)
             self._image.geometry = pygfx.Geometry(grid=self._grid)
             # RGB images (i.e. 3D datasets) cannot have a colormap
-            if not isinstance(self._image, pygfx.Volume):
+            if not is_three_d:
                 self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
 
     def visible(self) -> bool:
