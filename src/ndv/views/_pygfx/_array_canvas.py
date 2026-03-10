@@ -762,4 +762,4 @@ def _downcast_and_downsample(
         maxd = _get_max_texture_sizes()[1 if three_d else 0]
         if maxd is not None:
             data, downsample_factors = downsample_data(data, maxd, warn=warn)  # type: ignore[assignment]
-    return data, downsample_factors
+    return data, downsample_factors  # pyright: ignore[reportReturnType]
