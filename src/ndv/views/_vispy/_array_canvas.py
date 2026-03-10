@@ -480,13 +480,13 @@ class VispyArrayCanvas(ArrayCanvas):
                 tform = handle._visual.transform
                 if isinstance(tform, vispy.visuals.transforms.STTransform):
                     sx, sy, sz = tform.scale[:3]
-                if len(shape) == 3:
+                if isinstance(handle._visual, visuals.VolumeVisual):
                     # VolumeVisual: data (D,H,W) maps to scene (x=W, y=H, z=D)
                     _x[1] = max(_x[1], shape[2] * sx)
                     _y[1] = max(_y[1], shape[1] * sy)
                     _z[1] = max(_z[1], shape[0] * sz)
                 else:
-                    # ImageVisual: data (H,W) maps to scene (x=W, y=H)
+                    # ImageVisual: data (H,W[,C]) maps to scene (x=W, y=H)
                     _x[1] = max(_x[1], shape[1] * sx)
                     _y[1] = max(_y[1], shape[0] * sy)
 
