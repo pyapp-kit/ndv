@@ -37,7 +37,8 @@ import numpy as np
 from psygnal import Signal
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, SupportsIndex
+    from collections.abc import Callable
+    from typing import Any, SupportsIndex
 
     import numpy.typing as npt
 
@@ -229,7 +230,7 @@ class RingBuffer(Sequence):
 
     # numpy compatibility
     def __array__(
-        self, dtype: npt.DTypeLike = None, copy: bool | None = None
+        self, dtype: npt.DTypeLike | None = None, copy: bool | None = None
     ) -> np.ndarray:
         if copy is False:
             warnings.warn(

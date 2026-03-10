@@ -8,7 +8,7 @@ from pytest import fixture
 from qtpy.QtWidgets import QWidget
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
-from ndv.views._qt._array_view import QLutView
+from ndv.views._qt._array_view import QLUTView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 if TYPE_CHECKING:
@@ -21,8 +21,8 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(model: LUTModel, qtbot: QtBot) -> QLutView:
-    view = QLutView()
+def view(model: LUTModel, qtbot: QtBot) -> QLUTView:
+    view = QLUTView()
     qtbot.add_widget(view.frontend_widget())
     # Set the model
     assert view.model is None
@@ -31,7 +31,7 @@ def view(model: LUTModel, qtbot: QtBot) -> QLutView:
     return view
 
 
-def test_QLutView_update_model(model: LUTModel, view: QLutView) -> None:
+def test_QLUTView_update_model(model: LUTModel, view: QLUTView) -> None:
     """Ensures the view updates when the model is changed."""
 
     # Test modifying model.clims
@@ -58,7 +58,7 @@ def test_QLutView_update_model(model: LUTModel, view: QLutView) -> None:
     assert view._qwidget.cmap.currentColormap() == new_cmap
 
 
-def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
+def test_QLUTView_update_view(model: LUTModel, view: QLUTView) -> None:
     """Ensures the model updates when the view is changed."""
 
     new_visible = not model.visible
@@ -72,10 +72,15 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     assert model.cmap == new_cmap
 
     # Test toggling auto_clim
-    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
+    # Model starts as ClimsMinMax; synchronize checked the button (with signals
+    # blocked), so the model should NOT have been mutated to ClimsPercentile.
+    assert model.clims == ClimsMinMax()
+    assert view._qwidget.auto_clim.isChecked()
+    # Uncheck → manual
     view._qwidget.auto_clim.setChecked(False)
     mi, ma = view._qwidget.clims.value()
     assert model.clims == ClimsManual(min=mi, max=ma)
+    # Re-check → percentile
     view._qwidget.auto_clim.setChecked(True)
     assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
 
@@ -91,7 +96,7 @@ def test_QLutView_update_view(model: LUTModel, view: QLutView) -> None:
     assert model.clims == ClimsManual(min=0, max=1)
 
 
-def test_QLutView_histogram_controls(model: LUTModel, view: QLutView) -> None:
+def test_QLUTView_histogram_controls(model: LUTModel, view: QLUTView) -> None:
     # Mock up a histogram
     hist_mock = MagicMock(spec=HistogramCanvas)
     hist_frontend = QWidget()

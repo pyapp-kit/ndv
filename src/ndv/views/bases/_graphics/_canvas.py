@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from ndv.views.bases._lut_view import LutView
+from ndv.views.bases._lut_view import LUTView
 from ndv.views.bases._view_base import Viewable
 
 from ._mouseable import Mouseable
@@ -33,6 +33,9 @@ class GraphicsCanvas(Viewable, Mouseable):
     ) -> None:
         """Sets the bounds of the camera."""
         ...
+
+    def zoom(self, factor: float | tuple, center: tuple[float, float]) -> None:
+        """Zoom in (or out) at the given center (world coordinates)."""
 
     @abstractmethod
     def canvas_to_world(
@@ -62,8 +65,11 @@ class ArrayCanvas(GraphicsCanvas):
     @abstractmethod
     def add_bounding_box(self) -> RectangularROIHandle: ...
 
+    def set_scales(self, scales: tuple[float, ...]) -> None:
+        """Set per-visible-axis scale factors for rendering."""
 
-class HistogramCanvas(GraphicsCanvas, LutView):
+
+class HistogramCanvas(GraphicsCanvas, LUTView):
     """A histogram-based view for LookUp Table (LUT) adjustment."""
 
     def set_vertical(self, vertical: bool) -> None:

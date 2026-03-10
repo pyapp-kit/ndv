@@ -17,7 +17,7 @@ from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._wx._labeled_slider import WxLabeledSlider
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 
 from .range_slider import RangeSlider
 
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
@@ -83,7 +82,7 @@ class _LutChannelSelector(wx.Panel):
         # all channels displayed in view
         # if displayed, may or may not be visible, if not displayed, not visible
         self._displayed_channels: set[ChannelKey] = set(self._channels)
-        self._luts: dict[ChannelKey, WxLutView] = {}
+        self._luts: dict[ChannelKey, WxLUTView] = {}
 
         # Dropdown button with current selection
         self._dropdown_btn = wx.Button(
@@ -134,7 +133,7 @@ class _LutChannelSelector(wx.Panel):
         sizer.Add(self._selection_info, 0, wx.ALIGN_CENTER_VERTICAL)
         self.SetSizer(sizer)
 
-    def add_channel(self, view: WxLutView) -> None:
+    def add_channel(self, view: WxLUTView) -> None:
         if (type(view.channel) is int) or (
             type(view.channel) is str and view.channel.isdigit()
         ):
@@ -325,7 +324,7 @@ class _WxLUTWidget(wx.Panel):
         self.Layout()
 
 
-class WxLutView(LutView):
+class WxLUTView(LUTView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
@@ -339,6 +338,7 @@ class WxLutView(LutView):
         self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
         self.channel = channel
         self.histogram: HistogramCanvas | None = None
+        self._displayed = True  # whether shown in channel selector
 
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
         wdg.cmap.Bind(wx.EVT_COMBOBOX, self._on_cmap_changed)
@@ -412,12 +412,8 @@ class WxLutView(LutView):
 
     def _add_histogram(self, histogram: HistogramCanvas) -> None:
         widget = cast("wx.Window", histogram.frontend_widget())
-        # FIXME: pygfx backend needs this to be widget._subwidget
-        if hasattr(widget, "_subwidget"):
-            widget = widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
 
-        # FIXME: Rendercanvas may make this unnecessary
-        if parent := widget.GetParent():
+        if (parent := widget.GetParent()) and parent is not self._wxwidget:
             widget.Reparent(self._wxwidget)  # Reparent widget to this frame
             wx.CallAfter(parent.Destroy)
             widget.Show()
@@ -455,7 +451,8 @@ class WxLutView(LutView):
         self._wxwidget.visible.SetLabel(name)
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._wxwidget.auto_clim.SetValue(not policy.is_manual)
+        with wx.EventBlocker(self._wxwidget.auto_clim, ToggleBtnEvent):
+            self._wxwidget.auto_clim.SetValue(not policy.is_manual)
         if isinstance(policy, ClimsPercentile):
             self._wxwidget.lower_tail.SetValue(policy.min_percentile)
             self._wxwidget.upper_tail.SetValue(100 - policy.max_percentile)
@@ -480,27 +477,29 @@ class WxLutView(LutView):
         self._wxwidget.clims.SetMax(ma)
 
     def set_channel_visible(self, visible: bool) -> None:
-        self._wxwidget.visible.SetValue(visible and self._wxwidget.IsShown())
+        self._wxwidget.visible.SetValue(visible and self._displayed)
 
     def set_visible(self, visible: bool) -> None:
         if not visible:
             self._wxwidget.Hide()
-        elif self._wxwidget.IsShown():
+        elif self._displayed:
             self._wxwidget.Show()
 
     def set_display(self, display: bool) -> None:
         if not display:
+            self._displayed = False
             self._wxwidget.Hide()
             self._wxwidget.visible.SetValue(False)
             self._on_visible_changed(None)
-        elif not self._wxwidget.IsShown():
+        elif not self._displayed:
+            self._displayed = True
             self._wxwidget.Show()
 
     def close(self) -> None:
         self._wxwidget.Close()
 
 
-class WxRGBView(WxLutView):
+class WxRGBView(WxLUTView):
     def __init__(self, parent: wx.Window, channel: ChannelKey = None) -> None:
         super().__init__(parent, channel)
         self._wxwidget.cmap.Hide()
@@ -581,14 +580,11 @@ class _WxArrayViewer(wx.Frame):
     def __init__(self, canvas_widget: wx.Window, parent: wx.Window | None = None):
         super().__init__(parent)
 
-        # FIXME: pygfx backend needs this to be canvas_widget._subwidget
-        if hasattr(canvas_widget, "_subwidget"):
-            canvas_widget = canvas_widget._subwidget  # pyright: ignore[reportAttributeAccessIssue]
-
-        if (parent := canvas_widget.GetParent()) and parent is not self:
-            canvas_widget.Reparent(self)  # Reparent canvas_widget to this frame
-            if parent:
-                parent.Destroy()
+        if canvas_widget.GetParent() is not self:
+            old_parent = canvas_widget.GetParent()
+            canvas_widget.Reparent(self)
+            if old_parent is not None:
+                old_parent.Destroy()
             canvas_widget.Show()
 
         self._canvas = canvas_widget
@@ -683,6 +679,8 @@ class _WxArrayViewer(wx.Frame):
         self.Layout()
 
     def update_lut_scroll_size(self, *_: Any) -> None:
+        if not self or not self.luts_scroll:
+            return
         self.luts_scroll.Layout()
         total_size = self.luts.GetMinSize()
         total_height = total_size.GetHeight()
@@ -706,16 +704,14 @@ class WxArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: wx.Window,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
         parent: wx.Window | None = None,
     ) -> None:
-        self._data_model = data_model
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         self._wxwidget = wdg = _WxArrayViewer(canvas_widget, parent)
-        # Mapping of channel key to LutViews
-        self._luts: dict[ChannelKey, WxLutView] = {}
+        # Mapping of channel key to LUTViews
+        self._luts: dict[ChannelKey, WxLUTView] = {}
         self._visible_axes: Sequence[AxisKey] = []
 
         wdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -733,21 +729,7 @@ class WxArrayView(ArrayView):
 
     def _on_ndims_toggled(self, event: wx.CommandEvent) -> None:
         is_3d = self._wxwidget.ndims_btn.GetValue()
-        if len(self._visible_axes) > 2:
-            if not is_3d:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                sld = reversed(self._wxwidget.dims_sliders._sliders)
-                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
-        self.visibleAxesChanged.emit()
+        self.ndimToggleRequested.emit(is_3d)
 
     def _on_add_roi_toggled(self, event: wx.CommandEvent) -> None:
         create_roi = self._wxwidget.add_roi_btn.GetValue()
@@ -760,7 +742,8 @@ class WxArrayView(ArrayView):
 
     def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
         self._visible_axes = tuple(axes)
-        self._wxwidget.ndims_btn.SetValue(len(axes) == 3)
+        with wx.EventBlocker(self._wxwidget.ndims_btn, ToggleBtnEvent):
+            self._wxwidget.ndims_btn.SetValue(len(axes) > 2)
 
     def frontend_widget(self) -> wx.Window:
         return self._wxwidget
@@ -771,12 +754,12 @@ class WxArrayView(ArrayView):
     def _lut_selector(self) -> _LutChannelSelector:
         return self._wxwidget.lut_selector
 
-    def add_lut_view(self, channel: ChannelKey) -> WxLutView:
+    def add_lut_view(self, channel: ChannelKey) -> WxLUTView:
         scrollwdg = self._lut_area()
         view = (
             WxRGBView(scrollwdg, channel)
             if channel == "RGB"
-            else WxLutView(scrollwdg, channel, self._viewer_model.default_luts)
+            else WxLUTView(scrollwdg, channel, self._viewer_model.default_luts)
         )
         self._wxwidget.luts.Add(view._wxwidget, 0, wx.EXPAND | wx.BOTTOM, 5)
         self._luts[channel] = view
@@ -801,7 +784,10 @@ class WxArrayView(ArrayView):
             lut._add_histogram(widget)
         self._wxwidget.Layout()
 
-    def remove_lut_view(self, lut: LutView) -> None:
+    def remove_lut_view(self, lut: LUTView) -> None:
+        if lut not in self._luts.values():
+            return
+
         # Find the channel key for this LUT view
         channel_to_remove = next(
             (channel for channel, view in self._luts.items() if view == lut), None
@@ -867,7 +853,7 @@ class WxArrayView(ArrayView):
             self._wxwidget._top_info.Layout()
         elif sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            new, old = info.args
+            _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._wxwidget.add_roi_btn.SetValue(False)
         elif sig_name == "show_histogram_button":

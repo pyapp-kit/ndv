@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from qtpy.QtCore import QEvent, QObject, Qt, QTimer
-from qtpy.QtGui import QMouseEvent
+from qtpy.QtGui import QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import QApplication, QWidget
 
 from ndv._types import (
     CursorType,
+    KeyCode,
+    KeyMod,
+    KeyPressEvent,
     MouseButton,
     MouseMoveEvent,
     MousePressEvent,
@@ -17,7 +20,7 @@ from ndv._types import (
 from ndv.views.bases._app import NDVApp
 
 if TYPE_CHECKING:
-    from collections.abc import Container
+    from collections.abc import Callable, Container
     from concurrent.futures import Future
 
     from ndv.views.bases import ArrayView
@@ -80,6 +83,14 @@ class QtAppWrap(NDVApp):
         canvas.installEventFilter(f)
         return lambda: canvas.removeEventFilter(f)
 
+    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
+        if not isinstance(widget, QWidget):
+            raise TypeError(f"Expected widget to be QWidget, got {type(widget)}")
+
+        f = KeyEventFilter(receiver)
+        widget.installEventFilter(f)
+        return lambda: widget.removeEventFilter(f)
+
     def process_events(self) -> None:
         """Process events for the application."""
         QApplication.processEvents()
@@ -99,12 +110,11 @@ class MouseEventFilter(QObject):
     def mouse_btn(self, btn: Any) -> MouseButton:
         if btn == Qt.MouseButton.LeftButton:
             return MouseButton.LEFT
+        if btn == Qt.MouseButton.MiddleButton:
+            return MouseButton.MIDDLE
         if btn == Qt.MouseButton.RightButton:
             return MouseButton.RIGHT
-        if btn == Qt.MouseButton.NoButton:
-            return MouseButton.NONE
-
-        raise Exception(f"Qt mouse button {btn} is unknown")
+        return MouseButton.NONE
 
     def set_cursor(self, type: CursorType) -> None:
         self.canvas.setCursor(type.to_qt())
@@ -165,3 +175,51 @@ class MouseEventFilter(QObject):
                 intercept |= receiver.on_mouse_leave()
                 receiver.mouseLeft.emit()
         return intercept
+
+
+_QT_KEY_MAP: dict[int, KeyCode] = {
+    Qt.Key.Key_Up: KeyCode.UP,
+    Qt.Key.Key_Down: KeyCode.DOWN,
+    Qt.Key.Key_Left: KeyCode.LEFT,
+    Qt.Key.Key_Right: KeyCode.RIGHT,
+    Qt.Key.Key_Space: KeyCode.SPACE,
+    Qt.Key.Key_Home: KeyCode.HOME,
+    Qt.Key.Key_End: KeyCode.END,
+}
+
+
+def _qt_mods_to_keymods(modifiers: Qt.KeyboardModifier) -> KeyMod:
+    mods = KeyMod.NONE
+    if modifiers & Qt.KeyboardModifier.ShiftModifier:
+        mods |= KeyMod.SHIFT
+    if modifiers & Qt.KeyboardModifier.ControlModifier:
+        mods |= KeyMod.CTRL
+    if modifiers & Qt.KeyboardModifier.AltModifier:
+        mods |= KeyMod.ALT
+    if modifiers & Qt.KeyboardModifier.MetaModifier:
+        mods |= KeyMod.META
+    return mods
+
+
+class KeyEventFilter(QObject):
+    def __init__(self, receiver: ArrayView) -> None:
+        super().__init__()
+        self.receiver = receiver
+
+    def eventFilter(self, obj: QObject | None, qevent: QEvent | None) -> bool:
+        if qevent is None or qevent.type() != QEvent.Type.KeyPress:
+            return False
+
+        key_event = cast("QKeyEvent", qevent)
+        qt_key = key_event.key()
+        key: KeyCode | str
+        if qt_key in _QT_KEY_MAP:
+            key = _QT_KEY_MAP[qt_key]
+        else:
+            text = key_event.text()
+            if not text:
+                return False
+            key = text
+        mods = _qt_mods_to_keymods(key_event.modifiers())
+        self.receiver.keyPressed.emit(KeyPressEvent(key, mods))
+        return False

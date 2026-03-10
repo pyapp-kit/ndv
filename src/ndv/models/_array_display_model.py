@@ -2,11 +2,11 @@
 
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypedDict, cast
 
 from cmap import Colormap
 from pydantic import Field, computed_field, model_validator
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self
 
 from ndv._types import AxisKey, ChannelKey, Slice
 
@@ -16,17 +16,22 @@ from ._mapping import ValidatedEventedDict
 from ._reducer import ReducerType
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Mapping  # noqa: F401 # used for mkdocstrings
-    from typing import Callable  # noqa: F401  # used for mkdocstrings
+    from collections.abc import (  # noqa: F401 # used for mkdocstrings
+        Callable,  # used for mkdocstrings
+        Hashable,
+        Mapping,
+        Sequence,
+    )
 
     import cmap
     import numpy.typing as npt  # noqa: F401  # used for mkdocstrings
 
     from ._lut_model import AutoscaleType
 
-    class LutModelKwargs(TypedDict, total=False):
+    class LUTModelKwargs(TypedDict, total=False):
         """Keyword arguments for `LUTModel`."""
 
+        name: str
         visible: bool
         cmap: "cmap.Colormap | cmap._colormap.ColorStopsLike"
         clims: "tuple[float, float] | None"
@@ -37,30 +42,36 @@ if TYPE_CHECKING:
         """Keyword arguments for `ArrayDisplayModel`."""
 
         visible_axes: "tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]"
-        current_index: Mapping[AxisKey, Union[int, slice]]
+        current_index: Mapping[AxisKey, int | slice]
         channel_mode: 'ChannelMode | Literal["grayscale", "composite", "color", "rgba"]'
-        channel_axis: Optional[AxisKey]
+        channel_axis: AxisKey | None
         reducers: Mapping["AxisKey | None", ReducerType]
-        luts: Mapping["int | None", "LUTModel | LutModelKwargs"]
-        default_lut: "LUTModel | LutModelKwargs"
+        luts: Mapping["int | None", "LUTModel | LUTModelKwargs"]
+        default_lut: "LUTModel | LUTModelKwargs"
+        scales: Mapping[AxisKey, float] | Sequence[float]
 
 
 # map of axis to index/slice ... i.e. the current subset of data being displayed
-IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, Union[int, Slice]]
+IndexMap: TypeAlias = ValidatedEventedDict[AxisKey, int | Slice]
 # map of index along channel axis to LUTModel object
-LutMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
+LUTMap: TypeAlias = ValidatedEventedDict[ChannelKey, LUTModel]
 # map of axis to reducer
-Reducers: TypeAlias = ValidatedEventedDict[Union[AxisKey, None], ReducerType]
+Reducers: TypeAlias = ValidatedEventedDict[AxisKey | None, ReducerType]
+# map of axis to scale factor
+ScalesMap: TypeAlias = ValidatedEventedDict[AxisKey, float]
 # used for visible_axes
-TwoOrThreeAxisTuple: TypeAlias = Union[
-    tuple[AxisKey, AxisKey, AxisKey], tuple[AxisKey, AxisKey]
-]
+TwoOrThreeAxisTuple: TypeAlias = (
+    tuple[AxisKey, AxisKey, AxisKey] | tuple[AxisKey, AxisKey]
+)
 
 
-def _default_luts() -> LutMap:
-    colors = ["green", "magenta", "cyan", "red", "blue", "yellow"]
+DEFAULT_LUT_COLORS = ("green", "magenta", "cyan", "red", "blue", "yellow")
+
+
+def _default_luts() -> LUTMap:
     return ValidatedEventedDict(
-        (i, LUTModel(cmap=Colormap(color))) for i, color in enumerate(colors)
+        (i, LUTModel(cmap=Colormap(color)))
+        for i, color in enumerate(DEFAULT_LUT_COLORS)
     )
 
 
@@ -183,21 +194,35 @@ class ArrayDisplayModel(NDVModel):
     default_reducer: ReducerType = "numpy.max"  # type: ignore [assignment]  # FIXME
 
     channel_mode: ChannelMode = ChannelMode.GRAYSCALE
-    channel_axis: Optional[AxisKey] = None
+    channel_axis: AxisKey | None = None
     # must come after channel_axis, since it is used to set default visible_axes
     visible_axes: TwoOrThreeAxisTuple = Field(
         default_factory=lambda k: (-3, -2) if k.get("channel_axis") == -1 else (-2, -1)
     )
 
     # map of index along channel axis to LUTModel object
-    luts: LutMap = Field(default_factory=_default_luts)
+    luts: LUTMap = Field(default_factory=_default_luts)
     default_lut: LUTModel = Field(default_factory=LUTModel, frozen=True)
+
+    # per-axis scale factors (e.g. physical pixel size)
+    scales: ScalesMap = Field(default_factory=ScalesMap, frozen=True)
 
     @computed_field  # type: ignore [prop-decorator]
     @property
     def n_visible_axes(self) -> Literal[2, 3]:
         """Number of dims is derived from the length of `visible_axes`."""
         return cast("Literal[2, 3]", len(self.visible_axes))
+
+    def model_post_init(self, context: Any, /) -> None:
+        super().model_post_init(context)
+        # apply default color cycle to luts without an explicit cmap
+        # this is basically the same behavior as _default_luts,
+        # but applies in the case where the user has provided partial lut
+        # information (e.g. just the name) but not a cmap
+        for key, lut in self.luts.items():
+            if isinstance(key, int) and "cmap" not in lut.model_fields_set:
+                color = DEFAULT_LUT_COLORS[key % len(DEFAULT_LUT_COLORS)]
+                lut.cmap = Colormap(color)
 
     @model_validator(mode="after")
     def _validate_model(self) -> "Self":
@@ -211,4 +236,13 @@ class ArrayDisplayModel(NDVModel):
                 stacklevel=2,
             )
             self.channel_axis = None
+
+        # RGBA mode is not supported with 3D views
+        if self.channel_mode == ChannelMode.RGBA and len(self.visible_axes) > 2:
+            warnings.warn(
+                "Cannot use RGBA mode with 3D view",
+                stacklevel=2,
+            )
+            self.channel_mode = ChannelMode.GRAYSCALE
+
         return self

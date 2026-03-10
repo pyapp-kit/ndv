@@ -15,14 +15,14 @@ jobs:
   check-manifest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - run: pipx run check-manifest
 
   pyright:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv run pyright
@@ -32,27 +32,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       UV_PYTHON: ${{ matrix.python-version }}
-      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # using 3.12 as main current version, until 3.13 support
-        # is ubiquitous in upstream dependencies
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.13"]
         gui: [pyside, pyqt, jupyter, wxpython]
         canvas: [vispy, pygfx]
         exclude:
-          # unsolved intermittent segfaults on this combo
-          - python-version: "3.10"
-            gui: pyside
-          # this one always segfaults
-          - python-version: "3.12"
-            os: ubuntu-latest
-            gui: pyside
-            canvas: vispy
-          - python-version: "3.10"
-            gui: pyside
           # wxpython does not build wheels for ubuntu or macos-latest py3.10
           - os: ubuntu-latest
             gui: wxpython
@@ -61,45 +48,33 @@ jobs:
             python-version: "3.10"
 
         include:
-          # test a couple more python variants, without
-          # full os/gui/canvas matrix coverage
+          # spot-check a few more python versions
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.12"
             gui: jupyter
             canvas: vispy
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.12"
             gui: jupyter
             canvas: pygfx
-          # pyside6 is struggling with 3.9
-          - os: ubuntu-latest
-            python-version: "3.9"
-            gui: pyqt
-            canvas: vispy
           - os: ubuntu-latest
             python-version: "3.11"
             gui: pyqt
             canvas: vispy
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.12"
             gui: pyqt
             canvas: pygfx
-          - os: macos-13
-            gui: wxpython
-            python-version: "3.9"
-            canvas: vispy
-          - os: windows-latest
+          - os: ubuntu-latest
+            python-version: "3.14"
             gui: jupyter
-            python-version: "3.9"
             canvas: pygfx
 
     steps:
-      - uses: actions/checkout@v5
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-
       - uses: pyvista/setup-headless-display-action@main
         with:
           qt: ${{ matrix.gui == 'pyside' || matrix.gui == 'pyqt' }}
@@ -108,64 +83,55 @@ jobs:
         run: |
           sudo apt-get update -y -qq
           sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
-
-      - name: 🧪 Test (attempt 1)
-        id: test1
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1
-
-      - name: 🧪 Test (attempt 2)
-        if: steps.test1.outcome == 'failure'
-        id: test2
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
-
-      - name: 🧪 Test (attempt 3)
-        if: steps.test2.outcome == 'failure'
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" cov=1 verbose=1
-
-      - name: 🧪 Test min dependencies (attempt 1)
-        id: min1
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1
-
-      - name: 🧪 Test min dependencies (attempt 2)
-        if: steps.min1.outcome == 'failure'
-        id: min2
-        continue-on-error: true
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
-
-      - name: 🧪 Test min dependencies (attempt 3)
-        if: steps.min2.outcome == 'failure'
-        shell: bash
-        run: make test extras="${{ matrix.gui }},${{ matrix.canvas }}" min=1 verbose=1
+      - name: Test
+        run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}
           path: ./.coverage*
           include-hidden-files: true
 
+  test-min-deps:
+    name: min-deps py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+        gui: [pyqt, jupyter]
+        canvas: [vispy, pygfx]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: pyvista/setup-headless-display-action@main
+        with:
+          qt: ${{ matrix.gui == 'pyqt' }}
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        if: matrix.canvas == 'pygfx'
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+      - name: Test min deps
+        run: uv run --exact --no-dev --resolution=lowest-direct --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} pytest --color=yes
+
   test-array-libs:
     runs-on: ubuntu-latest
     env:
       UV_PYTHON: ${{ matrix.python-version }}
-      UV_FROZEN: 1
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.13"]
 
     steps:
-      - uses: actions/checkout@v5
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - uses: pyvista/setup-headless-display-action@main
@@ -173,19 +139,10 @@ jobs:
           qt: true
       - name: Install llvmpipe and lavapipe for offscreen canvas
         run: sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
-
-      - name: 🧪 Test (attempt 1)
-        id: test1
-        continue-on-error: true
-        run: make test extras="pyqt,pygfx" groups="array-libs" cov=1
-
-      - name: 🧪 Test (attempt 2)
-        if: steps.test1.outcome == 'failure'
-        id: test2
-        run: make test extras="pyqt,pygfx" groups="array-libs" cov=1 verbose=1
-
+      - name: Test
+        run: uv run --exact --no-dev --extra=pygfx --group=pyqt --group=array-libs coverage run -p -m pytest --color=yes
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: covreport-py${{ matrix.python-version }}-array-libs
           path: ./.coverage*
@@ -201,12 +158,14 @@ jobs:
   # make sure we can build docs without error
   test-docs:
     runs-on: macos-latest # nicer screenshots
+    env:
+      UV_PYTHON: "3.13"
     steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
       - name: 📚 Build docs
         run: uv run --group docs mkdocs build --strict
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: docs
           path: site
@@ -222,12 +181,12 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 

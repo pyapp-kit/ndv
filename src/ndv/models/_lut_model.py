@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Annotated, Any, Callable, Literal, Optional, Union
+from collections.abc import Callable
+from typing import Annotated, Any, Literal, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
@@ -7,39 +8,27 @@ from annotated_types import Gt, Interval
 from cmap import Colormap
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
-    PrivateAttr,
-    field_validator,
     model_validator,
 )
-from typing_extensions import TypeAlias
 
 from ._base_model import NDVModel
 
-AutoscaleType: TypeAlias = Union[
-    Callable[[npt.ArrayLike], tuple[float, float]], tuple[float, float], bool
-]
+AutoscaleType: TypeAlias = (
+    Callable[[npt.ArrayLike], tuple[float, float]] | tuple[float, float] | bool
+)
 
 
 class ClimPolicy(BaseModel, ABC):
     """ABC for contrast limit policies."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    _cached_clims: Optional[tuple[float, float]] = PrivateAttr(None)
 
     @abstractmethod
     def get_limits(self, image: npt.NDArray) -> tuple[float, float]:
         """Return the contrast limits for the given image."""
-
-    def calc_clims(self, image: npt.NDArray) -> tuple[float, float]:
-        self._cached_clims = value = self.get_limits(image)
-        return value
-
-    @property
-    def cached_clims(self) -> Optional[tuple[float, float]]:
-        """Return the last calculated clims."""
-        return self._cached_clims
 
     @property
     def is_manual(self) -> bool:
@@ -124,7 +113,7 @@ class ClimsStdDev(ClimPolicy):
 
     clim_type: Literal["stddev"] = "stddev"
     n_stdev: Annotated[float, Gt(0)] = 2  # number of standard deviations
-    center: Optional[float] = None  # None means center around the mean
+    center: float | None = None  # None means center around the mean
 
     def get_limits(self, data: npt.NDArray) -> tuple[float, float]:
         center = float(np.nanmean(data) if self.center is None else self.center)
@@ -149,7 +138,27 @@ class ClimsStdDev(ClimPolicy):
 #         return self.func(data)
 
 
-ClimsType = Union[ClimsManual, ClimsPercentile, ClimsStdDev, ClimsMinMax]
+def _validate_clims(v: Any) -> Any:
+    if isinstance(v, str):
+        v = {"clim_type": v}
+    if v is None or (
+        isinstance(v, dict)
+        and v.get("min_percentile") == 0
+        and v.get("max_percentile") == 100
+    ):
+        return ClimsMinMax()
+    if isinstance(v, (tuple, list, np.ndarray)):
+        if len(v) == 2:
+            return ClimsManual(min=v[0], max=v[1])
+        raise ValueError("Clims sequence must have exactly 2 elements.")
+    return v
+
+
+ClimsType: TypeAlias = Annotated[
+    ClimsManual | ClimsPercentile | ClimsStdDev | ClimsMinMax,
+    BeforeValidator(_validate_clims),
+    # Field(discriminator="clim_type"),
+]
 
 
 class LUTModel(NDVModel):
@@ -157,6 +166,8 @@ class LUTModel(NDVModel):
 
     Attributes
     ----------
+    name : str
+        Display name for this channel. Empty string means no explicit name.
     visible : bool
         Whether to display this channel.
         NOTE: This has implications for data retrieval, as we may not want to request
@@ -175,10 +186,11 @@ class LUTModel(NDVModel):
         Gamma applied to the data before applying the colormap. By default, `1.0`.
     """
 
+    name: str = ""
     visible: bool = True
     cmap: Colormap = Field(default_factory=lambda: Colormap("gray"))
-    clims: ClimsType = Field(discriminator="clim_type", default_factory=ClimsMinMax)
-    clim_bounds: tuple[Optional[float], Optional[float]] = (None, None)
+    clims: ClimsType = Field(default_factory=ClimsMinMax)
+    clim_bounds: tuple[float | None, float | None] = (None, None)
     gamma: float = 1.0
 
     @model_validator(mode="before")
@@ -186,19 +198,4 @@ class LUTModel(NDVModel):
         # cast bare string/colormap inputs to cmap declaration
         if isinstance(v, (str, Colormap)):
             return {"cmap": v}
-        return v
-
-    @field_validator("clims", mode="before")
-    @classmethod
-    def _validate_clims(cls, v: ClimsType) -> ClimsType:
-        if v is None or (
-            isinstance(v, dict)
-            and v.get("min_percentile") == 0
-            and v.get("max_percentile") == 100
-        ):
-            return ClimsMinMax()
-        if isinstance(v, (tuple, list, np.ndarray)):
-            if len(v) == 2:
-                return ClimsManual(min=v[0], max=v[1])
-            raise ValueError("Clims sequence must have exactly 2 elements.")
         return v

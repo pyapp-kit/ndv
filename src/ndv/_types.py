@@ -6,10 +6,9 @@ from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from enum import Enum, IntFlag, auto
 from functools import cache
-from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, TypeAlias, cast
 
 from pydantic import PlainSerializer, PlainValidator
-from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from qtpy.QtCore import Qt
@@ -89,6 +88,29 @@ class MouseReleaseEvent(NamedTuple):
     x: float
     y: float
     btn: MouseButton
+
+
+class KeyMod(IntFlag):
+    NONE = 0
+    SHIFT = auto()
+    CTRL = auto()
+    ALT = auto()
+    META = auto()
+
+
+class KeyCode(Enum):
+    UP = "up"
+    DOWN = "down"
+    LEFT = "left"
+    RIGHT = "right"
+    SPACE = "space"
+    HOME = "home"
+    END = "end"
+
+
+class KeyPressEvent(NamedTuple):
+    key: KeyCode | str
+    mods: KeyMod = KeyMod.NONE
 
 
 class CursorType(Enum):

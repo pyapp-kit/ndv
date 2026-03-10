@@ -8,7 +8,9 @@ from ndv.controllers import ArrayViewer
 from ndv.views._app import run_app
 
 if TYPE_CHECKING:
-    from typing import Any, Unpack
+    from typing import Any
+
+    from typing_extensions import Unpack
 
     from .models._array_display_model import ArrayDisplayModel, ArrayDisplayModelKwargs
     from .models._data_wrapper import DataWrapper

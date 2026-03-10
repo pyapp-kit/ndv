@@ -300,8 +300,9 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
             return 1
         return None
 
-    @scene.cameras.PanZoomCamera.rect.setter  # type:ignore[misc]
+    @scene.cameras.PanZoomCamera.rect.setter  # type: ignore[untyped-decorator]
     def rect(self, args: Any) -> None:
+        """Setter for the camera rect."""
         # Convert 4-tuple (x, y, w, h) to Rect
         if isinstance(args, tuple):
             args = geometry.Rect(*args)

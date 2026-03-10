@@ -39,6 +39,12 @@ ndv.run_app()
 > [`widget`](https://pyapp-kit.github.io/ndv/latest/reference/ndv/controllers/#ndv.controllers.ArrayViewer.widget)
 > attribute and add it to your layout.
 
+## Documentation
+
+For more information, and complete API reference, see the
+[documentation](https://pyapp-kit.github.io/ndv/).
+
+
 ## Features
 
 - ⚡️ fast to import, fast to show
@@ -92,8 +98,3 @@ For Jupyter with vispy, (no Qt or wxPython):
 ```python
 pip install ndv[jup]
 ```
-
-## Documentation
-
-For more information, and complete API reference, see the
-[documentation](https://pyapp-kit.github.io/ndv/).

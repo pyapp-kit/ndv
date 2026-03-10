@@ -8,9 +8,10 @@ from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from contextlib import suppress
 from functools import cache
 from threading import Timer
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
     import pydevd
@@ -49,6 +50,10 @@ class NDVApp:
         self, canvas: Any, receiver: Mouseable
     ) -> Callable[[], None]:
         """Install mouse event filter on `canvas`, redirecting events to `receiver`."""
+        raise NotImplementedError
+
+    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
+        """Install key event filter on `widget`, emitting `receiver.keyPressed`."""
         raise NotImplementedError
 
     def call_in_main_thread(

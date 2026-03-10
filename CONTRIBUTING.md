@@ -27,7 +27,7 @@ You can then activate the environment with:
 For macOS/Linux:
 
 ```bash
-source .venv/bin/activate  
+source .venv/bin/activate
 ```
 
 For Windows:
@@ -46,39 +46,30 @@ uv run pytest
 
 (Or just `pytest` if you've already activate your environment).
 
-The makefile also has a few targets for running tests (these all
-depend on having `uv` installed):
-
-```bash
-# just test with something standard (currently pyqt6/pygfx)
-make test
-```
-
 ### Testing with different dependencies
 
-To test different variants of `pygfx`, `vispy`, `pyqt`, `pyside`, `wx`:  
+To test different variants of `pygfx`, `vispy`, `pyqt`, `pyside`, `wx`:
 use extras or groups to add specific members of
 `project.optional-dependencies` or `project.dependency-groups`
 declared in `pyproject.toml`.
 
 ```bash
-# run all 
-make test extras=pyqt,vispy groups=array-libs
-```
+# Run tests (default: pyqt + pygfx)
+uv run --exact --no-dev --extra=pygfx --group=pyqt pytest
 
-> [!TIP]
-> that above command actually has an alias:
->
-> ```bash
-> make test-arrays
-> ```
+# Test with different backends
+uv run --exact --no-dev --extra=vispy --group=jupyter pytest
+
+# Test with array-libs group
+uv run --exact --no-dev --extra=pygfx --group=pyqt --group=array-libs pytest
+```
 
 **Note:** These commands *will* recreate your current .venv folder,
 since they include the `--exact` flag. If you don't want your current
-env modified, add `isolated=1` to the command.
+env modified, add `--isolated` to the command.
 
 ```bash
-make test extras=jupyter,vispy isolated=1
+uv run --exact --no-dev --isolated --extra=vispy --group=jupyter pytest
 ```
 
 (Alternatively, just run `uv sync` again afterwards and it will bring
@@ -86,18 +77,20 @@ back the full env)
 
 ### Testing different Python versions
 
-Use `py=` to specify a different python version.
+Use `UV_PYTHON` or `-p` to specify a different python version.
 
 ```bash
-make test py=3.10
+uv run -p 3.10 --exact --no-dev --extra=pygfx --group=pyqt pytest
 ```
 
 ### Testing with minimum dependency versions
 
-To test against the minimum stated versions of dependencies, use `min=1`
+To test against the minimum stated versions of dependencies, add
+`--resolution=lowest-direct`:
 
 ```bash
-make test min=1
+uv run --exact --no-dev --extra=pygfx --group=pyqt \
+  --resolution=lowest-direct pytest
 ```
 
 ## Linting and Formatting
@@ -108,31 +101,25 @@ To lint and format the code, use pre-commit (make sure you've run `uv sync` firs
 uv run pre-commit run --all-files
 ```
 
-or
-
-```bash
-make lint
-```
-
 ## Building Documentation
 
 To serve the documentation locally, use:
 
 ```bash
-make docs-serve
+uv run --group docs mkdocs serve --no-strict
 ```
 
 or to build into a `site` directory:
 
 ```bash
-make docs
+uv run --group docs mkdocs build --strict
 ```
 
 If the screenshot generation is annoying, you can
 disable it with the `GEN_SCREENSHOTS` environment variable:
 
 ```bash
-GEN_SCREENSHOTS=0 make docs
+GEN_SCREENSHOTS=0 uv run --group docs mkdocs build --strict
 ```
 
 ## Releasing

@@ -5,10 +5,10 @@ import os
 import sys
 from enum import Enum
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from concurrent.futures import Future
     from typing import Literal
 
@@ -320,6 +320,11 @@ def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
         A function that can be called to remove the event filter.
     """
     return ndv_app().filter_mouse_events(canvas, receiver)
+
+
+def filter_key_events(widget: Any, receiver: ArrayView) -> Callable[[], None]:
+    """Intercept key events on `widget` and emit `receiver.keyPressed`."""
+    return ndv_app().filter_key_events(widget, receiver)
 
 
 def call_later(msec: int, func: Callable[[], None]) -> None:

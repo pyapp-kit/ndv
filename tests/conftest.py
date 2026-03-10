@@ -4,6 +4,7 @@ import gc
 import importlib
 import importlib.util
 import os
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -36,6 +37,13 @@ def asyncio_app() -> Iterator[AbstractEventLoop]:
 @pytest.fixture(scope="session")
 def wxapp() -> Iterator[wx.App]:
     import wx
+
+    # wx.App() hangs on macOS if a QApplication is already running, because both
+    # try to own the NSApplication singleton. Skip wx tests in that case.
+    for mod_name in ("PyQt5", "PySide2", "PySide6", "PyQt6"):
+        if mod := sys.modules.get(f"{mod_name}.QtWidgets"):
+            if (qapp := getattr(mod, "QApplication", None)) and qapp.instance():
+                pytest.skip("Qt already running. Cannot also test wx.")
 
     if (_wxapp := wx.App.Get()) is None:
         _wxapp = wx.App()
@@ -91,15 +99,24 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     # if the test failed, don't worry about checking widgets
     if request.session.testsfailed - failures_before:
         return
+    allow: list[type] = []
     try:
         from vispy.app.backends._qt import CanvasBackendDesktop
 
-        allow: tuple[type, ...] = (CanvasBackendDesktop,)
+        allow.append(CanvasBackendDesktop)
     except (ImportError, RuntimeError):
-        allow = ()
+        pass
+    try:
+        # This is a known widget that is not cleaned up properly
+        # but it's not clear how to fix it
+        from rendercanvas.qt import QRenderWidget
+
+        allow.append(QRenderWidget)
+    except (ImportError, RuntimeError):
+        pass
 
     # This is a known widget that is not cleaned up properly
-    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, allow)]
+    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
     if len(remaining) > nbefore:
         test_node = request.node
 

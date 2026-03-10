@@ -5,16 +5,13 @@ from unittest.mock import Mock
 import ipywidgets
 from pytest import fixture
 
-from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._jupyter._array_view import JupyterArrayView
 
 
 @fixture
 def viewer() -> JupyterArrayView:
-    viewer = JupyterArrayView(
-        ipywidgets.DOMWidget(), _ArrayDataDisplayModel(), ArrayViewerModel()
-    )
+    viewer = JupyterArrayView(ipywidgets.DOMWidget(), ArrayViewerModel())
     viewer.add_lut_view(None)
     return viewer
 
@@ -57,3 +54,28 @@ def test_histogram(viewer: JupyterArrayView) -> None:
     # histogram = get_histogram_canvas_class()()  # will raise if not supported
     # histogram_wdg = histogram.frontend_widget()
     # viewer.add_histogram(channel, histogram_wdg)
+
+
+def test_find_rfb() -> None:
+    from jupyter_rfb import RemoteFrameBuffer
+
+    from ndv.views._jupyter._app import _find_rfb
+
+    class FakeRFB(RemoteFrameBuffer):
+        pass
+
+    rfb = FakeRFB()
+
+    # Direct match
+    assert _find_rfb(rfb) is rfb
+
+    # Nested in container
+    container = ipywidgets.VBox(children=[ipywidgets.Label(), rfb])
+    assert _find_rfb(container) is rfb
+
+    # Not found
+    container2 = ipywidgets.VBox(children=[ipywidgets.Label()])
+    assert _find_rfb(container2) is None
+
+    # No children attribute
+    assert _find_rfb(object()) is None

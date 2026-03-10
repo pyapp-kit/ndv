@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import Future
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from qtpy.QtCore import (  # type: ignore[attr-defined]
     QCoreApplication,
@@ -13,6 +13,8 @@ from qtpy.QtCore import (  # type: ignore[attr-defined]
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from typing_extensions import ParamSpec, TypeVar
 
     T = TypeVar("T")
@@ -42,8 +44,9 @@ class MainThreadInvoker(QObject):
         )
         return future
 
-    @Slot()  # type: ignore [misc]
+    @Slot()  # type: ignore[untyped-decorator]
     def _invoke_current(self) -> None:
+        """Invokes the current callable."""
         """Invokes the current callable."""
         if (cb := self._current_callable) is not None:
             cb()
@@ -65,7 +68,7 @@ def call_in_main_thread(
         invoker = MainThreadInvoker()
         invoker.moveToThread(_APP_THREAD)
         _INVOKERS.add(invoker)
-        return invoker.invoke(func, *args, **kwargs)  # type: ignore[no-any-return]
+        return invoker.invoke(func, *args, **kwargs)
 
     future: Future[T] = Future()
     future.set_result(func(*args, **kwargs))

@@ -13,7 +13,7 @@ from IPython.display import Javascript, display
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
@@ -150,7 +149,7 @@ class RightClickButton(widgets.ToggleButton):
         display(Javascript(js_code))  # type: ignore [no-untyped-call]
 
 
-class JupyterLutView(LutView):
+class JupyterLUTView(LUTView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
@@ -319,7 +318,10 @@ class JupyterLutView(LutView):
                 self._auto_clim.upper_tail.value = 100 - policy.max_percentile
 
     def set_colormap(self, cmap: cmap.Colormap) -> None:
-        self._cmap.value = cmap.name.split(":")[-1]  # FIXME: this is a hack
+        name = cmap.name.split(":")[-1]
+        if name not in self._cmap.options:
+            self._cmap.options = (*self._cmap.options, name)
+        self._cmap.value = name
 
     def set_clims(self, clims: tuple[float, float]) -> None:
         # block self._clims.observe, otherwise autoscale will be forced off
@@ -371,7 +373,7 @@ class JupyterLutView(LutView):
         self._histogram = histogram
 
 
-class JupyterRGBView(JupyterLutView):
+class JupyterRGBView(JupyterLUTView):
     def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__(channel)
         self._cmap.layout.display = "none"
@@ -384,16 +386,14 @@ class JupyterArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: _jupyter_rfb.CanvasBackend,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
-        self._data_model = data_model
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
-        self._luts: dict[ChannelKey, JupyterLutView] = {}
+        self._luts: dict[ChannelKey, JupyterLUTView] = {}
 
         self._sliders: dict[Hashable, widgets.IntSlider] = {}
         self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
@@ -546,12 +546,12 @@ class JupyterArrayView(ArrayView):
         if changed:
             self.currentIndexChanged.emit()
 
-    def add_lut_view(self, channel: ChannelKey) -> JupyterLutView:
+    def add_lut_view(self, channel: ChannelKey) -> JupyterLUTView:
         """Add a LUT view to the viewer."""
         wdg = (
             JupyterRGBView(channel)
             if channel == "RGB"
-            else JupyterLutView(channel, self._viewer_model.default_luts)
+            else JupyterLUTView(channel, self._viewer_model.default_luts)
         )
         layout = self._luts_box
         self._luts[channel] = wdg
@@ -560,9 +560,11 @@ class JupyterArrayView(ArrayView):
         layout.children = (*layout.children, wdg.layout)
         return wdg
 
-    def remove_lut_view(self, view: LutView) -> None:
+    def remove_lut_view(self, view: LUTView) -> None:
         """Remove a LUT view from the viewer."""
-        view = cast("JupyterLutView", view)
+        if view not in self._luts.values():
+            return
+        view = cast("JupyterLUTView", view)
         layout = self._luts_box
         layout.children = tuple(
             wdg for wdg in layout.children if wdg != view.frontend_widget()
@@ -616,25 +618,11 @@ class JupyterArrayView(ArrayView):
 
     def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
         self._visible_axes = tuple(axes)
-        self._ndims_btn.value = len(axes) == 3
+        with notifications_blocked(self._ndims_btn):
+            self._ndims_btn.value = len(axes) > 2
 
     def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
-        if len(self._visible_axes) > 2:
-            if not change["new"]:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                z_ax = next(
-                    ax for ax in reversed(self._sliders) if ax not in self._visible_axes
-                )
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
-        self.visibleAxesChanged.emit()
+        self.ndimToggleRequested.emit(change["new"])
 
     def _on_reset_zoom_clicked(self, change: dict[str, Any]) -> None:
         self.resetZoomClicked.emit()
@@ -649,7 +637,7 @@ class JupyterArrayView(ArrayView):
             self._progress_spinner.layout.display = "flex" if value else "none"
         elif sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            new, old = info.args
+            _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._add_roi_btn.value = False
         elif sig_name == "show_histogram_button":

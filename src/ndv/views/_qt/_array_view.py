@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import warnings
 from contextlib import suppress
 from pathlib import Path
@@ -7,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
 from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore[attr-defined]
-from qtpy.QtGui import QCursor, QMouseEvent, QMovie
+from qtpy.QtGui import QCursor, QFontDatabase, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -34,13 +35,13 @@ from superqt import (
 )
 from superqt.cmap import QColormapComboBox
 from superqt.iconify import QIconifyIcon
-from superqt.utils import signals_blocked
+from superqt.utils import ensure_main_thread, signals_blocked
 
 from ndv._types import AxisKey
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
-from ndv.views.bases import ArrayView, LutView
+from ndv.views.bases import ArrayView, LUTView
 
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
@@ -50,7 +51,6 @@ if TYPE_CHECKING:
     from qtpy.QtGui import QIcon
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.models._data_display_model import _ArrayDataDisplayModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import (
         CanvasElement,
@@ -301,7 +301,7 @@ class _QLUTWidget(QWidget):
         self._layout.addLayout(self.hist_layout)
 
 
-class QLutView(LutView):
+class QLUTView(LUTView):
     # NB: In practice this will be a ChannelKey but Unions not allowed here.
     histogramRequested = psygnal.Signal(object)
 
@@ -337,9 +337,16 @@ class QLutView(LutView):
 
     def set_channel_name(self, name: str) -> None:
         self._qwidget.visible.setText(name)
+        parent = self._qwidget.parent()
+        while parent is not None:
+            if isinstance(parent, _QArrayViewer):
+                parent._align_lut_names()
+                break
+            parent = parent.parent()
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        self._qwidget.auto_clim.setChecked(not policy.is_manual)
+        with signals_blocked(self._qwidget.auto_clim):
+            self._qwidget.auto_clim.setChecked(not policy.is_manual)
         if isinstance(policy, ClimsPercentile):
             self._qwidget.lower_tail.setValue(policy.min_percentile)
             self._qwidget.upper_tail.setValue(100 - policy.max_percentile)
@@ -440,7 +447,7 @@ class QLutView(LutView):
         self._qwidget.auto_popup.show_above_mouse()
 
 
-class QRGBView(QLutView):
+class QRGBView(QLUTView):
     def __init__(self, channel: ChannelKey = None) -> None:
         super().__init__(channel)
         # Hide the cmap selector
@@ -470,9 +477,15 @@ class DimRow(QObject):
         self.play_btn.toggled.connect(self.set_animated)
         self.label = QLabel(str(axis))
         self.out_of = QLabel(f"/ {len(_coords) - 1}")
-        self.out_of.setStyleSheet("margin: 0 0 2px 0;")  # hack
+        self.out_of.setStyleSheet("margin: 0 0 1px 0;")  # hack
 
         self._timer_id: int | None = None
+        self._play_start_time: float = 0.0
+        self._play_start_frame: int = 0
+        mono = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        mono.setPointSize(12)
+        self.index_label.setFont(mono)
+        self.out_of.setFont(mono)
 
     def set_fps(self, fps: float) -> None:
         self.play_btn.spin.setValue(fps)
@@ -482,8 +495,11 @@ class DimRow(QObject):
         if animate:
             if self._timer_id is not None:
                 self.killTimer(self._timer_id)
-            interval = int(1000 / self.play_btn.spin.value())
-            self._timer_id = self.startTimer(interval)
+            fps = self.play_btn.spin.value()
+            interval = max(1, int(1000 / fps / 2))  # oversample ~2x
+            self._play_start_time = time.perf_counter()
+            self._play_start_frame = self.slider.value()
+            self._timer_id = self.startTimer(interval, Qt.TimerType.PreciseTimer)
             self.play_btn.setChecked(True)
         elif self._timer_id is not None:
             self.killTimer(self._timer_id)
@@ -492,14 +508,14 @@ class DimRow(QObject):
 
     def timerEvent(self, a0: Any) -> None:
         """Handle timer event for play button, move to the next frame."""
-        # TODO
-        # for now just increment the value by 1, but we should be able to
-        # take FPS into account better and skip additional frames if the timerEvent
-        # is delayed for some reason.
-        inc = 1
-        ival = self.slider.value()
-        ival = (ival + inc) % (self.slider.maximum() + 1)
-        self.slider.setValue(ival)
+        if self._timer_id is None or a0.timerId() != self._timer_id:
+            return
+        elapsed = time.perf_counter() - self._play_start_time
+        fps = self.play_btn.spin.value()
+        n_frames = self.slider.maximum() + 1
+        target = (self._play_start_frame + int(elapsed * fps)) % n_frames
+        if target != self.slider.value():
+            self.slider.setValue(target)
 
 
 class _QDimsSliders(QWidget):
@@ -578,10 +594,18 @@ class _QDimsSliders(QWidget):
         if (sr := self._getSliderRow(slider)) is None:
             return
 
-        # Update the total label for the given row
+        # Update the total and index label widths for the given row
         item = self._layout.itemAtPosition(sr, self._rTOT)
         if item and (label := item.widget()):
-            cast("QLabel", label).setText(f"/ {total}")
+            n_chars = len(str(total))
+            label = cast("QLabel", label)
+            label.setText(f"/ {total}")
+            fm = label.fontMetrics()
+            wide = fm.horizontalAdvance(f"/ {'8' * n_chars}") + 6
+            label.setFixedWidth(wide)
+            idx_item = self._layout.itemAtPosition(sr, self._rINDEX)
+            if idx_item and (idx_label := idx_item.widget()):
+                idx_label.setFixedWidth(wide)
 
     def setRowVisible(self, slider: QWidget, visible: bool) -> None:
         if (sr := self._getSliderRow(slider)) is None:
@@ -725,7 +749,7 @@ class _QArrayViewer(QWidget):
         )
         self._btn_layout = self.luts.btn_row
         self._btn_layout.setParent(None)
-        self.luts.expand()
+        self.luts.expand(animate=False)
 
         # button to change number of displayed dimensions
         self.ndims_btn = _DimToggleButton(self)
@@ -767,6 +791,15 @@ class _QArrayViewer(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addWidget(self.splitter)
 
+    def _align_lut_names(self) -> None:
+        """Set matching minimum widths on all LUT name checkboxes."""
+        lut_widgets = self.luts.findChildren(_QLUTWidget)
+        if not lut_widgets:
+            return
+        max_w = max(w.visible.sizeHint().width() for w in lut_widgets)
+        for w in lut_widgets:
+            w.visible.setMinimumWidth(max_w)
+
     def resizeEvent(self, a0: Any) -> None:
         # position at spinner the top right of the canvas_widget:
         canv, spinner = self._canvas_widget, self._progress_spinner
@@ -784,14 +817,12 @@ class QtArrayView(ArrayView):
     def __init__(
         self,
         canvas_widget: QWidget,
-        data_model: _ArrayDataDisplayModel,
         viewer_model: ArrayViewerModel,
     ) -> None:
-        self._data_model = data_model
         self._viewer_model = viewer_model
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
-        # Mapping of channel key to LutViews
-        self._luts: dict[ChannelKey, QLutView] = {}
+        # Mapping of channel key to LUTViews
+        self._luts: dict[ChannelKey, QLUTView] = {}
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
@@ -806,20 +837,23 @@ class QtArrayView(ArrayView):
 
         self._visible_axes: Sequence[AxisKey] = []
 
-    def add_lut_view(self, channel: ChannelKey) -> QLutView:
+    def add_lut_view(self, channel: ChannelKey) -> QLUTView:
         view = (
             QRGBView(channel)
             if channel == "RGB"
-            else QLutView(channel, self._viewer_model.default_luts)
+            else QLUTView(channel, self._viewer_model.default_luts)
         )
         self._luts[channel] = view
 
         view.histogramRequested.connect(self.histogramRequested)
         self._qwidget.luts.addWidget(view.frontend_widget())
+        self._qwidget._align_lut_names()
         return view
 
-    def remove_lut_view(self, view: LutView) -> None:
-        self._qwidget.luts.removeWidget(cast("QLutView", view).frontend_widget())
+    def remove_lut_view(self, view: LUTView) -> None:
+        if view not in self._luts.values():
+            return
+        self._qwidget.luts.removeWidget(cast("QLUTView", view).frontend_widget())
 
     def _on_channel_mode_changed(self, text: str) -> None:
         self.channelModeChanged.emit(ChannelMode(text))
@@ -836,6 +870,7 @@ class QtArrayView(ArrayView):
         """Update sliders with the given coordinate ranges."""
         self._qwidget.dims_sliders.create_sliders(coords)
 
+    @ensure_main_thread  # type: ignore[untyped-decorator]
     def hide_sliders(
         self, axes_to_hide: Container[Hashable], *, show_remainder: bool = True
     ) -> None:
@@ -851,29 +886,16 @@ class QtArrayView(ArrayView):
         self._qwidget.dims_sliders.set_current_index(value)
 
     def _on_ndims_toggled(self, is_3d: bool) -> None:
-        if len(self._visible_axes) > 2:
-            if not is_3d:  # is now 2D
-                self._visible_axes = self._visible_axes[-2:]
-        else:
-            z_ax = None
-            if wrapper := self._data_model.data_wrapper:
-                z_ax = wrapper.guess_z_axis()
-            if z_ax is None:
-                # get the last slider that is not in visible axes
-                sld = reversed(self._qwidget.dims_sliders._sliders)
-                z_ax = next(ax for ax in sld if ax not in self._visible_axes)
-            self._visible_axes = (z_ax, *self._visible_axes)
-        # TODO: a future PR may decide to set this on the model directly...
-        # since we now have access to it.
         self._qwidget.dims_sliders.stop_animations()
-        self.visibleAxesChanged.emit()
+        self.ndimToggleRequested.emit(is_3d)
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet
 
     def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
         self._visible_axes = tuple(axes)
-        self._qwidget.ndims_btn.setChecked(len(axes) > 2)
+        with signals_blocked(self._qwidget.ndims_btn):
+            self._qwidget.ndims_btn.setChecked(len(axes) > 2)
 
     def set_data_info(self, data_info: str) -> None:
         """Set the data info text, above the canvas."""
@@ -908,7 +930,7 @@ class QtArrayView(ArrayView):
             self._qwidget._progress_spinner.setVisible(value)
         if sig_name == "interaction_mode":
             # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            new, old = info.args
+            _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._qwidget.add_roi_btn.setChecked(False)
         elif sig_name == "show_histogram_button":

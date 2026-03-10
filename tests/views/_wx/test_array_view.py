@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, Mock
 import wx
 from pytest import fixture
 
-from ndv.models._data_display_model import _ArrayDataDisplayModel
 from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
 from ndv.views._wx._array_view import WxArrayView
@@ -13,7 +12,7 @@ from ndv.views._wx._array_view import WxArrayView
 
 @fixture
 def viewer(wxapp: wx.App) -> WxArrayView:
-    viewer = WxArrayView(MagicMock(), _ArrayDataDisplayModel(), ArrayViewerModel())
+    viewer = WxArrayView(MagicMock(), ArrayViewerModel())
     viewer.add_lut_view(None)
     return viewer
 
@@ -130,14 +129,42 @@ def test_display_options_selection(wxapp: wx.App, viewer: WxArrayView) -> None:
     assert checklist.IsChecked(0)
     assert viewer._luts[0]._wxwidget.IsShown()
 
-    # channel_mode = viewer._wxwidget.channel_mode_combo
-    # viewer.set_channel_mode(ChannelMode.GRAYSCALE)
-    # _processEvent(wxapp, wx.EVT_COMBOBOX, channel_mode)
+    # Simulate what the controller does on mode change to grayscale:
+    # it calls set_visible(False) on all multi-channel LUTs
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(False)
+            assert not lut_view._wxwidget.IsShown()
 
-    ## all channels should be hidden
-    # for ch, lut_view in viewer._luts.items():
-    #    if type(ch) is int or (type(ch) is str and ch.isdigit()):
-    #        assert not lut_view._wxwidget.IsShown()
+    # Simulate switching back to composite: controller calls set_visible(True)
+    # All previously-displayed channels should reappear
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(True)
+            assert lut_view._wxwidget.IsShown(), (
+                f"Channel {ch} should be visible after set_visible(True)"
+            )
+
+    # Now test interaction with display selector:
+    # If a channel was deselected via the channel selector (set_display(False)),
+    # it should NOT reappear after a mode round-trip
+    viewer._luts[0].set_display(False)
+    assert not viewer._luts[0]._wxwidget.IsShown()
+
+    # Hide all (mode change to grayscale)
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(False)
+
+    # Show all (mode change back to composite)
+    for ch, lut_view in viewer._luts.items():
+        if type(ch) is int:
+            lut_view.set_visible(True)
+
+    # Channel 0 was display-hidden, so it should stay hidden
+    assert not viewer._luts[0]._wxwidget.IsShown()
+    # Other channels should be visible
+    assert viewer._luts[1]._wxwidget.IsShown()
 
 
 def test_removed_channels(wxapp: wx.App, viewer: WxArrayView) -> None:
@@ -198,3 +225,31 @@ def test_none_all(wxapp: wx.App, viewer: WxArrayView) -> None:
     for ch, lut_view in viewer._luts.items():
         if type(ch) is int or (type(ch) is str and ch.isdigit()):
             assert lut_view._wxwidget.IsShown()
+
+
+def test_key_event_filter(wxapp: wx.App) -> None:
+    from ndv._types import KeyCode, KeyMod, KeyPressEvent
+    from ndv.views._wx._app import WxAppWrap
+
+    app = WxAppWrap()
+    view = WxArrayView(MagicMock(), ArrayViewerModel())
+    widget = view.frontend_widget()
+
+    received: list[KeyPressEvent] = []
+    view.keyPressed.connect(received.append)
+
+    disconnect = app.filter_key_events(widget, view)
+
+    # Simulate a Right arrow key press
+    event = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
+    event.SetKeyCode(wx.WXK_RIGHT)
+    wx.PostEvent(widget.GetEventHandler(), event)
+    evtLoop = wxapp.GetTraits().CreateEventLoop()
+    wx.EventLoopActivator(evtLoop)
+    evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
+
+    assert len(received) == 1
+    assert received[0].key == KeyCode.RIGHT
+    assert received[0].mods == KeyMod.NONE
+
+    disconnect()

@@ -7,7 +7,7 @@ import wx
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
-from ndv.views._wx._array_view import WxLutView
+from ndv.views._wx._array_view import WxLUTView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
@@ -17,17 +17,17 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(wxapp: wx.App, model: LUTModel) -> WxLutView:
+def view(wxapp: wx.App, model: LUTModel) -> WxLUTView:
     # NB: wx.App necessary although unused
     frame = wx.Frame(None)
-    view = WxLutView(frame)
+    view = WxLUTView(frame)
     assert view.model is None
     view.model = model
     assert view.model is model
     return view
 
 
-def test_WxLutView_update_model(model: LUTModel, view: WxLutView) -> None:
+def test_WxLUTView_update_model(model: LUTModel, view: WxLUTView) -> None:
     """Ensures the view updates when the model is changed."""
 
     # Test modifying model.clims
@@ -54,7 +54,7 @@ def test_WxLutView_update_model(model: LUTModel, view: WxLutView) -> None:
     assert view._wxwidget.cmap.GetValue() == new_cmap
 
 
-def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) -> None:
+def test_WxLUTView_update_view(wxapp: wx.App, model: LUTModel, view: WxLUTView) -> None:
     """Ensures the model updates when the view is changed."""
 
     def processEvent(evt: wx.PyEventBinder | int, wdg: wx.Window) -> None:
@@ -117,7 +117,7 @@ def test_WxLutView_update_view(wxapp: wx.App, model: LUTModel, view: WxLutView) 
     assert model.clims == ClimsManual(min=0, max=1)
 
 
-def test_WxLutView_histogram_controls(wxapp: wx.App, view: WxLutView) -> None:
+def test_WxLUTView_histogram_controls(wxapp: wx.App, view: WxLUTView) -> None:
     def processEvent(evt: wx.PyEventBinder | int, wdg: wx.Window) -> None:
         ev = wx.PyCommandEvent(evt.typeId, wdg.GetId())
         wx.PostEvent(wdg.GetEventHandler(), ev)

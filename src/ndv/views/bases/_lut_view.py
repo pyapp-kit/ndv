@@ -11,14 +11,31 @@ if TYPE_CHECKING:
     from ndv.models._lut_model import ClimPolicy, LUTModel
 
 
-class LutView(Viewable):
+class LUTView(Viewable):
     """Manages LUT properties (contrast, colormap, etc...) in a view object."""
 
     _model: LUTModel | None = None
+    _fallback_name: str = ""
 
     @abstractmethod
     def set_channel_name(self, name: str) -> None:
         """Set the name of the channel to `name`."""
+
+    def set_fallback_name(self, name: str) -> None:
+        """Set the data-derived or default fallback name for this channel.
+
+        The display name resolves as: `lut.name` if set, else `fallback_name`.
+        """
+        self._fallback_name = name
+        self._refresh_display_name()
+
+    def _refresh_display_name(self) -> None:
+        """Resolve and apply the display name from model.name and fallback."""
+        if self._model and self._model.name:
+            name = self._model.name
+        else:
+            name = self._fallback_name
+        self.set_channel_name(name)
 
     @abstractmethod
     def set_clim_policy(self, policy: ClimPolicy) -> None:
@@ -82,6 +99,7 @@ class LutView(Viewable):
             self._model.events.cmap.disconnect(self.set_colormap)
             self._model.events.gamma.disconnect(self.set_gamma)
             self._model.events.visible.disconnect(self.set_channel_visible)
+            self._model.events.name.disconnect(self._refresh_display_name)
 
         # Connect new model
         self._model = model
@@ -91,6 +109,7 @@ class LutView(Viewable):
             self._model.events.cmap.connect(self.set_colormap)
             self._model.events.gamma.connect(self.set_gamma)
             self._model.events.visible.connect(self.set_channel_visible)
+            self._model.events.name.connect(self._refresh_display_name)
 
         self.synchronize()
 
@@ -102,3 +121,4 @@ class LutView(Viewable):
             self.set_colormap(model.cmap)
             self.set_gamma(model.gamma)
             self.set_channel_visible(model.visible)
+        self._refresh_display_name()
