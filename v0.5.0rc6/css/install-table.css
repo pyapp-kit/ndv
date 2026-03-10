@@ -1,0 +1,104 @@
+/* Install table. */
+
+#install-table {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 5px;
+  margin: 0 auto;
+}
+
+#install-table .category-label {
+  display: flex;
+  font-size: 16px;
+  font-weight: 200;
+  color: var(--md-default-fg-color--light);
+  align-items: center;
+  height: auto;
+  padding-left: 10px;
+  border-left: 2px solid var(--md-default-fg-color--lightest);
+}
+#install-table .command-label {
+  color: var(--md-default-fg-color);
+  border-color: var(--md-default-fg-color--light);
+}
+
+#install-table .grid-right {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1px;
+}
+
+#install-table button {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  flex: 1;
+  padding: 10px 0;
+  margin: 0 2px;
+  font-size: 14px;
+  text-align: left;
+  padding-left: 15px;
+  padding-right: 15px;
+  border: none;
+  background-color: var(--md-accent-fg-color--transparent);
+  color: var(--md-default-fg-color--light);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+#install-table button:first-child {
+  margin-left: 0;
+}
+
+#install-table button:last-child {
+  margin-right: 0;
+}
+
+#install-table button.active,
+#install-table button:hover {
+  background-color: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+}
+#install-table button:hover {
+  background-color: var(--md-primary-fg-color--light);
+}
+
+#install-table .command-section {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1px;
+  font-size: 14px;
+  /* grid-column: span 2; */
+  margin-top: 10px;
+  padding: 10px 15px;
+  background-color: var(--md-code-bg-color);
+  border: 1px solid var(--md-default-fg-color--lighter);
+}
+
+#install-table #command-output {
+  font-family: monospace;
+  color: var(--md-code-fg-color);
+}
+
+#install-table button.md-clipboard {
+  background-color: transparent;
+  color: var(--md-default-fg-color--lightest);
+  right: 15px;
+  top: 15px;
+}
+
+#install-table button.md-clipboard.copied {
+  color: lime !important;
+}
+
+#install-table button.md-clipboard::after {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+#install-table button.md-clipboard:hover,
+#install-table button.md-clipboard:focus {
+  color: var(--md-accent-fg-color);
+}

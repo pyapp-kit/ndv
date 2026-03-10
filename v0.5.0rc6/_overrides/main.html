@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% set prebuild = 'pre-release' if config.extra.pre_release else 'dev' if config.extra.dev_build else '' %}
+
+{% block announce %}
+  {%- if prebuild -%} <!-- See the dashes here -->
+    <!-- Need to reapply margin from base CSS, which is overridden in extra CSS (to fix empty banner) -->
+    <div style="margin: 0.6rem auto">
+      You are currently viewing documentation for a <strong>{{prebuild}}</strong> build.
+      This may reference unreleased features.
+      For latest release, see
+      <strong><a href="{{ '../' ~ base_url }}">stable release docs</a></strong>.
+    </div>
+  {%- endif -%}
+{% endblock %}
+
+{% block outdated %}
+  You're not viewing the latest stable version.
+  <a href="{{ '../' ~ base_url }}">
+    <strong>Click here to go to last release.</strong>
+  </a>
+{% endblock %}
