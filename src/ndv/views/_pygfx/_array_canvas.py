@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Literal, cast
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from weakref import ReferenceType, WeakValueDictionary, ref
 
 import cmap as _cmap
@@ -18,6 +19,7 @@ from ndv._types import (
 )
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views._app import filter_mouse_events
+from ndv.views._util import downsample_data
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
 
@@ -63,11 +65,19 @@ class PyGFXImageHandle(ImageHandle):
         self._render = render
         self._grid = cast("Texture", image.geometry.grid)
         self._material = cast("ImageBasicMaterial", image.material)
+        # per-axis downsample strides applied to fit GPU texture limits
+        self._downsample_factors: tuple[int, ...] = ()
 
     def data(self) -> np.ndarray:
         return self._grid.data  # type: ignore [no-any-return]
 
     def set_data(self, data: np.ndarray) -> None:
+        data, self._downsample_factors = _downcast_and_downsample(
+            data,
+            three_d=isinstance(self._image, pygfx.Volume),
+            warn=False,
+            copy=False,
+        )
         # If dimensions are unchanged, reuse the buffer
         if data.shape == self._grid.data.shape:
             self._grid.data[:] = data  # pyright: ignore[reportOptionalSubscript]
@@ -75,10 +85,12 @@ class PyGFXImageHandle(ImageHandle):
         # Otherwise, the size (and maybe number of dimensions) changed
         # - we need a new buffer
         else:
-            self._grid = pygfx.Texture(data, dim=2)
+            dim = 3 if isinstance(self._image, pygfx.Volume) else 2
+            self._grid = pygfx.Texture(data, dim=dim)
             self._image.geometry = pygfx.Geometry(grid=self._grid)
             # RGB images (i.e. 3D datasets) cannot have a colormap
-            self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
+            if not isinstance(self._image, pygfx.Volume):
+                self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
 
     def visible(self) -> bool:
         return bool(self._image.visible)
@@ -465,11 +477,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def add_image(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
-        if data is not None:
-            # pygfx uses a view of the data without copy, so if we don't
-            # copy it here, the original data will be modified when the
-            # texture changes.
-            data = data.copy()
+        data, downsample_factors = _downcast_and_downsample(data, three_d=False)
         tex = pygfx.Texture(data, dim=2)
         image = pygfx.Image(
             pygfx.Geometry(grid=tex),
@@ -485,15 +493,12 @@ class GfxArrayCanvas(ArrayCanvas):
         # FIXME: I suspect there are more performant ways to refresh the canvas
         # look into it.
         handle = PyGFXImageHandle(image, self.refresh)
+        handle._downsample_factors = downsample_factors
         self._elements[image] = handle
         return handle
 
     def add_volume(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
-        if data is not None:
-            # pygfx uses a view of the data without copy, so if we don't
-            # copy it here, the original data will be modified when the
-            # texture changes.
-            data = data.copy()
+        data, downsample_factors = _downcast_and_downsample(data, three_d=True)
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
             pygfx.Geometry(grid=tex),
@@ -512,6 +517,7 @@ class GfxArrayCanvas(ArrayCanvas):
         # FIXME: I suspect there are more performant ways to refresh the canvas
         # look into it.
         handle = PyGFXImageHandle(vol, self.refresh)
+        handle._downsample_factors = downsample_factors
         self._elements[vol] = handle
         return handle
 
@@ -539,10 +545,23 @@ class GfxArrayCanvas(ArrayCanvas):
             gfx_scales.append(1.0)
         sx, sy, sz = gfx_scales[0], gfx_scales[1], gfx_scales[2]
         has_visuals = False
-        for child in self._scene.children:
-            if isinstance(child, (pygfx.Image, pygfx.Volume)):
-                child.local.scale = (sx, sy, sz)
-                has_visuals = True
+        for handle in self._elements.values():
+            if not isinstance(handle, PyGFXImageHandle):
+                continue
+            child = handle._image
+            if not isinstance(child, (pygfx.Image, pygfx.Volume)):
+                continue
+            _sx, _sy, _sz = sx, sy, sz
+            # compensate for downsampling so coordinates stay correct
+            # factors are in data order; pygfx order is (x, y, z) = reversed
+            factors = handle._downsample_factors
+            if factors and any(f > 1 for f in factors):
+                rev = list(reversed(factors))
+                _sx *= rev[0]
+                _sy *= rev[1] if len(rev) > 1 else 1
+                _sz *= rev[2] if len(rev) > 2 else 1
+            child.local.scale = (_sx, _sy, _sz)
+            has_visuals = True
         if has_visuals:
             self.set_range()
 
@@ -710,3 +729,37 @@ class GfxArrayCanvas(ArrayCanvas):
             if cursor := vis.get_cursor(event):
                 return cursor
         return CursorType.DEFAULT
+
+
+T = TypeVar("T", bound=np.ndarray | None)
+
+
+@lru_cache(maxsize=1)
+def _get_max_texture_sizes() -> tuple[int | None, int | None]:
+    """Return (max_2d, max_3d) texture dimensions from the wgpu adapter."""
+    try:
+        import wgpu
+
+        adapter = wgpu.gpu.request_adapter_sync()
+        limits = adapter.limits
+        max_2d = limits.get("max-texture-dimension-2d")
+        max_3d = limits.get("max-texture-dimension-3d")
+        return max_2d, max_3d
+    except Exception:
+        return None, None
+
+
+def _downcast_and_downsample(
+    data: T, three_d: bool, *, warn: bool = True, copy: bool = True
+) -> tuple[T, tuple[int, ...]]:
+    downsample_factors: tuple[int, ...] = ()
+    if data is not None:
+        if copy:
+            # pygfx uses a view of the data without copy, so if we don't
+            # copy it here, the original data will be modified when the
+            # texture changes.
+            data = data.copy()
+        maxd = _get_max_texture_sizes()[1 if three_d else 0]
+        if maxd is not None:
+            data, downsample_factors = downsample_data(data, maxd, warn=warn)  # type: ignore[assignment]
+    return data, downsample_factors

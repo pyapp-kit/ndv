@@ -209,7 +209,7 @@ class DataWrapper(Generic[ArrayT], ABC):
         for subclass in sorted(_recurse_subclasses(cls), key=lambda x: x.PRIORITY):
             try:
                 if subclass.supports(data):
-                    logger.debug(f"Using {subclass.__name__} to wrap {type(data)}")
+                    logger.debug("Using %s to wrap %s", subclass.__name__, type(data))
                     return subclass(data)
             except Exception as e:
                 warnings.warn(
