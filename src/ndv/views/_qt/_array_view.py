@@ -92,36 +92,6 @@ QRangeSlider { qproperty-barColor: qlineargradient(
 """
 
 
-class _CmapCombo(QColormapComboBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent, allow_user_colormaps=True, add_colormap_text="Add...")
-        self.setMinimumSize(140, 21)
-        # self.setStyleSheet("background-color: transparent;")
-
-    def showPopup(self) -> None:
-        super().showPopup()
-        popup = self.findChild(QFrame)
-        popup.setMinimumWidth(self.width() + 100)
-        popup.move(popup.x(), popup.y() - self.height() - popup.height())
-
-    # TODO: upstream me
-    def setCurrentColormap(self, color: cmap.Colormap) -> None:
-        """Adds the color to the QComboBox and selects it."""
-        idx = 0
-        for idx in range(self.count()):
-            if item := self.itemColormap(idx):
-                if item.name == color.name:
-                    # cmap_ is already here - just select it
-                    self.setCurrentIndex(idx)
-                    return
-
-        # cmap_ not in the combo box - add it!
-        self.addColormap(color)
-        # then, select it!
-        # NB: "Add..." was at idx, now it's at idx+1 and cmap_ is at idx
-        self.setCurrentIndex(idx)
-
-
 class _QSpinner(QLabel):
     SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 
@@ -217,7 +187,10 @@ class _QLUTWidget(QWidget):
         # -- WIDGETS -- #
         self.visible = QCheckBox()
 
-        self.cmap = _CmapCombo()
+        self.cmap = QColormapComboBox(
+            allow_user_colormaps=True, add_colormap_text="Add..."
+        )
+        self.cmap.setMinimumWidth(140)
         self.cmap.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.cmap.addColormaps(default_luts)
 

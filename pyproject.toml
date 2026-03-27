@@ -49,10 +49,10 @@ jupyter = [
     "jupyter_rfb >=0.3.3",
     "glfw >=2.4",
 ]
-pyqt = ["pyqt6 >=6.7", "qtpy >=2", "superqt[iconify] >=0.7.2"]
+pyqt = ["pyqt6 >=6.7", "qtpy >=2", "superqt[iconify] >=0.8.1"]
 pyside = [
     # defer to superqt's pyside6 restrictions
-    "superqt[iconify,pyside6] >=0.8.0",
+    "superqt[iconify,pyside6] >=0.8.1",
     # note: still may need to fix windows https://github.com/pyapp-kit/ndv/issues/59
     "pyside6 >=6.7",
     "qtpy >=2",
