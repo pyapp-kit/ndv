@@ -337,8 +337,8 @@ class QLUTView(LUTView):
         bounds: tuple[float | None, float | None] = (None, None),
     ) -> None:
         # block self._qwidget._clims, otherwise autoscale will be forced off
-        mi = 0.0 if bounds[0] is None else float(bounds[0])
-        ma = 65535.0 if bounds[1] is None else float(bounds[1])
+        mi = 0 if bounds[0] is None else int(bounds[0])
+        ma = 65535 if bounds[1] is None else int(bounds[1])
         with signals_blocked(self._qwidget.clims):
             self._qwidget.clims.setRange(mi, ma)
 
