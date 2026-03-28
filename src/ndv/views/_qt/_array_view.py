@@ -663,7 +663,7 @@ class _UpCollapsible(QCollapsible):
         layout.removeWidget(self._toggle_btn)
         self.btn_row = QHBoxLayout()
         self.btn_row.setContentsMargins(0, 0, 0, 0)
-        self.btn_row.setSpacing(0)
+        self.btn_row.setSpacing(2)
         self.btn_row.addWidget(self._toggle_btn)
         self.btn_row.addStretch()
         layout.addLayout(self.btn_row)
