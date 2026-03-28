@@ -8,11 +8,11 @@ from itertools import count
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
-import psygnal
 from psygnal import Signal
 
 from ndv._keybindings import handle_key_press
 from ndv.controllers._channel_controller import ChannelController
+from ndv.controllers._image_stats import ImageStats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
-    from ndv.controllers._image_stats import ImageStats
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
@@ -69,7 +68,7 @@ class ArrayViewer:
         `display_model` is provided, these will be ignored.
     """
 
-    stats_updated = Signal(object, object)
+    stats_updated = Signal(object, ImageStats)
 
     def __init__(
         self,
@@ -246,16 +245,24 @@ class ArrayViewer:
         # TODO: provide deep_copy option
         return ArrayViewer(self._data_wrapper, display_model=self.display_model)
 
-    def channel_stats(self, key: ChannelKey = None) -> psygnal.SignalInstance:
-        """Signal emitting ImageStats whenever channel data updates.
+    def refresh_stats(self) -> None:
+        """Force re-emit stats for all channels with existing data.
 
-        Connect to this signal to receive histogram counts, bin edges, and
-        contrast limits for the given channel. The histogram is only computed
-        when at least one listener is connected.
+        This will mostly be used by external listeners that want the initial data,
+        before any interaction has occurred.
         """
-        if key not in self._lut_controllers:
-            raise KeyError(f"No channel with key {key!r}")
-        return self._lut_controllers[key].stats_updated
+        has_listeners = len(self.stats_updated) > 0
+        sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+        for key, ctrl in self._lut_controllers.items():
+            if not ctrl.handles:
+                continue
+            stats = ctrl.update_texture_data(
+                ctrl.handles[0].data(),
+                need_histogram=has_listeners,
+                significant_bits=sig_bits,
+            )
+            if has_listeners and stats is not None:
+                self.stats_updated.emit(key, stats)
 
     # --------------------- PRIVATE ------------------------------------------
 

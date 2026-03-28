@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from psygnal import Signal
 
-from ndv.controllers._image_stats import compute_image_stats
+from ndv.controllers._image_stats import ImageStats, compute_image_stats
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     import numpy as np
 
     from ndv._types import ChannelKey
-    from ndv.controllers._image_stats import ImageStats
     from ndv.models._lut_model import LUTModel
     from ndv.views.bases import LUTView
     from ndv.views.bases._graphics._canvas_elements import ImageHandle
@@ -28,7 +27,7 @@ class ChannelController:
     that displays the data, all for a single "channel" extracted from the data.
     """
 
-    stats_updated = Signal(object)
+    stats_updated = Signal(ImageStats)
 
     @property
     def needs_histogram(self) -> bool:
