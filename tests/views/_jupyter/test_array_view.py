@@ -37,7 +37,7 @@ def test_array_options(viewer: JupyterArrayView) -> None:
 
     assert viewer._add_roi_btn.layout.display == "none"
     viewer._viewer_model.show_roi_button = True
-    assert viewer._add_roi_btn.layout.display is None
+    assert viewer._add_roi_btn.layout.display == "flex"
 
 
 def test_histogram(viewer: JupyterArrayView) -> None:
