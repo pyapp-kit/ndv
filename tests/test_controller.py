@@ -630,6 +630,26 @@ def test_hover_with_scaled_axes() -> None:
 
 @no_type_check
 @_patch_views
+def test_hover_info_shows_data_indices_not_world_coords() -> None:
+    """Hover info label should display data indices, not scaled world coords."""
+    ctrl = ArrayViewer(scales={-2: 0.5, -1: 2.0})
+    ctrl._async = False
+    ctrl.data = np.zeros((10, 20), dtype=np.uint8)
+
+    mock_canvas = ctrl._canvas
+    mock_view = ctrl._view
+
+    # world (4.0, 3.0) -> data (row=6, col=2) with scales (sy=0.5, sx=2.0)
+    mock_canvas.canvas_to_world.return_value = (4.0, 3.0, 0)
+    ctrl._on_canvas_mouse_moved(MouseMoveEvent(100, 100))
+
+    hover_text = mock_view.set_hover_info.call_args[0][0]
+    # must show data indices [6, 2], NOT world coords [3, 4]
+    assert hover_text.startswith("[6, 2]"), f"got {hover_text!r}"
+
+
+@no_type_check
+@_patch_views
 def test_hover_with_negative_scales() -> None:
     """Hover should work with negative scales (descending coordinates).
 
