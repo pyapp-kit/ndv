@@ -351,7 +351,7 @@ class PlotWidget(scene.Widget):
     def update_yaxis_width(self, domain: tuple[float, float] | None = None) -> None:
         """Grow y-axis width if tick labels need more space. Never shrinks."""
         if domain is None:
-            domain = self.yaxis.axis.domain
+            domain = cast("tuple[float, float]", self.yaxis.axis.domain)
         # Estimate the widest label character count
         max_val = max(abs(domain[0]), abs(domain[1]))
         label = f"{max_val:g}"
