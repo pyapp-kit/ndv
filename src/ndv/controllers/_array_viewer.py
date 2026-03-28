@@ -8,10 +8,11 @@ from itertools import count
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
+import psygnal
+from psygnal import Signal
 
 from ndv._keybindings import handle_key_press
 from ndv.controllers._channel_controller import ChannelController
-from ndv.controllers._image_stats import compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
+    from ndv.controllers._image_stats import ImageStats
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
@@ -66,6 +68,8 @@ class ArrayViewer:
         Keyword arguments to pass to the `ArrayDisplayModel` constructor. If
         `display_model` is provided, these will be ignored.
     """
+
+    stats_updated = Signal(object, object)
 
     def __init__(
         self,
@@ -242,6 +246,17 @@ class ArrayViewer:
         # TODO: provide deep_copy option
         return ArrayViewer(self._data_wrapper, display_model=self.display_model)
 
+    def channel_stats(self, key: ChannelKey = None) -> psygnal.SignalInstance:
+        """Signal emitting ImageStats whenever channel data updates.
+
+        Connect to this signal to receive histogram counts, bin edges, and
+        contrast limits for the given channel. The histogram is only computed
+        when at least one listener is connected.
+        """
+        if key not in self._lut_controllers:
+            raise KeyError(f"No channel with key {key!r}")
+        return self._lut_controllers[key].stats_updated
+
     # --------------------- PRIVATE ------------------------------------------
 
     def _connect_datawrapper(
@@ -280,29 +295,28 @@ class ArrayViewer:
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
-        if ctrl := self._lut_controllers.get(channel, None):
-            # Add histogram to ArrayView for display
-            self._view.add_histogram(channel, hist)
-            # Add histogram to channel controller for updates
-            ctrl.add_lut_view(hist)
-            # Compute histogram from the (first) image handle.
-            # TODO: Compute histogram from all image handles
-            if handles := ctrl.handles:
-                data = handles[0].data()
-
-                sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
-                stats = compute_image_stats(
-                    data,
-                    ctrl.lut_model.clims,
-                    need_histogram=True,
-                    significant_bits=sig_bits,
-                )
-                if stats.counts is not None and stats.bin_edges is not None:
-                    hist.set_data(stats.counts, stats.bin_edges)
-            # Reset camera view (accounting for data)
-            hist.set_range()
-
         self._histograms[channel] = hist
+
+        if ctrl := self._lut_controllers.get(channel, None):
+            self._view.add_histogram(channel, hist)
+            ctrl.add_lut_view(hist)
+            self._connect_histogram(ctrl, hist)
+
+    def _connect_histogram(
+        self, ctrl: ChannelController, hist: HistogramCanvas
+    ) -> None:
+        """Connect a histogram to a channel controller's stats signal."""
+
+        def _on_stats(stats: ImageStats) -> None:
+            if stats.counts is not None and stats.bin_edges is not None:
+                hist.set_data(stats.counts, stats.bin_edges)
+
+        ctrl.stats_updated.connect(_on_stats)
+        # Trigger initial data from existing handle
+        if handles := ctrl.handles:
+            sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+            ctrl.update_texture_data(handles[0].data(), significant_bits=sig_bits)
+        hist.set_range()
 
     def _update_channel_dtype(
         self, channel: ChannelKey, dtype: npt.DTypeLike | None = None
@@ -707,18 +721,14 @@ class ArrayViewer:
                 self._canvas.set_scales(self._resolved.visible_scales)
 
             sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+            has_broadcast = len(self.stats_updated) > 0
             stats = lut_ctrl.update_texture_data(
                 data,
-                need_histogram=key in self._histograms,
+                need_histogram=has_broadcast,
                 significant_bits=sig_bits,
             )
-            if (
-                stats is not None
-                and stats.counts is not None
-                and stats.bin_edges is not None
-                and (hist := self._histograms.get(key))
-            ):
-                hist.set_data(stats.counts, stats.bin_edges)
+            if has_broadcast and stats is not None:
+                self.stats_updated.emit(key, stats)
 
         self._canvas.refresh()
         # update highlight display

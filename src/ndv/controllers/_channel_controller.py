@@ -3,6 +3,8 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from psygnal import Signal
+
 from ndv.controllers._image_stats import compute_image_stats
 
 if TYPE_CHECKING:
@@ -25,6 +27,13 @@ class ChannelController:
     allows the user to interact with these settings), as well as the image handle
     that displays the data, all for a single "channel" extracted from the data.
     """
+
+    stats_updated = Signal(object)
+
+    @property
+    def needs_histogram(self) -> bool:
+        """Whether any listener needs histogram data."""
+        return len(self.stats_updated) > 0
 
     def __init__(
         self, key: ChannelKey, lut_model: LUTModel, views: Sequence[LUTView]
@@ -66,6 +75,7 @@ class ChannelController:
         if not (handles := self.handles):
             return None
         handles[0].set_data(data)
+        need_histogram = need_histogram or self.needs_histogram
         stats = compute_image_stats(
             data,
             self.lut_model.clims,
@@ -73,6 +83,8 @@ class ChannelController:
             significant_bits=significant_bits,
         )
         self._set_clims(stats.clims)
+        if self.needs_histogram:
+            self.stats_updated.emit(stats)
         return stats
 
     def add_handle(self, handle: ImageHandle) -> None:

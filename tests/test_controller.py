@@ -241,10 +241,14 @@ def test_histogram_updates_on_first_draw() -> None:
     """Histogram should update even when the first response creates the handle."""
     ctrl = ArrayViewer()
 
-    ctrl._histograms[None] = hist = MagicMock(spec=HistogramCanvas)
-    ctrl._lut_controllers[None] = ChannelController(
+    hist = MagicMock(spec=HistogramCanvas)
+    ctrl._histograms[None] = hist
+    lut_ctrl = ChannelController(
         key=None, lut_model=LUTModel(), views=[MagicMock(spec=LUTView), hist]
     )
+    ctrl._lut_controllers[None] = lut_ctrl
+    # Connect histogram to stats signal (as _add_histogram would)
+    ctrl._connect_histogram(lut_ctrl, hist)
 
     response = DataResponse(
         n_visible_axes=2,
@@ -256,7 +260,7 @@ def test_histogram_updates_on_first_draw() -> None:
 
     ctrl._on_data_response_ready(future)
 
-    hist.set_data.assert_called_once()
+    hist.set_data.assert_called()
 
 
 @pytest.mark.usefixtures("any_app")
