@@ -63,13 +63,13 @@ class ArrayViewerModel(NDVModel):
     show_reset_zoom_button : bool, optional
         Whether to show the reset zoom button, by default True.
     show_roi_button : bool, optional
-        Whether to show the ROI button, by default True.
+        Whether to show the ROI button, by default False.
     show_channel_mode_selector : bool, optional
         Whether to show the channel mode selector, by default True.
     show_play_button : bool, optional
         Whether to show the play button, by default True.
     show_progress_spinner : bool, optional
-        Whether to show the progress spinner, by default
+        Whether to show the progress spinner, by default False.
     show_data_info : bool, optional
         Whether to show shape, dtype, size, etc. about the array
     default_luts : list[cmap.Colormap], optional

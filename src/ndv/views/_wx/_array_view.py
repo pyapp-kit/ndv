@@ -719,6 +719,7 @@ class WxArrayView(ArrayView):
         wdg.set_range_btn.Bind(wx.EVT_BUTTON, self._on_reset_zoom_clicked)
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
+        wdg.add_roi_btn.Show(viewer_model.show_roi_button)
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()

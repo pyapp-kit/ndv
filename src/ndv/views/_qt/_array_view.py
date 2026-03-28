@@ -799,6 +799,7 @@ class QtArrayView(ArrayView):
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
+        qwdg.add_roi_btn.setVisible(viewer_model.show_roi_button)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)

@@ -35,9 +35,9 @@ def test_array_options(viewer: JupyterArrayView) -> None:
     viewer._viewer_model.show_channel_mode_selector = False
     assert viewer._channel_mode_combo.layout.display == "none"
 
-    assert viewer._add_roi_btn.layout.display is None
-    viewer._viewer_model.show_roi_button = False
     assert viewer._add_roi_btn.layout.display == "none"
+    viewer._viewer_model.show_roi_button = True
+    assert viewer._add_roi_btn.layout.display is None
 
 
 def test_histogram(viewer: JupyterArrayView) -> None:
