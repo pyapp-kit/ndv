@@ -85,7 +85,7 @@ class ArrayViewerModel(NDVModel):
     show_3d_button: bool = True
     show_histogram_button: bool = True
     show_reset_zoom_button: bool = True
-    show_roi_button: bool = True
+    show_roi_button: bool = False
     show_channel_mode_selector: bool = True
     show_play_button: bool = True
     show_data_info: bool = True
