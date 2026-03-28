@@ -118,10 +118,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._range: tuple[float, float] | None = None
         # Canvas Margins, in pixels (around the data)
         # TODO: Computation might better support different displays
-        self.margin_left = 34  # Provide room for y-axis ticks
+        self.margin_left = 14  # Room for y-axis line + tick marks
         self.margin_bottom = 20  # Provide room for x-axis ticks
         self.margin_right = 10
-        self.margin_top = 10
+        self.margin_top = 20
 
         # ------------ PyGFX Canvas ------------ #
         cls = rendercanvas_class()
@@ -239,11 +239,18 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             tick_side="left",
             tick_size=4,
             line_width=1,
-            tick_format=".0f",
         )
-        self._y.text.font_size = 10
-        self._y.text.material.weight_offset = -300
         self._y_scene.add(self._y)
+
+        self._y_max_label = pygfx.MultiText(
+            text="",
+            material=pygfx.TextMaterial(color="white", aa=True, weight_offset=-300),
+            screen_space=True,
+            font_size=10,
+            anchor="bottom-left",
+        )
+
+        self._y_scene.add(self._y_max_label)
 
         self.refresh()
 
@@ -327,13 +334,15 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         y1 = (canvas_h - self.margin_top) / canvas_h
         self._y.start_pos = [x0, y0, 0]
         self._y.end_pos = [x0, y1, 0]
-        y_height = y1 - y0
-        if max_val > 0 and y_height > 0:
-            # Convert log-transformed value back to original count for display
-            label = self._log_base**max_val - 1 if self._log_base else max_val
-            self._y.ticks = {y_height: label}
+        # No tick labels on the ruler itself
+        self._y.ticks = {}
+        # Show max count as a label above the y-axis
+        if max_val > 0:
+            count = self._log_base**max_val - 1 if self._log_base else max_val
+            self._y_max_label.set_text(f"{count:.0f}")
+            self._y_max_label.local.position = (x0 - 0.01, y1 + 0.005, 0)
         else:
-            self._y.ticks = {}
+            self._y_max_label.set_text("")
 
     def _animate(self) -> None:
         # Dynamically rescale the graph when canvas size changes
