@@ -205,7 +205,7 @@ class _QLUTWidget(QWidget):
         self.clims.setRange(0, 2**16)
 
         self.auto_clim = QPushButton("Auto")
-        self.auto_clim.setMaximumWidth(42)
+        self.auto_clim.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.auto_clim.setCheckable(True)
 
         add_histogram_icon = QIconifyIcon("foundation:graph-bar")
