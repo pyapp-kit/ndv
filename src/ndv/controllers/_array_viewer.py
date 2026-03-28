@@ -562,8 +562,8 @@ class ArrayViewer:
         self._highlight_pos = (x, y)
 
         # update highlight display
-        channel_values = self._get_values_at_world_point(*self._highlight_pos)
-        self._highlight_values(channel_values, self._highlight_pos)
+        data_pos, channel_values = self._get_values_at_world_point(*self._highlight_pos)
+        self._highlight_values(channel_values, data_pos)
 
     def _on_canvas_mouse_left(self) -> None:
         """Respond to a mouse leaving the canvas in the view."""
@@ -581,7 +581,7 @@ class ArrayViewer:
     def _highlight_values(
         self,
         channel_values: dict[ChannelKey, float],
-        canvas_pos: tuple[float, float] | None = None,
+        data_pos: tuple[int, int] | None = None,
     ) -> None:
         """Highlights the given values for each channel."""
         # Update highlight each histogram. If the histogram channel is not present
@@ -593,8 +593,8 @@ class ArrayViewer:
             # clear hover info if no values found
             self._view.set_hover_info("")
         else:
-            if canvas_pos is not None:
-                pos = f"[{canvas_pos[1]:.0f}, {canvas_pos[0]:.0f}] "
+            if data_pos is not None:
+                pos = f"[{data_pos[0]}, {data_pos[1]}] "
             else:
                 pos = " "  # pragma: no cover
 
@@ -723,18 +723,13 @@ class ArrayViewer:
         self._canvas.refresh()
         # update highlight display
         if self._highlight_pos is not None:
-            channel_values = self._get_values_at_world_point(*self._highlight_pos)
-            self._highlight_values(channel_values, self._highlight_pos)
+            data_pos, channel_values = self._get_values_at_world_point(
+                *self._highlight_pos
+            )
+            self._highlight_values(channel_values, data_pos)
 
-    def _get_values_at_world_point(self, x: float, y: float) -> dict[ChannelKey, float]:
-        # TODO: handle 3D data
-        n_vis = len(self._resolved.visible_axes)
-        if n_vis != 2:  # pragma: no cover
-            return {}
-
-        # map world coordinates back to data pixel indices using scales
-        # world x corresponds to the fastest visible axis (last),
-        # world y corresponds to the second-fastest (second-to-last)
+    def _world_to_data(self, x: float, y: float) -> tuple[int, int]:
+        """Convert world (x, y) to data (row, col) indices using visible scales."""
         scales = self._resolved.visible_scales
         if len(scales) >= 2:
             sx, sy = scales[-1], scales[-2]
@@ -742,9 +737,21 @@ class ArrayViewer:
             data_y = int(y / sy) if sy != 0 else int(y)
         else:
             data_x, data_y = int(x), int(y)
+        return data_y, data_x
+
+    def _get_values_at_world_point(
+        self, x: float, y: float
+    ) -> tuple[tuple[int, int], dict[ChannelKey, float]]:
+        """Return (data_pos, channel_values) for world point (x, y)."""
+        # TODO: handle 3D data
+        n_vis = len(self._resolved.visible_axes)
+        if n_vis != 2:  # pragma: no cover
+            return (0, 0), {}
+
+        data_y, data_x = self._world_to_data(x, y)
 
         if data_x < 0 or data_y < 0:
-            return {}
+            return (data_y, data_x), {}
 
         values: dict[ChannelKey, float] = {}
         for key, ctrl in self._lut_controllers.items():
@@ -759,4 +766,4 @@ class ArrayViewer:
                 else:
                     values[key] = cast("float", value)
 
-        return values
+        return (data_y, data_x), values
