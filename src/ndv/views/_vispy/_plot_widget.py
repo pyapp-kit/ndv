@@ -453,13 +453,26 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         super().set_range(x, y, z, margin)
 
     def viewbox_mouse_event(self, event: SceneMouseEvent) -> None:
-        # Horizontal zooming should pan
         if event.type == "mouse_wheel":
             dx, dy = event.delta
             if abs(dx) > abs(dy):
-                # TODO: Can we do better here? Some sort of adaptive behavior?
+                # Horizontal scroll -> pan
                 pan_dist = 0.1 * self.rect.width
                 self.pan(*[pan_dist if dx < 0 else -pan_dist, 0])
                 event.handled = True
                 return
+            # Vertical scroll -> zoom anchored at the current minimum
+            # (only scale the max end of the free axis)
+            s = 1.1 ** (-dy)
+            rect = self.rect
+            if self._axis in ("y", 1):
+                # Free axis is x: keep left, scale width
+                new_w = rect.width * s
+                self.rect = geometry.Rect(rect.left, rect.bottom, new_w, rect.height)
+            else:
+                # Free axis is y (or None): keep bottom, scale height
+                new_h = rect.height * s
+                self.rect = geometry.Rect(rect.left, rect.bottom, rect.width, new_h)
+            event.handled = True
+            return
         super().viewbox_mouse_event(event)
