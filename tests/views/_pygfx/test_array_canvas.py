@@ -60,6 +60,32 @@ def test_zoom_center() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_canvas_to_world_scale_aware_offset() -> None:
+    """canvas_to_world pixel-center offset must scale with pixel size.
+
+    Regression: a constant +0.5 world-space offset (instead of +0.5*scale)
+    caused data-index errors when scales != 1.
+    """
+    for sx, sy in [(1.0, 1.0), (0.2, 0.2), (5.0, 3.0)]:
+        canvas = GfxArrayCanvas(ArrayViewerModel())
+        _force_canvas_size(canvas)
+        canvas.set_ndim(2)
+        # must keep a reference: _elements is a WeakValueDictionary
+        handle = canvas.add_image(np.zeros((100, 100), dtype=np.float32))
+        canvas.set_scales((sy, sx))
+        canvas.set_range()
+
+        wx, wy, _ = canvas.canvas_to_world((300, 300))
+        # canvas center should map to approximately the image center
+        data_x, data_y = int(wx / sx), int(wy / sy)
+        assert 49 <= data_x <= 51, f"scale=({sx},{sy}): data_x={data_x}"
+        assert 49 <= data_y <= 51, f"scale=({sx},{sy}): data_y={data_y}"
+
+        del handle
+        canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_no_gpu_memory_leak_on_remove() -> None:
     """GPU resource memory should not grow when image handles are removed."""
     canvas = GfxArrayCanvas(ArrayViewerModel())
