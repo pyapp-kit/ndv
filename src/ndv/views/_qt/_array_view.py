@@ -663,7 +663,7 @@ class _UpCollapsible(QCollapsible):
         layout.removeWidget(self._toggle_btn)
         self.btn_row = QHBoxLayout()
         self.btn_row.setContentsMargins(0, 0, 0, 0)
-        self.btn_row.setSpacing(0)
+        self.btn_row.setSpacing(2)
         self.btn_row.addWidget(self._toggle_btn)
         self.btn_row.addStretch()
         layout.addLayout(self.btn_row)
@@ -799,6 +799,7 @@ class QtArrayView(ArrayView):
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
+        qwdg.add_roi_btn.setVisible(viewer_model.show_roi_button)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)

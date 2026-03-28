@@ -9,13 +9,14 @@ import numpy as np
 import vispy
 import vispy.scene
 from vispy import scene
+from vispy.visuals.axis import Ticker
 
 from ndv._types import CursorType
 from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
-from ._plot_widget import PlotWidget
+from ._plot_widget import LogTicker, PlotWidget
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -184,7 +185,8 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
         camera_rect = self.plot.camera.rect
-        self._resize(x=(camera_rect.left, camera_rect.right))
+        y_max = float(np.max(values)) if len(values) > 0 else 1.0
+        self._resize(x=(camera_rect.left, camera_rect.right), y=(0, y_max))
 
     def set_clim_bounds(
         self,
@@ -229,13 +231,12 @@ class VispyHistogramCanvas(HistogramCanvas):
             camera_rect = self.plot.camera.rect
             self._resize(x=(camera_rect.left, camera_rect.right))
 
-        # Disable labels for log axis
-        self.plot.yaxis.axis.tick_color = (
-            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
-        )
-        self.plot.yaxis.axis.text_color = (
-            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
-        )
+        # Swap ticker for log-scale y-axis labels
+        count_axis = self.plot.yaxis if not self._vertical else self.plot.xaxis
+        if base is not None:
+            count_axis.axis.ticker = LogTicker(count_axis.axis, base=base)
+        else:
+            count_axis.axis.ticker = Ticker(count_axis.axis)
 
     def frontend_widget(self) -> Any:
         return self._canvas.native
@@ -473,6 +474,12 @@ class VispyHistogramCanvas(HistogramCanvas):
             # Data-specified
             y = (0, self._handle_transform.scale[0 if self._vertical else 1])
 
+        # Transform the count-axis range to match log-transformed mesh data
+        if self._log_base and y is not None:
+            y = (y[0], np.log(y[1] + 1) / np.log(self._log_base))
+        if self._log_base and x is not None and self._vertical:
+            x = (x[0], np.log(x[1] + 1) / np.log(self._log_base))
+
         self.plot.camera.set_range(
             x=x,
             y=y,
@@ -480,6 +487,9 @@ class VispyHistogramCanvas(HistogramCanvas):
             # It's pretty visible in logarithmic mode
             margin=1e-30,
         )
+        # Grow y-axis width if the count labels need more space
+        if not self._vertical and y is not None:
+            self.plot.update_yaxis_width(y)
 
     def setVisible(self, visible: bool) -> None: ...
 

@@ -76,6 +76,21 @@ class _Controller(pygfx.PanZoomController):
                 self.pan((pan_dist, 0), viewport.rect)
                 viewport.renderer.request_draw()
                 return
+            # Vertical scroll: zoom pinned at current minimum
+            # Use same gain as default pygfx zoom_to_point (-0.005)
+            factor = 2 ** (event.dy * 0.005)
+            state = self._get_camera_state()
+            pos = list(state.get("position", (0, 0, 0)))
+            width = state.get("width", 1)
+            left = pos[0] - width / 2
+            new_width = width * factor
+            pos[0] = left + new_width / 2
+            state["position"] = tuple(pos)
+            state["width"] = new_width
+            self._set_camera_state(state)
+            self._update_cameras()
+            viewport.renderer.request_draw()
+            return
         super().handle_event(event, viewport)
         return None
 
@@ -103,10 +118,10 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         self._range: tuple[float, float] | None = None
         # Canvas Margins, in pixels (around the data)
         # TODO: Computation might better support different displays
-        self.margin_left = 50  # Provide room for y-axis ticks
+        self.margin_left = 14  # Room for y-axis line + tick marks
         self.margin_bottom = 20  # Provide room for x-axis ticks
         self.margin_right = 10
-        self.margin_top = 10
+        self.margin_top = 20
 
         # ------------ PyGFX Canvas ------------ #
         cls = rendercanvas_class()
@@ -170,6 +185,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             ),
             material=pygfx.LineMaterial(
                 color_mode="vertex",
+                thickness=1,
             ),
             render_order=-9,
         )
@@ -209,7 +225,11 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             start_value=0,
             tick_format="",  # Avoid scientific notation
             tick_side="right",
+            tick_size=4,
+            line_width=1,
         )
+        self._x.text.font_size = 10
+        self._x.text.material.weight_offset = -300
         self._x_scene.add(self._x)
 
         self._y = pygfx.Ruler(
@@ -217,8 +237,20 @@ class PyGFXHistogramCanvas(HistogramCanvas):
             end_pos=(0, 1, 0),
             start_value=0,
             tick_side="left",
+            tick_size=4,
+            line_width=1,
         )
         self._y_scene.add(self._y)
+
+        self._y_max_label = pygfx.MultiText(
+            text="",
+            material=pygfx.TextMaterial(color="white", aa=True, weight_offset=-300),
+            screen_space=True,
+            font_size=10,
+            anchor="bottom-left",
+        )
+
+        self._y_scene.add(self._y_max_label)
 
         self.refresh()
 
@@ -250,14 +282,21 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         else:
             # Default
             bb[:, 0] = (0, 1)
+        needs_log_transform = False
         if y:
             bb[:, 1] = y
+            needs_log_transform = True
         elif self._range:
-            # User-specified
+            # User-specified (raw counts)
             bb[:, 1] = self._range
+            needs_log_transform = True
         else:
-            # Data-specified/default
+            # Data-specified/default (already log-transformed via scale_y)
             bb[:, 1] = (0, self._clim_handles.local.scale_y)
+
+        # Transform the count-axis range to match log-transformed mesh data
+        if needs_log_transform and self._log_base:
+            bb[1, 1] = np.log(bb[1, 1] + 1) / np.log(self._log_base)
 
         # Update cameras
         # 2D Plot layout:
@@ -285,18 +324,25 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # NB: Prevent errors for invisible canvases
         c_w = max(self._canvas.get_logical_size()[0], 1)
         c_h = max(self._canvas.get_logical_size()[1], 1)
-        around_origin = [
-            self.margin_left / c_w,
-            self.margin_bottom / c_h,
-        ]
 
-        self._y.start_pos = [around_origin[0], around_origin[1], 0]
-        self._y.end_pos = [around_origin[0], (c_h - self.margin_top) / c_h, 0]
+        self._update_y_ruler(c_w, c_h, bb[1, 1])
 
-        # TODO For short canvases, pygfx has a tough time assigning ticks.
-        # For lack of a more thorough dive/fix, just mark the maximum of the histogram
-        max_val = bb[1, 1] if self._values is None else float(self._values.max())
-        self._y.ticks = {self._y.end_pos[1] - around_origin[1]: max_val}
+    def _update_y_ruler(self, canvas_w: float, canvas_h: float, max_val: float) -> None:
+        """Update y-axis ruler positions and ticks for the current canvas size."""
+        x0 = self.margin_left / canvas_w
+        y0 = self.margin_bottom / canvas_h
+        y1 = (canvas_h - self.margin_top) / canvas_h
+        self._y.start_pos = [x0, y0, 0]
+        self._y.end_pos = [x0, y1, 0]
+        # No tick labels on the ruler itself
+        self._y.ticks = {}
+        # Show max count as a label above the y-axis
+        if max_val > 0:
+            count = self._log_base**max_val - 1 if self._log_base else max_val
+            self._y_max_label.set_text(f"{count:.0f}")
+            self._y_max_label.local.position = (x0 - 0.01, y1 + 0.005, 0)
+        else:
+            self._y_max_label.set_text("")
 
     def _animate(self) -> None:
         # Dynamically rescale the graph when canvas size changes
@@ -310,6 +356,12 @@ class PyGFXHistogramCanvas(HistogramCanvas):
                 max(0, rect[1] - self.margin_top - self.margin_bottom),
             )
             self._size = rect
+            max_val = (
+                float(self._values.max())
+                if self._values is not None
+                else self._clim_handles.local.scale_y
+            )
+            self._update_y_ruler(max(rect[0], 1), max(rect[1], 1), max_val)
 
         self._x.update(self._x_cam, self._canvas.get_logical_size())
         self._y.update(self._y_cam, self._canvas.get_logical_size())
@@ -391,10 +443,11 @@ class PyGFXHistogramCanvas(HistogramCanvas):
         # Update the histogram mesh
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
-        # Resize the y-axis against the new data
+        # Resize, preserving x-range but autoscaling y to new data
         camera_x = self._camera.local.x
         rad_x = self._camera.width / 2
-        self._resize(x=(camera_x - rad_x, camera_x + rad_x))
+        y_max = float(np.max(values)) if len(values) > 0 else 1.0
+        self._resize(x=(camera_x - rad_x, camera_x + rad_x), y=(0, y_max))
 
     def _update_histogram(self) -> None:
         """Set the histogram values and bin edges.

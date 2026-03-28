@@ -3,7 +3,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, cast
 
+import numpy as np
 from vispy import geometry, scene
+from vispy.visuals.axis import Ticker
 
 if TYPE_CHECKING:
     from typing import TypeVar
@@ -77,7 +79,89 @@ if TYPE_CHECKING:
         font_size: float  # overrides tick_font_size and axis_font_size
 
 
-__all__ = ["PlotWidget"]
+__all__ = ["LogTicker", "PlotWidget"]
+
+# Quantized width steps for axis sizing (only grows, snaps to these values)
+_AXIS_WIDTH_STEPS = (24, 34, 44, 54)
+
+
+class LogTicker(Ticker):
+    """Ticker that displays log-scale labels on a log-transformed axis.
+
+    The axis domain is assumed to be in log-transformed space (i.e., values are
+    already log(count+1)/log(base)). This ticker places major ticks at positions
+    corresponding to powers of 10 in the original count space, and labels them
+    with the original counts (e.g., 1, 10, 100, 1000).
+    """
+
+    def __init__(self, axis: Any, base: float = 2, anchors: Any = None) -> None:
+        super().__init__(axis, anchors=anchors)
+        self._log_base = base
+
+    def _get_tick_frac_labels(self) -> tuple[Any, Any, list[str]]:
+        domain = self.axis.domain
+        if domain[1] < domain[0]:
+            flip = True
+            domain = domain[::-1]
+        else:
+            flip = False
+
+        d_min, d_max = domain
+        scale = d_max - d_min
+        if scale == 0:
+            return np.array([]), np.array([]), []
+
+        # Convert domain back to original counts
+        # domain is in log_base space: val = log(count+1)/log(base)
+        # so count = base^val - 1
+        log_b = np.log(self._log_base)
+        count_min = self._log_base**d_min - 1
+        count_max = self._log_base**d_max - 1
+
+        # Generate major ticks at powers of 10
+        if count_max <= 0:
+            return np.array([]), np.array([]), []
+
+        min_exp = int(np.floor(np.log10(max(count_min, 1))))
+        max_exp = int(np.ceil(np.log10(max(count_max, 1))))
+        # Always include 0
+        major_counts = [0.0]
+        for exp in range(min_exp, max_exp + 1):
+            val = 10.0**exp
+            if val > count_min and val <= count_max * 1.01:
+                major_counts.append(val)
+
+        major_counts_arr = np.array(major_counts)
+        # Convert counts to log-transformed positions
+        major_pos = np.log(major_counts_arr + 1) / log_b
+        # Normalize to fractions
+        major_frac = (major_pos - d_min) / scale
+
+        labels = [f"{c:g}" for c in major_counts_arr]
+
+        # Minor ticks: place at 2, 3, ..., 9 within each decade
+        minor_list: list[float] = []
+        for exp in range(min_exp, max_exp + 1):
+            for mult in [2, 3, 4, 5, 6, 7, 8, 9]:
+                val = mult * 10.0**exp
+                if count_min < val <= count_max:
+                    pos = np.log(val + 1) / log_b
+                    frac = (pos - d_min) / scale
+                    minor_list.append(frac)
+        minor_frac = np.array(minor_list) if minor_list else np.array([])
+
+        # Filter to visible range
+        mask = (major_frac > -0.0001) & (major_frac < 1.0001)
+        major_frac = major_frac[mask]
+        labels = [lb for i, lb in enumerate(labels) if mask[i]]
+        if len(minor_frac) > 0:
+            minor_frac = minor_frac[(minor_frac > -0.0001) & (minor_frac < 1.0001)]
+
+        if flip:
+            major_frac = 1 - major_frac
+            minor_frac = 1 - minor_frac
+
+        return major_frac, minor_frac, labels
 
 
 DEFAULT_AXIS_KWARGS: AxisWidgetKwargs = {
@@ -85,13 +169,13 @@ DEFAULT_AXIS_KWARGS: AxisWidgetKwargs = {
     "axis_color": "w",
     "tick_color": "w",
     "tick_width": 1,
-    "tick_font_size": 8,
-    "tick_label_margin": 12,
+    "tick_font_size": 6,
+    "tick_label_margin": 6,
     "axis_label_margin": 50,
     "minor_tick_length": 2,
-    "major_tick_length": 5,
+    "major_tick_length": 4,
     "axis_width": 1,
-    "axis_font_size": 10,
+    "axis_font_size": 8,
 }
 
 
@@ -145,7 +229,7 @@ class PlotWidget(scene.Widget):
         self._visuals: list[scene.VisualNode] = []
         super().__init__(**widget_kwargs)
         self.unfreeze()
-        self.grid = cast("Grid", self.add_grid(spacing=0, margin=10))
+        self.grid = cast("Grid", self.add_grid(spacing=0, margin=0))
 
         title_kwargs: TextVisualKwargs = {"font_size": 14, "color": "w"}
         label_kwargs: TextVisualKwargs = {"font_size": 10, "color": "w"}
@@ -155,7 +239,9 @@ class PlotWidget(scene.Widget):
 
         axis_kwargs: AxisWidgetKwargs = DEFAULT_AXIS_KWARGS
         self.yaxis = scene.AxisWidget(orientation="left", **axis_kwargs)
-        self.xaxis = scene.AxisWidget(orientation="bottom", **axis_kwargs)
+        self.xaxis = scene.AxisWidget(
+            orientation="bottom", **{**axis_kwargs, "tick_label_margin": 12}
+        )
 
         # 2D Plot layout:
         #
@@ -208,14 +294,13 @@ class PlotWidget(scene.Widget):
         # The main view into which plots are added
         self._view = self.grid.add_view(row=2, col=4)
 
-        # NOTE: this is a mess of hardcoded values... not sure whether they will work
-        # cross-platform.  Note that `width_max` and `height_max` of 2 is actually
-        # *less* visible than 0 for some reason.  They should also be extracted into
-        # some sort of `hide/show` logic for each component
-        # TODO: dynamic max based on max tick value?
-        self._grid_wdgs[Component.YAXIS].width_max = 40  # otherwise it takes too much
-        self._grid_wdgs[Component.PAD_LEFT].width_max = 20  # otherwise you get clipping
-        self._grid_wdgs[Component.XAXIS].height_max = 20  # otherwise it takes too much
+        # NOTE: `width_max` and `height_max` of 2 is actually *less* visible
+        # than 0 for some reason.  They should also be extracted into some sort
+        # of `hide/show` logic for each component
+        self._yaxis_width = _AXIS_WIDTH_STEPS[0]
+        self._grid_wdgs[Component.YAXIS].width_max = self._yaxis_width
+        self._grid_wdgs[Component.PAD_LEFT].width_max = 2
+        self._grid_wdgs[Component.XAXIS].height_max = 14
         self.ylabel = ylabel
         self.xlabel = xlabel
         self.title = title
@@ -262,6 +347,27 @@ class PlotWidget(scene.Widget):
         self._ylabel.text = text
         wdg = self._grid_wdgs[Component.YLABEL]
         wdg.width_min = wdg.width_max = 20 if text else 2
+
+    def update_yaxis_width(self, domain: tuple[float, float] | None = None) -> None:
+        """Grow y-axis width if tick labels need more space. Never shrinks."""
+        if domain is None:
+            domain = cast("tuple[float, float]", self.yaxis.axis.domain)
+        # Estimate the widest label character count
+        max_val = max(abs(domain[0]), abs(domain[1]))
+        label = f"{max_val:g}"
+        # ~5px per character + padding for tick marks
+        needed = len(label) * 5 + 10
+        # Snap up to the next quantized step
+        for step in _AXIS_WIDTH_STEPS:
+            if step >= needed:
+                needed = step
+                break
+        else:
+            needed = _AXIS_WIDTH_STEPS[-1]
+        # Only grow, never shrink
+        if needed > self._yaxis_width:
+            self._yaxis_width = needed
+            self._grid_wdgs[Component.YAXIS].width_max = needed
 
     def lock_axis(self, axis: Literal["x", "y", None]) -> None:
         """Prevent panning and zooming along a particular axis."""
@@ -352,10 +458,11 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     def pan(self, *pan: float) -> None:
         """Pan the camera by `pan`."""
         if self.axis_index is None:
-            super().pan(pan)
+            super().pan(*pan)
             return
-        _pan = list(pan)
-        _pan[self.axis_index] = 0
+        _pan = list(np.ravel(pan))
+        if self.axis_index < len(_pan):
+            _pan[self.axis_index] = 0
         super().pan(*_pan)
 
     def set_range(
@@ -369,13 +476,26 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
         super().set_range(x, y, z, margin)
 
     def viewbox_mouse_event(self, event: SceneMouseEvent) -> None:
-        # Horizontal zooming should pan
         if event.type == "mouse_wheel":
             dx, dy = event.delta
             if abs(dx) > abs(dy):
-                # TODO: Can we do better here? Some sort of adaptive behavior?
+                # Horizontal scroll -> pan
                 pan_dist = 0.1 * self.rect.width
                 self.pan(*[pan_dist if dx < 0 else -pan_dist, 0])
                 event.handled = True
                 return
+            # Vertical scroll -> zoom anchored at the current minimum
+            # (only scale the max end of the free axis)
+            s = 1.1 ** (-dy)
+            rect = self.rect
+            if self._axis in ("y", 1):
+                # Free axis is x: keep left, scale width
+                new_w = rect.width * s
+                self.rect = geometry.Rect(rect.left, rect.bottom, new_w, rect.height)
+            else:
+                # Free axis is y (or None): keep bottom, scale height
+                new_h = rect.height * s
+                self.rect = geometry.Rect(rect.left, rect.bottom, rect.width, new_h)
+            event.handled = True
+            return
         super().viewbox_mouse_event(event)

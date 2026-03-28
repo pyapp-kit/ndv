@@ -445,6 +445,8 @@ class JupyterArrayView(ArrayView):
         )
 
         self._add_roi_btn.observe(self._on_add_roi_button_toggle, names="value")
+        if not viewer_model.show_roi_button:
+            self._add_roi_btn.layout.display = "none"
 
         # LAYOUT
 

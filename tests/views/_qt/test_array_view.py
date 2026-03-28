@@ -51,9 +51,9 @@ def test_array_options(viewer: QtArrayView) -> None:
     viewer._viewer_model.show_channel_mode_selector = False
     assert not qwdg.channel_mode_combo.isVisible()
 
-    assert qwdg.add_roi_btn.isVisible()
-    viewer._viewer_model.show_roi_button = False
     assert not qwdg.add_roi_btn.isVisible()
+    viewer._viewer_model.show_roi_button = True
+    assert qwdg.add_roi_btn.isVisible()
 
     assert isinstance(play_btn, PlayButton)
     assert play_btn.isVisible()
