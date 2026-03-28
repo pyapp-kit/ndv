@@ -81,6 +81,9 @@ if TYPE_CHECKING:
 
 __all__ = ["LogTicker", "PlotWidget"]
 
+# Quantized width steps for axis sizing (only grows, snaps to these values)
+_AXIS_WIDTH_STEPS = (24, 34, 44, 54)
+
 
 class LogTicker(Ticker):
     """Ticker that displays log-scale labels on a log-transformed axis.
@@ -291,12 +294,11 @@ class PlotWidget(scene.Widget):
         # The main view into which plots are added
         self._view = self.grid.add_view(row=2, col=4)
 
-        # NOTE: this is a mess of hardcoded values... not sure whether they will work
-        # cross-platform.  Note that `width_max` and `height_max` of 2 is actually
-        # *less* visible than 0 for some reason.  They should also be extracted into
-        # some sort of `hide/show` logic for each component
-        # TODO: dynamic max based on max tick value?
-        self._grid_wdgs[Component.YAXIS].width_max = 24
+        # NOTE: `width_max` and `height_max` of 2 is actually *less* visible
+        # than 0 for some reason.  They should also be extracted into some sort
+        # of `hide/show` logic for each component
+        self._yaxis_width = _AXIS_WIDTH_STEPS[0]
+        self._grid_wdgs[Component.YAXIS].width_max = self._yaxis_width
         self._grid_wdgs[Component.PAD_LEFT].width_max = 2
         self._grid_wdgs[Component.XAXIS].height_max = 14
         self.ylabel = ylabel
@@ -345,6 +347,27 @@ class PlotWidget(scene.Widget):
         self._ylabel.text = text
         wdg = self._grid_wdgs[Component.YLABEL]
         wdg.width_min = wdg.width_max = 20 if text else 2
+
+    def update_yaxis_width(self, domain: tuple[float, float] | None = None) -> None:
+        """Grow y-axis width if tick labels need more space. Never shrinks."""
+        if domain is None:
+            domain = self.yaxis.axis.domain
+        # Estimate the widest label character count
+        max_val = max(abs(domain[0]), abs(domain[1]))
+        label = f"{max_val:g}"
+        # ~5px per character + padding for tick marks
+        needed = len(label) * 5 + 10
+        # Snap up to the next quantized step
+        for step in _AXIS_WIDTH_STEPS:
+            if step >= needed:
+                needed = step
+                break
+        else:
+            needed = _AXIS_WIDTH_STEPS[-1]
+        # Only grow, never shrink
+        if needed > self._yaxis_width:
+            self._yaxis_width = needed
+            self._grid_wdgs[Component.YAXIS].width_max = needed
 
     def lock_axis(self, axis: Literal["x", "y", None]) -> None:
         """Prevent panning and zooming along a particular axis."""

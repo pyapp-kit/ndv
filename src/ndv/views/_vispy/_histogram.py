@@ -487,6 +487,9 @@ class VispyHistogramCanvas(HistogramCanvas):
             # It's pretty visible in logarithmic mode
             margin=1e-30,
         )
+        # Grow y-axis width if the count labels need more space
+        if not self._vertical and y is not None:
+            self.plot.update_yaxis_width(y)
 
     def setVisible(self, visible: bool) -> None: ...
 
