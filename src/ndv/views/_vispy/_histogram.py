@@ -473,6 +473,12 @@ class VispyHistogramCanvas(HistogramCanvas):
             # Data-specified
             y = (0, self._handle_transform.scale[0 if self._vertical else 1])
 
+        # Transform the count-axis range to match log-transformed mesh data
+        if self._log_base and y is not None:
+            y = (y[0], np.log(y[1] + 1) / np.log(self._log_base))
+        if self._log_base and x is not None and self._vertical:
+            x = (x[0], np.log(x[1] + 1) / np.log(self._log_base))
+
         self.plot.camera.set_range(
             x=x,
             y=y,
