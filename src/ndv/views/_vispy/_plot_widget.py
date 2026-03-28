@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, cast
 
+import numpy as np
 from vispy import geometry, scene
 
 if TYPE_CHECKING:
@@ -85,13 +86,13 @@ DEFAULT_AXIS_KWARGS: AxisWidgetKwargs = {
     "axis_color": "w",
     "tick_color": "w",
     "tick_width": 1,
-    "tick_font_size": 8,
-    "tick_label_margin": 12,
+    "tick_font_size": 6,
+    "tick_label_margin": 6,
     "axis_label_margin": 50,
     "minor_tick_length": 2,
-    "major_tick_length": 5,
+    "major_tick_length": 4,
     "axis_width": 1,
-    "axis_font_size": 10,
+    "axis_font_size": 8,
 }
 
 
@@ -145,7 +146,7 @@ class PlotWidget(scene.Widget):
         self._visuals: list[scene.VisualNode] = []
         super().__init__(**widget_kwargs)
         self.unfreeze()
-        self.grid = cast("Grid", self.add_grid(spacing=0, margin=10))
+        self.grid = cast("Grid", self.add_grid(spacing=0, margin=0))
 
         title_kwargs: TextVisualKwargs = {"font_size": 14, "color": "w"}
         label_kwargs: TextVisualKwargs = {"font_size": 10, "color": "w"}
@@ -155,7 +156,9 @@ class PlotWidget(scene.Widget):
 
         axis_kwargs: AxisWidgetKwargs = DEFAULT_AXIS_KWARGS
         self.yaxis = scene.AxisWidget(orientation="left", **axis_kwargs)
-        self.xaxis = scene.AxisWidget(orientation="bottom", **axis_kwargs)
+        self.xaxis = scene.AxisWidget(
+            orientation="bottom", **{**axis_kwargs, "tick_label_margin": 12}
+        )
 
         # 2D Plot layout:
         #
@@ -213,9 +216,9 @@ class PlotWidget(scene.Widget):
         # *less* visible than 0 for some reason.  They should also be extracted into
         # some sort of `hide/show` logic for each component
         # TODO: dynamic max based on max tick value?
-        self._grid_wdgs[Component.YAXIS].width_max = 40  # otherwise it takes too much
-        self._grid_wdgs[Component.PAD_LEFT].width_max = 20  # otherwise you get clipping
-        self._grid_wdgs[Component.XAXIS].height_max = 20  # otherwise it takes too much
+        self._grid_wdgs[Component.YAXIS].width_max = 24
+        self._grid_wdgs[Component.PAD_LEFT].width_max = 2
+        self._grid_wdgs[Component.XAXIS].height_max = 14
         self.ylabel = ylabel
         self.xlabel = xlabel
         self.title = title
@@ -352,10 +355,11 @@ class PanZoom1DCamera(scene.cameras.PanZoomCamera):
     def pan(self, *pan: float) -> None:
         """Pan the camera by `pan`."""
         if self.axis_index is None:
-            super().pan(pan)
+            super().pan(*pan)
             return
-        _pan = list(pan)
-        _pan[self.axis_index] = 0
+        _pan = list(np.ravel(pan))
+        if self.axis_index < len(_pan):
+            _pan[self.axis_index] = 0
         super().pan(*_pan)
 
     def set_range(
