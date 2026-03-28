@@ -12,7 +12,7 @@ from psygnal import Signal
 
 from ndv._keybindings import handle_key_press
 from ndv.controllers._channel_controller import ChannelController
-from ndv.controllers._image_stats import ImageStats
+from ndv.controllers._image_stats import ImageStats, compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
 from ndv.models._resolve import (
     EMPTY_STATE,
@@ -251,17 +251,17 @@ class ArrayViewer:
         This will mostly be used by external listeners that want the initial data,
         before any interaction has occurred.
         """
-        has_listeners = len(self.stats_updated) > 0
+        if not len(self.stats_updated):
+            return
         sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
         for key, ctrl in self._lut_controllers.items():
-            if not ctrl.handles:
-                continue
-            stats = ctrl.update_texture_data(
-                ctrl.handles[0].data(),
-                need_histogram=has_listeners,
-                significant_bits=sig_bits,
-            )
-            if has_listeners and stats is not None:
+            if ctrl.handles:
+                stats = compute_image_stats(
+                    ctrl.handles[0].data(),
+                    ctrl.lut_model.clims,
+                    need_histogram=True,
+                    significant_bits=sig_bits,
+                )
                 self.stats_updated.emit(key, stats)
 
     # --------------------- PRIVATE ------------------------------------------
