@@ -9,13 +9,14 @@ import numpy as np
 import vispy
 import vispy.scene
 from vispy import scene
+from vispy.visuals.axis import Ticker
 
 from ndv._types import CursorType
 from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
-from ._plot_widget import PlotWidget
+from ._plot_widget import LogTicker, PlotWidget
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -184,7 +185,8 @@ class VispyHistogramCanvas(HistogramCanvas):
         self._values, self._bin_edges = values, bin_edges
         self._update_histogram()
         camera_rect = self.plot.camera.rect
-        self._resize(x=(camera_rect.left, camera_rect.right))
+        y_max = float(np.max(values)) if len(values) > 0 else 1.0
+        self._resize(x=(camera_rect.left, camera_rect.right), y=(0, y_max))
 
     def set_clim_bounds(
         self,
@@ -229,13 +231,12 @@ class VispyHistogramCanvas(HistogramCanvas):
             camera_rect = self.plot.camera.rect
             self._resize(x=(camera_rect.left, camera_rect.right))
 
-        # Disable labels for log axis
-        self.plot.yaxis.axis.tick_color = (
-            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
-        )
-        self.plot.yaxis.axis.text_color = (
-            (0, 0, 0, 0) if base is not None else (1, 1, 1, 1)
-        )
+        # Swap ticker for log-scale y-axis labels
+        count_axis = self.plot.yaxis if not self._vertical else self.plot.xaxis
+        if base is not None:
+            count_axis.axis.ticker = LogTicker(count_axis.axis, base=base)
+        else:
+            count_axis.axis.ticker = Ticker(count_axis.axis)
 
     def frontend_widget(self) -> Any:
         return self._canvas.native
