@@ -433,6 +433,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._selection: CanvasElement | None = None
         # Maintain a weak reference to the last ROI created.
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
+        # Per-axis world-space scales (x, y, z) used for coordinate conversion
+        self._world_scales: tuple[float, float, float] = (1.0, 1.0, 1.0)
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -544,7 +546,9 @@ class GfxArrayCanvas(ArrayCanvas):
         # pad to 3 components
         while len(gfx_scales) < 3:
             gfx_scales.append(1.0)
-        sx, sy, sz = gfx_scales[0], gfx_scales[1], gfx_scales[2]
+
+        (sx, sy, sz) = gfx_scales[:3]
+        self._world_scales = (sx, sy, sz)
         has_visuals = False
         for handle in self._elements.values():
             if not isinstance(handle, PyGFXImageHandle):
@@ -647,9 +651,14 @@ class GfxArrayCanvas(ArrayCanvas):
             )
             pos_world = la.vec_unproject(pos_ndc[:2], self._camera.camera_matrix)
 
-            # NB In vispy, (0.5,0.5) is a center of an image pixel, while in pygfx
-            # (0,0) is the center. We conform to vispy's standard.
-            return (pos_world[0] + 0.5, pos_world[1] + 0.5, pos_world[2] + 0.5)
+            # In vispy, pixel n center is at (n+0.5)*scale; in pygfx it's at
+            # n*scale.  Add 0.5*scale per axis so both backends agree.
+            wsx, wsy, wsz = self._world_scales
+            return (
+                pos_world[0] + 0.5 * wsx,
+                pos_world[1] + 0.5 * wsy,
+                pos_world[2] + 0.5 * wsz,
+            )
         else:
             return (-1, -1, -1)
 

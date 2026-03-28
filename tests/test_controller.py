@@ -625,10 +625,31 @@ def test_hover_with_scaled_axes() -> None:
     for lut_ctrl in ctrl._lut_controllers.values():
         lut_ctrl.get_value_at_index = Mock(wraps=lut_ctrl.get_value_at_index)
 
-    ctrl._get_values_at_world_point(4.0, 3.0)
+    data_pos, _ = ctrl._get_values_at_world_point(4.0, 3.0)
+    assert data_pos == (6, 2)
 
     for lut_ctrl in ctrl._lut_controllers.values():
         lut_ctrl.get_value_at_index.assert_called_once_with((6, 2))
+
+
+@no_type_check
+@_patch_views
+def test_hover_info_shows_data_indices_not_world_coords() -> None:
+    """Hover info label should display data indices, not scaled world coords."""
+    ctrl = ArrayViewer(scales={-2: 0.5, -1: 2.0})
+    ctrl._async = False
+    ctrl.data = np.zeros((10, 20), dtype=np.uint8)
+
+    mock_canvas = ctrl._canvas
+    mock_view = ctrl._view
+
+    # world (4.0, 3.0) -> data (row=6, col=2) with scales (sy=0.5, sx=2.0)
+    mock_canvas.canvas_to_world.return_value = (4.0, 3.0, 0)
+    ctrl._on_canvas_mouse_moved(MouseMoveEvent(100, 100))
+
+    hover_text = mock_view.set_hover_info.call_args[0][0]
+    # must show data indices [6, 2], NOT world coords [3, 4]
+    assert hover_text.startswith("[6, 2]"), f"got {hover_text!r}"
 
 
 @no_type_check
@@ -649,7 +670,7 @@ def test_hover_with_negative_scales() -> None:
     # With scale_y=-1.0, valid world y coords are negative (e.g. y=-2.0 -> row 2)
     mock_canvas.canvas_to_world.return_value = (3.0, -2.0, 0)
 
-    vals = ctrl._get_values_at_world_point(3.0, -2.0)
+    _, vals = ctrl._get_values_at_world_point(3.0, -2.0)
     assert vals, f"expected values, scales={ctrl._resolved.visible_scales}"
 
     ctrl._on_canvas_mouse_moved(MouseMoveEvent(100, 100))

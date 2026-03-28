@@ -1,9 +1,3 @@
-# /// script
-# dependencies = [
-#     "ndv[pyqt,vispy]",
-#     "imageio[tifffile]",
-# ]
-# ///
 from __future__ import annotations
 
 import ndv
