@@ -348,6 +348,8 @@ class ArrayViewer:
         for key, ctrl in self._lut_controllers.items():
             self._connect_shared_histogram_channel(key, ctrl)
 
+        # Apply current channel mode visibility
+        self._update_lut_visibility(self._resolved.channel_mode)
         hist.set_range()
 
     def _connect_shared_histogram_channel(
@@ -381,6 +383,10 @@ class ArrayViewer:
 
             if isinstance(policy, ClimsManual):
                 hist.set_channel_clims(key, (policy.min, policy.max))
+            elif ctrl._last_clims is not None:
+                # Non-manual policy (autoscale): _auto_scale has already
+                # resolved and stored the clims in _last_clims
+                hist.set_channel_clims(key, ctrl._last_clims)
 
         def _on_gamma(gamma: float) -> None:
             hist.set_channel_gamma(key, gamma)

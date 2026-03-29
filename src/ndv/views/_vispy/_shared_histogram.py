@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     )
 
 MIN_GAMMA: np.float64 = np.float64(1e-6)
+_NO_KEY = object()  # sentinel for "no channel grabbed"
 # Max bins to display (downsample larger histograms for performance)
 MAX_DISPLAY_BINS = 1024
 # Alpha for area fill
@@ -70,7 +71,7 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         self._channels: dict[object, _ChannelVisuals] = {}
         self._log_base: float | None = None
         self._grabbed: Grabbable = Grabbable.NONE
-        self._grabbed_key: object | None = None
+        self._grabbed_key: object = _NO_KEY
         self._clim_bounds: tuple[float | None, float | None] = (None, None)
 
         # VisPy canvas and plot
@@ -275,20 +276,20 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
     def on_mouse_double_press(self, event: MousePressEvent) -> bool:
         pos = event.x, event.y
         key, nearby = self._find_nearest_grabbable(pos)
-        if nearby == Grabbable.GAMMA and key is not None:
+        if nearby == Grabbable.GAMMA and key is not _NO_KEY:
             self.gammaChanged.emit(key, 1.0)
         return False
 
     def on_mouse_release(self, event: MouseReleaseEvent) -> bool:
         self._grabbed = Grabbable.NONE
-        self._grabbed_key = None
+        self._grabbed_key = _NO_KEY
         self.plot.camera.interactive = True
         return False
 
     def on_mouse_move(self, event: MouseMoveEvent) -> bool:
         pos = event.x, event.y
         key = self._grabbed_key
-        if key is None or self._grabbed == Grabbable.NONE:
+        if key is _NO_KEY or self._grabbed == Grabbable.NONE:
             self.get_cursor(event).apply_to(self)
             return False
 
@@ -578,13 +579,13 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
 
     def _find_nearest_grabbable(
         self, pos: tuple[float, float], tolerance: int = 5
-    ) -> tuple[object | None, Grabbable]:
+    ) -> tuple[object, Grabbable]:
         """Find the nearest grabbable handle across all channels."""
         click_x, click_y = pos
         plot_to_canvas = self.node_tform.imap
 
         best_dist = float("inf")
-        best_key: object | None = None
+        best_key: object = _NO_KEY
         best_grab = Grabbable.NONE
 
         y_range = self._compute_y_range()
