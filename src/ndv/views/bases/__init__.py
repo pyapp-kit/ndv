@@ -4,7 +4,7 @@ from typing import Any
 
 from ._app import NDVApp
 from ._array_view import ArrayView
-from ._graphics._canvas import ArrayCanvas, HistogramCanvas
+from ._graphics._canvas import ArrayCanvas, HistogramCanvas, SharedHistogramCanvas
 from ._graphics._canvas_elements import CanvasElement, ImageHandle, RectangularROIHandle
 from ._graphics._mouseable import Mouseable
 from ._lut_view import LUTView
@@ -20,6 +20,7 @@ __all__ = [
     "Mouseable",
     "NDVApp",
     "RectangularROIHandle",
+    "SharedHistogramCanvas",
     "Viewable",
 ]
 

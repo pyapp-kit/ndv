@@ -4,6 +4,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
+from psygnal import Signal
 
 from ndv.views.bases._lut_view import LUTView
 from ndv.views.bases._view_base import Viewable
@@ -13,6 +14,7 @@ from ._mouseable import Mouseable
 if TYPE_CHECKING:
     import numpy as np
 
+    from ndv._types import ChannelKey
     from ndv.models._viewer_model import ArrayViewerModel
 
     from ._canvas_elements import CanvasElement, ImageHandle, RectangularROIHandle
@@ -98,3 +100,42 @@ class HistogramCanvas(GraphicsCanvas, LUTView):
 
     def highlight(self, value: float | None) -> None:
         """Highlights a domain value on the histogram."""
+
+
+class SharedHistogramCanvas(GraphicsCanvas):
+    """Multi-channel overlay histogram with per-channel clim/gamma controls."""
+
+    climsChanged = Signal(object, tuple)
+    gammaChanged = Signal(object, float)
+
+    def set_channel_data(
+        self, key: ChannelKey, counts: np.ndarray, bin_edges: np.ndarray
+    ) -> None:
+        """Set or update histogram data for a channel."""
+
+    def set_channel_color(self, key: ChannelKey, color: tuple) -> None:
+        """Set the display color (RGBA) for a channel."""
+
+    def set_channel_visible(self, key: ChannelKey, visible: bool) -> None:
+        """Show or hide a channel on the histogram."""
+
+    def set_channel_clims(self, key: ChannelKey, clims: tuple[float, float]) -> None:
+        """Update the clim line positions for a channel."""
+
+    def set_channel_gamma(self, key: ChannelKey, gamma: float) -> None:
+        """Update the gamma curve for a channel."""
+
+    def remove_channel(self, key: ChannelKey) -> None:
+        """Remove a channel from the histogram."""
+
+    def set_channel_name(self, key: ChannelKey, name: str) -> None:
+        """Set the display name for a channel (used in legend)."""
+
+    def set_clim_bounds(self, bounds: tuple[float | None, float | None]) -> None:
+        """Set global bounds for clim values and x-axis range."""
+
+    def set_log_base(self, base: float | None) -> None:
+        """Set logarithmic scale base, or None for linear."""
+
+    def highlight(self, value: float | None) -> None:
+        """Highlight a domain value across all channels."""

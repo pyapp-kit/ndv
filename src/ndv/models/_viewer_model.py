@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         show_controls: bool
         show_3d_button: bool
         show_histogram_button: bool
+        use_shared_histogram: bool
         show_reset_zoom_button: bool
         show_roi_button: bool
         show_channel_mode_selector: bool
@@ -60,6 +61,9 @@ class ArrayViewerModel(NDVModel):
         Whether to show the 3D button, by default True.
     show_histogram_button : bool, optional
         Whether to show the histogram button, by default True.
+    use_shared_histogram : bool, optional
+        Whether to use a shared histogram overlay for all channels, by default
+        True. When True, per-channel histogram buttons are hidden.
     show_reset_zoom_button : bool, optional
         Whether to show the reset zoom button, by default True.
     show_roi_button : bool, optional
@@ -84,6 +88,7 @@ class ArrayViewerModel(NDVModel):
     show_controls: bool = True
     show_3d_button: bool = True
     show_histogram_button: bool = True
+    use_shared_histogram: bool = True
     show_reset_zoom_button: bool = True
     show_roi_button: bool = False
     show_channel_mode_selector: bool = True
@@ -104,6 +109,7 @@ class ArrayViewerModel(NDVModel):
             show_controls = Signal(bool, bool)
             show_3d_button = Signal(bool, bool)
             show_histogram_button = Signal(bool, bool)
+            use_shared_histogram = Signal(bool, bool)
             show_reset_zoom_button = Signal(bool, bool)
             show_roi_button = Signal(bool, bool)
             show_channel_mode_selector = Signal(bool, bool)

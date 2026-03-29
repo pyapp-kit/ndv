@@ -14,4 +14,5 @@ viewer = ndv.imshow(
     channel_mode="composite",
     luts={0: {"name": "FITC"}, 1: {"name": "DAPI", "cmap": "magenta"}},
     scales={0: 0.4, -1: 0.2, -2: 0.2},
+    viewer_options={"use_shared_histogram": True},
 )

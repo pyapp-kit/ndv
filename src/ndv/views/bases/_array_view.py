@@ -30,6 +30,7 @@ class ArrayView(Viewable):
     currentIndexChanged = Signal()
     resetZoomClicked = Signal()
     histogramRequested = Signal(int)
+    sharedHistogramRequested = Signal()
     ndimToggleRequested = Signal(bool)
     channelModeChanged = Signal(ChannelMode)
     keyPressed = Signal(KeyPressEvent)
@@ -72,4 +73,10 @@ class ArrayView(Viewable):
         raise NotImplementedError
 
     def remove_histogram(self, widget: Any) -> None:
+        raise NotImplementedError
+
+    def add_shared_histogram(self, widget: Any) -> None:
+        raise NotImplementedError
+
+    def remove_shared_histogram(self) -> None:
         raise NotImplementedError
