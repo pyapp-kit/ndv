@@ -623,6 +623,10 @@ class _WxArrayViewer(wx.Frame):
         self.add_roi_btn = wx.ToggleButton(self, label="ROI", size=(40, -1))
         _add_icon(self.add_roi_btn, "mdi:vector-rectangle")
 
+        # White balance eyedropper button
+        self.wb_btn = wx.ToggleButton(self, label="WB", size=(40, -1))
+        _add_icon(self.wb_btn, "mdi:eyedropper")
+
         # how many luts need to be present before lut toolbar appears
         self._toolbar_display_thresh = 7
 
@@ -654,6 +658,7 @@ class _WxArrayViewer(wx.Frame):
         self._btns.Add(self.set_range_btn, 0, wx.ALL, 4)
         self._btns.Add(self.ndims_btn, 0, wx.ALL, 4)
         self._btns.Add(self.add_roi_btn, 0, wx.ALL, 4)
+        self._btns.Add(self.wb_btn, 0, wx.ALL, 4)
 
         self._top_info = top_info = wx.BoxSizer(wx.HORIZONTAL)
         top_info.Add(self._data_info_label, 0, wx.EXPAND | wx.BOTTOM, 0)
@@ -720,6 +725,9 @@ class WxArrayView(ArrayView):
         wdg.ndims_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_ndims_toggled)
         wdg.add_roi_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_add_roi_toggled)
         wdg.add_roi_btn.Show(viewer_model.show_roi_button)
+        wdg.wb_btn.Bind(wx.EVT_TOGGLEBUTTON, self._on_wb_toggled)
+        wdg.wb_btn.Bind(wx.EVT_RIGHT_DOWN, self._on_wb_right_click)
+        wdg.wb_btn.Show(viewer_model.show_white_balance_button)
 
     def _on_channel_mode_changed(self, event: wx.CommandEvent) -> None:
         mode = self._wxwidget.channel_mode_combo.GetValue()
@@ -737,6 +745,19 @@ class WxArrayView(ArrayView):
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if create_roi else InteractionMode.PAN_ZOOM
         )
+
+    def _on_wb_toggled(self, event: wx.CommandEvent) -> None:
+        pick = self._wxwidget.wb_btn.GetValue()
+        self._viewer_model.interaction_mode = (
+            InteractionMode.PICK_COLOR if pick else InteractionMode.PAN_ZOOM
+        )
+
+    def _on_wb_right_click(self, event: wx.MouseEvent) -> None:
+        menu = wx.Menu()
+        item = menu.Append(wx.ID_ANY, "Reset White Balance")
+        self._wxwidget.Bind(wx.EVT_MENU, lambda _: self.resetWhiteBalance.emit(), item)
+        self._wxwidget.PopupMenu(menu)
+        menu.Destroy()
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes  # no widget to control this yet
@@ -853,16 +874,20 @@ class WxArrayView(ArrayView):
             self._wxwidget._progress_spinner.Show(value)
             self._wxwidget._top_info.Layout()
         elif sig_name == "interaction_mode":
-            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
             _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._wxwidget.add_roi_btn.SetValue(False)
+            if old == InteractionMode.PICK_COLOR:
+                self._wxwidget.wb_btn.SetValue(False)
         elif sig_name == "show_histogram_button":
             for lut in self._luts.values():
                 lut._wxwidget.histogram_btn.Show(value)
                 lut._wxwidget.Layout()
         elif sig_name == "show_roi_button":
             self._wxwidget.add_roi_btn.Show(value)
+            self._wxwidget._btns.Layout()
+        elif sig_name == "show_white_balance_button":
+            self._wxwidget.wb_btn.Show(value)
             self._wxwidget._btns.Layout()
         elif sig_name == "show_channel_mode_selector":
             self._wxwidget.channel_mode_combo.Show(value)

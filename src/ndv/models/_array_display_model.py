@@ -207,6 +207,9 @@ class ArrayDisplayModel(NDVModel):
     # per-axis scale factors (e.g. physical pixel size)
     scales: ScalesMap = Field(default_factory=ScalesMap, frozen=True)
 
+    # per-channel (R, G, B) multiplicative gains for white balance correction
+    white_balance_gains: tuple[float, float, float] | None = None
+
     @computed_field  # type: ignore [prop-decorator]
     @property
     def n_visible_axes(self) -> Literal[2, 3]:

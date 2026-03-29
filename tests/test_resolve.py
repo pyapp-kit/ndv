@@ -66,6 +66,46 @@ def test_negative_index_produces_nonempty_data() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "shape, model_kwargs, expect_channel_axis, expect_visible_axes",
+    [
+        pytest.param(
+            (100, 200, 3),
+            {"channel_mode": "rgba"},
+            2,
+            (0, 1),
+            id="MN3_rgba_gets_channel_axis",
+        ),
+        pytest.param(
+            (100, 200, 3),
+            {},
+            None,
+            (1, 2),
+            id="MN3_default_mode_no_channel_split",
+        ),
+        pytest.param(
+            (100, 200, 3),
+            {"visible_axes": (0, 1)},
+            None,
+            (0, 1),
+            id="MN3_explicit_visible_axes_respected",
+        ),
+    ],
+)
+def test_channel_axis_visible_axis_collision(
+    shape: tuple[int, ...],
+    model_kwargs: dict,
+    expect_channel_axis: int | None,
+    expect_visible_axes: tuple[int, ...],
+) -> None:
+    """Channel/visible axis collision: RGBA shifts visible, others discard guess."""
+    wrapper = DataWrapper.create(np.ones(shape, dtype=np.uint8))
+    model = ArrayDisplayModel(**model_kwargs)
+    resolved = resolve(model, wrapper)
+    assert resolved.channel_axis == expect_channel_axis
+    assert resolved.visible_axes == expect_visible_axes
+
+
 def test_resolved_index_clamps_negative_to_valid_range() -> None:
     """Negative index values should be clamped to [0, max_val]."""
     data = np.ones((5, 8, 10), dtype=np.uint8)

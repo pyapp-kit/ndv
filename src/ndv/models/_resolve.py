@@ -79,6 +79,7 @@ class ResolvedDisplayState:
     current_index: dict[int, int | slice]
     data_coords: dict[int, tuple]
     hidden_sliders: frozenset[Hashable]
+    white_balance_gains: tuple[float, float, float] | None
     summary_info: str
     visible_scales: tuple[float, ...]
 
@@ -93,6 +94,7 @@ class ResolvedDisplayState:
             and self.data_coords == other.data_coords
             and self.hidden_sliders == other.hidden_sliders
             and self.visible_scales == other.visible_scales
+            and self.white_balance_gains == other.white_balance_gains
             # summary_info excluded: metadata-only, should not trigger data fetch
         )
 
@@ -121,6 +123,7 @@ EMPTY_STATE = ResolvedDisplayState(
     current_index={},
     data_coords={},
     hidden_sliders=frozenset(),
+    white_balance_gains=None,
     summary_info="",
     visible_scales=(),
 )
@@ -162,11 +165,6 @@ def _norm_channel_axis(model: ArrayDisplayModel, wrapper: DataWrapper) -> int | 
     try:
         normed_guess = wrapper.normalize_axis_key(guess)
     except Exception:
-        return None
-
-    # don't use a visible axis as the channel axis
-    normed_vis = _norm_visible_axes(model, wrapper)
-    if normed_guess in normed_vis:
         return None
 
     return normed_guess
@@ -289,6 +287,22 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
     """
     visible_axes = _norm_visible_axes(model, wrapper)
     channel_axis = _norm_channel_axis(model, wrapper)
+
+    # If the guessed channel axis collides with a visible axis (e.g. a 3D
+    # array where the last dim is size 3 and visible_axes defaults to (-2, -1)):
+    # - In RGBA mode, shift visible axes to make room so the channel axis is
+    #   usable (otherwise explicit channel_mode="rgba" breaks on (M,N,3) data).
+    # - In other modes, discard the guess: treat the ambiguous axis as spatial
+    #   so the user gets a normal Z slider instead of unwanted channel splitting.
+    if channel_axis is not None and channel_axis in visible_axes:
+        if model.channel_mode == ChannelMode.RGBA:
+            ndim = len(wrapper.dims)
+            n_vis = len(visible_axes)
+            candidates = [i for i in range(ndim) if i != channel_axis]
+            visible_axes = tuple(candidates[-n_vis:])
+        else:
+            channel_axis = None
+
     current_index = _norm_current_index(model, wrapper)
     data_coords = _norm_data_coords(wrapper)
 
@@ -297,6 +311,11 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
     )
     visible_scales = _resolve_visible_scales(model, wrapper, visible_axes)
 
+    # white balance only applies in RGBA mode
+    wb_gains = (
+        model.white_balance_gains if model.channel_mode == ChannelMode.RGBA else None
+    )
+
     return ResolvedDisplayState(
         visible_axes=visible_axes,
         channel_axis=channel_axis,
@@ -304,6 +323,7 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
         current_index=current_index,
         data_coords=data_coords,
         hidden_sliders=hidden_sliders,
+        white_balance_gains=wb_gains,
         summary_info=wrapper.summary_info(),
         visible_scales=visible_scales,
     )
