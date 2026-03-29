@@ -28,6 +28,7 @@ class ChannelController:
     """
 
     stats_updated = Signal(ImageStats)
+    clims_resolved = Signal(tuple)
 
     @property
     def needs_histogram(self) -> bool:
@@ -114,6 +115,7 @@ class ChannelController:
         self._last_clims = clims
         for view in self.lut_views:
             view.set_clims(clims)
+        self.clims_resolved.emit(clims)
 
     def _auto_scale(self) -> None:
         if self.lut_model and self.handles:

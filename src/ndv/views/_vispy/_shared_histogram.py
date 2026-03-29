@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -10,13 +9,19 @@ from vispy import scene
 from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import SharedHistogramCanvas
+from ndv.views.bases._graphics._histogram_utils import (
+    FILL_ALPHA,
+    LUT_LINE_ALPHA,
+    MIN_GAMMA,
+    Grabbable,
+    area_to_mesh,
+    downsample_histogram,
+)
 
 from ._plot_widget import LogTicker, PlotWidget
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    import numpy.typing as npt
 
     from ndv._types import (
         ChannelKey,
@@ -25,21 +30,7 @@ if TYPE_CHECKING:
         MouseReleaseEvent,
     )
 
-MIN_GAMMA: np.float64 = np.float64(1e-6)
 _NO_KEY = object()  # sentinel for "no channel grabbed"
-# Max bins to display (downsample larger histograms for performance)
-MAX_DISPLAY_BINS = 1024
-# Alpha for area fill
-FILL_ALPHA = 0.3
-# Alpha for clim/gamma lines
-LUT_LINE_ALPHA = 0.6
-
-
-class Grabbable(Enum):
-    NONE = auto()
-    LEFT_CLIM = auto()
-    RIGHT_CLIM = auto()
-    GAMMA = auto()
 
 
 @dataclass
@@ -159,7 +150,9 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         ch.counts = counts
         ch.bin_edges = bin_edges
         # Downsample for display
-        ch._display_centers, ch._display_counts = _downsample(counts, bin_edges)
+        ch._display_centers, ch._display_counts = downsample_histogram(
+            counts, bin_edges
+        )
         self._update_channel_area(key)
         if not self._has_initial_range:
             # First data: set both x and y range
@@ -394,31 +387,8 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         ch = self._channels[key]
         r, g, b = ch.color[:3]
         a = ch.color[3] if len(ch.color) > 3 else 1.0
-
-        # Area fill: semi-transparent
-        ch.area_mesh.color = (r, g, b, FILL_ALPHA)
-        # Outline: full color
-        ch.outline.set_data(
-            ch.outline._line.pos,
-            color=(r, g, b, a),
-            marker_size=0,
-        )
-        # LUT line color
-        ch.lut_line.set_data(
-            ch.lut_line._line.pos,
-            color=(r, g, b, LUT_LINE_ALPHA),
-            marker_size=0,
-        )
-        # Gamma handle
-        ch.gamma_handle.set_data(
-            pos=ch.gamma_handle._data["a_position"][:1],
-            face_color=(r, g, b, a),
-            edge_width=0,
-        )
-        # Legend
         ch.legend_text.color = (r, g, b, a)
-
-        # Re-render the area mesh with new color
+        # Re-render area and LUT visuals with new color
         self._update_channel_area(key)
         self._update_lut_visuals(key)
 
@@ -437,7 +407,7 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         r, g, b = ch.color[:3]
 
         # Area fill mesh: triangle strip from centers to baseline
-        verts, faces = _area_to_mesh(centers, counts)
+        verts, faces = area_to_mesh(centers, counts)
         ch.area_mesh.set_data(vertices=verts, faces=faces, color=(r, g, b, FILL_ALPHA))
         ch.area_mesh._bounds_changed()
 
@@ -626,48 +596,3 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
     def _to_plot_coords(self, pos: Sequence[float]) -> tuple[float, float]:
         x, y = self.node_tform.map(pos)[:2]
         return x, y
-
-
-def _downsample(
-    counts: np.ndarray, bin_edges: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    """Downsample histogram to ~MAX_DISPLAY_BINS bins, return (centers, counts)."""
-    n = len(counts)
-    if n > MAX_DISPLAY_BINS:
-        factor = n // MAX_DISPLAY_BINS
-        trim = n - (n % factor)
-        counts = counts[:trim].reshape(-1, factor).sum(axis=1)
-        bin_edges = np.concatenate(
-            [bin_edges[:trim:factor], bin_edges[trim : trim + 1]]
-        )
-    centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    return centers, counts
-
-
-def _area_to_mesh(
-    centers: np.ndarray,
-    counts: np.ndarray,
-) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.uint32]]:
-    """Convert area plot data to mesh vertices and faces (triangle strip)."""
-    n = len(centers)
-    if n == 0:
-        return np.zeros((0, 3), np.float32), np.zeros((0, 3), np.uint32)
-
-    # 2 vertices per point: one on the curve, one on the baseline
-    vertices = np.zeros((2 * n, 3), np.float32)
-    vertices[0::2, 0] = centers  # x: curve points
-    vertices[0::2, 1] = counts  # y: curve points
-    vertices[1::2, 0] = centers  # x: baseline points
-    # vertices[1::2, 1] = 0  # y: baseline (already 0)
-
-    # Triangle strip: for each pair of consecutive points, two triangles
-    faces = np.zeros((2 * (n - 1), 3), np.uint32)
-    for i in range(n - 1):
-        top_left = 2 * i
-        bot_left = 2 * i + 1
-        top_right = 2 * (i + 1)
-        bot_right = 2 * (i + 1) + 1
-        faces[2 * i] = [top_left, bot_left, top_right]
-        faces[2 * i + 1] = [bot_left, bot_right, top_right]
-
-    return vertices, faces

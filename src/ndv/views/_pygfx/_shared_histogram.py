@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from contextlib import suppress
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -12,6 +11,14 @@ import pylinalg as la
 from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import SharedHistogramCanvas
+from ndv.views.bases._graphics._histogram_utils import (
+    FILL_ALPHA,
+    LUT_LINE_ALPHA,
+    MIN_GAMMA,
+    Grabbable,
+    area_to_mesh,
+    downsample_histogram,
+)
 
 from ._histogram import _Controller, _OrthographicCamera
 from ._util import rendercanvas_class
@@ -23,18 +30,6 @@ if TYPE_CHECKING:
         MousePressEvent,
         MouseReleaseEvent,
     )
-
-MIN_GAMMA: np.float64 = np.float64(1e-6)
-MAX_DISPLAY_BINS = 256
-FILL_ALPHA = 0.3
-LUT_LINE_ALPHA = 0.6
-
-
-class Grabbable(Enum):
-    NONE = auto()
-    LEFT_CLIM = auto()
-    RIGHT_CLIM = auto()
-    GAMMA = auto()
 
 
 @dataclass
@@ -67,6 +62,7 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
         self._log_base: float | None = None
         self._grabbed: Grabbable = Grabbable.NONE
         self._grabbed_key: object | None = None
+        self._clim_bounds: tuple[float | None, float | None] = (None, None)
 
         # Canvas and renderer
         cls = rendercanvas_class()
@@ -233,7 +229,9 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
         ch = self._ensure_channel(key)
         ch.counts = counts
         ch.bin_edges = bin_edges
-        ch._display_centers, ch._display_counts = _downsample(counts, bin_edges)
+        ch._display_centers, ch._display_counts = downsample_histogram(
+            counts, bin_edges
+        )
         self._update_channel_area(key)
         self._auto_range()
 
@@ -295,6 +293,10 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
             return
         ch.name = name
         self._update_legend()
+
+    def set_clim_bounds(self, bounds: tuple[float | None, float | None]) -> None:
+        self._clim_bounds = bounds
+        self._camera.xbounds = bounds
 
     def set_log_base(self, base: float | None) -> None:
         if base == self._log_base:
@@ -486,7 +488,7 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
             counts = np.log(counts + 1) / np.log(self._log_base)
 
         # Area mesh
-        verts, faces = _area_to_mesh(centers, counts)
+        verts, faces = area_to_mesh(centers, counts)
         if (
             verts.shape == ch.area_mesh.geometry.positions.data.shape
             and faces.shape == ch.area_mesh.geometry.indices.data.shape
@@ -702,45 +704,3 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
                 best_grab = Grabbable.GAMMA
 
         return best_key, best_grab
-
-
-def _downsample(
-    counts: np.ndarray, bin_edges: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    """Downsample histogram to ~MAX_DISPLAY_BINS bins."""
-    n = len(counts)
-    if n > MAX_DISPLAY_BINS:
-        factor = n // MAX_DISPLAY_BINS
-        trim = n - (n % factor)
-        counts = counts[:trim].reshape(-1, factor).sum(axis=1)
-        bin_edges = np.concatenate(
-            [bin_edges[:trim:factor], bin_edges[trim : trim + 1]]
-        )
-    centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    return centers, counts
-
-
-def _area_to_mesh(
-    centers: np.ndarray,
-    counts: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Convert area plot data to mesh vertices and faces."""
-    n = len(centers)
-    if n == 0:
-        return np.zeros((0, 3), np.float32), np.zeros((0, 3), np.uint32)
-
-    vertices = np.zeros((2 * n, 3), np.float32)
-    vertices[0::2, 0] = centers
-    vertices[0::2, 1] = counts
-    vertices[1::2, 0] = centers
-
-    faces = np.zeros((2 * (n - 1), 3), np.uint32)
-    for i in range(n - 1):
-        top_left = 2 * i
-        bot_left = 2 * i + 1
-        top_right = 2 * (i + 1)
-        bot_right = 2 * (i + 1) + 1
-        faces[2 * i] = [top_left, bot_left, top_right]
-        faces[2 * i + 1] = [bot_left, bot_right, top_right]
-
-    return vertices, faces
