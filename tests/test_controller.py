@@ -539,6 +539,26 @@ def test_rgba_3d_fallback_warns() -> None:
 
 @no_type_check
 @_patch_views
+def test_rgba_invalid_channel_count_falls_back_to_composite() -> None:
+    """Invalid RGBA channel widths should warn and fall back to COMPOSITE."""
+    ctrl = ArrayViewer(
+        np.zeros((5, 2, 16, 16), dtype=np.uint8),
+        display_model=ArrayDisplayModel(
+            channel_axis=1,
+            channel_mode=ChannelMode.COMPOSITE,
+            visible_axes=(2, 3),
+        ),
+    )
+
+    with pytest.warns(UserWarning, match="effective channel count is 2"):
+        ctrl.display_model.channel_mode = ChannelMode.RGBA
+
+    assert ctrl.display_model.channel_mode == ChannelMode.COMPOSITE
+    ctrl._view.set_channel_mode_enabled.assert_any_call(ChannelMode.RGBA, False)
+
+
+@no_type_check
+@_patch_views
 def test_set_scales_called_on_apply() -> None:
     """set_scales is called on the canvas when scales change."""
     ctrl = ArrayViewer(np.empty((3, 100, 200)))

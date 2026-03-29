@@ -79,6 +79,7 @@ class ResolvedDisplayState:
     current_index: dict[int, int | slice]
     data_coords: dict[int, tuple]
     hidden_sliders: frozenset[Hashable]
+    rgba_channel_count: int
     summary_info: str
     visible_scales: tuple[float, ...]
 
@@ -121,6 +122,7 @@ EMPTY_STATE = ResolvedDisplayState(
     current_index={},
     data_coords={},
     hidden_sliders=frozenset(),
+    rgba_channel_count=0,
     summary_info="",
     visible_scales=(),
 )
@@ -295,6 +297,12 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
     hidden_sliders = _compute_hidden_sliders(
         visible_axes, channel_axis, model.channel_mode, data_coords, wrapper
     )
+    rgba_count = _resolved_rgba_channel_count(
+        visible_axes,
+        channel_axis,
+        current_index,
+        data_coords,
+    )
     visible_scales = _resolve_visible_scales(model, wrapper, visible_axes)
 
     return ResolvedDisplayState(
@@ -304,6 +312,7 @@ def resolve(model: ArrayDisplayModel, wrapper: DataWrapper) -> ResolvedDisplaySt
         current_index=current_index,
         data_coords=data_coords,
         hidden_sliders=hidden_sliders,
+        rgba_channel_count=rgba_count,
         summary_info=wrapper.summary_info(),
         visible_scales=visible_scales,
     )
@@ -345,6 +354,43 @@ def build_slice_requests(
     ]
 
 
+def _index_len(index: int | slice, axis_len: int) -> int:
+    # Keep int support for helper reuse, even though current callers normalize
+    # ints to single-element slices first.
+    if isinstance(index, int):
+        return 1
+    start, stop, step = index.indices(axis_len)
+    return len(range(start, stop, step))
+
+
+def _resolved_rgba_channel_count(
+    visible_axes: tuple[int, ...],
+    channel_axis: int | None,
+    current_index: dict[int, int | slice],
+    data_coords: dict[int, tuple],
+) -> int:
+    """Return effective trailing channel count if rendered in RGBA mode."""
+    requested_slice: dict[int, int | slice] = dict(current_index)
+
+    for ax in visible_axes:
+        if not isinstance(requested_slice.get(ax), slice):
+            requested_slice[ax] = slice(None)
+
+    c_ax = channel_axis
+    if c_ax is not None and not isinstance(requested_slice.get(c_ax), slice):
+        requested_slice[c_ax] = slice(None)
+
+    for ax, val in requested_slice.items():
+        if isinstance(val, int):
+            requested_slice[ax] = slice(val, val + 1)
+
+    return math.prod(
+        _index_len(requested_slice[ax], len(data_coords[ax]))
+        for ax in sorted(data_coords)
+        if ax not in visible_axes
+    )
+
+
 def process_request(req: DataRequest) -> DataResponse:
     """Slice, transpose, and split data into display-ready arrays.
 
@@ -367,6 +413,11 @@ def process_request(req: DataRequest) -> DataResponse:
         transposed = data.transpose(*t_dims)
         # Merge all non-visible dims into a single channel dim
         ch_size = math.prod(transposed.shape[len(vis_ax) :])
+        if ch_size not in {3, 4}:
+            raise ValueError(
+                "RGBA mode requires exactly 3 or 4 channels after slicing; "
+                f"got {ch_size}."
+            )
         data_response["RGB"] = transposed.reshape((*vis_shape, ch_size))
     elif ch_ax is None:
         data_response[None] = data.transpose(*t_dims).reshape(vis_shape)

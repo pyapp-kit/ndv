@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 ToggleBtnEvent = cast("int", wx.EVT_TOGGLEBUTTON.typeId)  # type: ignore[attr-defined]
 SliderEvent = cast("int", wx.EVT_SLIDER.typeId)  # type: ignore[attr-defined]
 CheckboxEvent = cast("int", wx.EVT_CHECKBOX.typeId)  # type: ignore[attr-defined]
+ComboBoxEvent = cast("int", wx.EVT_COMBOBOX.typeId)  # type: ignore[attr-defined]
 
 
 class _WxSpinner(wx.Panel):
@@ -713,6 +714,11 @@ class WxArrayView(ArrayView):
         # Mapping of channel key to LUTViews
         self._luts: dict[ChannelKey, WxLUTView] = {}
         self._visible_axes: Sequence[AxisKey] = []
+        self._mode_enabled: dict[ChannelMode, bool] = {
+            ChannelMode.GRAYSCALE: True,
+            ChannelMode.COMPOSITE: True,
+            ChannelMode.RGBA: True,
+        }
 
         wdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
         wdg.channel_mode_combo.Bind(wx.EVT_COMBOBOX, self._on_channel_mode_changed)
@@ -836,6 +842,25 @@ class WxArrayView(ArrayView):
             self._wxwidget.lut_selector.Show()
         else:
             self._wxwidget.lut_selector.Hide()
+
+    def set_channel_mode_enabled(self, mode: ChannelMode, enabled: bool) -> None:
+        if self._mode_enabled.get(mode) == enabled:
+            return
+        self._mode_enabled[mode] = enabled
+
+        combo = self._wxwidget.channel_mode_combo
+        current = combo.GetValue()
+        # Keep this list aligned with what this frontend exposes in the combo.
+        # `ChannelMode.COLOR` is intentionally not offered here.
+        ordered_modes = [ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE, ChannelMode.RGBA]
+        items = [m.value for m in ordered_modes if self._mode_enabled.get(m, True)]
+
+        if not items:
+            return
+
+        with wx.EventBlocker(combo, ComboBoxEvent):
+            combo.SetItems(items)
+            combo.SetValue(current if current in items else items[0])
 
     def set_visible(self, visible: bool) -> None:
         if visible:

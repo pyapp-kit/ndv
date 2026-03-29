@@ -368,8 +368,12 @@ class ArrayViewer:
         if self._data_wrapper is None:
             return
         old = self._resolved
-        self._resolved = resolve(self._display_model, self._data_wrapper)
-        self._apply_changes(old, self._resolved)
+        resolved = resolve(self._display_model, self._data_wrapper)
+        if not self._prepare_channel_mode(resolved):
+            return
+
+        self._resolved = resolved
+        self._apply_changes(old, resolved)
 
     def _apply_changes(
         self, old: ResolvedDisplayState, new: ResolvedDisplayState
@@ -438,6 +442,39 @@ class ArrayViewer:
                     view.set_visible(mode == ChannelMode.RGBA)
                 else:
                     view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
+
+    def _is_rgba_compatible(self, resolved: ResolvedDisplayState) -> bool:
+        # By design, RGBA channel display is only exposed for 2D image views.
+        # 3D views use volume rendering and do not support this RGBA path.
+        if len(resolved.visible_axes) != 2:
+            return False
+        return resolved.rgba_channel_count in {3, 4}
+
+    @staticmethod
+    def _rgba_fallback_mode(resolved: ResolvedDisplayState) -> ChannelMode:
+        if resolved.channel_axis is not None:
+            return ChannelMode.COMPOSITE
+        return ChannelMode.GRAYSCALE
+
+    def _prepare_channel_mode(self, resolved: ResolvedDisplayState) -> bool:
+        """Update mode availability and coerce invalid mode selections.
+
+        Returns True when this resolve pass can continue to `_apply_changes`.
+        Returns False when mode coercion triggered a new model event.
+        """
+        rgba_compatible = self._is_rgba_compatible(resolved)
+        self._view.set_channel_mode_enabled(ChannelMode.RGBA, rgba_compatible)
+        if self._display_model.channel_mode != ChannelMode.RGBA or rgba_compatible:
+            return True
+
+        self._display_model.channel_mode = fb = self._rgba_fallback_mode(resolved)
+        warnings.warn(
+            "Cannot use RGBA mode for this data slice "
+            f"(effective channel count is {resolved.rgba_channel_count}, "
+            f"expected 3 or 4). Falling back to {fb.value}.",
+            stacklevel=2,
+        )
+        return False
 
     # ------------------ Model callbacks ------------------
 

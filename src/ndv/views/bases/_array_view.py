@@ -55,6 +55,10 @@ class ArrayView(Viewable):
 
     @abstractmethod
     def set_channel_mode(self, mode: ChannelMode) -> None: ...
+
+    def set_channel_mode_enabled(self, mode: ChannelMode, enabled: bool) -> None:
+        """Enable/disable a specific channel mode option if supported by frontend."""
+
     @abstractmethod
     def set_data_info(self, data_info: str) -> None: ...
     @abstractmethod
