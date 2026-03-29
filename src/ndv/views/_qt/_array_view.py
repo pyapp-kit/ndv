@@ -899,8 +899,6 @@ class QtArrayView(ArrayView):
         if wdg := self._qwidget._shared_histogram_widget:
             wdg.setVisible(toggled)
         self._qwidget.shared_hist_log_btn.setVisible(toggled)
-        if not toggled:
-            self._qwidget.shared_hist_log_btn.setChecked(False)
 
     def _on_shared_hist_log_toggled(self, toggled: bool) -> None:
         if self._shared_histogram is not None:
