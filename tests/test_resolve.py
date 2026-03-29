@@ -4,8 +4,12 @@ import numpy as np
 import pytest
 
 from ndv.models import DataWrapper
-from ndv.models._array_display_model import ArrayDisplayModel
-from ndv.models._resolve import build_slice_requests, process_request, resolve
+from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
+from ndv.models._resolve import (
+    build_slice_requests,
+    process_request,
+    resolve,
+)
 
 
 @pytest.mark.parametrize(
@@ -76,3 +80,32 @@ def test_resolved_index_clamps_negative_to_valid_range() -> None:
     resolved = resolve(model, wrapper)
     assert isinstance(resolved.current_index[0], int)
     assert resolved.current_index[0] >= 0
+
+
+def test_rgba_channel_count_reports_effective_channels() -> None:
+    """RGBA channel count should match trailing flattened channel width."""
+    wrapper = DataWrapper.create(np.zeros((5, 2, 32, 32), dtype=np.uint8))
+    model = ArrayDisplayModel(
+        visible_axes=(2, 3),
+        channel_axis=1,
+        channel_mode=ChannelMode.COMPOSITE,
+    )
+
+    resolved = resolve(model, wrapper)
+    assert resolved.rgba_channel_count == 2
+
+
+def test_process_request_raises_for_invalid_rgba_channel_count() -> None:
+    """RGBA requests must reject effective channel counts other than 3 or 4."""
+    wrapper = DataWrapper.create(np.zeros((5, 2, 32, 32), dtype=np.uint8))
+    model = ArrayDisplayModel(
+        visible_axes=(2, 3),
+        channel_axis=1,
+        channel_mode=ChannelMode.RGBA,
+    )
+
+    resolved = resolve(model, wrapper)
+    req = build_slice_requests(resolved, wrapper)[0]
+
+    with pytest.raises(ValueError, match="requires exactly 3 or 4 channels"):
+        process_request(req)

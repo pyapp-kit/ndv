@@ -883,6 +883,15 @@ class QtArrayView(ArrayView):
         """Set the channel mode button text."""
         self._qwidget.channel_mode_combo.setCurrentText(mode.value)
 
+    def set_channel_mode_enabled(self, mode: ChannelMode, enabled: bool) -> None:
+        combo = self._qwidget.channel_mode_combo
+        idx = combo.findText(mode.value)
+        if idx < 0:
+            return
+        item = cast("Any", combo.model()).item(idx)
+        if item is not None:
+            item.setEnabled(enabled)
+
     def set_visible(self, visible: bool) -> None:
         self._qwidget.setVisible(visible)
 
