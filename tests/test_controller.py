@@ -838,6 +838,56 @@ def test_keybinding_zoom() -> None:
 
 
 @no_type_check
+@_patch_views
+def test_stats_signals() -> None:
+    """Test that stats_updated signals fire on data updates and refresh_stats."""
+    from ndv.controllers._image_stats import ImageStats
+
+    ctrl = ArrayViewer()
+    ctrl._async = False
+    ctrl.data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+
+    # -- ArrayViewer.stats_updated emits on data changes when connected --
+    viewer_mock = Mock()
+    ctrl.stats_updated.connect(viewer_mock)
+
+    ctrl.data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    viewer_mock.assert_called_once()
+    key, stats = viewer_mock.call_args[0]
+    assert key is None  # grayscale default channel
+    assert isinstance(stats, ImageStats)
+    assert stats.counts is not None
+    assert stats.bin_edges is not None
+
+    # -- ChannelController.stats_updated emits on update_texture_data --
+    ch_ctrl = ctrl._lut_controllers[None]
+    ch_mock = Mock()
+    ch_ctrl.stats_updated.connect(ch_mock)
+
+    new_data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    ch_ctrl.update_texture_data(new_data)
+    ch_mock.assert_called_once()
+    assert ch_mock.call_args[0][0].counts is not None
+
+    # -- refresh_stats re-emits for all channels --
+    viewer_mock.reset_mock()
+    ctrl.refresh_stats()
+    viewer_mock.assert_called_once()
+    assert viewer_mock.call_args[0][0] is None  # channel key
+
+    # -- stats_updated does NOT fire when no listeners are connected --
+    ctrl.stats_updated.disconnect()
+    ch_ctrl.stats_updated.disconnect()
+    viewer_mock.reset_mock()
+    ctrl.data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    viewer_mock.assert_not_called()
+
+    # refresh_stats is a no-op when no listeners
+    ctrl.refresh_stats()
+    viewer_mock.assert_not_called()
+
+
+@no_type_check
 @pytest.mark.usefixtures("any_app")
 def test_handle_gc_on_data_reassign() -> None:
     """Image handles should be GC'd when viewer.data is reassigned."""
