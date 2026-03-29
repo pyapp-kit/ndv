@@ -785,6 +785,17 @@ class WxArrayView(ArrayView):
             lut._add_histogram(widget)
         self._wxwidget.Layout()
 
+    def add_shared_histogram(self, widget: Any) -> None:
+        # Wx shared histogram support - add the widget above LUT controls
+        frontend = widget.frontend_widget()
+        if isinstance(frontend, wx.Window):
+            frontend.SetMinSize((-1, 120))
+            self._wxwidget.luts.Insert(0, frontend, 0, wx.EXPAND | wx.ALL, 2)
+            self._wxwidget.Layout()
+
+    def remove_shared_histogram(self) -> None:
+        pass
+
     def remove_lut_view(self, lut: LUTView) -> None:
         if lut not in self._luts.values():
             return

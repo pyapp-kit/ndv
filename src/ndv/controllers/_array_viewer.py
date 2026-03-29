@@ -8,11 +8,13 @@ from itertools import count
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
+from psygnal import Signal
 
 from ndv._keybindings import handle_key_press
 from ndv.controllers._channel_controller import ChannelController
-from ndv.controllers._image_stats import compute_image_stats
+from ndv.controllers._image_stats import ImageStats, compute_image_stats
 from ndv.models import ArrayDisplayModel, ChannelMode, DataWrapper, LUTModel
+from ndv.models._lut_model import ClimsManual
 from ndv.models._resolve import (
     EMPTY_STATE,
     DataResponse,
@@ -28,13 +30,14 @@ from ndv.views import _app
 if TYPE_CHECKING:
     from typing import Any
 
+    import cmap as cmap_mod
     import numpy.typing as npt
     from typing_extensions import Unpack
 
     from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
-    from ndv.views.bases import HistogramCanvas
+    from ndv.views.bases import HistogramCanvas, SharedHistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
 
@@ -66,6 +69,8 @@ class ArrayViewer:
         Keyword arguments to pass to the `ArrayDisplayModel` constructor. If
         `display_model` is provided, these will be ignored.
     """
+
+    stats_updated = Signal(object, ImageStats)
 
     def __init__(
         self,
@@ -121,6 +126,8 @@ class ArrayViewer:
 
         # TODO: Is this necessary?
         self._histograms: dict[ChannelKey, HistogramCanvas] = {}
+        self._shared_histogram: SharedHistogramCanvas | None = None
+        self._shared_histogram_links: dict[ChannelKey, _SharedHistogramLink] = {}
         self._view = frontend_cls(self._canvas.frontend_widget(), self._viewer_model)
 
         self._roi_view: RectangularROIHandle | None = None
@@ -131,6 +138,7 @@ class ArrayViewer:
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
+        self._view.sharedHistogramRequested.connect(self._add_shared_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.ndimToggleRequested.connect(self._on_view_ndim_toggle_requested)
 
@@ -242,6 +250,25 @@ class ArrayViewer:
         # TODO: provide deep_copy option
         return ArrayViewer(self._data_wrapper, display_model=self.display_model)
 
+    def refresh_stats(self) -> None:
+        """Force re-emit stats for all channels with existing data.
+
+        This will mostly be used by external listeners that want the initial data,
+        before any interaction has occurred.
+        """
+        if not len(self.stats_updated):
+            return
+        sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+        for key, ctrl in self._lut_controllers.items():
+            if ctrl.handles:
+                stats = compute_image_stats(
+                    ctrl.handles[0].data(),
+                    ctrl.lut_model.clims,
+                    need_histogram=True,
+                    significant_bits=sig_bits,
+                )
+                self.stats_updated.emit(key, stats)
+
     # --------------------- PRIVATE ------------------------------------------
 
     def _connect_datawrapper(
@@ -280,29 +307,74 @@ class ArrayViewer:
     def _add_histogram(self, channel: ChannelKey = None) -> None:
         histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
         hist = histogram_cls()
-        if ctrl := self._lut_controllers.get(channel, None):
-            # Add histogram to ArrayView for display
-            self._view.add_histogram(channel, hist)
-            # Add histogram to channel controller for updates
-            ctrl.add_lut_view(hist)
-            # Compute histogram from the (first) image handle.
-            # TODO: Compute histogram from all image handles
-            if handles := ctrl.handles:
-                data = handles[0].data()
-
-                sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
-                stats = compute_image_stats(
-                    data,
-                    ctrl.lut_model.clims,
-                    need_histogram=True,
-                    significant_bits=sig_bits,
-                )
-                if stats.counts is not None and stats.bin_edges is not None:
-                    hist.set_data(stats.counts, stats.bin_edges)
-            # Reset camera view (accounting for data)
-            hist.set_range()
-
         self._histograms[channel] = hist
+
+        if ctrl := self._lut_controllers.get(channel, None):
+            self._view.add_histogram(channel, hist)
+            ctrl.add_lut_view(hist)
+            self._connect_histogram(ctrl, hist)
+
+    def _connect_histogram(
+        self, ctrl: ChannelController, hist: HistogramCanvas
+    ) -> None:
+        """Connect a histogram to a channel controller's stats signal."""
+
+        def _on_stats(stats: ImageStats) -> None:
+            if stats.counts is not None and stats.bin_edges is not None:
+                hist.set_data(stats.counts, stats.bin_edges)
+
+        ctrl.stats_updated.connect(_on_stats)
+        # Trigger initial data from existing handle
+        if handles := ctrl.handles:
+            sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+            ctrl.update_texture_data(handles[0].data(), significant_bits=sig_bits)
+        hist.set_range()
+
+    def _add_shared_histogram(self) -> None:
+        """Create and connect the shared multi-channel histogram."""
+        if self._shared_histogram is not None:
+            return
+        hist_cls = _app.get_shared_histogram_canvas_class()
+        hist = hist_cls()
+        self._shared_histogram = hist
+        self._view.add_shared_histogram(hist)
+
+        # Connect clim/gamma changes from shared histogram back to models
+        hist.climsChanged.connect(self._on_shared_histogram_clims_changed)
+        hist.gammaChanged.connect(self._on_shared_histogram_gamma_changed)
+
+        # Connect all existing channels
+        for key, ctrl in self._lut_controllers.items():
+            self._connect_shared_histogram_channel(key, ctrl)
+
+        # Apply current channel mode visibility
+        self._update_lut_visibility(self._resolved.channel_mode)
+        hist.set_range()
+
+    def _connect_shared_histogram_channel(
+        self, key: ChannelKey, ctrl: ChannelController
+    ) -> None:
+        """Connect a channel controller to the shared histogram."""
+        hist = self._shared_histogram
+        if hist is None or key in self._shared_histogram_links:
+            return
+
+        self._shared_histogram_links[key] = link = _SharedHistogramLink(
+            key, ctrl, hist, fallback_name=self._fallback_channel_name(key)
+        )
+
+        sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+        link.trigger_initial_data(significant_bits=sig_bits)
+
+    def _on_shared_histogram_clims_changed(
+        self, key: ChannelKey, clims: tuple[float, float]
+    ) -> None:
+        if ctrl := self._lut_controllers.get(key):
+            ctrl.lut_model.clims = ClimsManual(min=clims[0], max=clims[1])
+
+    def _on_shared_histogram_gamma_changed(self, key: ChannelKey, gamma: float) -> None:
+        if ctrl := self._lut_controllers.get(key):
+            ctrl.lut_model.gamma = gamma
 
     def _update_channel_dtype(
         self, channel: ChannelKey, dtype: npt.DTypeLike | None = None
@@ -438,6 +510,21 @@ class ArrayViewer:
                     view.set_visible(mode == ChannelMode.RGBA)
                 else:
                     view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
+
+        # Mirror visibility on the shared histogram
+        if hist := self._shared_histogram:
+            for lut_ctrl in self._lut_controllers.values():
+                key = lut_ctrl.key
+                if key is None:
+                    hist.set_channel_visible(key, mode == ChannelMode.GRAYSCALE)
+                elif key == "RGB":
+                    hist.set_channel_visible(key, mode == ChannelMode.RGBA)
+                else:
+                    visible = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
+                    # Also respect the model's own visibility flag
+                    hist.set_channel_visible(
+                        key, visible and lut_ctrl.lut_model.visible
+                    )
 
     # ------------------ Model callbacks ------------------
 
@@ -589,6 +676,12 @@ class ArrayViewer:
         for ch, hist in self._histograms.items():
             hist.highlight(channel_values.get(ch, None))
 
+        # Also forward to shared histogram
+        if self._shared_histogram is not None:
+            # Use first channel's value for the highlight position
+            first_val = next(iter(channel_values.values()), None)
+            self._shared_histogram.highlight(first_val)
+
         if not channel_values:
             # clear hover info if no values found
             self._view.set_hover_info("")
@@ -695,6 +788,9 @@ class ArrayViewer:
                 fallback = self._fallback_channel_name(key)
                 for v in lut_ctrl.lut_views:
                     v.set_fallback_name(fallback)
+                # Connect new channel to shared histogram if it exists
+                if self._shared_histogram is not None:
+                    self._connect_shared_histogram_channel(key, lut_ctrl)
 
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
@@ -707,18 +803,14 @@ class ArrayViewer:
                 self._canvas.set_scales(self._resolved.visible_scales)
 
             sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
+            has_broadcast = len(self.stats_updated) > 0
             stats = lut_ctrl.update_texture_data(
                 data,
-                need_histogram=key in self._histograms,
+                need_histogram=has_broadcast,
                 significant_bits=sig_bits,
             )
-            if (
-                stats is not None
-                and stats.counts is not None
-                and stats.bin_edges is not None
-                and (hist := self._histograms.get(key))
-            ):
-                hist.set_data(stats.counts, stats.bin_edges)
+            if has_broadcast and stats is not None:
+                self.stats_updated.emit(key, stats)
 
         self._canvas.refresh()
         # update highlight display
@@ -767,3 +859,80 @@ class ArrayViewer:
                     values[key] = cast("float", value)
 
         return (data_y, data_x), values
+
+
+class _SharedHistogramLink:
+    """Binds one ChannelController to a SharedHistogramCanvas.
+
+    All signal connections use bound methods, so psygnal can weak-ref them
+    and they can be cleanly disconnected via `disconnect()`.
+    """
+
+    def __init__(
+        self,
+        key: ChannelKey,
+        ctrl: ChannelController,
+        hist: SharedHistogramCanvas,
+        fallback_name: str = "",
+    ) -> None:
+        self._key = key
+        self._ctrl = ctrl
+        self._hist = hist
+        model = ctrl.lut_model
+
+        ctrl.stats_updated.connect(self._on_stats)
+        ctrl.clims_resolved.connect(self._on_clims_resolved)
+        model.events.cmap.connect(self._on_cmap)
+        model.events.visible.connect(self._on_visible)
+        model.events.gamma.connect(self._on_gamma)
+        model.events.name.connect(self._on_name)
+        model.events.clim_bounds.connect(self._on_clim_bounds)
+
+        # Set initial state
+        hist.set_channel_color(key, model.cmap.color_stops[-1].color.rgba)
+        hist.set_channel_visible(key, model.visible)
+        hist.set_channel_gamma(key, model.gamma)
+        hist.set_channel_name(key, model.name or fallback_name)
+        if model.clim_bounds != (None, None):
+            hist.set_clim_bounds(model.clim_bounds)
+        if ctrl._last_clims is not None:
+            hist.set_channel_clims(key, ctrl._last_clims)
+
+    def _on_stats(self, stats: ImageStats) -> None:
+        if stats.counts is not None and stats.bin_edges is not None:
+            self._hist.set_channel_data(self._key, stats.counts, stats.bin_edges)
+
+    def _on_clims_resolved(self, clims: tuple[float, float]) -> None:
+        self._hist.set_channel_clims(self._key, clims)
+
+    def _on_cmap(self, cmap: cmap_mod.Colormap) -> None:
+        self._hist.set_channel_color(self._key, cmap.color_stops[-1].color.rgba)
+
+    def _on_visible(self, visible: bool) -> None:
+        self._hist.set_channel_visible(self._key, visible)
+
+    def _on_gamma(self, gamma: float) -> None:
+        self._hist.set_channel_gamma(self._key, gamma)
+
+    def _on_name(self, name: str) -> None:
+        self._hist.set_channel_name(self._key, name)
+
+    def _on_clim_bounds(self, bounds: tuple[float | None, float | None]) -> None:
+        self._hist.set_clim_bounds(bounds)
+
+    def disconnect(self) -> None:
+        model = self._ctrl.lut_model
+        self._ctrl.stats_updated.disconnect(self._on_stats)
+        self._ctrl.clims_resolved.disconnect(self._on_clims_resolved)
+        model.events.cmap.disconnect(self._on_cmap)
+        model.events.visible.disconnect(self._on_visible)
+        model.events.gamma.disconnect(self._on_gamma)
+        model.events.name.disconnect(self._on_name)
+        model.events.clim_bounds.disconnect(self._on_clim_bounds)
+
+    def trigger_initial_data(self, significant_bits: int | None = None) -> None:
+        """Push existing handle data through the stats pipeline."""
+        if handles := self._ctrl.handles:
+            self._ctrl.update_texture_data(
+                handles[0].data(), significant_bits=significant_bits
+            )

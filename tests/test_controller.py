@@ -241,10 +241,14 @@ def test_histogram_updates_on_first_draw() -> None:
     """Histogram should update even when the first response creates the handle."""
     ctrl = ArrayViewer()
 
-    ctrl._histograms[None] = hist = MagicMock(spec=HistogramCanvas)
-    ctrl._lut_controllers[None] = ChannelController(
+    hist = MagicMock(spec=HistogramCanvas)
+    ctrl._histograms[None] = hist
+    lut_ctrl = ChannelController(
         key=None, lut_model=LUTModel(), views=[MagicMock(spec=LUTView), hist]
     )
+    ctrl._lut_controllers[None] = lut_ctrl
+    # Connect histogram to stats signal (as _add_histogram would)
+    ctrl._connect_histogram(lut_ctrl, hist)
 
     response = DataResponse(
         n_visible_axes=2,
@@ -831,6 +835,56 @@ def test_keybinding_zoom() -> None:
     ctrl._canvas.zoom.reset_mock()
     press("_", KeyMod.SHIFT)
     ctrl._canvas.zoom.assert_called_once_with(factor=1.5, center=(5.0, 5.0))
+
+
+@no_type_check
+@_patch_views
+def test_stats_signals() -> None:
+    """Test that stats_updated signals fire on data updates and refresh_stats."""
+    from ndv.controllers._image_stats import ImageStats
+
+    ctrl = ArrayViewer()
+    ctrl._async = False
+    ctrl.data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+
+    # -- ArrayViewer.stats_updated emits on data changes when connected --
+    viewer_mock = Mock()
+    ctrl.stats_updated.connect(viewer_mock)
+
+    ctrl.data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    viewer_mock.assert_called_once()
+    key, stats = viewer_mock.call_args[0]
+    assert key is None  # grayscale default channel
+    assert isinstance(stats, ImageStats)
+    assert stats.counts is not None
+    assert stats.bin_edges is not None
+
+    # -- ChannelController.stats_updated emits on update_texture_data --
+    ch_ctrl = ctrl._lut_controllers[None]
+    ch_mock = Mock()
+    ch_ctrl.stats_updated.connect(ch_mock)
+
+    new_data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    ch_ctrl.update_texture_data(new_data)
+    ch_mock.assert_called_once()
+    assert ch_mock.call_args[0][0].counts is not None
+
+    # -- refresh_stats re-emits for all channels --
+    viewer_mock.reset_mock()
+    ctrl.refresh_stats()
+    viewer_mock.assert_called_once()
+    assert viewer_mock.call_args[0][0] is None  # channel key
+
+    # -- stats_updated does NOT fire when no listeners are connected --
+    ctrl.stats_updated.disconnect()
+    ch_ctrl.stats_updated.disconnect()
+    viewer_mock.reset_mock()
+    ctrl.data = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    viewer_mock.assert_not_called()
+
+    # refresh_stats is a no-op when no listeners
+    ctrl.refresh_stats()
+    viewer_mock.assert_not_called()
 
 
 @no_type_check

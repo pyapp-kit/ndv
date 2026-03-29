@@ -39,6 +39,9 @@ def test_array_options(viewer: QtArrayView) -> None:
     viewer._viewer_model.show_3d_button = False
     assert not qwdg.ndims_btn.isVisible()
 
+    # Per-channel histogram buttons are hidden when use_shared_histogram=True
+    assert not qlut.histogram_btn.isVisible()
+    viewer._viewer_model.use_shared_histogram = False
     assert qlut.histogram_btn.isVisible()
     viewer._viewer_model.show_histogram_button = False
     assert not qlut.histogram_btn.isVisible()

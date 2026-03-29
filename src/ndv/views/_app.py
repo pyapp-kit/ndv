@@ -15,7 +15,12 @@ if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
     from typing_extensions import ParamSpec, TypeVar
 
-    from ndv.views.bases import ArrayCanvas, ArrayView, HistogramCanvas
+    from ndv.views.bases import (
+        ArrayCanvas,
+        ArrayView,
+        HistogramCanvas,
+        SharedHistogramCanvas,
+    )
     from ndv.views.bases._app import NDVApp
     from ndv.views.bases._graphics._mouseable import Mouseable
 
@@ -74,6 +79,8 @@ class CanvasProvider(Protocol):
     def array_canvas_class() -> type[ArrayCanvas]: ...
     @staticmethod
     def histogram_canvas_class() -> type[HistogramCanvas]: ...
+    @staticmethod
+    def shared_histogram_canvas_class() -> type[SharedHistogramCanvas]: ...
 
 
 class VispyProvider(CanvasProvider):
@@ -112,6 +119,12 @@ class VispyProvider(CanvasProvider):
 
         return VispyHistogramCanvas
 
+    @staticmethod
+    def shared_histogram_canvas_class() -> type[SharedHistogramCanvas]:
+        from ndv.views._vispy._shared_histogram import VispySharedHistogramCanvas
+
+        return VispySharedHistogramCanvas
+
 
 class PygfxProvider(CanvasProvider):
     @staticmethod
@@ -133,6 +146,12 @@ class PygfxProvider(CanvasProvider):
         from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
 
         return PyGFXHistogramCanvas
+
+    @staticmethod
+    def shared_histogram_canvas_class() -> type[SharedHistogramCanvas]:
+        from ndv.views._pygfx._shared_histogram import PyGFXSharedHistogramCanvas
+
+        return PyGFXSharedHistogramCanvas
 
 
 # -------------------- Provider selection --------------------
@@ -302,6 +321,16 @@ def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanv
     if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
         raise NotImplementedError(f"No canvas backend found for {_backend}")
     return CANVAS_PROVIDERS[_backend].histogram_canvas_class()
+
+
+def get_shared_histogram_canvas_class(
+    backend: str | None = None,
+) -> type[SharedHistogramCanvas]:
+    """Return SharedHistogramCanvas class for current canvas backend."""
+    _backend = canvas_backend(backend)
+    if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
+        raise NotImplementedError(f"No canvas backend found for {_backend}")
+    return CANVAS_PROVIDERS[_backend].shared_histogram_canvas_class()
 
 
 def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:

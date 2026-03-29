@@ -8,7 +8,7 @@ except PackageNotFoundError:
     __version__ = "uninstalled"
 
 from . import data
-from .controllers import ArrayViewer
+from .controllers import ArrayViewer, ImageStats
 from .models import DataWrapper
 from .util import imshow
 from .views import (
@@ -22,6 +22,7 @@ from .views import (
 __all__ = [
     "ArrayViewer",
     "DataWrapper",
+    "ImageStats",
     "call_later",
     "data",
     "imshow",

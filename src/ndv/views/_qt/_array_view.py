@@ -727,6 +727,27 @@ class _QArrayViewer(QWidget):
         # button to change number of displayed dimensions
         self.ndims_btn = _DimToggleButton(self)
 
+        # button to toggle shared histogram
+        shared_hist_icon = QIconifyIcon("foundation:graph-bar")
+        self.shared_histogram_btn = QPushButton(shared_hist_icon, "", self)
+        self.shared_histogram_btn.setCheckable(True)
+        self.shared_histogram_btn.setToolTip("Toggle shared histogram")
+        self.shared_histogram_btn.setVisible(False)
+
+        # button to toggle log scale on shared histogram
+        log_icon = QIconifyIcon("mdi:math-log")
+        self.shared_hist_log_btn = QPushButton(log_icon, "", self)
+        self.shared_hist_log_btn.setCheckable(True)
+        self.shared_hist_log_btn.setToolTip("Log scale (base 10)")
+        self.shared_hist_log_btn.setVisible(False)
+
+        # Container for the shared histogram widget
+        self._shared_histogram_widget: QWidget | None = None
+
+        # Insert histogram + log buttons right after the LUTs toggle (index 1),
+        # before the stretch
+        self._btn_layout.insertWidget(1, self.shared_histogram_btn)
+        self._btn_layout.insertWidget(2, self.shared_hist_log_btn)
         self._btn_layout.addWidget(self.channel_mode_combo)
         self._btn_layout.addWidget(self.ndims_btn)
         self._btn_layout.addWidget(self.add_roi_btn)
@@ -796,6 +817,7 @@ class QtArrayView(ArrayView):
         self._qwidget = qwdg = _QArrayViewer(canvas_widget)
         # Mapping of channel key to LUTViews
         self._luts: dict[ChannelKey, QLUTView] = {}
+        self._shared_histogram: Any = None
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
@@ -808,6 +830,16 @@ class QtArrayView(ArrayView):
         )
         qwdg.set_range_btn.clicked.connect(self.resetZoomClicked.emit)
         qwdg.ndims_btn.toggled.connect(self._on_ndims_toggled)
+        qwdg.shared_histogram_btn.toggled.connect(self._on_shared_histogram_toggled)
+        qwdg.shared_hist_log_btn.toggled.connect(self._on_shared_hist_log_toggled)
+
+        # Show the shared histogram button if shared mode is enabled
+        # (but don't check it — histogram starts hidden)
+        if viewer_model.use_shared_histogram:
+            qwdg.shared_histogram_btn.setVisible(True)
+            # Hide per-channel histogram buttons
+            for lut in self._luts.values():
+                lut._qwidget.histogram_btn.setVisible(False)
 
         self._visible_axes: Sequence[AxisKey] = []
 
@@ -822,6 +854,9 @@ class QtArrayView(ArrayView):
         view.histogramRequested.connect(self.histogramRequested)
         self._qwidget.luts.addWidget(view.frontend_widget())
         self._qwidget._align_lut_names()
+        # Hide per-channel histogram button when shared mode is active
+        if self._viewer_model.use_shared_histogram:
+            view._qwidget.histogram_btn.setVisible(False)
         return view
 
     def remove_lut_view(self, view: LUTView) -> None:
@@ -839,6 +874,35 @@ class QtArrayView(ArrayView):
     def remove_histogram(self, widget: QWidget) -> None:
         widget.setParent(None)
         widget.deleteLater()
+
+    def add_shared_histogram(self, widget: Any) -> None:
+        self._shared_histogram = widget
+        qwidget = cast("QWidget", widget.frontend_widget())
+        qwidget.setFixedHeight(120)
+        qwidget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._qwidget._shared_histogram_widget = qwidget
+        # Add after the LUTs content widget but before the btn_row,
+        # so it always stays at the bottom regardless of LUT visibility
+        luts_layout = cast("QVBoxLayout", self._qwidget.luts.layout())
+        # _content is at index 0, insert histogram right after it
+        luts_layout.insertWidget(1, qwidget)
+
+    def remove_shared_histogram(self) -> None:
+        if (wdg := self._qwidget._shared_histogram_widget) is not None:
+            wdg.setParent(None)
+            self._qwidget._shared_histogram_widget = None
+
+    def _on_shared_histogram_toggled(self, toggled: bool) -> None:
+        if toggled:
+            self.sharedHistogramRequested.emit()
+        # Show/hide the shared histogram widget and log button
+        if wdg := self._qwidget._shared_histogram_widget:
+            wdg.setVisible(toggled)
+        self._qwidget.shared_hist_log_btn.setVisible(toggled)
+
+    def _on_shared_hist_log_toggled(self, toggled: bool) -> None:
+        if self._shared_histogram is not None:
+            self._shared_histogram.set_log_base(10 if toggled else None)
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
         """Update sliders with the given coordinate ranges."""
@@ -910,6 +974,22 @@ class QtArrayView(ArrayView):
         elif sig_name == "show_histogram_button":
             for lut in self._luts.values():
                 lut._qwidget.histogram_btn.setVisible(value)
+        elif sig_name == "use_shared_histogram":
+            self._qwidget.shared_histogram_btn.setVisible(value)
+            if value:
+                # Hide per-channel histogram buttons
+                for lut in self._luts.values():
+                    lut._qwidget.histogram_btn.setVisible(False)
+                # Auto-toggle the shared histogram button on
+                if not self._qwidget.shared_histogram_btn.isChecked():
+                    self._qwidget.shared_histogram_btn.setChecked(True)
+                self._qwidget.shared_hist_log_btn.setVisible(True)
+            else:
+                # Restore per-channel histogram buttons
+                show_hist = self._viewer_model.show_histogram_button
+                for lut in self._luts.values():
+                    lut._qwidget.histogram_btn.setVisible(show_hist)
+                self._qwidget.shared_hist_log_btn.setVisible(False)
         elif sig_name == "show_roi_button":
             self._qwidget.add_roi_btn.setVisible(value)
         elif sig_name == "show_channel_mode_selector":

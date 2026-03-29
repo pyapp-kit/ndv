@@ -603,6 +603,14 @@ class JupyterArrayView(ArrayView):
     def remove_histogram(self, widget: Any) -> None:
         """Remove a histogram widget from the viewer."""
 
+    def add_shared_histogram(self, widget: Any) -> None:
+        """Add a shared histogram to the Jupyter viewer."""
+        pass
+
+    def remove_shared_histogram(self) -> None:
+        """Remove shared histogram from the Jupyter viewer."""
+        pass
+
     def frontend_widget(self) -> Any:
         return self.layout
 
