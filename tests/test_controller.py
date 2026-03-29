@@ -260,7 +260,7 @@ def test_histogram_updates_on_first_draw() -> None:
 
     ctrl._on_data_response_ready(future)
 
-    hist.set_data.assert_called()
+    hist.set_data.assert_called_once()
 
 
 @pytest.mark.usefixtures("any_app")
