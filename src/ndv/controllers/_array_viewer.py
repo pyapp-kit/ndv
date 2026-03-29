@@ -444,6 +444,8 @@ class ArrayViewer:
                     view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
 
     def _is_rgba_compatible(self, resolved: ResolvedDisplayState) -> bool:
+        # By design, RGBA channel display is only exposed for 2D image views.
+        # 3D views use volume rendering and do not support this RGBA path.
         if len(resolved.visible_axes) != 2:
             return False
         return resolved.rgba_channel_count in {3, 4}

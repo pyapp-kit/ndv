@@ -888,6 +888,8 @@ class QtArrayView(ArrayView):
         idx = combo.findText(mode.value)
         if idx < 0:
             return
+        # QComboBox uses a QStandardItemModel internally, and we need the item
+        # to toggle enabled state for a single option.
         item = cast("Any", combo.model()).item(idx)
         if item is not None:
             item.setEnabled(enabled)

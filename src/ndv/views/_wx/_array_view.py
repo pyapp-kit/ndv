@@ -850,11 +850,9 @@ class WxArrayView(ArrayView):
 
         combo = self._wxwidget.channel_mode_combo
         current = combo.GetValue()
-        ordered_modes = [
-            ChannelMode.GRAYSCALE,
-            ChannelMode.COMPOSITE,
-            ChannelMode.RGBA,
-        ]
+        # Keep this list aligned with what this frontend exposes in the combo.
+        # `ChannelMode.COLOR` is intentionally not offered here.
+        ordered_modes = [ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE, ChannelMode.RGBA]
         items = [m.value for m in ordered_modes if self._mode_enabled.get(m, True)]
 
         if not items:

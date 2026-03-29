@@ -355,6 +355,8 @@ def build_slice_requests(
 
 
 def _index_len(index: int | slice, axis_len: int) -> int:
+    # Keep int support for helper reuse, even though current callers normalize
+    # ints to single-element slices first.
     if isinstance(index, int):
         return 1
     start, stop, step = index.indices(axis_len)
@@ -382,17 +384,10 @@ def _resolved_rgba_channel_count(
         if isinstance(val, int):
             requested_slice[ax] = slice(val, val + 1)
 
-    n_axes = len(data_coords)
-    shape_after_slice = [
-        _index_len(
-            requested_slice[ax],
-            len(data_coords[ax]),
-        )
-        for ax in range(n_axes)
-    ]
-
     return math.prod(
-        size for ax, size in enumerate(shape_after_slice) if ax not in visible_axes
+        _index_len(requested_slice[ax], len(data_coords[ax]))
+        for ax in sorted(data_coords)
+        if ax not in visible_axes
     )
 
 
