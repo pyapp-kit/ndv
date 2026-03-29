@@ -438,6 +438,15 @@ class ROIButton(QPushButton):
         self.setIcon(QIconifyIcon("mdi:vector-rectangle"))
 
 
+class WhiteBalanceButton(QPushButton):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setToolTip("Pick white balance point (right-click to reset)")
+        self.setIcon(QIconifyIcon("mdi:eyedropper"))
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+
 class DimRow(QObject):
     def __init__(
         self, axis: AxisKey, _coords: Sequence, parent: QObject | None
@@ -713,6 +722,7 @@ class _QArrayViewer(QWidget):
         self._roi_handle: RectangularROIHandle | None = None
         self._selection: CanvasElement | None = None
         self.add_roi_btn = ROIButton()
+        self.wb_btn = WhiteBalanceButton()
 
         self.luts = _UpCollapsible(
             "LUTs",
@@ -730,6 +740,7 @@ class _QArrayViewer(QWidget):
         self._btn_layout.addWidget(self.channel_mode_combo)
         self._btn_layout.addWidget(self.ndims_btn)
         self._btn_layout.addWidget(self.add_roi_btn)
+        self._btn_layout.addWidget(self.wb_btn)
         self._btn_layout.addWidget(self.set_range_btn)
 
         self._btns = QWidget()
@@ -797,9 +808,12 @@ class QtArrayView(ArrayView):
         # Mapping of channel key to LUTViews
         self._luts: dict[ChannelKey, QLUTView] = {}
         qwdg.add_roi_btn.toggled.connect(self._on_add_roi_clicked)
+        qwdg.wb_btn.toggled.connect(self._on_wb_clicked)
+        qwdg.wb_btn.customContextMenuRequested.connect(self._on_wb_context_menu)
 
         self._viewer_model.events.connect(self._on_viewer_model_event)
         qwdg.add_roi_btn.setVisible(viewer_model.show_roi_button)
+        qwdg.wb_btn.setVisible(viewer_model.show_white_balance_button)
 
         # TODO: use emit_fast
         qwdg.dims_sliders.currentIndexChanged.connect(self.currentIndexChanged.emit)
@@ -897,21 +911,38 @@ class QtArrayView(ArrayView):
             InteractionMode.CREATE_ROI if checked else InteractionMode.PAN_ZOOM
         )
 
+    def _on_wb_clicked(self, checked: bool) -> None:
+        self._viewer_model.interaction_mode = (
+            InteractionMode.PICK_COLOR if checked else InteractionMode.PAN_ZOOM
+        )
+
+    def _on_wb_context_menu(self) -> None:
+        from qtpy.QtWidgets import QMenu
+
+        menu = QMenu(self._qwidget.wb_btn)
+        menu.addAction("Reset White Balance", self.resetWhiteBalance.emit)
+        menu.exec(
+            self._qwidget.wb_btn.mapToGlobal(self._qwidget.wb_btn.rect().center())
+        )
+
     def _on_viewer_model_event(self, info: EmissionInfo) -> None:
         sig_name = info.signal.name
         value = info.args[0]
         if sig_name == "show_progress_spinner":
             self._qwidget._progress_spinner.setVisible(value)
         if sig_name == "interaction_mode":
-            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
             _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._qwidget.add_roi_btn.setChecked(False)
+            if old == InteractionMode.PICK_COLOR:
+                self._qwidget.wb_btn.setChecked(False)
         elif sig_name == "show_histogram_button":
             for lut in self._luts.values():
                 lut._qwidget.histogram_btn.setVisible(value)
         elif sig_name == "show_roi_button":
             self._qwidget.add_roi_btn.setVisible(value)
+        elif sig_name == "show_white_balance_button":
+            self._qwidget.wb_btn.setVisible(value)
         elif sig_name == "show_channel_mode_selector":
             self._qwidget.channel_mode_combo.setVisible(value)
         elif sig_name == "show_reset_zoom_button":

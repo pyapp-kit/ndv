@@ -448,6 +448,17 @@ class JupyterArrayView(ArrayView):
         if not viewer_model.show_roi_button:
             self._add_roi_btn.layout.display = "none"
 
+        # White balance eyedropper button
+        self._wb_btn = widgets.ToggleButton(
+            value=False,
+            description="WB",
+            tooltip="Pick white balance point",
+            icon="eyedropper",
+        )
+        self._wb_btn.observe(self._on_wb_button_toggle, names="value")
+        if not viewer_model.show_white_balance_button:
+            self._wb_btn.layout.display = "none"
+
         # LAYOUT
 
         top_row = widgets.HBox(
@@ -470,6 +481,7 @@ class JupyterArrayView(ArrayView):
                 self._channel_mode_combo,
                 self._ndims_btn,
                 self._add_roi_btn,
+                self._wb_btn,
                 self._reset_zoom_btn,
             ],
             layout=widgets.Layout(justify_content="flex-end"),
@@ -595,9 +607,13 @@ class JupyterArrayView(ArrayView):
             lut.add_histogram(histogram)
 
     def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
-        """Emit signal when the channel mode changes."""
         self._viewer_model.interaction_mode = (
             InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
+        )
+
+    def _on_wb_button_toggle(self, change: dict[str, Any]) -> None:
+        self._viewer_model.interaction_mode = (
+            InteractionMode.PICK_COLOR if change["new"] else InteractionMode.PAN_ZOOM
         )
 
     def remove_histogram(self, widget: Any) -> None:
@@ -638,16 +654,19 @@ class JupyterArrayView(ArrayView):
         if sig_name == "show_progress_spinner":
             self._progress_spinner.layout.display = "flex" if value else "none"
         elif sig_name == "interaction_mode":
-            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
             _new, old = info.args
             if old == InteractionMode.CREATE_ROI:
                 self._add_roi_btn.value = False
+            if old == InteractionMode.PICK_COLOR:
+                self._wb_btn.value = False
         elif sig_name == "show_histogram_button":
             # Note that "block" displays the icon better than "flex"
             for lut in self._luts.values():
                 lut._histogram_btn.layout.display = "block" if value else "none"
         elif sig_name == "show_roi_button":
             self._add_roi_btn.layout.display = "flex" if value else "none"
+        elif sig_name == "show_white_balance_button":
+            self._wb_btn.layout.display = "flex" if value else "none"
         elif sig_name == "show_channel_mode_selector":
             self._channel_mode_combo.layout.display = "flex" if value else "none"
         elif sig_name == "show_reset_zoom_button":

@@ -34,6 +34,7 @@ class InteractionMode(str, Enum):
 
     PAN_ZOOM = "pan_zoom"
     CREATE_ROI = "create_roi"
+    PICK_COLOR = "pick_color"
 
     def __str__(self) -> str:
         """Return the string representation of the enum value."""
@@ -86,6 +87,7 @@ class ArrayViewerModel(NDVModel):
     show_histogram_button: bool = True
     show_reset_zoom_button: bool = True
     show_roi_button: bool = False
+    show_white_balance_button: bool = False
     show_channel_mode_selector: bool = True
     show_play_button: bool = True
     show_data_info: bool = True

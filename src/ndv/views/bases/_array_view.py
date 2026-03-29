@@ -33,6 +33,7 @@ class ArrayView(Viewable):
     ndimToggleRequested = Signal(bool)
     channelModeChanged = Signal(ChannelMode)
     keyPressed = Signal(KeyPressEvent)
+    resetWhiteBalance = Signal()
 
     @abstractmethod
     def __init__(

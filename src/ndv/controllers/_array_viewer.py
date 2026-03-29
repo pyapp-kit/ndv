@@ -31,11 +31,33 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from typing_extensions import Unpack
 
-    from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
+    from ndv._types import (
+        AxisKey,
+        ChannelKey,
+        KeyPressEvent,
+        MouseMoveEvent,
+        MousePressEvent,
+    )
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
     from ndv.views.bases import HistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
+
+
+def _apply_white_balance(
+    data: np.ndarray, gains: tuple[float, float, float]
+) -> np.ndarray:
+    """Apply per-channel RGB gains to an array with a trailing color dimension."""
+    result = data.astype(np.float32, copy=True)
+    n_channels = min(3, result.shape[-1])
+    for i in range(n_channels):
+        result[..., i] *= gains[i]
+    if data.dtype.kind in ("u", "i"):
+        info = np.iinfo(data.dtype)
+        np.clip(result, info.min, info.max, out=result)
+        return result.astype(data.dtype)
+    np.clip(result, 0, None, out=result)
+    return result
 
 
 class ArrayViewer:
@@ -133,10 +155,12 @@ class ArrayViewer:
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.ndimToggleRequested.connect(self._on_view_ndim_toggle_requested)
+        self._view.resetWhiteBalance.connect(self._on_reset_white_balance)
 
         self._highlight_pos: tuple[float, float] | None = None
         self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
         self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
+        self._canvas.mousePressed.connect(self._on_canvas_mouse_pressed)
 
         self._focused_slider_axis: AxisKey | None = None
         self._disconnect_key_events = _app.filter_key_events(
@@ -336,6 +360,7 @@ class ArrayViewer:
             (model.events.channel_mode, self._re_resolve),
             (model.scales.value_changed, self._re_resolve),
             (model.luts.value_changed, self._re_resolve),
+            (model.events.white_balance_gains, self._re_resolve),
         ]:
             getattr(obj, _connect)(callback)
 
@@ -394,6 +419,7 @@ class ArrayViewer:
             or old.channel_axis != new.channel_axis
             or old.channel_mode != new.channel_mode
             or old.current_index != new.current_index
+            or old.white_balance_gains != new.white_balance_gains
         )
         if needs_data:
             self._request_data()
@@ -406,6 +432,12 @@ class ArrayViewer:
 
         if old.summary_info != new.summary_info:
             self._view.set_data_info(new.summary_info)
+
+        if old.channel_mode != new.channel_mode:
+            is_rgba = new.channel_mode == ChannelMode.RGBA
+            self._viewer_model.show_white_balance_button = is_rgba
+            if not is_rgba:
+                self._display_model.white_balance_gains = None
 
     def _fallback_channel_name(self, key: ChannelKey) -> str:
         """Compute the data-derived fallback name for a channel key."""
@@ -570,11 +602,59 @@ class ArrayViewer:
         self._highlight_pos = None
         self._highlight_values({}, self._highlight_pos)
 
+    def _on_canvas_mouse_pressed(self, event: MousePressEvent) -> None:
+        """Handle mouse press for eyedropper white balance pick."""
+        if self._viewer_model.interaction_mode != InteractionMode.PICK_COLOR:
+            return
+
+        x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
+        pixel = self._sample_original_rgb(x, y)
+        if pixel is not None:
+            max_val = pixel.max()
+            if max_val > 1e-10:
+                gains = tuple(float(max_val / max(ch, 1e-10)) for ch in pixel)
+                self._display_model.white_balance_gains = gains  # type: ignore[assignment]
+
+        self._viewer_model.interaction_mode = InteractionMode.PAN_ZOOM
+
+    def _sample_original_rgb(self, x: float, y: float) -> np.ndarray | None:
+        """Sample the original (un-gained) RGB pixel at world coordinates."""
+        wrapper = self._data_wrapper
+        if wrapper is None:
+            return None
+
+        row, col = self._world_to_data(x, y)
+        vis = self._resolved.visible_axes
+        if len(vis) < 2:
+            return None
+
+        # Build index: current slice position + the clicked pixel coords
+        idx: dict[int, int | slice] = dict(self._resolved.current_index)
+        idx[vis[-2]] = row
+        idx[vis[-1]] = col
+        # Channel axis gets all channels
+        ch_ax = self._resolved.channel_axis
+        if ch_ax is not None:
+            idx[ch_ax] = slice(None)
+
+        try:
+            data = wrapper.isel(idx)
+        except (IndexError, KeyError):
+            return None
+
+        pixel = np.asarray(data, dtype=np.float64).ravel()
+        if pixel.size < 3:
+            return None
+        return pixel[:3]
+
     def _on_key_pressed(self, event: KeyPressEvent) -> None:
         handle_key_press(event, self)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._display_model.channel_mode = mode
+
+    def _on_reset_white_balance(self) -> None:
+        self._display_model.white_balance_gains = None
 
     # ------------------ Helper methods ------------------
 
@@ -670,9 +750,12 @@ class ArrayViewer:
             warnings.warn(f"Error fetching data: {e}", stacklevel=1)
             return
 
+        wb_gains = self._resolved.white_balance_gains
         for key, data in response.data.items():
             if data.size == 0:
                 continue
+            if wb_gains is not None and data.ndim >= 3 and data.shape[-1] >= 3:
+                data = _apply_white_balance(data, wb_gains)
             if (lut_ctrl := self._lut_controllers.get(key)) is None:
                 if key is None:
                     model = self._display_model.default_lut

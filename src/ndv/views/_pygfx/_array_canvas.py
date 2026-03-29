@@ -689,6 +689,11 @@ class GfxArrayCanvas(ArrayCanvas):
         canvas_pos = (event.x, event.y)
         world_pos = self.canvas_to_world(canvas_pos)[:2]
 
+        # In PICK_COLOR mode, consume the press to prevent camera pan.
+        # The mousePressed signal still fires so the controller can handle it.
+        if self._viewer.interaction_mode == InteractionMode.PICK_COLOR:
+            return True
+
         # If in CREATE_ROI mode, the new ROI should "start" here.
         if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
             if self._last_roi_created is None:
@@ -733,7 +738,10 @@ class GfxArrayCanvas(ArrayCanvas):
         return False
 
     def get_cursor(self, event: MouseMoveEvent) -> CursorType:
-        if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
+        if self._viewer.interaction_mode in (
+            InteractionMode.CREATE_ROI,
+            InteractionMode.PICK_COLOR,
+        ):
             return CursorType.CROSS
         for vis in self.elements_at((event.x, event.y)):
             if cursor := vis.get_cursor(event):
