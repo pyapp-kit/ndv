@@ -52,10 +52,10 @@ def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
     if bounding_box is None:
         return False
     return bool(
-        bounding_box[0, 0] + 0.5 <= pos[0]
-        and pos[0] <= bounding_box[1, 0] + 0.5
-        and bounding_box[0, 1] + 0.5 <= pos[1]
-        and pos[1] <= bounding_box[1, 1] + 0.5
+        bounding_box[0, 0] <= pos[0]
+        and pos[0] <= bounding_box[1, 0]
+        and bounding_box[0, 1] <= pos[1]
+        and pos[1] <= bounding_box[1, 1]
     )
 
 
@@ -325,17 +325,18 @@ class PyGFXRectangle(RectangularROIHandle):
         return False
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
-        self.set_selected(True)
         # Convert canvas -> world
         world_pos = self._canvas_to_world((event.x, event.y))
         drag_idx = self._handle_under((event.x, event.y))
         # If a marker is pressed
         if drag_idx is not None:
+            self.set_selected(True)
             opposite_idx = (drag_idx + 2) % 4
             self._move_mode = ROIMoveMode.HANDLE
             self._move_anchor = tuple(self._positions[opposite_idx, :2].copy())
-        # If the rectangle is pressed
-        else:
+        # If the click is inside the rectangle, translate
+        elif self._outline and _is_inside(self._outline.get_bounding_box(), world_pos):
+            self.set_selected(True)
             self._move_mode = ROIMoveMode.TRANSLATE
             self._move_anchor = world_pos
         return False
@@ -652,15 +653,7 @@ class GfxArrayCanvas(ArrayCanvas):
                 self._camera.world.position, self._camera.camera_matrix
             )
             pos_world = la.vec_unproject(pos_ndc[:2], self._camera.camera_matrix)
-
-            # In vispy, pixel n center is at (n+0.5)*scale; in pygfx it's at
-            # n*scale.  Add 0.5*scale per axis so both backends agree.
-            wsx, wsy, wsz = self._world_scales
-            return (
-                pos_world[0] + 0.5 * wsx,
-                pos_world[1] + 0.5 * wsy,
-                pos_world[2] + 0.5 * wsz,
-            )
+            return (pos_world[0], pos_world[1], pos_world[2])
         else:
             return (-1, -1, -1)
 
@@ -672,14 +665,6 @@ class GfxArrayCanvas(ArrayCanvas):
         if self._camera is None:
             return (-1.0, -1.0)
 
-        # Undo the 0.5*scale offset added in canvas_to_world
-        wsx, wsy, wsz = self._world_scales
-        adjusted = (
-            pos_xyz[0] - 0.5 * wsx,
-            pos_xyz[1] - 0.5 * wsy,
-            pos_xyz[2] - 0.5 * wsz,
-        )
-
         # Build NDC-to-screen matrix
         screen_space = pygfx.utils.transform.AffineTransform()
         screen_space.position = (-1, 1, 0)
@@ -688,7 +673,7 @@ class GfxArrayCanvas(ArrayCanvas):
         ndc_to_screen = screen_space.inverse_matrix
 
         canvas_pos = la.vec_transform(
-            adjusted, ndc_to_screen @ self._camera.camera_matrix
+            pos_xyz, ndc_to_screen @ self._camera.camera_matrix
         )
         return (
             canvas_pos[0] + viewport.rect[0],
