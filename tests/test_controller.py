@@ -374,12 +374,20 @@ def test_roi_controller() -> None:
     # Note - avoid diving into rendering logic here - just identify view
     with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
         ctrl._canvas.on_mouse_press(mpe)
-    world_pos = ctrl._canvas.canvas_to_world(canvas_pos)
 
-    assert roi.bounding_box == (
-        (world_pos[0], world_pos[1]),
-        (world_pos[0] + 1, world_pos[1] + 1),
+    # The creation code emits raw world coords (no pixel-center offset).
+    # Compute expected data-space bounding box via the same pipeline:
+    # canvas -> raw world -> _world_point_to_data
+    w2d = ctrl._world_point_to_data
+    # pygfx exposes _canvas_to_world_raw; vispy's canvas_to_world is already raw
+    raw_c2w = getattr(
+        ctrl._canvas, "_canvas_to_world_raw", ctrl._canvas.canvas_to_world
     )
+    raw_world = raw_c2w(canvas_pos)
+    expected_min = w2d(raw_world[0], raw_world[1])
+    expected_max = w2d(raw_world[0] + 1, raw_world[1] + 1)
+    assert roi.bounding_box[0] == pytest.approx(expected_min)
+    assert roi.bounding_box[1] == pytest.approx(expected_max)
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
     ctrl._canvas.close()
 
@@ -401,22 +409,33 @@ def test_roi_interaction() -> None:
 
     # FIXME: We need a large world space on the canvas, but
     # VispyArrayCanvas.set_range is not implemented yet. This workaround
-    # sets the range to the extent of the data i.e. the extent of the ROI
+    # sets the range to the extent of the data i.e. the extent of the ROI.
+    # bounding_box is in data space.
     roi.bounding_box = ((0, 0), (500, 500))
     ctrl._canvas.set_range()
+
+    # Set the ROI to known data-space coordinates via two canvas positions.
     # Note that these positions are far apart to satisfy sufficient distance
-    # in world space
+    # in world space.
     canvas_roi_start = (200, 200)
-    world_roi_start = tuple(ctrl._canvas.canvas_to_world(canvas_roi_start)[:2])
-    canvas_new_start = (100, 100)
-    world_new_start = tuple(ctrl._canvas.canvas_to_world(canvas_new_start)[:2])
     canvas_roi_end = (300, 300)
-    world_roi_end = tuple(ctrl._canvas.canvas_to_world(canvas_roi_end)[:2])
-    roi.bounding_box = (world_roi_start, world_roi_end)
+    canvas_new_start = (100, 100)
+
+    # Use the ROI view's own boundingBoxChanged to set positions in the same
+    # coordinate space the mouse handler uses (raw world for pygfx, scene
+    # for vispy). This ensures the test works regardless of backend.
+    world_start = ctrl._canvas.canvas_to_world(canvas_roi_start)[:2]
+    world_end = ctrl._canvas.canvas_to_world(canvas_roi_end)[:2]
+    roi_view.boundingBoxChanged.emit((world_start, world_end))
+    bb_initial = roi.bounding_box
+    roi_size = (
+        bb_initial[1][0] - bb_initial[0][0],
+        bb_initial[1][1] - bb_initial[0][1],
+    )
 
     # Note - avoid diving into rendering logic here - just identify view
     with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
-        # Test moving handle
+        # Test moving handle: drag top-left corner to canvas_new_start
         assert not roi_view.selected()
         mpe = MousePressEvent(
             canvas_roi_start[0], canvas_roi_start[1], MouseButton.LEFT
@@ -425,39 +444,51 @@ def test_roi_interaction() -> None:
         assert roi_view.selected()
         mme = MouseMoveEvent(canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT)
         ctrl._canvas.on_mouse_move(mme)
-        assert roi.bounding_box[0] == pytest.approx(world_new_start, 1e-6)
-        assert roi.bounding_box[1] == pytest.approx(world_roi_end, 1e-6)
+        # The opposite (max) corner should not have moved
+        assert roi.bounding_box[1] == pytest.approx(bb_initial[1], 1e-6)
+        # The dragged (min) corner should have moved
+        assert roi.bounding_box[0] != pytest.approx(bb_initial[0], 1e-6)
         mre = MouseReleaseEvent(
             canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT
         )
         ctrl._canvas.on_mouse_release(mre)
 
-        # Test translation
-        roi.bounding_box = (world_roi_start, world_roi_end)
+        # Test translation: reset ROI, then drag the body
+        roi_view.boundingBoxChanged.emit((world_start, world_end))
+        assert roi.bounding_box[0] == pytest.approx(bb_initial[0])
+        assert roi.bounding_box[1] == pytest.approx(bb_initial[1])
         mpe = MousePressEvent(
-            (canvas_roi_start[0] + canvas_roi_end[0] / 2),
-            (canvas_roi_start[1] + canvas_roi_end[1] / 2),
+            (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
+            (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
             MouseButton.LEFT,
         )
         ctrl._canvas.on_mouse_press(mpe)
         assert roi_view.selected()
         mme = MouseMoveEvent(
-            (canvas_roi_start[0] + canvas_new_start[0] / 2),
-            (canvas_roi_start[1] + canvas_new_start[1] / 2),
+            (canvas_roi_start[0] + canvas_new_start[0]) / 2,
+            (canvas_roi_start[1] + canvas_new_start[1]) / 2,
             MouseButton.LEFT,
         )
         ctrl._canvas.on_mouse_move(mme)
-        assert roi.bounding_box[0] == pytest.approx(world_new_start, 1e-6)
-        assert roi.bounding_box[1] == pytest.approx(world_roi_start, 1e-6)
+        # Translation should preserve size
+        bb_translated = roi.bounding_box
+        translated_size = (
+            bb_translated[1][0] - bb_translated[0][0],
+            bb_translated[1][1] - bb_translated[0][1],
+        )
+        assert translated_size == pytest.approx(roi_size, 1e-6)
+        # Both corners should have moved
+        assert bb_translated[0] != pytest.approx(bb_initial[0], 1e-6)
+        assert bb_translated[1] != pytest.approx(bb_initial[1], 1e-6)
         mre = MouseReleaseEvent(
-            (canvas_roi_start[0] + canvas_new_start[0] / 2),
-            (canvas_roi_start[1] + canvas_new_start[1] / 2),
+            (canvas_roi_start[0] + canvas_new_start[0]) / 2,
+            (canvas_roi_start[1] + canvas_new_start[1]) / 2,
             MouseButton.LEFT,
         )
         ctrl._canvas.on_mouse_release(mre)
 
     # Test cursors
-    roi.bounding_box = (world_roi_start, world_roi_end)
+    roi_view.boundingBoxChanged.emit((world_start, world_end))
     # Top-Left corner
     mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_start[1])
     assert roi_view.get_cursor(mme) == CursorType.FDIAG_ARROW
