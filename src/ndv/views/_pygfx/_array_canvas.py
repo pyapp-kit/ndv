@@ -726,7 +726,7 @@ class GfxArrayCanvas(ArrayCanvas):
             self._selection.set_selected(False)
             self._selection = None
         canvas_pos = (event.x, event.y)
-        world_pos = self.canvas_to_world(canvas_pos)[:2]
+        world_pos = self._canvas_to_world_raw(canvas_pos)[:2]
 
         # If in CREATE_ROI mode, the new ROI should "start" here.
         if self._viewer.interaction_mode == InteractionMode.CREATE_ROI:
