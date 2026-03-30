@@ -52,10 +52,10 @@ def _is_inside(bounding_box: np.ndarray | None, pos: Sequence[float]) -> bool:
     if bounding_box is None:
         return False
     return bool(
-        bounding_box[0, 0] <= pos[0]
-        and pos[0] <= bounding_box[1, 0]
-        and bounding_box[0, 1] <= pos[1]
-        and pos[1] <= bounding_box[1, 1]
+        bounding_box[0, 0] + 0.5 <= pos[0]
+        and pos[0] <= bounding_box[1, 0] + 0.5
+        and bounding_box[0, 1] + 0.5 <= pos[1]
+        and pos[1] <= bounding_box[1, 1] + 0.5
     )
 
 
@@ -335,7 +335,7 @@ class PyGFXRectangle(RectangularROIHandle):
             self._move_mode = ROIMoveMode.HANDLE
             self._move_anchor = tuple(self._positions[opposite_idx, :2].copy())
         # If the click is inside the rectangle, translate
-        elif self._outline and _is_inside(self._outline.get_bounding_box(), world_pos):
+        elif self._is_inside_roi(world_pos):
             self.set_selected(True)
             self._move_mode = ROIMoveMode.TRANSLATE
             self._move_anchor = world_pos
@@ -361,6 +361,12 @@ class PyGFXRectangle(RectangularROIHandle):
             handles.visible = visible and self.selected()
         self._render()
 
+    def _is_inside_roi(self, world_pos: Sequence[float]) -> bool:
+        """Check if a raw world position is inside the ROI rectangle."""
+        p0 = self._positions[0]  # min corner
+        p2 = self._positions[2]  # max corner
+        return bool(p0[0] <= world_pos[0] <= p2[0] and p0[1] <= world_pos[1] <= p2[1])
+
     def _handle_under(self, canvas_pos: Sequence[float]) -> int | None:
         """Returns an int in [0, 3], or None.
 
@@ -385,11 +391,9 @@ class PyGFXRectangle(RectangularROIHandle):
             # Idx 1 is bottom left, 3 is top right
             return CursorType.BDIAG_ARROW
         # Step 2: Entire ROI
-        if self._outline:
-            roi_bb = self._outline.get_bounding_box()
-            world_pos = self._canvas_to_world(canvas_pos)
-            if _is_inside(roi_bb, world_pos):
-                return CursorType.ALL_ARROW
+        world_pos = self._canvas_to_world(canvas_pos)
+        if self._is_inside_roi(world_pos):
+            return CursorType.ALL_ARROW
         return None
 
     def remove(self) -> None:
@@ -530,7 +534,7 @@ class GfxArrayCanvas(ArrayCanvas):
         """Add a new Rectangular ROI node to the scene."""
         roi = PyGFXRectangle(
             render=self.refresh,
-            canvas_to_world=self.canvas_to_world,
+            canvas_to_world=self._canvas_to_world_raw,
             world_to_canvas=self.world_to_canvas,
             parent=self._scene,
         )
@@ -625,25 +629,22 @@ class GfxArrayCanvas(ArrayCanvas):
         if self._camera is not None:
             self._renderer.render(self._scene, self._camera)
 
-    def canvas_to_world(
+    def _canvas_to_world_raw(
         self, pos_xy: tuple[float, float]
     ) -> tuple[float, float, float]:
-        """Map XY canvas position (pixels) to XYZ coordinate in world space."""
-        # Code adapted from:
-        # https://github.com/pygfx/pygfx/pull/753/files#diff-173d643434d575e67f8c0a5bf2d7ea9791e6e03a4e7a64aa5fa2cf4172af05cdR395
+        """Map canvas position to world space without pixel-center offset.
+
+        Returns the raw scene coordinates where pygfx objects live.
+        """
         viewport = pygfx.Viewport.from_viewport_or_renderer(self._renderer)
         if not viewport.is_inside(*pos_xy):
             return (-1, -1, -1)
 
-        # Get position relative to viewport
         pos_rel = (
             pos_xy[0] - viewport.rect[0],
             pos_xy[1] - viewport.rect[1],
         )
-
         vs = viewport.logical_size
-
-        # Convert position to NDC
         x = pos_rel[0] / vs[0] * 2 - 1
         y = -(pos_rel[1] / vs[1] * 2 - 1)
         pos_ndc = (x, y, 0)
@@ -656,6 +657,26 @@ class GfxArrayCanvas(ArrayCanvas):
             return (pos_world[0], pos_world[1], pos_world[2])
         else:
             return (-1, -1, -1)
+
+    def canvas_to_world(
+        self, pos_xy: tuple[float, float]
+    ) -> tuple[float, float, float]:
+        """Map XY canvas position (pixels) to XYZ coordinate in world space.
+
+        Includes a 0.5*scale pixel-center offset so that int(world / scale)
+        gives the correct data index at pixel boundaries. In pygfx, pixel n
+        is centered at world n*scale; in vispy it is at (n+0.5)*scale. The
+        offset aligns both backends so controller code works identically.
+        """
+        pos_world = self._canvas_to_world_raw(pos_xy)
+        if pos_world == (-1, -1, -1):
+            return pos_world
+        wsx, wsy, wsz = self._world_scales
+        return (
+            pos_world[0] + 0.5 * wsx,
+            pos_world[1] + 0.5 * wsy,
+            pos_world[2] + 0.5 * wsz,
+        )
 
     def world_to_canvas(
         self, pos_xyz: tuple[float, float, float]
