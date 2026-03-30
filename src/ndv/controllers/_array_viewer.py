@@ -208,18 +208,20 @@ class ArrayViewer:
         return self._roi_model
 
     @roi.setter
-    def roi(self, roi_model: RectangularROIModel | None) -> None:
-        """Set ROI being displayed."""
+    def roi(self, roi_model: RectangularROIModel | tuple | None) -> None:
+        """Set ROI being displayed.
+
+        Either a RectangularROIModel or a tuple of ((x1, y1), (x2, y2)) can be provided.
+        Bounding box is in data coordinates (i.e. array indices).
+        """
         # Disconnect old model
         if self._roi_model is not None:
             self._set_roi_model_connected(self._roi_model, False)
 
-        # Connect new model
-        if isinstance(roi_model, tuple):
-            self._roi_model = RectangularROIModel(bounding_box=roi_model)
+        if roi_model is None:
+            self._roi_model = None
         else:
-            self._roi_model = roi_model
-        if self._roi_model is not None:
+            self._roi_model = RectangularROIModel.model_validate(roi_model)
             self._set_roi_model_connected(self._roi_model)
         self._synchronize_roi()
 
@@ -425,6 +427,7 @@ class ArrayViewer:
 
         if old.visible_scales != new.visible_scales:
             self._canvas.set_scales(new.visible_scales)
+            self._synchronize_roi()
 
         if old.channel_axis != new.channel_axis:
             self._push_fallback_channel_names()

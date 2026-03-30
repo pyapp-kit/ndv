@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import field_validator
+from typing import Any
+
+from pydantic import field_validator, model_validator
 
 from ndv.models._base_model import NDVModel
 
@@ -13,9 +15,9 @@ class RectangularROIModel(NDVModel):
     visible : bool
         Whether to display this roi.
     bounding_box : tuple[tuple[float, float], tuple[float, float]]
-        The minimum (2D) point and the maximum (2D) point contained within the
-        region. Using these two points, an axis-aligned bounding box can be
-        constructed.
+        The minimum and maximum (x, y) points of the region in data space
+        (i.e. array indices, not scaled world coordinates). These two points
+        define an axis-aligned bounding box.
     """
 
     visible: bool = True
@@ -31,3 +33,10 @@ class RectangularROIModel(NDVModel):
         x2 = max(bb[0][0], bb[1][0])
         y2 = max(bb[0][1], bb[1][1])
         return ((x1, y1), (x2, y2))
+
+    @model_validator(mode="before")
+    @classmethod
+    def _cast_tuple(cls, values: Any) -> Any:
+        if isinstance(values, tuple):
+            return {"bounding_box": values}
+        return values
