@@ -159,6 +159,7 @@ class PyGFXRectangle(RectangularROIHandle):
         self,
         render: Callable,
         canvas_to_world: Callable,
+        world_to_canvas: Callable,
         parent: pygfx.WorldObject | None = None,
         *args: Any,
         **kwargs: Any,
@@ -189,6 +190,7 @@ class PyGFXRectangle(RectangularROIHandle):
         self._move_anchor: tuple[float, float] = (0, 0)
         self._render: Callable = render
         self._canvas_to_world: Callable = canvas_to_world
+        self._world_to_canvas: Callable = world_to_canvas
 
         # Initialize
         self.set_fill(_cmap.Color("transparent"))
@@ -326,7 +328,7 @@ class PyGFXRectangle(RectangularROIHandle):
         self.set_selected(True)
         # Convert canvas -> world
         world_pos = self._canvas_to_world((event.x, event.y))
-        drag_idx = self._handle_under(world_pos)
+        drag_idx = self._handle_under((event.x, event.y))
         # If a marker is pressed
         if drag_idx is not None:
             opposite_idx = (drag_idx + 2) % 4
@@ -358,26 +360,24 @@ class PyGFXRectangle(RectangularROIHandle):
             handles.visible = visible and self.selected()
         self._render()
 
-    def _handle_under(self, pos: Sequence[float]) -> int | None:
+    def _handle_under(self, canvas_pos: Sequence[float]) -> int | None:
         """Returns an int in [0, 3], or None.
 
-        If an int i, means that the handle at self._positions[i] is at pos.
-        If None, there is no handle at pos.
+        canvas_pos should be in canvas (screen pixel) coordinates.
         """
-        # FIXME: Ideally, Renderer.get_pick_info would do this for us. But it
-        # seems broken.
+        rad2 = self._handle_rad**2
         for i, p in enumerate(self._positions[:-1]):
-            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= self._handle_rad**2:
+            hp = self._world_to_canvas((p[0], p[1], 0))
+            if (hp[0] - canvas_pos[0]) ** 2 + (hp[1] - canvas_pos[1]) ** 2 <= rad2:
                 return i
         return None
 
     def get_cursor(self, mme: MouseMoveEvent) -> CursorType | None:
-        # Convert event pos (on canvas) to world pos
-        world_pos = self._canvas_to_world((mme.x, mme.y))
+        canvas_pos = (mme.x, mme.y)
         # Step 1: Handles
         # Preferred over the rectangle
         # Can only be moved if ROI is selected
-        if (idx := self._handle_under(world_pos)) is not None and self.selected():
+        if (idx := self._handle_under(canvas_pos)) is not None and self.selected():
             # Idx 0 is top left, 2 is bottom right
             if idx % 2 == 0:
                 return CursorType.FDIAG_ARROW
@@ -386,6 +386,7 @@ class PyGFXRectangle(RectangularROIHandle):
         # Step 2: Entire ROI
         if self._outline:
             roi_bb = self._outline.get_bounding_box()
+            world_pos = self._canvas_to_world(canvas_pos)
             if _is_inside(roi_bb, world_pos):
                 return CursorType.ALL_ARROW
         return None
@@ -529,6 +530,7 @@ class GfxArrayCanvas(ArrayCanvas):
         roi = PyGFXRectangle(
             render=self.refresh,
             canvas_to_world=self.canvas_to_world,
+            world_to_canvas=self.world_to_canvas,
             parent=self._scene,
         )
         roi.set_visible(False)
@@ -661,6 +663,37 @@ class GfxArrayCanvas(ArrayCanvas):
             )
         else:
             return (-1, -1, -1)
+
+    def world_to_canvas(
+        self, pos_xyz: tuple[float, float, float]
+    ) -> tuple[float, float]:
+        """Map XYZ coordinate in world space to XY canvas position (pixels)."""
+        viewport = pygfx.Viewport.from_viewport_or_renderer(self._renderer)
+        if self._camera is None:
+            return (-1.0, -1.0)
+
+        # Undo the 0.5*scale offset added in canvas_to_world
+        wsx, wsy, wsz = self._world_scales
+        adjusted = (
+            pos_xyz[0] - 0.5 * wsx,
+            pos_xyz[1] - 0.5 * wsy,
+            pos_xyz[2] - 0.5 * wsz,
+        )
+
+        # Build NDC-to-screen matrix
+        screen_space = pygfx.utils.transform.AffineTransform()
+        screen_space.position = (-1, 1, 0)
+        x_d, y_d = viewport.logical_size
+        screen_space.scale = (2 / x_d, -2 / y_d, 1)
+        ndc_to_screen = screen_space.inverse_matrix
+
+        canvas_pos = la.vec_transform(
+            adjusted, ndc_to_screen @ self._camera.camera_matrix
+        )
+        return (
+            canvas_pos[0] + viewport.rect[0],
+            canvas_pos[1] + viewport.rect[1],
+        )
 
     def elements_at(self, pos_xy: tuple[float, float]) -> list[CanvasElement]:
         """Obtains all elements located at pos."""

@@ -534,7 +534,9 @@ class ArrayViewer:
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
         if self._roi_view is not None:
-            self._roi_view.set_bounding_box(*bb)
+            world_min = self._data_point_to_world(*bb[0])
+            world_max = self._data_point_to_world(*bb[1])
+            self._roi_view.set_bounding_box(world_min, world_max)
 
     def _on_roi_model_visible_changed(self, visible: bool) -> None:
         if self._roi_view is not None:
@@ -612,7 +614,9 @@ class ArrayViewer:
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
         if self._roi_model:
-            self._roi_model.bounding_box = bb
+            data_min = self._world_point_to_data(*bb[0])
+            data_max = self._world_point_to_data(*bb[1])
+            self._roi_model.bounding_box = (data_min, data_max)
 
     def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
         """Respond to a mouse move event in the view."""
@@ -792,6 +796,25 @@ class ArrayViewer:
         else:
             data_x, data_y = int(x), int(y)
         return data_y, data_x
+
+    def _world_point_to_data(self, x: float, y: float) -> tuple[float, float]:
+        """Convert world (x, y) to data (x, y) as floats using visible scales."""
+        scales = self._resolved.visible_scales
+        if len(scales) >= 2:
+            sx, sy = scales[-1], scales[-2]
+            data_x = x / sx if sx != 0 else x
+            data_y = y / sy if sy != 0 else y
+        else:
+            data_x, data_y = x, y
+        return data_x, data_y
+
+    def _data_point_to_world(self, x: float, y: float) -> tuple[float, float]:
+        """Convert data (x, y) to world (x, y) using visible scales."""
+        scales = self._resolved.visible_scales
+        if len(scales) >= 2:
+            sx, sy = scales[-1], scales[-2]
+            return x * sx, y * sy
+        return x, y
 
     def _get_values_at_world_point(
         self, x: float, y: float

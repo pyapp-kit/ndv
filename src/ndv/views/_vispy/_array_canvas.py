@@ -241,7 +241,7 @@ class VispyRectangle(RectangularROIHandle):
         # Convert canvas -> world
         canvas_pos = (event.x, event.y)
         world_pos = self._tform().map(canvas_pos)[:2]
-        drag_idx = self._handle_under(world_pos)
+        drag_idx = self._handle_under(canvas_pos)
         # If a marker is pressed
         if drag_idx is not None:
             opposite_idx = (drag_idx + 2) % 4
@@ -259,7 +259,7 @@ class VispyRectangle(RectangularROIHandle):
     def get_cursor(self, event: MouseMoveEvent) -> CursorType | None:
         canvas_pos = (event.x, event.y)
         pos = self._tform().map(canvas_pos)[:2]
-        if self._handle_under(pos) is not None:
+        if self._handle_under(canvas_pos) is not None:
             center = self._rect.center
             if pos[0] < center[0] and pos[1] < center[1]:
                 return CursorType.FDIAG_ARROW
@@ -279,15 +279,16 @@ class VispyRectangle(RectangularROIHandle):
         self._rect.parent = None
         self._handles.parent = None
 
-    def _handle_under(self, pos: Sequence[float]) -> int | None:
+    def _handle_under(self, canvas_pos: Sequence[float]) -> int | None:
         """Returns an int in [0, 3], or None.
 
-        If an int i, means that the handle at self._positions[i] is at pos.
-        If None, there is no handle at pos.
+        canvas_pos should be in canvas (screen pixel) coordinates.
         """
         rad2 = (self._handle_size / 2) ** 2
+        tform = self._rect.transforms.get_transform("scene", "canvas")
         for i, p in enumerate(self._handle_data):
-            if (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2 <= rad2:
+            hp = tform.map(p)[:2]
+            if (hp[0] - canvas_pos[0]) ** 2 + (hp[1] - canvas_pos[1]) ** 2 <= rad2:
                 return i
         return None
 
