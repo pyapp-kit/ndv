@@ -317,7 +317,7 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
         self._log_base = base
         for key in self._channels:
             self._update_channel_area(key)
-        self._auto_range()
+        self._auto_range_y_only()
 
     def highlight(self, value: float | None) -> None:
         self._highlight.visible = value is not None

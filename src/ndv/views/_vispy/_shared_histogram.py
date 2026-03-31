@@ -235,7 +235,7 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
             from vispy.visuals.axis import Ticker
 
             count_axis.axis.ticker = Ticker(count_axis.axis)
-        self._auto_range()
+        self._auto_range_y_only()
 
     def set_clim_bounds(self, bounds: tuple[float | None, float | None]) -> None:
         self._clim_bounds = bounds
