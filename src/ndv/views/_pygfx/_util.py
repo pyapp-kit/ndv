@@ -29,7 +29,19 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
     if frontend == GuiFrontend.JUPYTER:
         import rendercanvas.jupyter
 
-        return rendercanvas.jupyter.JupyterRenderCanvas  # type: ignore[no-any-return]
+        class JupyterRenderCanvas(rendercanvas.jupyter.JupyterRenderCanvas):
+            def get_frame(self) -> Any:
+                # Workaround for async GPU readback in rendercanvas:
+                # _time_to_draw() calls _draw_and_present(force_sync=False),
+                # which may complete the present asynchronously, meaning
+                # _last_image still holds the previous frame when get_frame()
+                # returns. Force a synchronous present so the returned image
+                # is always up-to-date.
+                self._process_events()
+                self._draw_and_present(force_sync=True)
+                return self._last_image
+
+        return JupyterRenderCanvas
     if frontend == GuiFrontend.WX:
         import rendercanvas.wx
         import wx
