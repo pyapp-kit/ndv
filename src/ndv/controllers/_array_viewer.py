@@ -361,12 +361,14 @@ class ArrayViewer:
         if hist is None or key in self._shared_histogram_links:
             return
 
-        self._shared_histogram_links[key] = link = _SharedHistogramLink(
-            key, ctrl, hist, fallback_name=self._fallback_channel_name(key)
-        )
-
         sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
-        link.trigger_initial_data(significant_bits=sig_bits)
+        self._shared_histogram_links[key] = _SharedHistogramLink(
+            key,
+            ctrl,
+            hist,
+            fallback_name=self._fallback_channel_name(key),
+            significant_bits=sig_bits,
+        )
 
     def _on_shared_histogram_clims_changed(
         self, key: ChannelKey, clims: tuple[float, float]
@@ -923,11 +925,7 @@ class ArrayViewer:
 
 
 class _SharedHistogramLink:
-    """Binds one ChannelController to a SharedHistogramCanvas.
-
-    All signal connections use bound methods, so psygnal can weak-ref them
-    and they can be cleanly disconnected via `disconnect()`.
-    """
+    """Binds one ChannelController to a SharedHistogramCanvas."""
 
     def __init__(
         self,
@@ -935,6 +933,7 @@ class _SharedHistogramLink:
         ctrl: ChannelController,
         hist: SharedHistogramCanvas,
         fallback_name: str = "",
+        significant_bits: int | None = None,
     ) -> None:
         self._key = key
         self._ctrl = ctrl
@@ -959,6 +958,11 @@ class _SharedHistogramLink:
         if ctrl._last_clims is not None:
             hist.set_channel_clims(key, ctrl._last_clims)
 
+        if handles := self._ctrl.handles:
+            self._ctrl.update_texture_data(
+                handles[0].data(), significant_bits=significant_bits
+            )
+
     def _on_stats(self, stats: ImageStats) -> None:
         if stats.counts is not None and stats.bin_edges is not None:
             self._hist.set_channel_data(self._key, stats.counts, stats.bin_edges)
@@ -980,20 +984,3 @@ class _SharedHistogramLink:
 
     def _on_clim_bounds(self, bounds: tuple[float | None, float | None]) -> None:
         self._hist.set_clim_bounds(bounds)
-
-    def disconnect(self) -> None:
-        model = self._ctrl.lut_model
-        self._ctrl.stats_updated.disconnect(self._on_stats)
-        self._ctrl.clims_resolved.disconnect(self._on_clims_resolved)
-        model.events.cmap.disconnect(self._on_cmap)
-        model.events.visible.disconnect(self._on_visible)
-        model.events.gamma.disconnect(self._on_gamma)
-        model.events.name.disconnect(self._on_name)
-        model.events.clim_bounds.disconnect(self._on_clim_bounds)
-
-    def trigger_initial_data(self, significant_bits: int | None = None) -> None:
-        """Push existing handle data through the stats pipeline."""
-        if handles := self._ctrl.handles:
-            self._ctrl.update_texture_data(
-                handles[0].data(), significant_bits=significant_bits
-            )

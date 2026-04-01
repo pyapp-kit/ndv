@@ -283,6 +283,8 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
             ch.gamma_handle,
         ):
             self._scene.remove(obj)
+        if (hl := self._highlight_lines.pop(key, None)) is not None:
+            self._scene.remove(hl)
         self._update_legend()
         self._auto_range()
 

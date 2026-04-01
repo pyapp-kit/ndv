@@ -197,6 +197,8 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
             ch.legend_text,
         ):
             visual.parent = None
+        if (hl := self._highlight_lines.pop(key, None)) is not None:
+            hl.parent = None
         self._update_legend_positions()
         self._auto_range()
 
