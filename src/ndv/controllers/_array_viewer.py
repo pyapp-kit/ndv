@@ -722,9 +722,7 @@ class ArrayViewer:
 
         # Also forward to shared histogram
         if self._shared_histogram is not None:
-            # Use first channel's value for the highlight position
-            first_val = next(iter(channel_values.values()), None)
-            self._shared_histogram.highlight(first_val)
+            self._shared_histogram.highlight(channel_values)
 
         if not channel_values:
             # clear hover info if no values found

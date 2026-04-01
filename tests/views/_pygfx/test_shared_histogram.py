@@ -262,13 +262,13 @@ def test_log_scale() -> None:
 def test_highlight() -> None:
     """Highlight line shows and hides correctly."""
     hist = PyGFXSharedHistogramCanvas()
-    assert not hist._highlight.visible
+    assert not hist._highlight_lines
 
-    hist.highlight(50)
-    assert hist._highlight.visible
+    hist.highlight({"ch0": 50})
+    assert hist._highlight_lines["ch0"].visible
 
-    hist.highlight(None)
-    assert not hist._highlight.visible
+    hist.highlight({})
+    assert not hist._highlight_lines["ch0"].visible
 
 
 # ---------- Legend ----------

@@ -118,19 +118,9 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
 
         # ------------ Nodes ------------ #
 
-        # Highlight line
-        self._highlight = pygfx.Line(
-            geometry=pygfx.Geometry(
-                positions=np.array([[0, 0, 0], [0, 1, 0]], dtype=np.float32),
-            ),
-            material=pygfx.LineMaterial(
-                color=(1.0, 1.0, 0.2, 0.75),
-                dash_pattern=[4, 4],
-                thickness=1.5,
-            ),
-            visible=False,
-        )
-        self._scene.add(self._highlight)
+        # Per-channel highlight lines (created on demand)
+        self._highlight_lines: dict[object, pygfx.Line] = {}
+        self._highlight_unit_pos = np.array([[0, 0, 0], [0, 1, 0]], dtype=np.float32)
 
         # X-axis ruler
         self._x = pygfx.Ruler(
@@ -319,13 +309,30 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
             self._update_channel_area(key)
         self._auto_range_y_only()
 
-    def highlight(self, value: float | None) -> None:
-        self._highlight.visible = value is not None
-        if value is not None:
-            self._highlight.local.x = value
-            y_range = self._compute_y_range()
-            if y_range:
-                self._highlight.local.scale_y = y_range[1]
+    def highlight(self, channel_values: dict[object, float]) -> None:
+        y_range = self._compute_y_range()
+        y_scale = y_range[1] * 0.5 if y_range else 1.0
+        active_keys = set()
+        for key, value in channel_values.items():
+            active_keys.add(key)
+            line = self._highlight_lines.get(key)
+            if line is None:
+                ch = self._channels.get(key)
+                color = (*ch.color[:3], 0.5) if ch else (1.0, 1.0, 0.2, 0.5)
+                line = pygfx.Line(
+                    geometry=pygfx.Geometry(positions=self._highlight_unit_pos),
+                    material=pygfx.LineMaterial(
+                        color=color, dash_pattern=[4, 4], thickness=1
+                    ),
+                )
+                self._scene.add(line)
+                self._highlight_lines[key] = line
+            line.visible = True
+            line.local.x = value
+            line.local.scale_y = y_scale
+        for key, line in self._highlight_lines.items():
+            if key not in active_keys:
+                line.visible = False
         self.refresh()
 
     # ------------ Mouse interaction ------------ #

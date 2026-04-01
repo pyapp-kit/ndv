@@ -76,16 +76,9 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         self._canvas = scene.SceneCanvas()
         self._disconnect_mouse_events = filter_mouse_events(self._canvas.native, self)
 
-        # Highlight line for domain value
-        self._highlight = scene.Line(
-            pos=np.array([[0, 0], [0, 1]]),
-            color=(1, 1, 0.2, 0.75),
-            connect="strip",
-            width=1,
-        )
-        self._highlight_tform = scene.transforms.STTransform()
-        self._highlight.visible = False
-        self._highlight.order = -3
+        # Per-channel highlight lines (created on demand)
+        self._highlight_lines: dict[object, scene.Line] = {}
+        self._highlight_unit_pos = np.array([[0, 0], [0, 1]], dtype=np.float32)
 
         self.plot = PlotWidget()
         self.plot.lock_axis("y")
@@ -100,12 +93,6 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         self._canvas.central_widget.add_widget(self.plot)
         self.node_tform = cast("scene.Node", self.plot).node_transform(
             self.plot._view.scene
-        )
-
-        self.plot._view.add(self._highlight)
-        self._highlight.transform = scene.transforms.ChainTransform(
-            scene.transforms.STTransform(),
-            self._highlight_tform,
         )
 
         self._has_initial_range = False
@@ -241,9 +228,23 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         self._clim_bounds = bounds
         self.plot.camera.xbounds = bounds
 
-    def highlight(self, value: float | None) -> None:
-        self._highlight.visible = value is not None
-        self._highlight_tform.translate = (value,)
+    def highlight(self, channel_values: dict[object, float]) -> None:
+        y_range = self._compute_y_range()
+        y_scale = y_range[1] * 0.5 if y_range else 1.0
+        for key, line in self._highlight_lines.items():
+            if key not in channel_values:
+                line.visible = False
+        for key, value in channel_values.items():
+            if (line := self._highlight_lines.get(key)) is None:
+                ch = self._channels.get(key)
+                color = (*ch.color[:3], 0.5) if ch else (1, 1, 0.2, 0.5)
+                line = scene.Line(pos=self._highlight_unit_pos, color=color, width=1)
+                self.plot._view.add(line)
+                line.transform = scene.transforms.STTransform()
+                self._highlight_lines[key] = line
+            line.visible = True
+            line.transform.translate = (value, 0, 0, 0)
+            line.transform.scale = (1, y_scale, 1, 1)
 
     # ------------ Mouse interaction ------------ #
 
