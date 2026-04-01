@@ -87,7 +87,7 @@ jobs:
         run: uv run --exact --no-dev --extra=${{ matrix.canvas }} --group=${{ matrix.gui }} coverage run -p -m pytest --color=yes
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: covreport-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.gui }}-${{ matrix.canvas }}
           path: ./.coverage*
@@ -142,7 +142,7 @@ jobs:
       - name: Test
         run: uv run --exact --no-dev --extra=pygfx --group=pyqt --group=array-libs coverage run -p -m pytest --color=yes
       - name: Upload coverage
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: covreport-py${{ matrix.python-version }}-array-libs
           path: ./.coverage*
@@ -165,7 +165,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: 📚 Build docs
         run: uv run --group docs mkdocs build --strict
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: docs
           path: site
