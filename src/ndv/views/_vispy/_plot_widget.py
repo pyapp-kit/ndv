@@ -349,23 +349,22 @@ class PlotWidget(scene.Widget):
         wdg.width_min = wdg.width_max = 20 if text else 2
 
     def update_yaxis_width(self, domain: tuple[float, float] | None = None) -> None:
-        """Grow y-axis width if tick labels need more space. Never shrinks."""
+        """Update y-axis width to fit tick labels."""
         if domain is None:
             domain = cast("tuple[float, float]", self.yaxis.axis.domain)
-        # Estimate the widest label character count
-        max_val = max(abs(domain[0]), abs(domain[1]))
-        label = f"{max_val:g}"
+        # Estimate the widest tick label (ticks are integers on a histogram)
+        max_val = round(max(abs(domain[0]), abs(domain[1])))
+        label = str(max_val)
         # ~5px per character + padding for tick marks
         needed = len(label) * 5 + 10
-        # Snap up to the next quantized step
+        # Snap to the nearest quantized step
         for step in _AXIS_WIDTH_STEPS:
             if step >= needed:
                 needed = step
                 break
         else:
             needed = _AXIS_WIDTH_STEPS[-1]
-        # Only grow, never shrink
-        if needed > self._yaxis_width:
+        if needed != self._yaxis_width:
             self._yaxis_width = needed
             self._grid_wdgs[Component.YAXIS].width_max = needed
 
