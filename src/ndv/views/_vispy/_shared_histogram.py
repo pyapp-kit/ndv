@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-from vispy import scene
+from vispy import scene, visuals
 
 from ndv._types import CursorType
 from ndv.views._app import filter_mouse_events
@@ -77,7 +77,7 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         self._disconnect_mouse_events = filter_mouse_events(self._canvas.native, self)
 
         # Per-channel highlight lines (created on demand)
-        self._highlight_lines: dict[object, scene.Line] = {}
+        self._highlight_lines: dict[object, visuals.LineVisual] = {}
         self._highlight_unit_pos = np.array([[0, 0], [0, 1]], dtype=np.float32)
 
         self.plot = PlotWidget()
