@@ -96,6 +96,7 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
         )
 
         self._has_initial_range = False
+        self._redownsampling = False
         self._canvas.events.resize.connect(self._on_canvas_resize)
         self._canvas.events.draw.connect(self._on_draw)
         self._last_cam_rect: tuple[float, float] = (0.0, 0.0)  # (left, right)
@@ -516,12 +517,30 @@ class VispySharedHistogramCanvas(SharedHistogramCanvas):
             self._update_lut_visuals(key)
 
     def _on_draw(self, event: Any = None) -> None:
-        """Re-downsample when camera pans/zooms."""
+        """Re-downsample when camera pans/zooms.
+
+        Guard against an infinite draw loop caused by vispy's set_range
+        adding a tiny margin on every call (https://github.com/vispy/vispy/issues/1483).
+        We use margin=1e-30 to avoid the 0.1 fallback, but each set_range
+        still shifts the rect by ~1e-28. Without the guard, this creates:
+        _on_draw -> _redownsample_all -> set_range (shifts rect) -> draw -> ...
+        The _redownsampling flag blocks synchronous re-entrant draws (wx),
+        and re-reading the rect after redownsampling absorbs the drift so
+        deferred draws (Qt) don't see it as a change.
+        """
+        if self._redownsampling:
+            return
         r = self.plot.camera.rect
         cam_rect = (r.left, r.right)
         if cam_rect != self._last_cam_rect:
             self._last_cam_rect = cam_rect
-            self._redownsample_all()
+            self._redownsampling = True
+            try:
+                self._redownsample_all()
+            finally:
+                r = self.plot.camera.rect
+                self._last_cam_rect = (r.left, r.right)
+                self._redownsampling = False
 
     def _on_canvas_resize(self, event: Any = None) -> None:
         self._update_legend_positions()
