@@ -400,7 +400,7 @@ def test_highlight_forwarded_to_shared_histogram() -> None:
     mock_hist = ctrl._shared_histogram
 
     ctrl._highlight_values({None: 42.0}, (5, 5))
-    mock_hist.highlight.assert_called_once_with(42.0)
+    mock_hist.highlight.assert_called_once_with({None: 42.0})
 
 
 @no_type_check
@@ -412,4 +412,4 @@ def test_highlight_clears_on_empty_values() -> None:
     mock_hist = ctrl._shared_histogram
 
     ctrl._highlight_values({}, (5, 5))
-    mock_hist.highlight.assert_called_with(None)
+    mock_hist.highlight.assert_called_with({})
