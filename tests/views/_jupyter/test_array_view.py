@@ -23,6 +23,9 @@ def test_array_options(viewer: JupyterArrayView) -> None:
     viewer._viewer_model.show_3d_button = False
     assert viewer._ndims_btn.layout.display == "none"
 
+    # Per-channel histogram buttons are hidden when use_shared_histogram=True
+    assert lut._histogram_btn.layout.display == "none"
+    viewer._viewer_model.use_shared_histogram = False
     assert lut._histogram_btn.layout.display is None
     viewer._viewer_model.show_histogram_button = False
     assert lut._histogram_btn.layout.display == "none"

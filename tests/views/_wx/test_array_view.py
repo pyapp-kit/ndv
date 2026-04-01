@@ -43,6 +43,9 @@ def test_array_options(viewer: WxArrayView) -> None:
     viewer._viewer_model.show_3d_button = False
     assert not wxwdg.ndims_btn.IsShown()
 
+    # Per-channel histogram buttons are hidden when use_shared_histogram=True
+    assert not wxlut.histogram_btn.IsShown()
+    viewer._viewer_model.use_shared_histogram = False
     assert wxlut.histogram_btn.IsShown()
     viewer._viewer_model.show_histogram_button = False
     assert not wxlut.histogram_btn.IsShown()
