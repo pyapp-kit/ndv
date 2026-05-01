@@ -5,7 +5,10 @@ import os
 import sys
 from enum import Enum
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, cast
+
+from scenex.adaptors import use
+from scenex.app import app
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -15,14 +18,8 @@ if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
     from typing_extensions import ParamSpec, TypeVar
 
-    from ndv.views.bases import (
-        ArrayCanvas,
-        ArrayView,
-        HistogramCanvas,
-        SharedHistogramCanvas,
-    )
+    from ndv.views.bases import ArrayView
     from ndv.views.bases._app import NDVApp
-    from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
     P = ParamSpec("P")
@@ -55,105 +52,6 @@ class GuiFrontend(str, Enum):
     WX = "wx"
 
 
-class CanvasBackend(str, Enum):
-    """Enum of available canvas backends.
-
-    Attributes
-    ----------
-    VISPY : str
-        [Vispy](https://vispy.org)
-    PYGFX : str
-        [Pygfx](https://github.com/pygfx/pygfx)
-    """
-
-    VISPY = "vispy"
-    PYGFX = "pygfx"
-
-
-class CanvasProvider(Protocol):
-    @staticmethod
-    def is_imported() -> bool: ...
-    @staticmethod
-    def is_available() -> bool: ...
-    @staticmethod
-    def array_canvas_class() -> type[ArrayCanvas]: ...
-    @staticmethod
-    def histogram_canvas_class() -> type[HistogramCanvas]: ...
-    @staticmethod
-    def shared_histogram_canvas_class() -> type[SharedHistogramCanvas]: ...
-
-
-class VispyProvider(CanvasProvider):
-    @staticmethod
-    def is_imported() -> bool:
-        return "vispy" in sys.modules
-
-    @staticmethod
-    def is_available() -> bool:
-        return importlib.util.find_spec("vispy") is not None
-
-    @staticmethod
-    def array_canvas_class() -> type[ArrayCanvas]:
-        from vispy.app import use_app
-
-        from ndv.views._vispy._array_canvas import VispyArrayCanvas
-
-        # these may not be necessary, since we likely have already called
-        # create_app by this point and vispy will autodetect that.
-        # it's an extra precaution
-        _frontend = gui_frontend()
-        if _frontend == GuiFrontend.JUPYTER:
-            use_app("jupyter_rfb")
-        elif _frontend == GuiFrontend.WX:
-            use_app("wx")
-        elif _frontend == GuiFrontend.QT:
-            from qtpy import API_NAME
-
-            use_app(API_NAME.lower())
-
-        return VispyArrayCanvas
-
-    @staticmethod
-    def histogram_canvas_class() -> type[HistogramCanvas]:
-        from ndv.views._vispy._histogram import VispyHistogramCanvas
-
-        return VispyHistogramCanvas
-
-    @staticmethod
-    def shared_histogram_canvas_class() -> type[SharedHistogramCanvas]:
-        from ndv.views._vispy._shared_histogram import VispySharedHistogramCanvas
-
-        return VispySharedHistogramCanvas
-
-
-class PygfxProvider(CanvasProvider):
-    @staticmethod
-    def is_imported() -> bool:
-        return "pygfx" in sys.modules
-
-    @staticmethod
-    def is_available() -> bool:
-        return importlib.util.find_spec("pygfx") is not None
-
-    @staticmethod
-    def array_canvas_class() -> type[ArrayCanvas]:
-        from ndv.views._pygfx._array_canvas import GfxArrayCanvas
-
-        return GfxArrayCanvas
-
-    @staticmethod
-    def histogram_canvas_class() -> type[HistogramCanvas]:
-        from ndv.views._pygfx._histogram import PyGFXHistogramCanvas
-
-        return PyGFXHistogramCanvas
-
-    @staticmethod
-    def shared_histogram_canvas_class() -> type[SharedHistogramCanvas]:
-        from ndv.views._pygfx._shared_histogram import PyGFXSharedHistogramCanvas
-
-        return PyGFXSharedHistogramCanvas
-
-
 # -------------------- Provider selection --------------------
 
 # list of available GUI frontends and canvas backends, tried in order
@@ -164,10 +62,6 @@ GUI_PROVIDERS: dict[GuiFrontend, tuple[str, str]] = {
     GuiFrontend.JUPYTER: ("ndv.views._jupyter._app", "JupyterAppWrap"),
 }
 MOD_TO_KEY = {mod: key for key, (mod, _) in GUI_PROVIDERS.items()}
-CANVAS_PROVIDERS: dict[CanvasBackend, CanvasProvider] = {
-    CanvasBackend.VISPY: VispyProvider,
-    CanvasBackend.PYGFX: PygfxProvider,
-}
 
 
 def _running_apps() -> Iterator[GuiFrontend]:
@@ -243,14 +137,11 @@ def ndv_app() -> NDVApp:
     )
 
 
-def set_canvas_backend(backend: Literal["pygfx", "vispy"] | None = None) -> None:
+def set_canvas_backend(
+    backend: Literal["vispy", "pygfx"] | None = None,
+) -> None:
     """Sets the preferred canvas backend. Cannot be set after the GUI is running."""
-    if _APP:
-        raise RuntimeError("Cannot change the backend once the app is running")
-    if backend is None:
-        os.environ.pop(CANVAS_ENV_VAR)
-    else:
-        os.environ[CANVAS_ENV_VAR] = CanvasBackend(backend).value  # validate
+    use(backend)
 
 
 def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None = None) -> None:
@@ -268,87 +159,9 @@ def gui_frontend() -> GuiFrontend:
     return MOD_TO_KEY[ndv_app().__module__]
 
 
-def canvas_backend(requested: str | None = None) -> CanvasBackend:
-    """Return the preferred canvas backend.
-
-    This is determined first by the NDV_CANVAS_BACKEND environment variable, after which
-    CANVAS_PROVIDERS are tried in order until one is found that is either already
-    imported or available
-    """
-    backend = requested or os.getenv(CANVAS_ENV_VAR, "").lower()
-
-    valid = {x.value for x in CanvasBackend}
-    if backend:
-        if backend not in valid:
-            raise ValueError(
-                f"Invalid canvas backend: {backend!r}. Valid options: {valid}"
-            )
-        return CanvasBackend(backend)
-
-    for key, provider in CANVAS_PROVIDERS.items():
-        if provider.is_imported():
-            return key
-    errors: list[tuple[CanvasBackend, BaseException]] = []
-    for key, provider in CANVAS_PROVIDERS.items():
-        try:
-            if provider.is_available():
-                return key
-        except Exception as e:
-            errors.append((key, e))
-
-    raise RuntimeError(  # pragma: no cover
-        f"Could not find an appropriate canvas backend: {valid!r}. Tried:\n\n"
-        + "\n".join(f"- {key.value}: {err}" for key, err in errors)
-    )
-
-
 def get_array_view_class() -> type[ArrayView]:
     """Return [`ArrayView`][ndv.views.bases.ArrayView] class for current GUI frontend."""  # noqa: E501
     return ndv_app().array_view_class()
-
-
-def get_array_canvas_class(backend: str | None = None) -> type[ArrayCanvas]:
-    """Return [`ArrayCanvas`][ndv.views.bases.ArrayCanvas] class for current canvas backend."""  # noqa: E501
-    _backend = canvas_backend(backend)
-    if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
-        raise NotImplementedError(f"No canvas backend found for {_backend}")
-    return CANVAS_PROVIDERS[_backend].array_canvas_class()
-
-
-def get_histogram_canvas_class(backend: str | None = None) -> type[HistogramCanvas]:
-    """Return [`HistogramCanvas`][ndv.views.bases.HistogramCanvas] class for current canvas backend."""  # noqa: E501
-    _backend = canvas_backend(backend)
-    if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
-        raise NotImplementedError(f"No canvas backend found for {_backend}")
-    return CANVAS_PROVIDERS[_backend].histogram_canvas_class()
-
-
-def get_shared_histogram_canvas_class(
-    backend: str | None = None,
-) -> type[SharedHistogramCanvas]:
-    """Return SharedHistogramCanvas class for current canvas backend."""
-    _backend = canvas_backend(backend)
-    if _backend not in CANVAS_PROVIDERS:  # pragma: no cover
-        raise NotImplementedError(f"No canvas backend found for {_backend}")
-    return CANVAS_PROVIDERS[_backend].shared_histogram_canvas_class()
-
-
-def filter_mouse_events(canvas: Any, receiver: Mouseable) -> Callable[[], None]:
-    """Intercept mouse events on `scene_canvas` and forward them to `receiver`.
-
-    Parameters
-    ----------
-    canvas : Any
-        The front-end canvas widget to intercept mouse events from.
-    receiver : Mouseable
-        The object to forward mouse events to.
-
-    Returns
-    -------
-    Callable[[], None]
-        A function that can be called to remove the event filter.
-    """
-    return ndv_app().filter_mouse_events(canvas, receiver)
 
 
 def filter_key_events(widget: Any, receiver: ArrayView) -> Callable[[], None]:
@@ -375,12 +188,12 @@ def call_later(msec: int, func: Callable[[], None]) -> None:
 
 def process_events() -> None:
     """Force processing of events for the application."""
-    ndv_app().process_events()
+    app().process_events()
 
 
 def run_app() -> None:
     """Start the active GUI application event loop."""
-    ndv_app().run()
+    app().run()
 
 
 def ensure_main_thread(func: Callable[P, T]) -> Callable[P, Future[T]]:

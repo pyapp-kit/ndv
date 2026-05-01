@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Mapping, Sequence
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.views.bases._graphics._canvas import HistogramCanvas
+    from ndv.views._histogram import Histogram
 
 
 ToggleBtnEvent = cast("int", wx.EVT_TOGGLEBUTTON.typeId)  # type: ignore[attr-defined]
@@ -338,7 +338,7 @@ class WxLUTView(LUTView):
         super().__init__()
         self._wxwidget = wdg = _WxLUTWidget(parent, default_luts)
         self.channel = channel
-        self.histogram: HistogramCanvas | None = None
+        self.histogram: Histogram | None = None
         self._displayed = True  # whether shown in channel selector
 
         wdg.visible.Bind(wx.EVT_CHECKBOX, self._on_visible_changed)
@@ -411,7 +411,7 @@ class WxLUTView(LUTView):
         if hist := self.histogram:
             hist.set_range()
 
-    def _add_histogram(self, histogram: HistogramCanvas) -> None:
+    def _add_histogram(self, histogram: Histogram) -> None:
         widget = cast("wx.Window", histogram.frontend_widget())
 
         if (parent := widget.GetParent()) and parent is not self._wxwidget:
@@ -466,7 +466,10 @@ class WxLUTView(LUTView):
         # Block signals from changing clims
         with wx.EventBlocker(self._wxwidget.clims, SliderEvent):
             self._wxwidget.clims.SetValue(*clims)
-            wx.SafeYield()
+            # FIXME: Is this used for anything?
+            # Seems to result in MouseLeaveEvents being propagated to the histogram
+            # during drags
+            # wx.SafeYield()
 
     def set_clim_bounds(
         self,
@@ -833,7 +836,7 @@ class WxArrayView(ArrayView):
         return view
 
     # TODO: Fix type
-    def add_histogram(self, channel: ChannelKey, widget: HistogramCanvas) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: Histogram) -> None:
         if lut := self._luts.get(channel, None):
             # Add the histogram widget on the LUT
             lut._add_histogram(widget)
@@ -841,7 +844,7 @@ class WxArrayView(ArrayView):
 
     def add_shared_histogram(self, widget: Any) -> None:
         self._shared_histogram = widget
-        frontend = cast("wx.Window", widget.frontend_widget())
+        frontend = cast("wx.Window", widget)
         old_parent = frontend.GetParent()
         if old_parent and old_parent is not self._wxwidget:
             old_parent.Hide()

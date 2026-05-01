@@ -5,10 +5,14 @@ import warnings
 from concurrent.futures import Future
 from contextlib import suppress
 from itertools import count
+from math import floor
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
+import scenex as snx
+import scenex.app.events as events
 from psygnal import Signal
+from scenex.model import BlendMode
 
 from ndv._keybindings import handle_key_press
 from ndv.controllers._channel_controller import ChannelController
@@ -26,19 +30,20 @@ from ndv.models._resolve import (
 from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
+from ndv.views._data_canvas import DataCanvas
+from ndv.views._histogram import Histogram
+from ndv.views._shared_histogram import SharedHistogram
 
 if TYPE_CHECKING:
     from typing import Any
 
-    import cmap as cmap_mod
+    import cmap
     import numpy.typing as npt
     from typing_extensions import Unpack
 
-    from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
+    from ndv._types import AxisKey, ChannelKey, KeyPressEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
-    from ndv.views.bases import HistogramCanvas, SharedHistogramCanvas
-    from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
 
 class ArrayViewer:
@@ -100,7 +105,6 @@ class ArrayViewer:
         self._viewer_model.events.interaction_mode.connect(
             self._on_interaction_mode_changed
         )
-        self._roi_model: RectangularROIModel | None = None
 
         app = _app.gui_frontend()
 
@@ -121,36 +125,38 @@ class ArrayViewer:
 
         # get and create the front-end and canvas classes
         frontend_cls = _app.get_array_view_class()
-        canvas_cls = _app.get_array_canvas_class()
-        self._canvas = canvas_cls(self._viewer_model)
+        self._canvas = DataCanvas(self._viewer_model)
+        # NOTE that by receiving events through a signal, we do not provide the canvas
+        # with a strong reference to this controller. This helps avoid reference cycles
+        # preventing garbage collection. The tradeoff, though, is that we cannot consume
+        # events at this point. If future needs require event consumption, we may need
+        # to switch approaches.
+        self._canvas.eventCaptured.connect(self._view_event)
+        self._canvas.roi_view.events.bb.connect(self._on_roi_view_bounding_box_changed)
+
+        self._roi_model: RectangularROIModel | None = None
 
         # TODO: Is this necessary?
-        self._histograms: dict[ChannelKey, HistogramCanvas] = {}
-        self._shared_histogram: SharedHistogramCanvas | None = None
+        self._histograms: dict[ChannelKey, Histogram] = {}
+        self._shared_histogram: SharedHistogram | None = None
         self._shared_histogram_links: dict[ChannelKey, _SharedHistogramLink] = {}
-        self._view = frontend_cls(self._canvas.frontend_widget(), self._viewer_model)
-
-        self._roi_view: RectangularROIHandle | None = None
+        self._view = frontend_cls(self._canvas.widget(), self._viewer_model)
+        self._hover_ray: events.Ray | None = None
 
         self._set_model_connected(self._display_model)
-        self._canvas.set_ndim(self._display_model.n_visible_axes)
+        self._canvas.ndims = self._display_model.n_visible_axes
 
         self._view.currentIndexChanged.connect(self._on_view_current_index_changed)
         self._view.resetZoomClicked.connect(self._on_view_reset_zoom_clicked)
         self._view.histogramRequested.connect(self._add_histogram)
         self._view.sharedHistogramRequested.connect(self._add_shared_histogram)
+        self._view.sharedHistogramLogRequested.connect(
+            self._on_view_shared_histogram_log_requested
+        )
         self._view.channelModeChanged.connect(self._on_view_channel_mode_changed)
         self._view.ndimToggleRequested.connect(self._on_view_ndim_toggle_requested)
 
-        self._highlight_pos: tuple[float, float] | None = None
-        self._canvas.mouseMoved.connect(self._on_canvas_mouse_moved)
-        self._canvas.mouseLeft.connect(self._on_canvas_mouse_left)
-
         self._focused_slider_axis: AxisKey | None = None
-        self._disconnect_key_events = _app.filter_key_events(
-            self._view.frontend_widget(), self._view
-        )
-        self._view.keyPressed.connect(self._on_key_pressed)
 
         if self._data_wrapper is not None:
             self._fully_synchronize_view()
@@ -230,9 +236,12 @@ class ArrayViewer:
             self._set_roi_model_connected(self._roi_model)
         self._synchronize_roi()
 
-    def show(self) -> None:
+    def show(self, zoom_to_fit: bool = True) -> None:
         """Show the viewer."""
+        self._canvas._canvas.visible = True
         self._view.set_visible(True)
+        if zoom_to_fit:
+            self._canvas.reset_zoom()
 
     def hide(self) -> None:
         """Hide the viewer."""
@@ -240,7 +249,7 @@ class ArrayViewer:
 
     def close(self) -> None:
         """Close the viewer."""
-        self._disconnect_key_events()
+        self._canvas._canvas.set_event_filter(None)
         self._view.set_visible(False)
 
     def clone(self) -> ArrayViewer:
@@ -264,7 +273,7 @@ class ArrayViewer:
         for key, ctrl in self._lut_controllers.items():
             if ctrl.handles:
                 stats = compute_image_stats(
-                    ctrl.handles[0].data(),
+                    ctrl.handles[0].img.data,
                     ctrl.lut_model.clims,
                     need_histogram=True,
                     significant_bits=sig_bits,
@@ -307,18 +316,17 @@ class ArrayViewer:
         return ArrayDisplayModel(**kwargs)
 
     def _add_histogram(self, channel: ChannelKey = None) -> None:
-        histogram_cls = _app.get_histogram_canvas_class()  # will raise if not supported
-        hist = histogram_cls()
+        hist = Histogram()
         self._histograms[channel] = hist
 
         if ctrl := self._lut_controllers.get(channel, None):
+            # Add histogram to ArrayView for display
             self._view.add_histogram(channel, hist)
+            # Add histogram to channel controller for updates
             ctrl.add_lut_view(hist)
             self._connect_histogram(ctrl, hist)
 
-    def _connect_histogram(
-        self, ctrl: ChannelController, hist: HistogramCanvas
-    ) -> None:
+    def _connect_histogram(self, ctrl: ChannelController, hist: Histogram) -> None:
         """Connect a histogram to a channel controller's stats signal."""
 
         def _on_stats(stats: ImageStats) -> None:
@@ -329,17 +337,17 @@ class ArrayViewer:
         # Trigger initial data from existing handle
         if handles := ctrl.handles:
             sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
-            ctrl.update_texture_data(handles[0].data(), significant_bits=sig_bits)
+            ctrl.update_texture_data(handles[0].img.data, significant_bits=sig_bits)
         hist.set_range()
 
     def _add_shared_histogram(self) -> None:
         """Create and connect the shared multi-channel histogram."""
         if self._shared_histogram is not None:
             return
-        hist_cls = _app.get_shared_histogram_canvas_class()
-        hist = hist_cls()
+        hist = SharedHistogram()
         self._shared_histogram = hist
-        self._view.add_shared_histogram(hist)
+        self._view.add_shared_histogram(hist.widget())
+        hist.canvas.visible = True
 
         # Connect clim/gamma changes from shared histogram back to models
         hist.climsChanged.connect(self._on_shared_histogram_clims_changed)
@@ -352,6 +360,10 @@ class ArrayViewer:
         # Apply current channel mode visibility
         self._update_lut_visibility(self._resolved.channel_mode)
         hist.set_range()
+
+    def _on_view_shared_histogram_log_requested(self, log_base: int | None) -> None:
+        if self._shared_histogram is not None:
+            self._shared_histogram.set_log_base(log_base)
 
     def _connect_shared_histogram_channel(
         self, key: ChannelKey, ctrl: ChannelController
@@ -431,12 +443,6 @@ class ArrayViewer:
         ]:
             getattr(obj, _connect)(callback)
 
-        if _connect:
-            self._create_roi_view()
-        else:
-            if self._roi_view:
-                self._roi_view.remove()
-
     # ------------------ Resolve / Apply ------------------
 
     def _re_resolve(self) -> None:
@@ -462,7 +468,7 @@ class ArrayViewer:
             if old.visible_axes != new.visible_axes:
                 self._view.set_visible_axes(new.visible_axes)
                 ndim = len(new.visible_axes)
-                self._canvas.set_ndim(cast("Literal[2, 3]", ndim))
+                self._canvas.ndims = cast("Literal[2, 3]", ndim)
                 self._clear_canvas()
             if old.hidden_sliders != new.hidden_sliders:
                 self._view.hide_sliders(new.hidden_sliders, show_remainder=True)
@@ -512,13 +518,15 @@ class ArrayViewer:
     def _update_lut_visibility(self, mode: ChannelMode) -> None:
         """Update LUT view visibility based on channel mode."""
         for lut_ctrl in self._lut_controllers.values():
+            key = lut_ctrl.key
+            if key is None:
+                visible = mode == ChannelMode.GRAYSCALE
+            elif key == "RGB":
+                visible = mode == ChannelMode.RGBA
+            else:
+                visible = mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE}
             for view in lut_ctrl.lut_views:
-                if lut_ctrl.key is None:
-                    view.set_visible(mode == ChannelMode.GRAYSCALE)
-                elif lut_ctrl.key == "RGB":
-                    view.set_visible(mode == ChannelMode.RGBA)
-                else:
-                    view.set_visible(mode in {ChannelMode.COLOR, ChannelMode.COMPOSITE})
+                view.set_visible(visible)
 
         # Mirror visibility on the shared histogram
         if hist := self._shared_histogram:
@@ -604,36 +612,82 @@ class ArrayViewer:
     def _on_roi_model_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
-        if self._roi_view is not None:
-            world_min = self._data_point_to_world(*bb[0])
-            world_max = self._data_point_to_world(*bb[1])
-            self._roi_view.set_bounding_box(world_min, world_max)
+        if self._canvas.roi_view is not None:
+            self._canvas.roi_view.bb = bb
 
     def _on_roi_model_visible_changed(self, visible: bool) -> None:
-        if self._roi_view is not None:
-            self._roi_view.set_visible(visible)
+        if self._canvas.roi_view is not None:
+            self._canvas.roi_view.rect_mesh.visible = visible
 
     def _on_interaction_mode_changed(self, mode: InteractionMode) -> None:
         if mode == InteractionMode.CREATE_ROI:
-            # Create ROI model if needed to store ROI state
-            if self.roi is None:
-                self.roi = RectangularROIModel(visible=False)
+            self._canvas.roi_view.rect_mesh.visible = False
 
-            # Create a new ROI
-            self._create_roi_view()
+    # def _create_roi_view(self) -> None:
+    #     # Remove old ROI view
+    #     # TODO: Enable multiple ROIs
+    #     if self._canvas.roi_view:
+    #         self._canvas.roi_view.remove()
 
-    def _create_roi_view(self) -> None:
-        # Remove old ROI view
-        # TODO: Enable multiple ROIs
-        if self._roi_view:
-            self._roi_view.remove()
+    #     # Create new ROI view
+    #     self._canvas.roi_view = self._canvas.add_bounding_box()
+    #     # Connect view signals
+    #     self._canvas.roi_view.boundingBoxChanged.connect(
+    #         self._on_roi_view_bounding_box_changed
+    #     )
+    def _view_event(self, event: events.Event) -> None:
+        """Respond to user events, delegating to focused sub-handlers."""
+        self._hover_event(event)
+        if isinstance(event, events.KeyPressEvent):
+            handle_key_press(event, self)
 
-        # Create new ROI view
-        self._roi_view = self._canvas.add_bounding_box()
-        # Connect view signals
-        self._roi_view.boundingBoxChanged.connect(
-            self._on_roi_view_bounding_box_changed
-        )
+    def _hover_event(self, event: events.Event) -> None:
+        """Update hover info and cursor based on mouse position."""
+        if isinstance(event, events.MouseMoveEvent):
+            if not (ray := self._canvas.view.to_ray(event.pos)):
+                return
+            if self.display_model.n_visible_axes == 2:
+                self._hover_ray = ray
+            else:
+                self._hover_ray = None
+            self._update_hover()
+        elif isinstance(event, events.MouseLeaveEvent):
+            self._hover_ray = None
+            self._update_hover()
+
+    def _update_hover(self) -> None:
+        channel_values: dict[ChannelKey, float] = {}
+        highlight_pos: tuple[int, int] | None = None
+        if self._hover_ray is not None:
+            for node, distance in self._hover_ray.intersections(
+                self._canvas.view.scene
+            ):
+                if not isinstance(node, snx.Image):
+                    continue
+                intersect_pos = self._hover_ray.point_at_distance(distance)
+                # TODO: Recursive mapping from node to scene
+                local_pos = node.transform.imap(intersect_pos)
+                # Note the addition - scenex nodes put pixel centers at integer
+                # coordinates.
+                # TODO: A __getitem___ on the image node could encapsulate this logic
+                highlight_pos = (
+                    floor(local_pos[1] + 0.5),
+                    floor(local_pos[0] + 0.5),
+                )
+                channel_values[self._channel_of(node)] = node.data[highlight_pos]
+
+        # update highlight display
+        self._highlight_values(channel_values, highlight_pos)
+
+    def _channel_of(self, node: snx.Image) -> ChannelKey | None:
+        """Return the channel key for the given image node."""
+        # FIXME: This is horrible, and we're likely going to want to query based on e.g.
+        # chunk idx, dataset id in more complicated scenarios.
+        for channel, ctrl in self._lut_controllers.items():
+            for handle in ctrl.handles:
+                if node is handle.img:
+                    return channel
+        return None
 
     def _clear_canvas(self) -> None:
         for lut_ctrl in self._lut_controllers.values():
@@ -641,7 +695,7 @@ class ArrayViewer:
                 handle = lut_ctrl.handles.pop()
                 # disconnect model signals
                 handle.model = None
-                handle.remove()
+                handle.close()
                 # handles are also added as lut_views via add_handle();
                 # remove them so old GPU textures can be garbage-collected
                 with suppress(ValueError):
@@ -679,29 +733,13 @@ class ArrayViewer:
 
     def _on_view_reset_zoom_clicked(self) -> None:
         """Reset the zoom level of the canvas."""
-        self._canvas.set_range()
+        self._canvas.reset_zoom()
 
     def _on_roi_view_bounding_box_changed(
         self, bb: tuple[tuple[float, float], tuple[float, float]]
     ) -> None:
         if self._roi_model:
-            data_min = self._world_point_to_data(*bb[0])
-            data_max = self._world_point_to_data(*bb[1])
-            self._roi_model.bounding_box = (data_min, data_max)
-
-    def _on_canvas_mouse_moved(self, event: MouseMoveEvent) -> None:
-        """Respond to a mouse move event in the view."""
-        x, y, _z = self._canvas.canvas_to_world((event.x, event.y))
-        self._highlight_pos = (x, y)
-
-        # update highlight display
-        data_pos, channel_values = self._get_values_at_world_point(*self._highlight_pos)
-        self._highlight_values(channel_values, data_pos)
-
-    def _on_canvas_mouse_left(self) -> None:
-        """Respond to a mouse leaving the canvas in the view."""
-        self._highlight_pos = None
-        self._highlight_values({}, self._highlight_pos)
+            self._roi_model.bounding_box = bb
 
     def _on_key_pressed(self, event: KeyPressEvent) -> None:
         handle_key_press(event, self)
@@ -721,8 +759,6 @@ class ArrayViewer:
         # in channel_values, the highlight will be set to None (i.e. hidden)
         for ch, hist in self._histograms.items():
             hist.highlight(channel_values.get(ch, None))
-
-        # Also forward to shared histogram
         if self._shared_histogram is not None:
             self._shared_histogram.highlight(channel_values)
 
@@ -839,12 +875,29 @@ class ArrayViewer:
             if not lut_ctrl.handles:
                 # we don't yet have any handles for this channel
                 if response.n_visible_axes == 2:
-                    handle = self._canvas.add_image(data)
-                    lut_ctrl.add_handle(handle)
+                    img = snx.Image(
+                        name=str(key),
+                        data=data,
+                        blending=BlendMode.ADDITIVE,
+                        interactive=True,
+                    )
                 elif response.n_visible_axes == 3:
-                    handle = self._canvas.add_volume(data)
-                    lut_ctrl.add_handle(handle)
+                    img = snx.Volume(
+                        name=str(key),
+                        data=data,
+                        blending=BlendMode.ADDITIVE,
+                        interactive=True,
+                    )
+                else:
+                    n_axes = response.n_visible_axes
+                    raise ValueError(f"Unsupported number of visible axes: {n_axes}")
+                self._canvas.view.scene.add_child(img)
+                lut_ctrl.add_image(img)
                 self._canvas.set_scales(self._resolved.visible_scales)
+                # FIXME: This was previously done in the canvas impls whenever a new
+                # image was added. We probably don't actually want to do this every
+                # time a new dataset is added.
+                self._canvas.reset_zoom()
 
             sig_bits = wrp.significant_bits if (wrp := self._data_wrapper) else None
             has_broadcast = len(self.stats_updated) > 0
@@ -856,72 +909,8 @@ class ArrayViewer:
             if has_broadcast and stats is not None:
                 self.stats_updated.emit(key, stats)
 
-        self._canvas.refresh()
         # update highlight display
-        if self._highlight_pos is not None:
-            data_pos, channel_values = self._get_values_at_world_point(
-                *self._highlight_pos
-            )
-            self._highlight_values(channel_values, data_pos)
-
-    def _world_to_data(self, x: float, y: float) -> tuple[int, int]:
-        """Convert world (x, y) to data (row, col) indices using visible scales."""
-        scales = self._resolved.visible_scales
-        if len(scales) >= 2:
-            sx, sy = scales[-1], scales[-2]
-            data_x = int(x / sx) if sx != 0 else int(x)
-            data_y = int(y / sy) if sy != 0 else int(y)
-        else:
-            data_x, data_y = int(x), int(y)
-        return data_y, data_x
-
-    def _world_point_to_data(self, x: float, y: float) -> tuple[float, float]:
-        """Convert world (x, y) to data (x, y) as floats using visible scales."""
-        scales = self._resolved.visible_scales
-        if len(scales) >= 2:
-            sx, sy = scales[-1], scales[-2]
-            data_x = x / sx if sx != 0 else x
-            data_y = y / sy if sy != 0 else y
-        else:
-            data_x, data_y = x, y
-        return data_x, data_y
-
-    def _data_point_to_world(self, x: float, y: float) -> tuple[float, float]:
-        """Convert data (x, y) to world (x, y) using visible scales."""
-        scales = self._resolved.visible_scales
-        if len(scales) >= 2:
-            sx, sy = scales[-1], scales[-2]
-            return x * sx, y * sy
-        return x, y
-
-    def _get_values_at_world_point(
-        self, x: float, y: float
-    ) -> tuple[tuple[int, int], dict[ChannelKey, float]]:
-        """Return (data_pos, channel_values) for world point (x, y)."""
-        # TODO: handle 3D data
-        n_vis = len(self._resolved.visible_axes)
-        if n_vis != 2:  # pragma: no cover
-            return (0, 0), {}
-
-        data_y, data_x = self._world_to_data(x, y)
-
-        if data_x < 0 or data_y < 0:
-            return (data_y, data_x), {}
-
-        values: dict[ChannelKey, float] = {}
-        for key, ctrl in self._lut_controllers.items():
-            if (value := ctrl.get_value_at_index((data_y, data_x))) is not None:
-                # Handle RGB
-                if key == "RGB" and isinstance(value, np.ndarray):
-                    values["R"] = value[0]
-                    values["G"] = value[1]
-                    values["B"] = value[2]
-                    if value.shape[0] > 3:
-                        values["A"] = value[3]
-                else:
-                    values[key] = cast("float", value)
-
-        return (data_y, data_x), values
+        self._update_hover()
 
 
 class _SharedHistogramLink:
@@ -931,7 +920,7 @@ class _SharedHistogramLink:
         self,
         key: ChannelKey,
         ctrl: ChannelController,
-        hist: SharedHistogramCanvas,
+        hist: SharedHistogram,
         fallback_name: str = "",
         significant_bits: int | None = None,
     ) -> None:
@@ -960,7 +949,9 @@ class _SharedHistogramLink:
 
         if handles := self._ctrl.handles:
             self._ctrl.update_texture_data(
-                handles[0].data(), significant_bits=significant_bits
+                handles[0].img.data,
+                significant_bits=significant_bits,
+                need_histogram=True,
             )
 
     def _on_stats(self, stats: ImageStats) -> None:
@@ -970,7 +961,7 @@ class _SharedHistogramLink:
     def _on_clims_resolved(self, clims: tuple[float, float]) -> None:
         self._hist.set_channel_clims(self._key, clims)
 
-    def _on_cmap(self, cmap: cmap_mod.Colormap) -> None:
+    def _on_cmap(self, cmap: cmap.Colormap) -> None:
         self._hist.set_channel_color(self._key, cmap.color_stops[-1].color.rgba)
 
     def _on_visible(self, visible: bool) -> None:

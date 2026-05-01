@@ -1,47 +1,46 @@
-"""Tests for PyGFXSharedHistogramCanvas visual behavior."""
+"""Tests SharedHistogram visual behavior."""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 from pytest import fixture
-
-from ndv._types import (
+from scenex.app.events import (
     MouseButton,
+    MouseDoublePressEvent,
     MouseMoveEvent,
     MousePressEvent,
     MouseReleaseEvent,
 )
-from ndv.views._pygfx._shared_histogram import PyGFXSharedHistogramCanvas
 
+from ndv.views._shared_histogram import SharedHistogram
 
-def _force_canvas_size(
-    canvas: PyGFXSharedHistogramCanvas, w: int = 600, h: int = 600
-) -> None:
-    """Force the rendercanvas to report a valid size (needed before show)."""
-    rc = canvas._canvas
-    rc._size_info.set_physical_size(w, h, 1.0)
+if TYPE_CHECKING:
+    import scenex as snx
 
 
 @fixture
-def hist() -> PyGFXSharedHistogramCanvas:
-    canvas = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(canvas)
+def hist() -> SharedHistogram:
+    canvas = SharedHistogram()
     canvas.set_range(x=(0, 100), y=(0, 1))
     return canvas
 
 
-def _world_to_canvas(
-    hist: PyGFXSharedHistogramCanvas, x: float, y: float
-) -> tuple[float, float]:
-    return hist.world_to_canvas((x, y, 0))
+# def _world_to_canvas(
+#     hist: SharedHistogram, x: float, y: float
+# ) -> tuple[float, float]:
+#     cam = hist.view.camera
+#     return cam.
+#     return tuple(hist.node_tform.imap((x, y))[:2])  # type: ignore[return-value]
 
 
 # ---------- Channel lifecycle ----------
 
 
 @pytest.mark.usefixtures("any_app")
-def test_channel_creation(hist: PyGFXSharedHistogramCanvas) -> None:
+def test_channel_creation(hist: SharedHistogram) -> None:
     """Channels are created lazily on first data/color set."""
     assert len(hist._channels) == 0
 
@@ -56,7 +55,7 @@ def test_channel_creation(hist: PyGFXSharedHistogramCanvas) -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_channel_removal(hist: PyGFXSharedHistogramCanvas) -> None:
+def test_channel_removal(hist: SharedHistogram) -> None:
     """Removed channels are cleaned up."""
     counts = np.array([1, 2, 3])
     edges = np.array([0, 33, 66, 100], dtype=float)
@@ -72,7 +71,7 @@ def test_channel_removal(hist: PyGFXSharedHistogramCanvas) -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_channel_visibility(hist: PyGFXSharedHistogramCanvas) -> None:
+def test_channel_visibility(hist: SharedHistogram) -> None:
     """Channel visibility controls all visual elements."""
     counts = np.array([1, 2, 3])
     edges = np.array([0, 33, 66, 100], dtype=float)
@@ -104,8 +103,7 @@ def test_channel_visibility(hist: PyGFXSharedHistogramCanvas) -> None:
 @pytest.mark.usefixtures("any_app")
 def test_none_key_channel() -> None:
     """key=None (grayscale default channel) works correctly."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(None, counts, edges)
@@ -124,28 +122,40 @@ def test_none_key_channel() -> None:
 # ---------- Clim/gamma interaction ----------
 
 
+def _world_to_canvas(view: snx.View, x: float, y: float) -> tuple[float, float]:
+    return view.camera.projection.map(view.camera.transform.imap((x, y, 0)))[:2]  # type: ignore[return-value]
+
+
 @pytest.mark.usefixtures("any_app")
 def test_clim_drag_emits_signal() -> None:
     """Dragging a clim handle emits climsChanged with correct key."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
+    hist.set_range(x=(0, 100))  # ensure we have a known canvas width
     hist.set_channel_clims(0, (10, 90))
     hist.set_channel_color(0, (0, 1, 0, 1))
-    hist.set_range(x=(0, 100))
 
     received: list = []
     hist.climsChanged.connect(lambda key, clims: received.append((key, clims)))
 
     # Grab the left clim
-    lx, ly = _world_to_canvas(hist, 10, 0)
-    hist.on_mouse_press(MousePressEvent(x=lx, y=ly, btn=MouseButton.LEFT))
+    x_start, y_start, width, height = hist.canvas.content_rect_for(hist.view)
+    left_clim_pos = (
+        x_start + (width / 10),
+        y_start + height - 1,
+    )
+    hist.canvas.handle(MousePressEvent(pos=left_clim_pos, buttons=MouseButton.LEFT))
     # Drag to new position
-    nx, ny = _world_to_canvas(hist, 30, 0)
-    hist.on_mouse_move(MouseMoveEvent(x=nx, y=ny, btn=MouseButton.LEFT))
-    hist.on_mouse_release(MouseReleaseEvent(x=nx, y=ny, btn=MouseButton.LEFT))
+    new_left_clim_pos = (
+        x_start + (width * 3 / 10),
+        y_start + height - 1,
+    )
+    hist.canvas.handle(MouseMoveEvent(pos=new_left_clim_pos, buttons=MouseButton.LEFT))
+    hist.canvas.handle(
+        MouseReleaseEvent(pos=new_left_clim_pos, buttons=MouseButton.LEFT)
+    )
 
     assert len(received) >= 1
     assert received[-1][0] == 0  # correct channel key
@@ -155,24 +165,32 @@ def test_clim_drag_emits_signal() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_none_key_clim_drag() -> None:
     """Clim dragging works for key=None (grayscale channel)."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(None, counts, edges)
+    hist.set_range(x=(0, 100))  # ensure we have a known canvas width
     hist.set_channel_clims(None, (10, 90))
     hist.set_channel_color(None, (0.5, 0.5, 0.5, 1))
-    hist.set_range(x=(0, 100))
 
     received: list = []
     hist.climsChanged.connect(lambda key, clims: received.append((key, clims)))
 
     # Grab the right clim
-    rx, ry = _world_to_canvas(hist, 90, 0)
-    hist.on_mouse_press(MousePressEvent(x=rx, y=ry, btn=MouseButton.LEFT))
-    nx, ny = _world_to_canvas(hist, 70, 0)
-    hist.on_mouse_move(MouseMoveEvent(x=nx, y=ny, btn=MouseButton.LEFT))
-    hist.on_mouse_release(MouseReleaseEvent(x=nx, y=ny, btn=MouseButton.LEFT))
+    x_start, y_start, width, height = hist.canvas.content_rect_for(hist.view)
+    right_clim_pos = (
+        x_start + (width * 9 / 10),
+        y_start + height - 1,
+    )
+    hist.canvas.handle(MousePressEvent(pos=right_clim_pos, buttons=MouseButton.LEFT))
+    new_right_clim_pos = (
+        x_start + (width * 7 / 10),
+        y_start + height - 1,
+    )
+    hist.canvas.handle(MouseMoveEvent(pos=new_right_clim_pos, buttons=MouseButton.LEFT))
+    hist.canvas.handle(
+        MouseReleaseEvent(pos=new_right_clim_pos, buttons=MouseButton.LEFT)
+    )
 
     assert len(received) >= 1
     assert received[-1][0] is None  # key is None, not _NO_KEY
@@ -181,26 +199,23 @@ def test_none_key_clim_drag() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_gamma_double_click_resets() -> None:
     """Double-clicking gamma handle emits gammaChanged with 1.0."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
+    hist.set_range(x=(0, 100))  # ensure we have a known canvas width
     hist.set_channel_clims(0, (0, 100))
     hist.set_channel_gamma(0, 2.0)
     hist.set_channel_color(0, (0, 1, 0, 1))
-    hist.set_range(x=(0, 100))
 
     received: list = []
     hist.gammaChanged.connect(lambda key, gamma: received.append((key, gamma)))
 
     # Find gamma handle position: midpoint of clims, y = 2^(-gamma) * y_top
-    y_range = hist._compute_y_range()
-    y_top = (y_range[1] if y_range else 1.0) * 0.98
-    mid_x = 50.0
-    mid_y = (2 ** (-2.0)) * y_top
-    gx, gy = _world_to_canvas(hist, mid_x, mid_y)
-    hist.on_mouse_double_press(MousePressEvent(x=gx, y=gy, btn=MouseButton.LEFT))
+    x_start, y_start, width, height = hist.canvas.content_rect_for(hist.view)
+    gamma_height = 2 ** (-2.0)
+    gamma_pos = (x_start + (width / 2), y_start + height * (1 - gamma_height))
+    hist.canvas.handle(MouseDoublePressEvent(pos=gamma_pos, buttons=MouseButton.LEFT))
 
     assert len(received) == 1
     assert received[0] == (0, 1.0)
@@ -212,29 +227,39 @@ def test_gamma_double_click_resets() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_clim_bounds_constrain_drag() -> None:
     """Clim drag respects clim_bounds."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
+    hist.set_range(x=(-50, 150))  # ensure we have a known canvas width
     hist.set_channel_clims(0, (10, 90))
     hist.set_channel_color(0, (1, 0, 0, 1))
     hist.set_clim_bounds((0, 255))
-    hist.set_range(x=(0, 100))
 
     received: list = []
     hist.climsChanged.connect(lambda key, clims: received.append((key, clims)))
 
     # Try to drag left clim below 0
-    lx, ly = _world_to_canvas(hist, 10, 0)
-    hist.on_mouse_press(MousePressEvent(x=lx, y=ly, btn=MouseButton.LEFT))
-    nx, ny = _world_to_canvas(hist, -50, 0)
-    hist.on_mouse_move(MouseMoveEvent(x=nx, y=ny, btn=MouseButton.LEFT))
-    hist.on_mouse_release(MouseReleaseEvent(x=nx, y=ny, btn=MouseButton.LEFT))
+    # Grab the left clim
+    x_start, y_start, width, height = hist.canvas.content_rect_for(hist.view)
+    left_clim_pos = (
+        x_start + (6 * width / 20),
+        y_start + height - 1,
+    )
+    hist.canvas.handle(MousePressEvent(pos=left_clim_pos, buttons=MouseButton.LEFT))
+    new_left_clim_pos = (
+        x_start + (2 * width / 20),
+        y_start + height - 1,
+    )
+    hist.canvas.handle(MouseMoveEvent(pos=new_left_clim_pos, buttons=MouseButton.LEFT))
+    hist.canvas.handle(
+        MouseReleaseEvent(pos=new_left_clim_pos, buttons=MouseButton.LEFT)
+    )
 
     if received:
         # Left clim should be clamped to 0, not -50
         assert received[-1][1][0] >= 0
+    hist.climsChanged.disconnect()
 
 
 # ---------- Log scale ----------
@@ -243,7 +268,7 @@ def test_clim_bounds_constrain_drag() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_log_scale() -> None:
     """Log scale can be toggled without errors."""
-    hist = PyGFXSharedHistogramCanvas()
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
@@ -261,23 +286,29 @@ def test_log_scale() -> None:
 @pytest.mark.usefixtures("any_app")
 def test_highlight() -> None:
     """Highlight line shows and hides correctly."""
-    hist = PyGFXSharedHistogramCanvas()
-    assert not hist._highlight_lines
+    hist = SharedHistogram()
+    counts = np.array([5, 10, 15, 10, 5])
+    edges = np.linspace(0, 100, 6)
+    hist.set_channel_data(0, counts, edges)
+    for channel in hist._channels.values():
+        assert not channel.highlight.visible
 
     hist.highlight({"ch0": 50})
-    assert hist._highlight_lines["ch0"].visible
+    for key, channel in hist._channels.items():
+        assert channel.highlight.visible == (key == "ch0")
 
     hist.highlight({})
-    assert not hist._highlight_lines["ch0"].visible
+    for channel in hist._channels.values():
+        assert not channel.highlight.visible
 
 
 # ---------- Legend ----------
 
 
 @pytest.mark.usefixtures("any_app")
-def test_legend_names() -> None:
-    """Legend entries track channel names."""
-    hist = PyGFXSharedHistogramCanvas()
+def test_legend_visibility() -> None:
+    """Legend entries match channel visibility and names."""
+    hist = SharedHistogram()
     counts = np.array([5, 10, 15])
     edges = np.array([0, 33, 66, 100], dtype=float)
 
@@ -288,12 +319,12 @@ def test_legend_names() -> None:
 
     ch0 = hist._channels[0]
     ch1 = hist._channels[1]
-    assert ch0.name == "FITC"
-    assert ch1.name == "DAPI"
+    assert ch0.legend_text.text == "● FITC"
+    assert ch1.legend_text.text == "● DAPI"
 
-    # Hiding a channel updates state
+    # Hiding a channel hides its legend
     hist.set_channel_visible(0, False)
-    assert ch0.visible is False
+    assert not ch0.legend_text.visible
 
     hist.set_channel_visible(0, True)
-    assert ch0.visible is True
+    assert ch0.legend_text.visible

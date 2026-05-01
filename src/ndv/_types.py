@@ -59,37 +59,6 @@ ChannelKey: TypeAlias = Annotated[
 ]
 
 
-class MouseButton(IntFlag):
-    LEFT = auto()
-    MIDDLE = auto()
-    RIGHT = auto()
-    NONE = auto()
-
-
-class MouseMoveEvent(NamedTuple):
-    """Event emitted when the user moves the cursor."""
-
-    x: float
-    y: float
-    btn: MouseButton = MouseButton.NONE
-
-
-class MousePressEvent(NamedTuple):
-    """Event emitted when mouse button is pressed."""
-
-    x: float
-    y: float
-    btn: MouseButton
-
-
-class MouseReleaseEvent(NamedTuple):
-    """Event emitted when mouse button is released."""
-
-    x: float
-    y: float
-    btn: MouseButton
-
-
 class KeyMod(IntFlag):
     NONE = 0
     SHIFT = auto()

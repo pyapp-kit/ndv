@@ -31,6 +31,7 @@ class ArrayView(Viewable):
     resetZoomClicked = Signal()
     histogramRequested = Signal(int)
     sharedHistogramRequested = Signal()
+    sharedHistogramLogRequested = Signal(int)
     ndimToggleRequested = Signal(bool)
     channelModeChanged = Signal(ChannelMode)
     keyPressed = Signal(KeyPressEvent)

@@ -10,7 +10,7 @@ from qtpy.QtWidgets import QApplication, QWidget
 
 from ndv._types import KeyCode, KeyMod, KeyPressEvent
 from ndv.models._viewer_model import ArrayViewerModel
-from ndv.views._app import get_histogram_canvas_class
+from ndv.views._histogram import Histogram
 from ndv.views._qt._app import QtAppWrap
 from ndv.views._qt._array_view import PlayButton, QtArrayView
 
@@ -76,7 +76,7 @@ def test_histogram(viewer: QtArrayView) -> None:
 
     # Test adding the histogram widget puts it on the relevant lut
     assert lut.histogram is None
-    histogram = get_histogram_canvas_class()()  # will raise if not supported
+    histogram = Histogram()  # will raise if not supported
     viewer.add_histogram(channel, histogram)
     assert lut.histogram is not None
 

@@ -22,11 +22,11 @@ def test_set_gui_backend() -> None:
 
 
 def test_set_canvas_backend() -> None:
-    backends = [
-        ndv.views._app.CanvasBackend.VISPY,
-        ndv.views._app.CanvasBackend.PYGFX,
-    ]
+    """Ensure that ndv.set_canvas_backend passes through to scenex."""
+    backends = ["pygfx", "vispy"]
     for backend in backends:
-        ndv.set_canvas_backend(backend.value)
-        assert ndv.views._app.canvas_backend() == backend
+        ndv.set_canvas_backend(backend)
+        from scenex.adaptors._auto import determine_backend
+
+        assert determine_backend() == backend
     ndv.set_canvas_backend()

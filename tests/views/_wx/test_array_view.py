@@ -6,7 +6,7 @@ import wx
 from pytest import fixture
 
 from ndv.models._viewer_model import ArrayViewerModel
-from ndv.views._app import get_histogram_canvas_class
+from ndv.views._histogram import Histogram
 from ndv.views._wx._array_view import WxArrayView
 
 
@@ -77,7 +77,7 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
 
     # Test adding the histogram widget puts it on the relevant lut
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 1
-    histogram = get_histogram_canvas_class()()  # will raise if not supported
+    histogram = Histogram()
     viewer.add_histogram(channel, histogram)
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 2
 
