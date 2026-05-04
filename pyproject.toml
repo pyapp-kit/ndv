@@ -37,7 +37,8 @@ dependencies = [
     "cmap >=0.3",
     "numpy >=2.1.0; python_version >= '3.13'",
     "numpy >=1.26.0; python_version >= '3.12'",
-    "psygnal >=0.12",
+    # Gives us SignalGroupDescriptor.connect_child_events
+    "psygnal >=0.14",
     "pydantic >=2.10",
     "typing_extensions >= 4.10",
     "ihist>=0.1.3",
