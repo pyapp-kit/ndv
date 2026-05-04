@@ -671,8 +671,8 @@ class JupyterArrayView(ArrayView):
         from IPython import display
 
         # HACK: This used to be in an else clause, but this actually is useful here now
-        # because the setting of the canvas to visible in _array_viewer shows the canvas.
-        # Since we can't really reparent that widget, let's just clear it.
+        # because the setting of the canvas to visible in _array_viewer shows the
+        # canvas. Since we can't really reparent that widget, let's just clear it.
         display.clear_output()  # type: ignore [no-untyped-call]
         if visible:
             display.display(self.layout)  # type: ignore [no-untyped-call]
