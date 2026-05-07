@@ -356,6 +356,9 @@ def test_roi_controller() -> None:
     assert roi.bounding_box[1] == pytest.approx(expected_max)
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
 
+    # HACK: Unset the ROI Model to enable GC of ctrl
+    ctrl.roi = None
+
 
 @no_type_check
 @pytest.mark.usefixtures("any_app")
