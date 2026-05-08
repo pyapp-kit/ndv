@@ -271,6 +271,7 @@ def test_array_viewer_with_app() -> None:
     viewer.display_model.visible_axes = (0, -2, -1)
     visax_mock.assert_called_once()
     assert viewer.display_model.visible_axes == (0, -2, -1)
+    viewer.close()
 
 
 @pytest.mark.usefixtures("any_app")
@@ -322,6 +323,7 @@ def test_array_viewer_histogram() -> None:
     histogram.set_data(counts, bin_edges)
 
     histogram.close()
+    viewer.close()
 
 
 @no_type_check
@@ -355,9 +357,7 @@ def test_roi_controller() -> None:
     assert roi.bounding_box[0] == pytest.approx(expected_min)
     assert roi.bounding_box[1] == pytest.approx(expected_max)
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
-
-    # HACK: Unset the ROI Model to enable GC of ctrl
-    ctrl.roi = None
+    ctrl.close()
 
 
 @no_type_check
@@ -508,6 +508,7 @@ def test_roi_interaction() -> None:
             )
         )
     mock_set_cursor.assert_called_once_with(ctrl._canvas._canvas, CursorType.ALL_ARROW)
+    ctrl.close()
 
 
 @pytest.mark.allow_leaks
@@ -881,3 +882,4 @@ def test_handle_gc_on_data_reassign() -> None:
     gc.collect()
 
     assert handle_ref() is None
+    viewer.close()
