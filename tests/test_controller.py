@@ -548,6 +548,7 @@ def test_resolve_is_pure() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_stale_response_discard() -> None:
     """Test that responses from old request generations are discarded."""
     ctrl = ArrayViewer()
@@ -571,6 +572,7 @@ def test_stale_response_discard() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_rgba_3d_fallback_warns() -> None:
     """Test that RGBA mode with 3D view reverts to GRAYSCALE with a warning."""
     ctrl = ArrayViewer(np.zeros((10, 4, 10, 10)))
@@ -584,6 +586,7 @@ def test_rgba_3d_fallback_warns() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_rgba_invalid_channel_count_falls_back_to_composite() -> None:
     """Invalid RGBA channel widths should warn and fall back to COMPOSITE."""
     ctrl = ArrayViewer(
@@ -604,6 +607,7 @@ def test_rgba_invalid_channel_count_falls_back_to_composite() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_set_scales_called_on_apply() -> None:
     """set_scales is called on the canvas when scales change."""
     ctrl = ArrayViewer(np.empty((3, 100, 200)))
@@ -617,6 +621,7 @@ def test_set_scales_called_on_apply() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_fallback_channel_names_pushed() -> None:
     """Fallback channel names are pushed to LUT views."""
     ctrl = ArrayViewer(
@@ -638,6 +643,7 @@ def test_fallback_channel_names_pushed() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_scales_applied_after_async_data_response() -> None:
     """Scales must be applied after handles are created in async data response.
 
@@ -669,6 +675,7 @@ def test_scales_applied_after_async_data_response() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_data_replacement_with_stale_index() -> None:
     """Replacing data with fewer dims should not crash due to stale current_index."""
     # Start with 4D data — axes 0, 1, 2, 3 are all valid
@@ -690,6 +697,7 @@ def test_data_replacement_with_stale_index() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_remove_lut_view_with_non_gui_view() -> None:
     """remove_lut_view should handle non-GUI LUTViews (e.g. ImageHandle).
 
@@ -708,6 +716,7 @@ def test_remove_lut_view_with_non_gui_view() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_user_current_index_preserved_on_init() -> None:
     """User-provided current_index must not be overwritten by slider defaults."""
     user_index = {0: 5}
@@ -720,6 +729,7 @@ def test_user_current_index_preserved_on_init() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_keybinding_slice_navigation() -> None:
     """Arrow keys step focused slider and cycle focused axis."""
     from ndv._keybindings import _ensure_focused_axis
@@ -782,6 +792,7 @@ def test_keybinding_slice_navigation() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_keybinding_zoom() -> None:
     """Plus/minus keys should call canvas.zoom when mouse is over canvas."""
 
@@ -819,6 +830,7 @@ def test_keybinding_zoom() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_stats_signals() -> None:
     """Test that stats_updated signals fire on data updates and refresh_stats."""
     from ndv.controllers._image_stats import ImageStats

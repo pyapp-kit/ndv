@@ -28,10 +28,7 @@ if TYPE_CHECKING:
 # HACK: Enable tests inside vispy
 if determine_app() == GuiFrontend.JUPYTER:
     if determine_backend() == "vispy":
-        import asyncio
-
         os.environ["_VISPY_TESTING_APP"] = "jupyter_rfb"
-        asyncio.set_event_loop(asyncio.new_event_loop())
 
 
 @pytest.fixture

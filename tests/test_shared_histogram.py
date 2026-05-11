@@ -6,6 +6,7 @@ from typing import Any, no_type_check
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 import scenex as snx
 
 from ndv.controllers import ArrayViewer
@@ -35,6 +36,7 @@ def _make_ctrl_with_data(
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_shared_histogram_creation() -> None:
     """Shared histogram is created and added to view on demand."""
     ctrl = _make_ctrl_with_data()
@@ -48,6 +50,7 @@ def test_shared_histogram_creation() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_shared_histogram_not_created_at_init() -> None:
     """use_shared_histogram=True only controls style, not visibility."""
     ctrl = ArrayViewer(viewer_options={"use_shared_histogram": True})
@@ -59,6 +62,7 @@ def test_shared_histogram_not_created_at_init() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_shared_histogram_idempotent() -> None:
     """Calling _add_shared_histogram twice doesn't create a second one."""
     ctrl = _make_ctrl_with_data()
@@ -74,6 +78,7 @@ def test_shared_histogram_idempotent() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_channel_data_flows_to_shared_histogram() -> None:
     """Stats updates propagate channel data to shared histogram."""
     with patch(
@@ -93,6 +98,7 @@ def test_channel_data_flows_to_shared_histogram() -> None:
 @patch("ndv.controllers._array_viewer.SharedHistogram.set_channel_gamma")
 @patch("ndv.controllers._array_viewer.SharedHistogram.set_channel_visible")
 @patch("ndv.controllers._array_viewer.SharedHistogram.set_channel_color")
+@pytest.mark.usefixtures("any_app")
 def test_initial_state_set_on_connection(mock_color, mock_visible, mock_gamma) -> None:
     """Color, visibility, gamma, and name are set when channel connects."""
     ctrl = _make_ctrl_with_data()
@@ -104,6 +110,7 @@ def test_initial_state_set_on_connection(mock_color, mock_visible, mock_gamma) -
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_new_channel_connects_to_existing_shared_histogram() -> None:
     """When a new channel appears after shared histogram exists, it connects."""
     ctrl = ArrayViewer(channel_mode="composite")
@@ -125,6 +132,7 @@ def test_new_channel_connects_to_existing_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_clims_from_shared_histogram_update_model() -> None:
     """Dragging clims on shared histogram updates the LUT model."""
     ctrl = _make_ctrl_with_data()
@@ -144,6 +152,7 @@ def test_clims_from_shared_histogram_update_model() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_gamma_from_shared_histogram_updates_model() -> None:
     """Dragging gamma on shared histogram updates the LUT model."""
     ctrl = _make_ctrl_with_data()
@@ -157,6 +166,7 @@ def test_gamma_from_shared_histogram_updates_model() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_model_clims_sync_to_shared_histogram() -> None:
     """Manual clim changes on the model propagate to shared histogram."""
     ctrl = _make_ctrl_with_data()
@@ -175,6 +185,7 @@ def test_model_clims_sync_to_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_model_cmap_sync_to_shared_histogram() -> None:
     """Colormap changes on the model propagate to shared histogram."""
     import cmap
@@ -194,6 +205,7 @@ def test_model_cmap_sync_to_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_model_visibility_sync_to_shared_histogram() -> None:
     """Visibility changes on the model propagate to shared histogram."""
     ctrl = _make_ctrl_with_data()
@@ -216,6 +228,7 @@ def test_model_visibility_sync_to_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_autoscale_syncs_clims_to_shared_histogram() -> None:
     """When autoscale recomputes clims, shared histogram clim lines update."""
     ctrl = _make_ctrl_with_data()
@@ -235,6 +248,7 @@ def test_autoscale_syncs_clims_to_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_stats_update_syncs_clims() -> None:
     """When new data arrives, resolved clims from stats reach the histogram."""
     ctrl = _make_ctrl_with_data()
@@ -253,6 +267,7 @@ def test_stats_update_syncs_clims() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_grayscale_mode_shows_only_default_channel() -> None:
     """In grayscale mode, only key=None channel is visible on shared histogram."""
     ctrl = _make_ctrl_with_data()
@@ -275,6 +290,7 @@ def test_grayscale_mode_shows_only_default_channel() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_composite_mode_shows_numbered_channels() -> None:
     """In composite mode, numbered channels are visible."""
     ctrl = _make_ctrl_with_data()
@@ -294,6 +310,7 @@ def test_composite_mode_shows_numbered_channels() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_opening_histogram_in_grayscale_respects_mode() -> None:
     """If histogram is opened while in grayscale, only default channel shows."""
     ctrl = _make_ctrl_with_data()
@@ -321,6 +338,7 @@ def test_opening_histogram_in_grayscale_respects_mode() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_clim_bounds_propagate_to_shared_histogram() -> None:
     """clim_bounds from LUT model are forwarded to shared histogram."""
     ctrl = _make_ctrl_with_data()
@@ -337,6 +355,7 @@ def test_clim_bounds_propagate_to_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_highlight_forwarded_to_shared_histogram() -> None:
     """Mouse hover values are forwarded to shared histogram."""
     ctrl = _make_ctrl_with_data()
@@ -348,6 +367,7 @@ def test_highlight_forwarded_to_shared_histogram() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_highlight_clears_on_empty_values() -> None:
     """Empty channel values forward None to shared histogram."""
     ctrl = _make_ctrl_with_data()
