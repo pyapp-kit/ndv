@@ -68,6 +68,7 @@ def _patch_views(f: Callable) -> Callable:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     ctrl = ArrayViewer()
@@ -134,6 +135,7 @@ def test_controller() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_canvas_interaction() -> None:
     SHAPE = (10, 4, 10, 10)
     data = np.zeros(SHAPE)
@@ -189,6 +191,7 @@ def test_canvas_interaction() -> None:
 @no_type_check
 @_patch_views
 @patch("ndv.controllers._array_viewer.Histogram", _get_mock_hist_canvas)
+@pytest.mark.usefixtures("any_app")
 def test_histogram_controller() -> None:
     ctrl = ArrayViewer()
     ctrl._async = False
@@ -214,6 +217,7 @@ def test_histogram_controller() -> None:
 
 
 @no_type_check
+@pytest.mark.usefixtures("any_app")
 def test_histogram_updates_on_first_draw() -> None:
     """Histogram should update even when the first response creates the handle."""
     ctrl = ArrayViewer()
