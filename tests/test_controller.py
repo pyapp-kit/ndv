@@ -635,7 +635,7 @@ def test_fallback_channel_names_pushed() -> None:
         ),
     )
     ctrl._async = False
-    ctrl.data = np.empty((3, 10, 10))
+    ctrl.data = np.empty((3, 10, 10), dtype=np.float32)
 
     # fallback names default to str(key) for plain numpy arrays
     for key, lut_ctrl in ctrl._lut_controllers.items():
