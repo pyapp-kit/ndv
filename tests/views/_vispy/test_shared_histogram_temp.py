@@ -28,14 +28,6 @@ def hist() -> SharedHistogram:
     return canvas
 
 
-# def _world_to_canvas(
-#     hist: SharedHistogram, x: float, y: float
-# ) -> tuple[float, float]:
-#     cam = hist.view.camera
-#     return cam.
-#     return tuple(hist.node_tform.imap((x, y))[:2])  # type: ignore[return-value]
-
-
 # ---------- Channel lifecycle ----------
 
 

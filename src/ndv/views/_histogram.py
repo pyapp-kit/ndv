@@ -50,7 +50,7 @@ class Histogram(LUTView):
 
         # Create views with empty scenes in constructor
         self.x_view = snx.View(
-            scene=snx.Scene(),
+            scene=snx.Scene(name="x axis scene"),
             camera=snx.Camera(),
         )
         self.view = snx.View(
@@ -58,7 +58,7 @@ class Histogram(LUTView):
             camera=snx.Camera(interactive=True),
         )
         self.y_view = snx.View(
-            scene=snx.Scene(),
+            scene=snx.Scene(name="y axis scene"),
             camera=snx.Camera(),
         )
 
@@ -172,10 +172,11 @@ class Histogram(LUTView):
 
         self.controls = snx.Scene(
             name="controls scene",
+            # NOTE: This ordering determines selection on overlapping nodes
             children=[
+                self.right_clim,
                 self.left_clim,
                 self.gamma_curve,
-                self.right_clim,
                 self.gamma_handle,
             ],
             interactive=True,
@@ -268,6 +269,17 @@ class Histogram(LUTView):
                 else:
                     snx.set_cursor(self.canvas, CursorType.DEFAULT)
 
+        elif isinstance(event, events.WheelEvent):
+            # Pan on horizontal mouse scroll
+            dx, dy = event.angle_delta
+            if abs(dx) > abs(dy):
+                # FIXME: 5000 is a magic number
+                cam = self.view.camera
+                left, *_ = cam.transform.map(cam.projection.imap((-1, 0)))
+                right, *_ = cam.transform.map(cam.projection.imap((1, 0)))
+                pan_dist = -dx / 5000 * (right - left)
+                cam.transform = cam.transform.translated((pan_dist, 0, 0))
+
         if isinstance(event, events.MouseReleaseEvent | events.MouseLeaveEvent):
             self._grabbed = None
             self.view.camera.interactive = True
@@ -358,7 +370,8 @@ class Histogram(LUTView):
         pass
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        pass
+        if isinstance(policy, ClimsManual):
+            self.set_clims((policy.min, policy.max))
 
     def set_colormap(self, lut: cmap.Colormap) -> None:
         if self.mesh is not None:
@@ -407,11 +420,25 @@ class Histogram(LUTView):
 
     # ---- Viewable interface implementations ----
 
-    def set_range(self) -> None:
+    def set_range(
+        self,
+        x: tuple[float, float] | None = None,
+        y: tuple[float, float] | None = None,
+    ) -> None:
         if not self._initialized:
             return
 
-        projections.zoom_to_fit(self.view, "orthographic", zoom_factor=1)
+        bb = self.view.scene.bounding_box
+        center = np.mean(bb, axis=0) if bb else (0, 0, 0)
+        w, h, d = np.maximum(np.ptp(bb, axis=0) if bb else (1, 1, 1), 1e-6)
+        if x is not None:
+            center = (np.mean(x), center[1], center[2])
+            w = x[1] - x[0]
+        if y is not None:
+            center = (center[0], np.mean(y), center[2])
+            h = y[1] - y[0]
+        self.view.camera.transform = snx.Transform().translated(center)
+        self.view.camera.projection = projections.orthographic(w, h, d)
         self.x_view.camera.projection = projections.orthographic(1, 1, 1)
         self.y_view.camera.projection = projections.orthographic(1, 1, 1)
         self.x_view.camera.transform = snx.Transform().translated((0.5, -0.5, 0))
