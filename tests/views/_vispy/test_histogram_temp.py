@@ -43,6 +43,7 @@ def histogram() -> Histogram:
 
 @pytest.mark.usefixtures("any_app")
 def test_hscroll(histogram: Histogram) -> None:
+    """Test scrolling horizontally pans the histogram"""
     cam = histogram.view.camera
 
     def get_extents() -> tuple[float, float]:
@@ -73,6 +74,7 @@ def test_hscroll(histogram: Histogram) -> None:
 
 @pytest.mark.usefixtures("any_app")
 def test_highlight(histogram: Histogram) -> None:
+    """Test that the highlight line is shown, moved, and hidden correctly."""
     # Ensure the line is present
     line = histogram.highlight_line
     assert line is not None
@@ -90,80 +92,125 @@ def test_highlight(histogram: Histogram) -> None:
     assert not line.visible
 
 
+def world_to_canvas(histogram: Histogram, x: float, y: float) -> tuple[float, float]:
+    cam = histogram.view.camera
+    view_pos_ndc = cam.projection.map(cam.transform.imap((x, y, 0)))
+    rx, ry, w, h = histogram.canvas.content_rect_for(histogram.view)
+    view_pos = (view_pos_ndc[0] * w / 2 + w / 2, -view_pos_ndc[1] * h / 2 + h / 2)
+    return (rx + view_pos[0], ry + view_pos[1])
+
+
 @pytest.mark.usefixtures("any_app")
-def test_interaction(model: LUTModel, histogram: Histogram) -> None:
-    """Checks basic histogram functionality."""
+def test_gamma_cursor(model: LUTModel, histogram: Histogram) -> None:
+    """Tests that the cursor changes when hovering over the gamma handle."""
     histogram.model = model
-    left, right = 0, 10
-    histogram.set_clims((left, right))
+    model.clims = ClimsManual(min=0, max=10)
 
-    def world_to_canvas(x: float, y: float) -> tuple[float, float]:
-        cam = histogram.view.camera
-        view_pos_ndc = cam.projection.map(cam.transform.imap((x, y, 0)))
-        x, y, w, h = histogram.canvas.content_rect_for(histogram.view)
-        view_pos = (view_pos_ndc[0] * w / 2 + w / 2, -view_pos_ndc[1] * h / 2 + h / 2)
-        return (x + view_pos[0], y + view_pos[1])
-
-    # Test cursors
-    pos = world_to_canvas((left + right) / 2, 0.5)
-    with patch("ndv.views._histogram.snx.set_cursor") as mock_set_cursor:
+    pos = world_to_canvas(histogram, 5, 0.5)
+    with patch("ndv.views._histogram.snx.set_cursor") as mock:
         histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.NONE))
-    mock_set_cursor.assert_called_once_with(histogram.canvas, CursorType.V_ARROW)
+    mock.assert_called_once_with(histogram.canvas, CursorType.V_ARROW)
 
-    pos = world_to_canvas(left, 0.5)
-    with patch("ndv.views._histogram.snx.set_cursor") as mock_set_cursor:
-        histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.NONE))
-    mock_set_cursor.assert_called_once_with(histogram.canvas, CursorType.H_ARROW)
-    pos = world_to_canvas(right, 0.5)
-    with patch("ndv.views._histogram.snx.set_cursor") as mock_set_cursor:
-        histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.NONE))
-    mock_set_cursor.assert_called_once_with(histogram.canvas, CursorType.H_ARROW)
 
-    # Select and move gamma
-    pos = world_to_canvas((left + right) / 2, 0.5)
+@pytest.mark.usefixtures("any_app")
+def test_clims_cursor(model: LUTModel, histogram: Histogram) -> None:
+    """Tests that the cursor changes when hovering over the clim handles."""
+    histogram.model = model
+    model.clims = ClimsManual(min=0, max=10)
+
+    pos = world_to_canvas(histogram, 0, 0.5)
+    with patch("ndv.views._histogram.snx.set_cursor") as mock:
+        histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.NONE))
+    mock.assert_called_once_with(histogram.canvas, CursorType.H_ARROW)
+
+    pos = world_to_canvas(histogram, 10, 0.5)
+    with patch("ndv.views._histogram.snx.set_cursor") as mock:
+        histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.NONE))
+    mock.assert_called_once_with(histogram.canvas, CursorType.H_ARROW)
+
+
+@pytest.mark.usefixtures("any_app")
+def test_gamma_drag(model: LUTModel, histogram: Histogram) -> None:
+    """Tests that dragging the gamma handle changes the gamma on the LUTModel."""
+    histogram.model = model
+    model.clims = ClimsManual(min=0, max=10)
+
+    pos = world_to_canvas(histogram, 5, 0.5)
     histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
-    pos = world_to_canvas((left + right) / 2, 0.75)
+    pos = world_to_canvas(histogram, 5, 0.75)
     histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
     histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
     assert model.gamma == -np.log2(0.75)
 
-    # Double clicking gamma resets to 1.
-    pos = world_to_canvas((left + right) / 2, 0.75)
+
+@pytest.mark.usefixtures("any_app")
+def test_gamma_double_click_resets(model: LUTModel, histogram: Histogram) -> None:
+    """Tests that double-clicking the gamma handle resets the gamma to 1."""
+    histogram.model = model
+    # Position the gamma handle to x=5
+    model.clims = ClimsManual(min=0, max=10)
+    # And y=2**(-gamma)
+    model.gamma = 2.0
+
+    # Then double click and show a reset to gamma=1
+    pos = world_to_canvas(histogram, 5, 2 ** (-model.gamma))
     histogram.canvas.handle(MouseDoublePressEvent(pos=pos, buttons=MouseButton.LEFT))
     assert model.gamma == 1
 
-    # Select and move the left clim
-    pos = world_to_canvas(left, 0.5)
-    histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
-    left = 1
-    pos = world_to_canvas(left, 0.5)
-    histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
-    histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
-    assert model.clims == ClimsManual(min=left, max=right)
 
-    # Select and move the right clim
-    pos = world_to_canvas(right, 0.5)
-    histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
-    right = 9
-    pos = world_to_canvas(right, 0.5)
-    histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
-    histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
-    assert model.clims == ClimsManual(min=left, max=right)
+@pytest.mark.usefixtures("any_app")
+def test_left_clim_drag(model: LUTModel, histogram: Histogram) -> None:
+    """Tests dragging the left clim handle to change the left contrast limit"""
+    histogram.model = model
+    model.clims = ClimsManual(min=0, max=10)
 
-    # Ensure the right clim cannot move beyond the left clim
-    pos = world_to_canvas(right, 0.5)
+    pos = world_to_canvas(histogram, 0, 0.5)
     histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
-    right = 0
-    pos = world_to_canvas(right, 0.5)
+    pos = world_to_canvas(histogram, 1, 0.5)
     histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
     histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
-    assert model.clims == ClimsManual(min=left, max=left)
+    assert model.clims == ClimsManual(min=1, max=10)
 
-    # Ensure right clim is chosen when overlapping
-    pos = world_to_canvas(left, 0.5)
+
+@pytest.mark.usefixtures("any_app")
+def test_right_clim_drag(model: LUTModel, histogram: Histogram) -> None:
+    """Tests dragging the right clim handle to change the right contrast limit"""
+    histogram.model = model
+    model.clims = ClimsManual(min=0, max=10)
+
+    pos = world_to_canvas(histogram, 10, 0.5)
     histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
-    right = 9
-    pos = world_to_canvas(right, 0.5)
+    pos = world_to_canvas(histogram, 9, 0.5)
     histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
     histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
-    assert model.clims == ClimsManual(min=left, max=right)
+    assert model.clims == ClimsManual(min=0, max=9)
+
+
+@pytest.mark.usefixtures("any_app")
+def test_right_clim_clamped_to_left(model: LUTModel, histogram: Histogram) -> None:
+    """Tests the right contrast limit cannot be dragged past the left contrast limit."""
+    histogram.model = model
+    model.clims = ClimsManual(min=1, max=10)
+
+    pos = world_to_canvas(histogram, 10, 0.5)
+    histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
+    pos = world_to_canvas(histogram, 0, 0.5)
+    histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
+    histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
+    assert model.clims == ClimsManual(min=1, max=1)
+
+
+@pytest.mark.usefixtures("any_app")
+def test_right_clim_priority_when_overlapping(
+    model: LUTModel, histogram: Histogram
+) -> None:
+    """Tests the right contrast limit is selected when left=right."""
+    histogram.model = model
+    model.clims = ClimsManual(min=1, max=1)
+
+    pos = world_to_canvas(histogram, 1, 0.5)
+    histogram.canvas.handle(MousePressEvent(pos=pos, buttons=MouseButton.LEFT))
+    pos = world_to_canvas(histogram, 9, 0.5)
+    histogram.canvas.handle(MouseMoveEvent(pos=pos, buttons=MouseButton.LEFT))
+    histogram.canvas.handle(MouseReleaseEvent(pos=pos, buttons=MouseButton.LEFT))
+    assert model.clims == ClimsManual(min=1, max=9)
