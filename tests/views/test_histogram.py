@@ -30,10 +30,8 @@ def model() -> LUTModel:
 
 @fixture
 def histogram() -> Histogram:
-    # Set up a histogram
     histogram = Histogram()
 
-    # Add some data...
     values = np.random.randint(0, 100, (100))
     bin_edges = np.linspace(0, 10, values.size + 1)
     histogram.set_data(values, bin_edges)
@@ -75,20 +73,15 @@ def test_hscroll(histogram: Histogram) -> None:
 @pytest.mark.usefixtures("any_app")
 def test_highlight(histogram: Histogram) -> None:
     """Test that the highlight line is shown, moved, and hidden correctly."""
-    # Ensure the line is present
     line = histogram.highlight_line
     assert line is not None
     assert not line.visible
 
-    # Highlight a value...
     histogram.highlight(5)
-    # ...and ensure the highlight is shown in the right place
     assert line.visible
     assert 5 == line.transform.root[3, 0]
 
-    # Remove the highlight...
     histogram.highlight(None)
-    # ...and ensure the highlight is hidden
     assert not line.visible
 
 
@@ -147,12 +140,9 @@ def test_gamma_drag(model: LUTModel, histogram: Histogram) -> None:
 def test_gamma_double_click_resets(model: LUTModel, histogram: Histogram) -> None:
     """Tests that double-clicking the gamma handle resets the gamma to 1."""
     histogram.model = model
-    # Position the gamma handle to x=5
     model.clims = ClimsManual(min=0, max=10)
-    # And y=2**(-gamma)
     model.gamma = 2.0
 
-    # Then double click and show a reset to gamma=1
     pos = world_to_canvas(histogram, 5, 2 ** (-model.gamma))
     histogram.canvas.handle(MouseDoublePressEvent(pos=pos, buttons=MouseButton.LEFT))
     assert model.gamma == 1
