@@ -624,18 +624,6 @@ class ArrayViewer:
         if mode == InteractionMode.CREATE_ROI:
             self._canvas.roi_view.rect_mesh.visible = False
 
-    # def _create_roi_view(self) -> None:
-    #     # Remove old ROI view
-    #     # TODO: Enable multiple ROIs
-    #     if self._canvas.roi_view:
-    #         self._canvas.roi_view.remove()
-
-    #     # Create new ROI view
-    #     self._canvas.roi_view = self._canvas.add_bounding_box()
-    #     # Connect view signals
-    #     self._canvas.roi_view.boundingBoxChanged.connect(
-    #         self._on_roi_view_bounding_box_changed
-    #     )
     def _view_event(self, event: events.Event) -> None:
         """Handle canvas events requiring controller-level access."""
         self._hover_event(event)
