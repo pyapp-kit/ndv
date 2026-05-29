@@ -148,10 +148,12 @@ def test_canvas_interaction() -> None:
     ctrl._add_histogram(None)
     histogram = ctrl._histograms[None]
 
-    # clicking the reset zoom button calls reset_zoom on the canvas
+    # clicking the reset zoom button calls zoom_to_fit...
     with patch.object(projections, "zoom_to_fit") as mock_zoom_to_fit:
         ctrl._on_view_reset_zoom_clicked()
     mock_zoom_to_fit.assert_called_once()
+    # ...with the canvas' view
+    assert mock_zoom_to_fit.call_args_list[0][0][0] == ctrl._canvas.view
 
     # hovering on the image updates the hover info in the view
     mock_view.reset_mock()
