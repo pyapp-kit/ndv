@@ -4,11 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 import wx
 
-from ndv._types import (
-    KeyCode,
-    KeyMod,
-    KeyPressEvent,
-)
 from ndv.views.bases._app import NDVApp
 
 from ._main_thread import call_in_main_thread
@@ -57,41 +52,6 @@ class WxAppWrap(NDVApp):
 
         return WxArrayView
 
-    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
-        if not isinstance(widget, wx.Window):
-            raise TypeError(f"Expected widget to be wx.Window, got {type(widget)}")
-
-        def on_key_down(event: wx.KeyEvent) -> None:
-            key_code = event.GetKeyCode()
-            key: KeyCode | str
-            if key_code in _WX_KEY_MAP:
-                key = _WX_KEY_MAP[key_code]
-            else:
-                uchar = event.GetUnicodeKey()
-                if uchar != wx.WXK_NONE:
-                    key = chr(uchar)
-                else:
-                    event.Skip()
-                    return
-            mods = KeyMod.NONE
-            if event.ShiftDown():
-                mods |= KeyMod.SHIFT
-            if event.ControlDown():
-                mods |= KeyMod.CTRL
-            if event.AltDown():
-                mods |= KeyMod.ALT
-            if event.MetaDown():
-                mods |= KeyMod.META
-            receiver.keyPressed.emit(KeyPressEvent(key, mods))
-            event.Skip()
-
-        widget.Bind(wx.EVT_CHAR_HOOK, handler=on_key_down)
-
-        def _unbind() -> None:
-            widget.Unbind(wx.EVT_CHAR_HOOK, handler=on_key_down)
-
-        return _unbind
-
     def process_events(self) -> None:
         """Process events."""
         wx.SafeYield()
@@ -99,14 +59,3 @@ class WxAppWrap(NDVApp):
     def call_later(self, msec: int, func: Callable[[], None]) -> None:
         """Call `func` after `msec` milliseconds."""
         wx.CallLater(msec, func)
-
-
-_WX_KEY_MAP: dict[int, KeyCode] = {
-    wx.WXK_UP: KeyCode.UP,
-    wx.WXK_DOWN: KeyCode.DOWN,
-    wx.WXK_LEFT: KeyCode.LEFT,
-    wx.WXK_RIGHT: KeyCode.RIGHT,
-    wx.WXK_SPACE: KeyCode.SPACE,
-    wx.WXK_HOME: KeyCode.HOME,
-    wx.WXK_END: KeyCode.END,
-}

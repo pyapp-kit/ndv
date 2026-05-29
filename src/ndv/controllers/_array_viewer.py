@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from typing_extensions import Unpack
 
-    from ndv._types import AxisKey, ChannelKey, KeyPressEvent
+    from ndv._types import AxisKey, ChannelKey
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
 
@@ -741,9 +741,6 @@ class ArrayViewer:
     ) -> None:
         if self._roi_model:
             self._roi_model.bounding_box = bb
-
-    def _on_key_pressed(self, event: KeyPressEvent) -> None:
-        handle_key_press(event, self)
 
     def _on_view_channel_mode_changed(self, mode: ChannelMode) -> None:
         self._display_model.channel_mode = mode
