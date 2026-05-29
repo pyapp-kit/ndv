@@ -12,12 +12,10 @@ from scenex.adaptors import get_adaptor_registry
 from scenex.app import CursorType, events
 from scenex.util import projections
 
-from ndv.views.bases._graphics._histogram_utils import (
-    _NO_KEY,
+from ndv.views._util import (
     apply_log_counts,
     area_to_mesh,
     downsample_histogram,
-    gamma_handle_pos,
 )
 
 if TYPE_CHECKING:
@@ -69,7 +67,7 @@ class SharedHistogram:
         self._channels: dict[object, _ChannelVisuals] = {}
         self._log_base: float | None = None
         self._grabbed: snx.Node | None = None
-        self._grabbed_key: object = _NO_KEY
+        self._grabbed_key: object = None
         self._clim_bounds: tuple[float | None, float | None] = (None, None)
         self._has_initial_range = False
         self._last_cam_state: tuple[float, float] = (0.0, 0.0)  # (x, width)
@@ -406,7 +404,7 @@ class SharedHistogram:
         ch.gamma_line.visible = ch.visible
 
         # Gamma handle
-        mid_x, mid_y = gamma_handle_pos(clims, gamma, 1)
+        mid_x, mid_y = float(np.mean(clims)), (2 ** (-gamma))
         handle_pos = np.array([[mid_x, mid_y, 0]], dtype=np.float32)
         ch.gamma_handle.vertices = handle_pos
         ch.gamma_handle.visible = ch.visible
