@@ -18,10 +18,12 @@ from ndv.views.bases import ArrayView, LUTView
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
+    from jupyter_rfb import RemoteFrameBuffer
     from psygnal import EmissionInfo
     from traitlets import HasTraits
 
     from ndv._types import AxisKey, ChannelKey
+    from ndv.views._histogram import Histogram
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -359,7 +361,7 @@ class JupyterLUTView(LUTView):
 
     # ------------------ private methods ---------------
 
-    def add_histogram(self, histogram: Any) -> None:
+    def add_histogram(self, histogram: Histogram) -> None:
         widget = histogram.frontend_widget()
         # Resize widget to a respectable size
         widget.set_trait("css_height", "auto")
@@ -383,7 +385,7 @@ SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 class JupyterArrayView(ArrayView):
     def __init__(
         self,
-        canvas_widget: Any,
+        canvas_widget: RemoteFrameBuffer,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
@@ -628,7 +630,7 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
-    def add_histogram(self, channel: ChannelKey, histogram: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, histogram: Histogram) -> None:
         if lut := self._luts.get(channel, None):
             lut.add_histogram(histogram)
 

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._viewer_model import ArrayViewerModel
+    from ndv.views._histogram import Histogram
     from ndv.views.bases import LUTView
 
 
@@ -72,7 +73,7 @@ class ArrayView(Viewable):
     @abstractmethod
     def remove_lut_view(self, view: LUTView) -> None: ...
 
-    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: Histogram) -> None:
         raise NotImplementedError
 
     def remove_histogram(self, widget: Any) -> None:
