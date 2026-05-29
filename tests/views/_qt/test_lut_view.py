@@ -8,8 +8,8 @@ from pytest import fixture
 from qtpy.QtWidgets import QWidget
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
+from ndv.views._histogram import Histogram
 from ndv.views._qt._array_view import QLUTView
-from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -98,7 +98,7 @@ def test_QLUTView_update_view(model: LUTModel, view: QLUTView) -> None:
 
 def test_QLUTView_histogram_controls(model: LUTModel, view: QLUTView) -> None:
     # Mock up a histogram
-    hist_mock = MagicMock(spec=HistogramCanvas)
+    hist_mock = MagicMock(spec=Histogram)
     hist_frontend = QWidget()
     hist_mock.frontend_widget.return_value = hist_frontend
 

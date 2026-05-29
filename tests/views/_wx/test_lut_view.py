@@ -7,8 +7,8 @@ import wx
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
+from ndv.views._histogram import Histogram
 from ndv.views._wx._array_view import WxLUTView
-from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
 @fixture
@@ -128,7 +128,7 @@ def test_WxLUTView_histogram_controls(wxapp: wx.App, view: WxLUTView) -> None:
         evtLoop.YieldFor(wx.EVT_CATEGORY_ALL)
 
     # Mock up a histogram
-    hist_mock = MagicMock(spec=HistogramCanvas)
+    hist_mock = MagicMock(spec=Histogram)
     # Note that containing the frontend widget within a frame prevents segfaults
     frame = wx.Frame(None)
     hist_frontend = wx.Window(frame)

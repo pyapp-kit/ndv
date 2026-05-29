@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from psygnal import Signal
 
-from ndv._types import KeyPressEvent
 from ndv.models._array_display_model import ChannelMode
 
 from ._view_base import Viewable
@@ -16,6 +15,7 @@ if TYPE_CHECKING:
 
     from ndv._types import AxisKey, ChannelKey
     from ndv.models._viewer_model import ArrayViewerModel
+    from ndv.views._histogram import Histogram
     from ndv.views.bases import LUTView
 
 
@@ -31,9 +31,9 @@ class ArrayView(Viewable):
     resetZoomClicked = Signal()
     histogramRequested = Signal(int)
     sharedHistogramRequested = Signal()
+    sharedHistogramLogRequested = Signal(int)
     ndimToggleRequested = Signal(bool)
     channelModeChanged = Signal(ChannelMode)
-    keyPressed = Signal(KeyPressEvent)
 
     @abstractmethod
     def __init__(
@@ -73,7 +73,7 @@ class ArrayView(Viewable):
     @abstractmethod
     def remove_lut_view(self, view: LUTView) -> None: ...
 
-    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+    def add_histogram(self, channel: ChannelKey, widget: Histogram) -> None:
         raise NotImplementedError
 
     def remove_histogram(self, widget: Any) -> None:

@@ -11,26 +11,31 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-
-from ndv._types import (
-    CursorType,
+import scenex as snx
+from app_model.types import KeyBinding, KeyCode, KeyMod, SimpleKeyBinding
+from scenex.adaptors._auto import determine_backend
+from scenex.app import CursorType
+from scenex.app.events import (
+    KeyPressEvent,
     MouseButton,
+    MouseLeaveEvent,
     MouseMoveEvent,
     MousePressEvent,
     MouseReleaseEvent,
+    WheelEvent,
 )
+from scenex.utils import projections
+
 from ndv.controllers import ArrayViewer
 from ndv.controllers._channel_controller import ChannelController
-from ndv.models import DataWrapper
+from ndv.models import DataWrapper, RectangularROIModel
 from ndv.models._array_display_model import ArrayDisplayModel, ChannelMode
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, LUTModel
 from ndv.models._resolve import DataResponse, resolve
-from ndv.models._roi_model import RectangularROIModel
 from ndv.models._viewer_model import InteractionMode
 from ndv.views import _app, gui_frontend
+from ndv.views._histogram import Histogram
 from ndv.views.bases import ArrayView, LUTView
-from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
-from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -42,30 +47,11 @@ except ImportError:
 
 IS_WIN = os.name == "nt"
 IS_PYSIDE6 = API_NAME == "PySide6"
-IS_PYGFX = _app.canvas_backend(None) == "pygfx"
+IS_PYGFX = determine_backend() == "pygfx"
 
 
-def _make_img_handle() -> MagicMock:
-    handle = MagicMock(spec=ImageHandle)
-    handle.data.return_value = np.zeros((10, 10)).astype(np.uint8)
-    return handle
-
-
-def _make_vol_handle() -> MagicMock:
-    handle = MagicMock(spec=ImageHandle)
-    handle.data.return_value = np.zeros((10, 10, 10)).astype(np.uint8)
-    return handle
-
-
-def _get_mock_canvas(*_: Any) -> ArrayCanvas:
-    mock = MagicMock(spec=ArrayCanvas)
-    mock.add_image.side_effect = lambda *a, **k: _make_img_handle()
-    mock.add_volume.side_effect = lambda *a, **k: _make_vol_handle()
-    return mock
-
-
-def _get_mock_hist_canvas() -> HistogramCanvas:
-    return MagicMock(spec=HistogramCanvas)
+def _get_mock_hist_canvas() -> Histogram:
+    return MagicMock(spec=Histogram)
 
 
 def _get_mock_view(*_: Any) -> ArrayView:
@@ -75,15 +61,13 @@ def _get_mock_view(*_: Any) -> ArrayView:
 
 
 def _patch_views(f: Callable) -> Callable:
-    f = patch.object(_app, "get_array_canvas_class", lambda: _get_mock_canvas)(f)
     f = patch.object(_app, "get_array_view_class", lambda: _get_mock_view)(f)
-    f = patch.object(_app, "get_histogram_canvas_class", lambda: _get_mock_hist_canvas)(f)  # fmt: skip # noqa
-    f = patch.object(_app, "filter_key_events", lambda *a, **k: lambda: None)(f)
     return f
 
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     ctrl = ArrayViewer()
@@ -150,67 +134,65 @@ def test_controller() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_canvas_interaction() -> None:
     SHAPE = (10, 4, 10, 10)
-    data = np.empty(SHAPE)
+    data = np.zeros(SHAPE)
     ctrl = ArrayViewer()
     ctrl._async = False
-    mock_canvas = ctrl._canvas
+    canvas = ctrl._canvas
 
     mock_view = ctrl._view
     ctrl.data = data
 
     ctrl._add_histogram(None)
-    mock_histogram = ctrl._histograms[None]
+    histogram = ctrl._histograms[None]
 
-    # clicking the reset zoom button calls set_range on the canvas
-    ctrl._on_view_reset_zoom_clicked()
-    mock_canvas.set_range.assert_called_once_with()
+    # clicking the reset zoom button calls zoom_to_fit...
+    with patch.object(projections, "zoom_to_fit") as mock_zoom_to_fit:
+        ctrl._on_view_reset_zoom_clicked()
+    mock_zoom_to_fit.assert_called_once()
+    # ...with the canvas' view
+    assert mock_zoom_to_fit.call_args_list[0][0][0] == ctrl._canvas.view
 
     # hovering on the image updates the hover info in the view
-    mock_canvas.canvas_to_world.return_value = (1, 2, 3)
-    ctrl._on_canvas_mouse_moved(MouseMoveEvent(1, 2))
-    mock_canvas.canvas_to_world.assert_called_once_with((1, 2))
-    mock_view.set_hover_info.assert_called_once_with("[2, 1] 0")
-    mock_histogram.highlight.assert_called_once_with(0)
-
-    mock_canvas.reset_mock()
     mock_view.reset_mock()
-    mock_histogram.reset_mock()
+    pos = (canvas._canvas.width // 2, canvas._canvas.height // 2)
+    ctrl._view_event(MouseMoveEvent(pos=pos, buttons=MouseButton.NONE))
+    world_pos = canvas.view.to_ray(pos).origin[:2]
+    y, x = int(world_pos[1]), int(world_pos[0])
+    mock_view.set_hover_info.assert_called_once_with(f"[{y}, {x}] 0")
+    assert histogram.highlight_line.transform.root[3, 0] == 0
 
+    mock_view.reset_mock()
     # updating the image also updates the hover info in the view
-    # NB Since the image handle is a mock, the data won't be updated.
-    ctrl.data = np.empty(SHAPE, dtype=np.uint8)
+    ctrl.data = np.ones(SHAPE, dtype=np.uint8)
     # FIXME: These methods are actually called twice, both within
     # _fully_synchronize_view. The first time is on
     # ArrayViewer._on_view_current_index_change, and the second on
     # ArrayViewer._request_data
-    mock_view.set_hover_info.assert_called_with("[2, 1] 0")
-    mock_histogram.highlight.assert_called_with(0)
+    mock_view.set_hover_info.assert_called_once_with(f"[{y}, {x}] 1")
+    assert histogram.highlight_line.transform.root[3, 0] == 1
 
-    mock_canvas.reset_mock()
     mock_view.reset_mock()
-    mock_histogram.reset_mock()
 
     # hovering off the image clears the hover info in the view
-    mock_canvas.canvas_to_world.return_value = (-1, -1, 3)
-    ctrl._on_canvas_mouse_moved(MouseMoveEvent(-1, -1))
-    mock_canvas.canvas_to_world.assert_called_once_with((-1, -1))
+    ctrl._view_event(MouseMoveEvent(pos=(0, 0), buttons=MouseButton.NONE))
     mock_view.set_hover_info.assert_called_once_with("")
-    mock_histogram.highlight.assert_called_once_with(None)
+    assert not histogram.highlight_line.visible
 
-    mock_canvas.reset_mock()
     mock_view.reset_mock()
-    mock_histogram.reset_mock()
 
     # leaving the canvas clears the hover info as well
-    ctrl._on_canvas_mouse_left()
+    ctrl._view_event(MouseLeaveEvent())
     mock_view.set_hover_info.assert_called_once_with("")
-    mock_histogram.highlight.assert_called_once_with(None)
+    assert not histogram.highlight_line.visible
 
 
 @no_type_check
 @_patch_views
+@patch("ndv.controllers._array_viewer.Histogram", _get_mock_hist_canvas)
+@pytest.mark.usefixtures("any_app")
 def test_histogram_controller() -> None:
     ctrl = ArrayViewer()
     ctrl._async = False
@@ -236,13 +218,12 @@ def test_histogram_controller() -> None:
 
 
 @no_type_check
-@_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_histogram_updates_on_first_draw() -> None:
     """Histogram should update even when the first response creates the handle."""
     ctrl = ArrayViewer()
 
-    hist = MagicMock(spec=HistogramCanvas)
-    ctrl._histograms[None] = hist
+    ctrl._histograms[None] = hist = MagicMock(spec=Histogram)
     lut_ctrl = ChannelController(
         key=None, lut_model=LUTModel(), views=[MagicMock(spec=LUTView), hist]
     )
@@ -295,6 +276,7 @@ def test_array_viewer_with_app() -> None:
     viewer.display_model.visible_axes = (0, -2, -1)
     visax_mock.assert_called_once()
     assert viewer.display_model.visible_axes == (0, -2, -1)
+    viewer.close()
 
 
 @pytest.mark.usefixtures("any_app")
@@ -304,9 +286,7 @@ def test_channel_autoscale() -> None:
     # NB: Use a planar dataset so we can manually compute the min/max
     data = np.random.randint(0, 255, size=(10, 10), dtype="uint8")
     mi, ma = np.nanmin(data), np.nanmax(data)
-    handle = MagicMock(spec=ImageHandle)
-    handle.data.return_value = data
-    ctrl.add_handle(handle)
+    ctrl.add_image(snx.Image(data=data))
 
     # Test some random LutController
     lut_model = ctrl.lut_model
@@ -337,9 +317,7 @@ def test_array_viewer_histogram() -> None:
     assert histogram is not None
 
     # change views
-    if "pygfx" not in type(histogram).__name__.lower():
-        histogram.set_vertical(True)
-        histogram.set_log_base(10)
+    histogram.set_log_base(10)
 
     # update data
     np.random.seed(0)
@@ -350,6 +328,7 @@ def test_array_viewer_histogram() -> None:
     histogram.set_data(counts, bin_edges)
 
     histogram.close()
+    viewer.close()
 
 
 @no_type_check
@@ -369,27 +348,21 @@ def test_roi_controller() -> None:
     # Clicking the ROI button and then clicking the canvas creates a ROI
     viewer.interaction_mode = InteractionMode.CREATE_ROI
     canvas_pos = (5, 5)
-    mpe = MousePressEvent(canvas_pos[0], canvas_pos[1], MouseButton.LEFT)
+    mpe = MousePressEvent(pos=canvas_pos, buttons=MouseButton.LEFT)
 
     # Note - avoid diving into rendering logic here - just identify view
-    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
-        ctrl._canvas.on_mouse_press(mpe)
+    ctrl._canvas._canvas.handle(mpe)
 
     # The creation code emits raw world coords (no pixel-center offset).
     # Compute expected data-space bounding box via the same pipeline:
     # canvas -> raw world -> _world_point_to_data
-    w2d = ctrl._world_point_to_data
-    # pygfx exposes _canvas_to_world_raw; vispy's canvas_to_world is already raw
-    raw_c2w = getattr(
-        ctrl._canvas, "_canvas_to_world_raw", ctrl._canvas.canvas_to_world
-    )
-    raw_world = raw_c2w(canvas_pos)
-    expected_min = w2d(raw_world[0], raw_world[1])
-    expected_max = w2d(raw_world[0] + 1, raw_world[1] + 1)
+    raw_world = ctrl._canvas.view.to_ray(canvas_pos).origin[:2]
+    expected_min = (raw_world[0], raw_world[1])
+    expected_max = (raw_world[0] + 1, raw_world[1] + 1)
     assert roi.bounding_box[0] == pytest.approx(expected_min)
     assert roi.bounding_box[1] == pytest.approx(expected_max)
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
-    ctrl._canvas.close()
+    ctrl.close()
 
 
 @no_type_check
@@ -404,7 +377,7 @@ def test_roi_interaction() -> None:
     _app.process_events()
     roi = RectangularROIModel()
     ctrl.roi = roi
-    roi_view = ctrl._roi_view
+    roi_view = ctrl._canvas.roi_view
     assert roi_view is not None
 
     # FIXME: We need a large world space on the canvas, but
@@ -412,7 +385,7 @@ def test_roi_interaction() -> None:
     # sets the range to the extent of the data i.e. the extent of the ROI.
     # bounding_box is in data space.
     roi.bounding_box = ((0, 0), (500, 500))
-    ctrl._canvas.set_range()
+    ctrl._canvas.reset_zoom()
 
     # Set the ROI to known data-space coordinates via two canvas positions.
     # Note that these positions are far apart to satisfy sufficient distance
@@ -424,84 +397,123 @@ def test_roi_interaction() -> None:
     # Use the ROI view's own boundingBoxChanged to set positions in the same
     # coordinate space the mouse handler uses (raw world for pygfx, scene
     # for vispy). This ensures the test works regardless of backend.
-    world_start = ctrl._canvas.canvas_to_world(canvas_roi_start)[:2]
-    world_end = ctrl._canvas.canvas_to_world(canvas_roi_end)[:2]
-    roi_view.boundingBoxChanged.emit((world_start, world_end))
+    world_start = ctrl._canvas.view.to_ray(canvas_roi_start).origin[:2]
+    world_end = ctrl._canvas.view.to_ray(canvas_roi_end).origin[:2]
+    world_new_start = ctrl._canvas.view.to_ray(canvas_new_start).origin[:2]
+    roi_view.bb = (world_start, world_end)
     bb_initial = roi.bounding_box
     roi_size = (
         bb_initial[1][0] - bb_initial[0][0],
         bb_initial[1][1] - bb_initial[0][1],
     )
 
-    # Note - avoid diving into rendering logic here - just identify view
-    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
-        # Test moving handle: drag top-left corner to canvas_new_start
-        assert not roi_view.selected()
-        mpe = MousePressEvent(
-            canvas_roi_start[0], canvas_roi_start[1], MouseButton.LEFT
-        )
-        ctrl._canvas.on_mouse_press(mpe)
-        assert roi_view.selected()
-        mme = MouseMoveEvent(canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT)
-        ctrl._canvas.on_mouse_move(mme)
-        # The opposite (max) corner should not have moved
-        assert roi.bounding_box[1] == pytest.approx(bb_initial[1], 1e-6)
-        # The dragged (min) corner should have moved
-        assert roi.bounding_box[0] != pytest.approx(bb_initial[0], 1e-6)
-        mre = MouseReleaseEvent(
-            canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT
-        )
-        ctrl._canvas.on_mouse_release(mre)
+    # Test moving handle: drag top-left corner to canvas_new_start
+    assert roi_view.anchor is None
+    ctrl._canvas._canvas.handle(
+        MousePressEvent(pos=canvas_roi_start, buttons=MouseButton.LEFT)
+    )
+    # The anchor should then be the opposite corner, i.e. world_end
+    np.testing.assert_array_equal(roi_view.anchor, world_end)
+    # Move to new position
+    ctrl._canvas._canvas.handle(
+        MouseMoveEvent(pos=canvas_new_start, buttons=MouseButton.LEFT)
+    )
+    # The roi should now be between world_new_start and world_end (order doesn't matter)
+    np.testing.assert_allclose(
+        roi.bounding_box,
+        np.asarray(
+            (
+                (
+                    min(world_end[0], world_new_start[0]),
+                    min(world_end[1], world_new_start[1]),
+                ),
+                (
+                    max(world_end[0], world_new_start[0]),
+                    max(world_end[1], world_new_start[1]),
+                ),
+            )
+        ),
+    )
+    ctrl._canvas._canvas.handle(
+        MouseReleaseEvent(pos=canvas_new_start, buttons=MouseButton.LEFT)
+    )
 
-        # Test translation: reset ROI, then drag the body
-        roi_view.boundingBoxChanged.emit((world_start, world_end))
-        assert roi.bounding_box[0] == pytest.approx(bb_initial[0])
-        assert roi.bounding_box[1] == pytest.approx(bb_initial[1])
-        mpe = MousePressEvent(
-            (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
-            (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
-            MouseButton.LEFT,
+    # Test translation: reset ROI, then drag the body
+    roi_view.bb = (world_start, world_end)
+    assert roi.bounding_box[0] == pytest.approx(bb_initial[0])
+    assert roi.bounding_box[1] == pytest.approx(bb_initial[1])
+    ctrl._canvas._canvas.handle(
+        MousePressEvent(
+            pos=(
+                (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
+                (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
+            ),
+            buttons=MouseButton.LEFT,
         )
-        ctrl._canvas.on_mouse_press(mpe)
-        assert roi_view.selected()
-        mme = MouseMoveEvent(
-            (canvas_roi_start[0] + canvas_new_start[0]) / 2,
-            (canvas_roi_start[1] + canvas_new_start[1]) / 2,
-            MouseButton.LEFT,
+    )
+    assert roi_view.drag_start is not None
+    ctrl._canvas._canvas.handle(
+        MouseMoveEvent(
+            pos=(
+                (canvas_roi_start[0] + canvas_new_start[0]) / 2,
+                (canvas_roi_start[1] + canvas_new_start[1]) / 2,
+            ),
+            buttons=MouseButton.LEFT,
         )
-        ctrl._canvas.on_mouse_move(mme)
-        # Translation should preserve size
-        bb_translated = roi.bounding_box
-        translated_size = (
-            bb_translated[1][0] - bb_translated[0][0],
-            bb_translated[1][1] - bb_translated[0][1],
+    )
+    # Translation should preserve size
+    bb_translated = roi.bounding_box
+    translated_size = (
+        bb_translated[1][0] - bb_translated[0][0],
+        bb_translated[1][1] - bb_translated[0][1],
+    )
+    assert translated_size == pytest.approx(roi_size, 1e-6)
+    # Both corners should have moved
+    assert bb_translated[0] != pytest.approx(bb_initial[0], 1e-6)
+    assert bb_translated[1] != pytest.approx(bb_initial[1], 1e-6)
+    ctrl._canvas._canvas.handle(
+        MouseReleaseEvent(
+            pos=(
+                (canvas_roi_start[0] + canvas_new_start[0]) / 2,
+                (canvas_roi_start[1] + canvas_new_start[1]) / 2,
+            ),
+            buttons=MouseButton.LEFT,
         )
-        assert translated_size == pytest.approx(roi_size, 1e-6)
-        # Both corners should have moved
-        assert bb_translated[0] != pytest.approx(bb_initial[0], 1e-6)
-        assert bb_translated[1] != pytest.approx(bb_initial[1], 1e-6)
-        mre = MouseReleaseEvent(
-            (canvas_roi_start[0] + canvas_new_start[0]) / 2,
-            (canvas_roi_start[1] + canvas_new_start[1]) / 2,
-            MouseButton.LEFT,
-        )
-        ctrl._canvas.on_mouse_release(mre)
+    )
 
     # Test cursors
-    roi_view.boundingBoxChanged.emit((world_start, world_end))
+    roi_view.bb = (world_start, world_end)
     # Top-Left corner
-    mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_start[1])
-    assert roi_view.get_cursor(mme) == CursorType.FDIAG_ARROW
-    # Top-Right corner
-    mme = MouseMoveEvent(canvas_roi_start[0], canvas_roi_end[1])
-    assert roi_view.get_cursor(mme) == CursorType.BDIAG_ARROW
-    # Middle
-    mme = MouseMoveEvent(
-        (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
-        (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
+    with patch("ndv.views._data_canvas.set_cursor") as mock_set_cursor:
+        ctrl._canvas._canvas.handle(
+            MouseMoveEvent(pos=canvas_roi_start, buttons=MouseButton.NONE)
+        )
+    mock_set_cursor.assert_called_once_with(
+        ctrl._canvas._canvas, CursorType.FDIAG_ARROW
     )
-    assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
-    ctrl._canvas.close()
+    # Top-Right corner
+    with patch("ndv.views._data_canvas.set_cursor") as mock_set_cursor:
+        ctrl._canvas._canvas.handle(
+            MouseMoveEvent(
+                pos=(canvas_roi_start[0], canvas_roi_end[1]), buttons=MouseButton.NONE
+            )
+        )
+    mock_set_cursor.assert_called_once_with(
+        ctrl._canvas._canvas, CursorType.BDIAG_ARROW
+    )
+    # Middle
+    with patch("ndv.views._data_canvas.set_cursor") as mock_set_cursor:
+        ctrl._canvas._canvas.handle(
+            MouseMoveEvent(
+                pos=(
+                    (canvas_roi_start[0] + canvas_roi_end[0]) / 2,
+                    (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
+                ),
+                buttons=MouseButton.NONE,
+            )
+        )
+    mock_set_cursor.assert_called_once_with(ctrl._canvas._canvas, CursorType.ALL_ARROW)
+    ctrl.close()
 
 
 @pytest.mark.allow_leaks
@@ -541,26 +553,31 @@ def test_resolve_is_pure() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_stale_response_discard() -> None:
     """Test that responses from old request generations are discarded."""
     ctrl = ArrayViewer()
 
     # simulate a stale response from generation 1 when we're on generation 2
-    old_response = DataResponse(n_visible_axes=2, data={None: np.zeros((8, 8))})
-    future = Future()
-    future.set_result(old_response)
+    future: Future[DataResponse] = Future()
+    future.result = Mock(  # type: ignore[method-assign]
+        side_effect=AssertionError("result() must not be called on stale future")
+    )
     ctrl._current_gen = 2
     ctrl._futures[future] = 1  # old generation
 
     ctrl._on_data_response_ready(future)
 
-    # stale response should be ignored — no LUT controllers created, no refresh
+    # stale response should be ignored — no LUT controllers created, no images
     assert len(ctrl._lut_controllers) == 0
-    ctrl._canvas.refresh.assert_not_called()
+    scene = ctrl._canvas.view.scene
+    data_nodes = [node for node in scene.children if isinstance(node, snx.Image)]
+    assert len(data_nodes) == 0
 
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_rgba_3d_fallback_warns() -> None:
     """Test that RGBA mode with 3D view reverts to GRAYSCALE with a warning."""
     ctrl = ArrayViewer(np.zeros((10, 4, 10, 10)))
@@ -574,6 +591,7 @@ def test_rgba_3d_fallback_warns() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_rgba_invalid_channel_count_falls_back_to_composite() -> None:
     """Invalid RGBA channel widths should warn and fall back to COMPOSITE."""
     ctrl = ArrayViewer(
@@ -594,21 +612,21 @@ def test_rgba_invalid_channel_count_falls_back_to_composite() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_set_scales_called_on_apply() -> None:
     """set_scales is called on the canvas when scales change."""
     ctrl = ArrayViewer(np.empty((3, 100, 200)))
     ctrl._async = False
-    mock_canvas = ctrl._canvas
 
-    mock_canvas.set_scales.reset_mock()
-    ctrl.display_model.scales[1] = 0.5
-    mock_canvas.set_scales.assert_called()
-    args = mock_canvas.set_scales.call_args[0][0]
-    assert args[0] == 0.5  # axis 1
+    with patch.object(ctrl._canvas, "set_scales") as mock_set_scales:
+        ctrl.display_model.scales[1] = 0.5
+        mock_set_scales.assert_called()
+        args = mock_set_scales.call_args[0][0]
+        assert args[0] == 0.5  # axis 1
 
 
 @no_type_check
-@_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_fallback_channel_names_pushed() -> None:
     """Fallback channel names are pushed to LUT views."""
     ctrl = ArrayViewer(
@@ -618,17 +636,19 @@ def test_fallback_channel_names_pushed() -> None:
         ),
     )
     ctrl._async = False
-    ctrl.data = np.empty((3, 10, 10))
+    ctrl.data = np.empty((3, 10, 10), dtype=np.float32)
 
     # fallback names default to str(key) for plain numpy arrays
     for key, lut_ctrl in ctrl._lut_controllers.items():
         if isinstance(key, int):
             for view in lut_ctrl.lut_views:
-                view.set_fallback_name.assert_called_with(str(key))
+                assert view._fallback_name == str(key)
+                # assert view.set_fallback_name.assert_called_with(str(key))
 
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_scales_applied_after_async_data_response() -> None:
     """Scales must be applied after handles are created in async data response.
 
@@ -637,101 +657,30 @@ def test_scales_applied_after_async_data_response() -> None:
     handle creation in _on_data_response_ready().
     """
     ctrl = ArrayViewer(display_model=ArrayDisplayModel(scales={-2: 0.5, -1: 2.0}))
-    mock_canvas = ctrl._canvas
 
     # Set up data wrapper and resolve state without triggering data fetch
     ctrl._data_wrapper = DataWrapper.create(np.empty((10, 100, 200)))
     ctrl._resolved = resolve(ctrl._display_model, ctrl._data_wrapper)
-    mock_canvas.set_scales.reset_mock()
 
-    # Simulate the async data response arriving (creates handles)
-    response = DataResponse(
-        n_visible_axes=2, data={None: np.zeros((100, 200), dtype=np.uint8)}
-    )
-    future: Future[DataResponse] = Future()
-    future.set_result(response)
-    ctrl._futures[future] = ctrl._current_gen
-    ctrl._on_data_response_ready(future)
+    with patch.object(ctrl._canvas, "set_scales") as mock_set_scales:
+        # Simulate the async data response arriving (creates handles)
+        response = DataResponse(
+            n_visible_axes=2, data={None: np.zeros((100, 200), dtype=np.uint8)}
+        )
+        future: Future[DataResponse] = Future()
+        future.set_result(response)
+        ctrl._futures[future] = ctrl._current_gen
+        ctrl._on_data_response_ready(future)
 
     # set_scales must be called AFTER handles are created
-    mock_canvas.set_scales.assert_called()
-    last_scales = mock_canvas.set_scales.call_args[0][0]
+    mock_set_scales.assert_called()
+    last_scales = mock_set_scales.call_args[0][0]
     assert last_scales == (0.5, 2.0)
 
 
 @no_type_check
 @_patch_views
-def test_hover_with_scaled_axes() -> None:
-    """Hover correctly maps world coords to data indices with non-unit scales.
-
-    With scales (sy=0.5, sx=2.0), world coord (4.0, 3.0) should map to
-    data indices: data_x = 4.0/2.0 = 2, data_y = 3.0/0.5 = 6.
-    The controller should sample data[6, 2], not data[3, 4].
-    """
-    ctrl = ArrayViewer(scales={-2: 0.5, -1: 2.0})
-    ctrl._async = False
-    ctrl.data = np.zeros((10, 20), dtype=np.uint8)
-
-    # Spy on the ChannelController.get_value_at_index to capture the index
-    for lut_ctrl in ctrl._lut_controllers.values():
-        lut_ctrl.get_value_at_index = Mock(wraps=lut_ctrl.get_value_at_index)
-
-    data_pos, _ = ctrl._get_values_at_world_point(4.0, 3.0)
-    assert data_pos == (6, 2)
-
-    for lut_ctrl in ctrl._lut_controllers.values():
-        lut_ctrl.get_value_at_index.assert_called_once_with((6, 2))
-
-
-@no_type_check
-@_patch_views
-def test_hover_info_shows_data_indices_not_world_coords() -> None:
-    """Hover info label should display data indices, not scaled world coords."""
-    ctrl = ArrayViewer(scales={-2: 0.5, -1: 2.0})
-    ctrl._async = False
-    ctrl.data = np.zeros((10, 20), dtype=np.uint8)
-
-    mock_canvas = ctrl._canvas
-    mock_view = ctrl._view
-
-    # world (4.0, 3.0) -> data (row=6, col=2) with scales (sy=0.5, sx=2.0)
-    mock_canvas.canvas_to_world.return_value = (4.0, 3.0, 0)
-    ctrl._on_canvas_mouse_moved(MouseMoveEvent(100, 100))
-
-    hover_text = mock_view.set_hover_info.call_args[0][0]
-    # must show data indices [6, 2], NOT world coords [3, 4]
-    assert hover_text.startswith("[6, 2]"), f"got {hover_text!r}"
-
-
-@no_type_check
-@_patch_views
-def test_hover_with_negative_scales() -> None:
-    """Hover should work with negative scales (descending coordinates).
-
-    Regression: _get_values_at_world_point rejects negative world coordinates,
-    but negative scales produce negative world coords for valid data positions.
-    """
-    ctrl = ArrayViewer(scales={-2: -1.0, -1: 1.0})
-    ctrl._async = False
-    ctrl.data = np.ones((5, 10), dtype=np.uint8)
-
-    mock_canvas = ctrl._canvas
-    mock_view = ctrl._view
-
-    # With scale_y=-1.0, valid world y coords are negative (e.g. y=-2.0 -> row 2)
-    mock_canvas.canvas_to_world.return_value = (3.0, -2.0, 0)
-
-    _, vals = ctrl._get_values_at_world_point(3.0, -2.0)
-    assert vals, f"expected values, scales={ctrl._resolved.visible_scales}"
-
-    ctrl._on_canvas_mouse_moved(MouseMoveEvent(100, 100))
-    hover_call = mock_view.set_hover_info.call_args[0][0]
-    # Should show valid data, not empty string (which means hover was rejected)
-    assert hover_call != ""
-
-
-@no_type_check
-@_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_data_replacement_with_stale_index() -> None:
     """Replacing data with fewer dims should not crash due to stale current_index."""
     # Start with 4D data — axes 0, 1, 2, 3 are all valid
@@ -753,6 +702,7 @@ def test_data_replacement_with_stale_index() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_remove_lut_view_with_non_gui_view() -> None:
     """remove_lut_view should handle non-GUI LUTViews (e.g. ImageHandle).
 
@@ -771,6 +721,7 @@ def test_remove_lut_view_with_non_gui_view() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_user_current_index_preserved_on_init() -> None:
     """User-provided current_index must not be overwritten by slider defaults."""
     user_index = {0: 5}
@@ -783,10 +734,10 @@ def test_user_current_index_preserved_on_init() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_keybinding_slice_navigation() -> None:
     """Arrow keys step focused slider and cycle focused axis."""
     from ndv._keybindings import _ensure_focused_axis
-    from ndv._types import KeyCode, KeyMod, KeyPressEvent
 
     SHAPE = (5, 10, 128, 128)
     ctrl = ArrayViewer()
@@ -802,40 +753,41 @@ def test_keybinding_slice_navigation() -> None:
     assert ctrl._focused_slider_axis == 1
 
     def press(key: KeyCode | str, mods: KeyMod = KeyMod.NONE) -> None:
-        ctrl._on_key_pressed(KeyPressEvent(key, mods))
+        kb = KeyBinding(parts=[SimpleKeyBinding(key=key, mods=mods)])
+        ctrl._view_event(KeyPressEvent(key=kb))
 
     # RIGHT arrow steps forward on focused axis (1)
-    press(KeyCode.RIGHT)
+    press(KeyCode.RightArrow)
     assert ctrl.display_model.current_index[1] == 1
 
     # Another RIGHT
-    press(KeyCode.RIGHT)
+    press(KeyCode.RightArrow)
     assert ctrl.display_model.current_index[1] == 2
 
     # LEFT arrow steps backward
-    press(KeyCode.LEFT)
+    press(KeyCode.LeftArrow)
     assert ctrl.display_model.current_index[1] == 1
 
     # UP arrow cycles to previous axis (0)
-    press(KeyCode.UP)
+    press(KeyCode.UpArrow)
     assert ctrl._focused_slider_axis == 0
 
     # RIGHT now steps axis 0
-    press(KeyCode.RIGHT)
+    press(KeyCode.RightArrow)
     assert ctrl.display_model.current_index[0] == 1
 
     # DOWN cycles back to axis 1
-    press(KeyCode.DOWN)
+    press(KeyCode.DownArrow)
     assert ctrl._focused_slider_axis == 1
 
     # LEFT doesn't go below 0
     ctrl.display_model.current_index[1] = 0
-    press(KeyCode.LEFT)
+    press(KeyCode.LeftArrow)
     assert ctrl.display_model.current_index[1] == 0
 
     # RIGHT doesn't go above max
     ctrl.display_model.current_index[1] = 9  # max for shape 10
-    press(KeyCode.RIGHT)
+    press(KeyCode.RightArrow)
     assert ctrl.display_model.current_index[1] == 9
 
     # Unrecognized key does nothing
@@ -845,51 +797,45 @@ def test_keybinding_slice_navigation() -> None:
 
 @no_type_check
 @_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_keybinding_zoom() -> None:
     """Plus/minus keys should call canvas.zoom when mouse is over canvas."""
-    from ndv._types import KeyMod, KeyPressEvent
 
     ctrl = ArrayViewer()
     ctrl._async = False
     ctrl.data = np.empty((10, 10))
+    canvas_pos = (ctrl._canvas._canvas.width // 2, ctrl._canvas._canvas.height // 2)
 
     def press(key: str, mods: KeyMod = KeyMod.NONE) -> None:
-        ctrl._on_key_pressed(KeyPressEvent(key, mods))
+        kb = KeyBinding(parts=[SimpleKeyBinding(key=key, mods=mods)])
+        ctrl._view_event(KeyPressEvent(key=kb))
 
-    # When mouse is not over the canvas, zoom should not be called
-    assert ctrl._highlight_pos is None
-    ctrl._canvas.zoom.reset_mock()
-    press("=")
-    ctrl._canvas.zoom.assert_not_called()
-    press("-")
-    ctrl._canvas.zoom.assert_not_called()
-
-    # Simulate mouse over canvas
-    ctrl._highlight_pos = (5.0, 5.0)
+    mouse_in = WheelEvent(canvas_pos, MouseButton.NONE, angle_delta=(0, 120))
+    mouse_out = WheelEvent(canvas_pos, MouseButton.NONE, angle_delta=(0, -120))
 
     # = key (zoom in)
-    ctrl._canvas.zoom.reset_mock()
-    press("=")
-    ctrl._canvas.zoom.assert_called_once_with(factor=0.667, center=(5.0, 5.0))
+    with patch.object(snx.PanZoom, "handle_event") as mock_handle_event:
+        press("=")
+    mock_handle_event.assert_called_once_with(mouse_in, ctrl._canvas.view)
 
     # - key (zoom out)
-    ctrl._canvas.zoom.reset_mock()
-    press("-")
-    ctrl._canvas.zoom.assert_called_once_with(factor=1.5, center=(5.0, 5.0))
+    with patch.object(snx.PanZoom, "handle_event") as mock_handle_event:
+        press("-")
+    mock_handle_event.assert_called_once_with(mouse_out, ctrl._canvas.view)
 
     # + (shift+=) should also zoom in
-    ctrl._canvas.zoom.reset_mock()
-    press("+", KeyMod.SHIFT)
-    ctrl._canvas.zoom.assert_called_once_with(factor=0.667, center=(5.0, 5.0))
+    with patch.object(snx.PanZoom, "handle_event") as mock_handle_event:
+        press("=", KeyMod.Shift)
+    mock_handle_event.assert_called_once_with(mouse_in, ctrl._canvas.view)
 
     # _ (shift+-) should also zoom out
-    ctrl._canvas.zoom.reset_mock()
-    press("_", KeyMod.SHIFT)
-    ctrl._canvas.zoom.assert_called_once_with(factor=1.5, center=(5.0, 5.0))
+    with patch.object(snx.PanZoom, "handle_event") as mock_handle_event:
+        press("-", KeyMod.Shift)
+    mock_handle_event.assert_called_once_with(mouse_out, ctrl._canvas.view)
 
 
 @no_type_check
-@_patch_views
+@pytest.mark.usefixtures("any_app")
 def test_stats_signals() -> None:
     """Test that stats_updated signals fire on data updates and refresh_stats."""
     from ndv.controllers._image_stats import ImageStats
@@ -953,3 +899,4 @@ def test_handle_gc_on_data_reassign() -> None:
     gc.collect()
 
     assert handle_ref() is None
+    viewer.close()

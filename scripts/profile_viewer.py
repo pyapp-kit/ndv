@@ -17,13 +17,13 @@ from typing import Any, no_type_check
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+from ndv.views.bases._graphics._canvas import ArrayCanvas
+from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 from ndv.controllers import ArrayViewer
 from ndv.models._array_display_model import ChannelMode
 from ndv.views import _app
 from ndv.views.bases import ArrayView, LUTView
-from ndv.views.bases._graphics._canvas import ArrayCanvas
-from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 # --------------- mock setup (same pattern as test_controller) ---------------
 

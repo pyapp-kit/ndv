@@ -7,8 +7,8 @@ from jupyter_rfb.widget import RemoteFrameBuffer
 from pytest import fixture
 
 from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
+from ndv.views._histogram import Histogram
 from ndv.views._jupyter._array_view import JupyterLUTView
-from ndv.views.bases._graphics._canvas import HistogramCanvas
 
 
 @fixture
@@ -88,7 +88,7 @@ def test_JupyterLUTView_update_view(model: LUTModel, view: JupyterLUTView) -> No
 
 def test_JupyterLUTView_histogram_controls(view: JupyterLUTView) -> None:
     # Mock up a histogram
-    hist_mock = MagicMock(spec=HistogramCanvas)
+    hist_mock = MagicMock(spec=Histogram)
     hist_frontend = RemoteFrameBuffer()
     hist_mock.frontend_widget.return_value = hist_frontend
 

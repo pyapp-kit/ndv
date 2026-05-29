@@ -11,9 +11,11 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import pytest
+from scenex.adaptors._auto import determine_backend
+from scenex.app import GuiFrontend, determine_app
 
 from ndv.views import gui_frontend
-from ndv.views._app import GUI_ENV_VAR, GuiFrontend
+from ndv.views._app import GUI_ENV_VAR
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -22,6 +24,11 @@ if TYPE_CHECKING:
     import wx
     from pytest import FixtureRequest
     from qtpy.QtWidgets import QApplication
+
+# HACK: Enable tests inside vispy
+if determine_app() == GuiFrontend.JUPYTER:
+    if determine_backend() == "vispy":
+        os.environ["_VISPY_TESTING_APP"] = "jupyter_rfb"
 
 
 @pytest.fixture

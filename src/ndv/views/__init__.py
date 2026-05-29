@@ -5,12 +5,9 @@ shows the protocol that GUI & graphics classes should implement.
 """
 
 from ._app import (
-    CanvasBackend,
     GuiFrontend,
     call_later,
-    get_array_canvas_class,
     get_array_view_class,
-    get_histogram_canvas_class,
     gui_frontend,
     process_events,
     run_app,
@@ -19,12 +16,9 @@ from ._app import (
 )
 
 __all__ = [
-    "CanvasBackend",
     "GuiFrontend",
     "call_later",
-    "get_array_canvas_class",
     "get_array_view_class",
-    "get_histogram_canvas_class",
     "gui_frontend",
     "process_events",
     "run_app",

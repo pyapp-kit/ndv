@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from typing_extensions import ParamSpec, TypeVar
 
     from ndv.views.bases import ArrayView
-    from ndv.views.bases._graphics._mouseable import Mouseable
 
     T = TypeVar("T")
     P = ParamSpec("P")
@@ -45,16 +44,6 @@ class NDVApp:
     def run(self) -> None:
         """Run the application."""
         pass
-
-    def filter_mouse_events(
-        self, canvas: Any, receiver: Mouseable
-    ) -> Callable[[], None]:
-        """Install mouse event filter on `canvas`, redirecting events to `receiver`."""
-        raise NotImplementedError
-
-    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
-        """Install key event filter on `widget`, emitting `receiver.keyPressed`."""
-        raise NotImplementedError
 
     def call_in_main_thread(
         self, func: Callable[P, T], *args: P.args, **kwargs: P.kwargs

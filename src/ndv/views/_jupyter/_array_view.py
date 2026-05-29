@@ -18,12 +18,12 @@ from ndv.views.bases import ArrayView, LUTView
 if TYPE_CHECKING:
     from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
 
+    from jupyter_rfb import RemoteFrameBuffer
     from psygnal import EmissionInfo
     from traitlets import HasTraits
-    from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, ChannelKey
-    from ndv.views.bases._graphics._canvas import HistogramCanvas
+    from ndv.views._histogram import Histogram
 
 # not entirely sure why it's necessary to specifically annotat signals as : PSignal
 # i think it has to do with type variance?
@@ -159,7 +159,7 @@ class JupyterLUTView(LUTView):
         default_luts: Sequence[Any] = ("gray", "green", "magenta", "red", "blue"),
     ) -> None:
         self._channel = channel
-        self._histogram: HistogramCanvas | None = None
+        self._histogram: Any | None = None
         # WIDGETS
         self._visible = widgets.Checkbox(value=True, indent=False)
         self._visible.layout.width = "60px"
@@ -361,7 +361,7 @@ class JupyterLUTView(LUTView):
 
     # ------------------ private methods ---------------
 
-    def add_histogram(self, histogram: HistogramCanvas) -> None:
+    def add_histogram(self, histogram: Histogram) -> None:
         widget = histogram.frontend_widget()
         # Resize widget to a respectable size
         widget.set_trait("css_height", "auto")
@@ -385,13 +385,14 @@ SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
 class JupyterArrayView(ArrayView):
     def __init__(
         self,
-        canvas_widget: _jupyter_rfb.CanvasBackend,
+        canvas_widget: RemoteFrameBuffer,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
         self._viewer_model.events.connect(self._on_viewer_model_event)
         # WIDGETS
         self._canvas_widget = canvas_widget
+        self._canvas_widget.layout.display = "flex"
         self._visible_axes: Sequence[AxisKey] = []
         self._luts: dict[ChannelKey, JupyterLUTView] = {}
 
@@ -629,7 +630,7 @@ class JupyterArrayView(ArrayView):
         """Emit signal when the channel mode changes."""
         self.channelModeChanged.emit(ChannelMode(change["new"]))
 
-    def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
+    def add_histogram(self, channel: ChannelKey, histogram: Histogram) -> None:
         if lut := self._luts.get(channel, None):
             lut.add_histogram(histogram)
 
@@ -647,16 +648,18 @@ class JupyterArrayView(ArrayView):
         self._shared_hist_log_btn.layout.display = "block" if toggled else "none"
 
     def _on_shared_hist_log_toggled(self, change: dict[str, Any]) -> None:
-        if self._shared_histogram is not None:
-            self._shared_histogram.set_log_base(10 if change["new"] else None)
+        self.sharedHistogramLogRequested.emit(10 if change["new"] else None)
 
     def remove_histogram(self, widget: Any) -> None:
         """Remove a histogram widget from the viewer."""
 
     def add_shared_histogram(self, widget: Any) -> None:
         self._shared_histogram = widget
-        frontend = widget.frontend_widget()
-        self._shared_histogram_container.children = (frontend,)
+        widget.layout.display = "flex"
+        # HACK:
+        height = self._shared_histogram_container.layout.height
+        widget.set_trait("css_height", height)
+        self._shared_histogram_container.children = (widget,)
 
     def remove_shared_histogram(self) -> None:
         self._shared_histogram_container.children = ()
@@ -669,10 +672,12 @@ class JupyterArrayView(ArrayView):
         # show or hide the actual widget itself
         from IPython import display
 
+        # HACK: This used to be in an else clause, but this actually is useful here now
+        # because the setting of the canvas to visible in _array_viewer shows the
+        # canvas. Since we can't really reparent that widget, let's just clear it.
+        display.clear_output()  # type: ignore [no-untyped-call]
         if visible:
             display.display(self.layout)  # type: ignore [no-untyped-call]
-        else:
-            display.clear_output()  # type: ignore [no-untyped-call]
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes
