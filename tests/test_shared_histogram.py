@@ -1,4 +1,7 @@
-"""Tests for shared histogram controller wiring and behavior."""
+"""Tests for shared histogram controller wiring and behavior.
+
+TODO: Move this to tests/views
+"""
 
 from __future__ import annotations
 
@@ -106,8 +109,11 @@ def test_initial_state_set_on_connection(mock_color, mock_visible, mock_gamma) -
     ctrl = _make_ctrl_with_data()
     ctrl._add_shared_histogram()
 
+    # set_channel_color should have been called for each channel
     assert mock_color.call_count >= len(ctrl._lut_controllers)
+    # set_channel_visible should have been called
     assert mock_visible.call_count >= len(ctrl._lut_controllers)
+    # set_channel_gamma should have been called
     assert mock_gamma.call_count >= len(ctrl._lut_controllers)
 
 
