@@ -5,7 +5,7 @@ import os
 import sys
 from enum import Enum
 from functools import wraps
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from scenex.adaptors import use
 from scenex.app import app
@@ -164,11 +164,6 @@ def get_array_view_class() -> type[ArrayView]:
     return ndv_app().array_view_class()
 
 
-def filter_key_events(widget: Any, receiver: ArrayView) -> Callable[[], None]:
-    """Intercept key events on `widget` and emit `receiver.keyPressed`."""
-    return ndv_app().filter_key_events(widget, receiver)
-
-
 def call_later(msec: int, func: Callable[[], None]) -> None:
     """Call `func` after `msec` milliseconds.
 
@@ -183,7 +178,7 @@ def call_later(msec: int, func: Callable[[], None]) -> None:
     func : Callable[[], None]
         The function to call.
     """
-    ndv_app().call_later(msec, func)
+    app().call_later(msec, func)
 
 
 def process_events() -> None:

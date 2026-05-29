@@ -45,10 +45,6 @@ class NDVApp:
         """Run the application."""
         pass
 
-    def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
-        """Install key event filter on `widget`, emitting `receiver.keyPressed`."""
-        raise NotImplementedError
-
     def call_in_main_thread(
         self, func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
     ) -> Future[T]:

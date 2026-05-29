@@ -637,7 +637,7 @@ class ArrayViewer:
     #         self._on_roi_view_bounding_box_changed
     #     )
     def _view_event(self, event: events.Event) -> None:
-        """Respond to user events, delegating to focused sub-handlers."""
+        """Handle canvas events requiring controller-level access."""
         self._hover_event(event)
         if isinstance(event, events.KeyPressEvent):
             handle_key_press(event, self)

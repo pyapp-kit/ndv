@@ -62,7 +62,6 @@ def _get_mock_view(*_: Any) -> ArrayView:
 
 def _patch_views(f: Callable) -> Callable:
     f = patch.object(_app, "get_array_view_class", lambda: _get_mock_view)(f)
-    f = patch.object(_app, "filter_key_events", lambda *a, **k: lambda: None)(f)
     return f
 
 
