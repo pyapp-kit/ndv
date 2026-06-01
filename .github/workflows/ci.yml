@@ -93,6 +93,33 @@ jobs:
           path: ./.coverage*
           include-hidden-files: true
 
+  test-marimo:
+    name: marimo e2e
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.13"
+      UV_NO_SYNC: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install llvmpipe and lavapipe for offscreen canvas
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt install -y libegl1-mesa-dev libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+      - name: Install Python dependencies
+        run: uv sync --no-dev --extra=pygfx --group=jupyter
+      - name: Build JS
+        run: cd js && npm ci && npm run build
+      - name: Install Playwright
+        run: uv run playwright install --with-deps chromium
+      - name: Test
+        run: uv run pytest tests/views/_marimo/ --color=yes
+
   test-min-deps:
     name: min-deps py${{ matrix.python-version }} ${{ matrix.gui }} ${{ matrix.canvas }}
     runs-on: ubuntu-latest

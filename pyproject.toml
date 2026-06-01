@@ -44,11 +44,12 @@ dependencies = [
 [project.optional-dependencies]
 # Supported GUI frontends
 jupyter = [
-    "ipywidgets >=8.0.5",
+    "anywidget >=0.9",
     "jupyter >=1.1",
-    "jupyter_rfb >=0.3.3",
+    "jupyter_rfb >=1.0.2",
     "glfw >=2.4",
 ]
+marimo = ["marimo >=0.22.5", "anywidget >=0.9", "glfw >=2.4"]
 pyqt = ["pyqt6 >=6.7", "qtpy >=2", "superqt[iconify] >=0.8.1"]
 pyside = [
     # defer to superqt's pyside6 restrictions
@@ -93,6 +94,7 @@ testqt = [{ include-group = "test" }, "pytest-qt >=4.5.0"]
 pyqt = [{ include-group = "testqt" }, "ndv[pyqt]"]
 pyside = [{ include-group = "testqt" }, "ndv[pyside]"]
 jupyter = [{ include-group = "test" }, "ndv[jupyter]"]
+marimo = [{ include-group = "test" }, "ndv[marimo]", "pytest-playwright>=0.6"]
 wxpython = [{ include-group = "test" }, "ndv[wxpython]"]
 dev = [
     { include-group = "testqt" },
@@ -182,7 +184,7 @@ pretty = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*"]
+module = ["jupyter_rfb.*", "vispy.*", "ipywidgets.*", "anywidget.*"]
 ignore_missing_imports = true
 
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
@@ -239,6 +241,9 @@ exclude_lines = [
 [tool.coverage.run]
 source = ["ndv"]
 omit = ["src/ndv/viewer/_backends/_protocols.py"]
+
+[tool.hatch.build]
+artifacts = ["src/ndv/views/_jupyter/static/*"]
 
 [tool.check-manifest]
 ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]

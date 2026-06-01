@@ -26,7 +26,7 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
 
         return QRenderWidget
 
-    if frontend == GuiFrontend.JUPYTER:
+    if frontend in (GuiFrontend.JUPYTER, GuiFrontend.MARIMO):
         import rendercanvas.jupyter
 
         class JupyterRenderCanvas(rendercanvas.jupyter.JupyterRenderCanvas):
