@@ -58,7 +58,7 @@ if (QAPP := QCoreApplication.instance()) is None:
 
 _APP_THREAD = QAPP.thread()
 
-_INVOKERS = set()
+_INVOKERS: set[MainThreadInvoker] = set()
 
 
 def call_in_main_thread(
