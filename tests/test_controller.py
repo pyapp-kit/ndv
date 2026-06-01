@@ -1,4 +1,4 @@
-"""Test controller without canavs or gui frontend"""
+"""Test controller without canvas or gui frontend"""
 
 from __future__ import annotations
 
