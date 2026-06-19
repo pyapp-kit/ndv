@@ -26,9 +26,9 @@ from scenex import (
     UniformColor,
     View,
     Volume,
+    native,
     set_cursor,
 )
-from scenex.adaptors import get_adaptor_registry
 from scenex.app import CursorType
 from scenex.model import EventedBase
 from scenex.utils import projections
@@ -73,7 +73,7 @@ class DataCanvas:
         return False  # don't consume the event, allow normal processing to continue
 
     def widget(self) -> Any:
-        return get_adaptor_registry().get_adaptor(self._canvas)._snx_get_native()
+        return native(self._canvas)
 
     @property
     def ndims(self) -> int:

@@ -8,7 +8,6 @@ import cmap
 import numpy as np
 import scenex as snx
 from psygnal import Signal
-from scenex.adaptors import get_adaptor_registry
 from scenex.app import CursorType, events
 from scenex.util import projections
 
@@ -155,7 +154,7 @@ class SharedHistogram:
     # ------------ SharedHistogramCanvas methods ------------ #
 
     def widget(self) -> Any:
-        return get_adaptor_registry().get_adaptor(self.canvas)._snx_get_native()
+        return snx.native(self.canvas)
 
     def set_channel_data(
         self, key: ChannelKey, counts: np.ndarray, bin_edges: np.ndarray

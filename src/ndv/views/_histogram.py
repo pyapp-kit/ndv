@@ -7,7 +7,6 @@ import cmap
 import numpy as np
 import numpy.typing as npt
 import scenex as snx
-from scenex.adaptors import get_adaptor_registry
 from scenex.app import CursorType, events
 from scenex.utils import projections
 
@@ -448,7 +447,7 @@ class Histogram(LUTView):
         self.canvas.visible = visible
 
     def frontend_widget(self) -> Any:
-        return get_adaptor_registry().get_adaptor(self.canvas)._snx_get_native()
+        return snx.native(self.canvas)
 
     def close(self) -> None:
         # TODO Implement
