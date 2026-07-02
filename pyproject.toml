@@ -219,6 +219,8 @@ filterwarnings = [
     # unsolved python 3.10 warning on shutdown, either xarray or dask
     "ignore:unclosed transport:ResourceWarning",
     "ignore:Jupyter is migrating its paths",
+    # See https://github.com/pygfx/pygfx/pull/1306 and https://github.com/vispy/vispy/pull/2757
+    "ignore:Setting the shape on a NumPy array has been deprecated in NumPy 2.5:DeprecationWarning:pygfx.*|vispy.*",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
