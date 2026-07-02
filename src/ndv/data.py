@@ -28,7 +28,7 @@ def nd_sine_wave(
     half_per = base_frequency * np.pi
     x = np.linspace(-half_per, half_per, nx)
     y = np.linspace(-half_per, half_per, ny)
-    y, x = np.meshgrid(y, x)
+    yy, xx = np.meshgrid(y, x)
 
     # Iterate through each parameter in the higher dimensions
     for phase_idx in range(phase_dim):
@@ -41,7 +41,7 @@ def nd_sine_wave(
                 # Calculate angle
                 angle = np.pi / angle_dim * angle_idx
                 # Rotate x and y coordinates
-                xr = np.cos(angle) * x - np.sin(angle) * y
+                xr = np.cos(angle) * xx - np.sin(angle) * yy
 
                 # Compute the sine wave
                 sine_wave = (amplitude * 0.5) * np.sin(frequency * xr + phase)
