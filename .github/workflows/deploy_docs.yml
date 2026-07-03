@@ -11,10 +11,10 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: macos-latest  # nicer screenshots
+    runs-on: macos-15  # nicer screenshots
     if: github.repository == 'pyapp-kit/ndv'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v7

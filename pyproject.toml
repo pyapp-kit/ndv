@@ -78,6 +78,8 @@ array-libs = [
     "aiohttp>=3.11.11",
     "dask[array]>=2024.8.0",
     "jax[cpu]>=0.4.30",
+    # TODO: numba<=0.65 capped numpy<2.5 for some reason. When numba>0.65 ships, remove this pin
+    "numpy<2.5",
     "pooch>=1.8.2",
     "pyopencl>=2025.1",
     "pyopencl[pocl]>=2025.1 ; sys_platform == 'linux'",
@@ -219,6 +221,8 @@ filterwarnings = [
     # unsolved python 3.10 warning on shutdown, either xarray or dask
     "ignore:unclosed transport:ResourceWarning",
     "ignore:Jupyter is migrating its paths",
+    # See https://github.com/pygfx/pygfx/pull/1306 and https://github.com/vispy/vispy/pull/2757
+    "ignore:Setting the shape on a NumPy array has been deprecated in NumPy 2.5:DeprecationWarning:pygfx.*|vispy.*",
 ]
 markers = ["allow_leaks: mark test to allow widget leaks"]
 
