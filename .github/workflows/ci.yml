@@ -46,8 +46,33 @@ jobs:
           - os: macos-latest
             gui: wxpython
             python-version: "3.10"
+          # FIXME: Prone to segfaults
+          - os: macos-latest
+            gui: pyside
+            canvas: vispy
+          # FIXME: Prone to segfaults
+          - os: macos-latest
+            gui: pyqt
+            canvas: vispy
 
         include:
+          # Check macos+vispy
+          - os: macos-15
+            python-version: "3.13"
+            gui: pyside
+            canvas: vispy
+          - os: macos-15
+            python-version: "3.13"
+            gui: pyqt
+            canvas: vispy
+          - os: macos-15
+            python-version: "3.10"
+            gui: pyside
+            canvas: vispy
+          - os: macos-15
+            python-version: "3.10"
+            gui: pyqt
+            canvas: vispy
           # spot-check a few more python versions
           - os: ubuntu-latest
             python-version: "3.12"
