@@ -73,7 +73,7 @@ def _add_icon(btn: wx.AnyButton, icon: str) -> None:
 
 class _LutChannelSelector(wx.Panel):
     def __init__(
-        self, parent: wx.Window, channels: None | list[ChannelKey] = None
+        self, parent: wx.Window, channels: list[ChannelKey] | None = None
     ) -> None:
         super().__init__(parent)
 

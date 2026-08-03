@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
         def add_widget(
             self,
-            widget: None | scene.Widget = None,
+            widget: scene.Widget | None = None,
             row: int | None = None,
             col: int | None = None,
             row_span: int = 1,
