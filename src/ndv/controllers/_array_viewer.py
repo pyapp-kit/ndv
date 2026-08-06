@@ -287,7 +287,7 @@ class ArrayViewer:
 
     @staticmethod
     def _default_display_model(
-        data: None | DataWrapper, **kwargs: Unpack[ArrayDisplayModelKwargs]
+        data: DataWrapper | None, **kwargs: Unpack[ArrayDisplayModelKwargs]
     ) -> ArrayDisplayModel:
         """
         Creates a default ArrayDisplayModel when none is provided by the user.
