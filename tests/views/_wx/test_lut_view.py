@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import cmap
@@ -10,6 +11,9 @@ from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUT
 from ndv.views._wx._array_view import WxLUTView
 from ndv.views.bases._graphics._canvas import HistogramCanvas
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 @fixture
 def model() -> LUTModel:
@@ -17,14 +21,17 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(wxapp: wx.App, model: LUTModel) -> WxLUTView:
+def view(wxapp: wx.App, model: LUTModel) -> Iterator[WxLUTView]:
     # NB: wx.App necessary although unused
     frame = wx.Frame(None)
     view = WxLUTView(frame)
     assert view.model is None
     view.model = model
     assert view.model is model
-    return view
+    yield view
+    # frame is a top-level wx.Frame; must be explicitly destroyed rather than
+    # left for Python's GC (see test_array_view.py's viewer fixture for why).
+    frame.Destroy()
 
 
 def test_WxLUTView_update_model(model: LUTModel, view: WxLUTView) -> None:
@@ -129,7 +136,9 @@ def test_WxLUTView_histogram_controls(wxapp: wx.App, view: WxLUTView) -> None:
 
     # Mock up a histogram
     hist_mock = MagicMock(spec=HistogramCanvas)
-    # Note that containing the frontend widget within a frame prevents segfaults
+    # Note that containing the frontend widget within a frame prevents segfaults.
+    # This frame is reparented away and destroyed by _add_histogram below, so it
+    # does not need (and must not get) an explicit Destroy() of its own here.
     frame = wx.Frame(None)
     hist_frontend = wx.Window(frame)
     hist_mock.frontend_widget.return_value = hist_frontend
