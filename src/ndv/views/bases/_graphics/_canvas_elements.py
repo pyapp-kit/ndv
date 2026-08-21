@@ -52,6 +52,14 @@ class ImageHandle(CanvasElement, LUTView):
     @abstractmethod
     def set_data(self, data: np.ndarray) -> None: ...
     @abstractmethod
+    def set_world_transform(
+        self,
+        scales: tuple[float, ...],
+        origins: tuple[float, ...],
+    ) -> None:
+        """Set this element's world transform in data-axis order."""
+
+    @abstractmethod
     def clims(self) -> tuple[float, float]: ...
     @abstractmethod
     def set_clims(self, clims: tuple[float, float]) -> None: ...

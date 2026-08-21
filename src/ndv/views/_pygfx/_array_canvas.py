@@ -93,6 +93,26 @@ class PyGFXImageHandle(ImageHandle):
             if not is_three_d:
                 self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
 
+    def set_world_transform(
+        self,
+        scales: tuple[float, ...],
+        origins: tuple[float, ...],
+    ) -> None:
+        """Set this visual's scale and translation in data-axis order."""
+        scene_scales = list(reversed(scales))
+        scene_origins = list(reversed(origins))
+        while len(scene_scales) < 3:
+            scene_scales.append(1.0)
+            scene_origins.append(0.0)
+        factors = list(reversed(self._downsample_factors))
+        while len(factors) < 3:
+            factors.append(1)
+        self._image.local.scale = tuple(
+            scale * factor
+            for scale, factor in zip(scene_scales, factors, strict=True)
+        )
+        self._image.local.position = tuple(scene_origins)
+
     def visible(self) -> bool:
         return bool(self._image.visible)
 
@@ -486,7 +506,9 @@ class GfxArrayCanvas(ArrayCanvas):
         if state := self._last_state.get(ndim):
             cam.set_state(state)
 
-    def add_image(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
+    def add_image(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
         data, downsample_factors = _downcast_and_downsample(data, three_d=False)
         tex = pygfx.Texture(data, dim=2)
@@ -498,7 +520,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
         if data is not None:
             self._current_shape, prev_shape = data.shape, self._current_shape
-            if not prev_shape:
+            if reset_range and not prev_shape:
                 self.set_range()
 
         # FIXME: I suspect there are more performant ways to refresh the canvas
@@ -508,7 +530,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._elements[image] = handle
         return handle
 
-    def add_volume(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
+    def add_volume(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> PyGFXImageHandle:
         data, downsample_factors = _downcast_and_downsample(data, three_d=True)
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
@@ -522,7 +546,7 @@ class GfxArrayCanvas(ArrayCanvas):
         if data is not None:
             vol.local_position = [-0.5 * i for i in data.shape[::-1]]
             self._current_shape, prev_shape = data.shape, self._current_shape
-            if len(prev_shape) != 3:
+            if reset_range and len(prev_shape) != 3:
                 self.set_range()
 
         # FIXME: I suspect there are more performant ways to refresh the canvas
@@ -573,25 +597,13 @@ class GfxArrayCanvas(ArrayCanvas):
         self._apply_world_transform()
 
     def _apply_world_transform(self) -> None:
-        sx, sy, sz = self._world_scales
-        ox, oy, oz = self._world_origins
         for handle in self._elements.values():
             if not isinstance(handle, PyGFXImageHandle):
                 continue
-            child = handle._image
-            if not isinstance(child, (pygfx.Image, pygfx.Volume)):
-                continue
-            _sx, _sy, _sz = sx, sy, sz
-            # compensate for downsampling so coordinates stay correct
-            # factors are in data order; pygfx order is (x, y, z) = reversed
-            factors = handle._downsample_factors
-            if factors and any(f > 1 for f in factors):
-                rev = list(reversed(factors))
-                _sx *= rev[0]
-                _sy *= rev[1] if len(rev) > 1 else 1
-                _sz *= rev[2] if len(rev) > 2 else 1
-            child.local.scale = (_sx, _sy, _sz)
-            child.local.position = (ox, oy, oz)
+            handle.set_world_transform(
+                tuple(reversed(self._world_scales)),
+                tuple(reversed(self._world_origins)),
+            )
 
     def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
         """Return viewport and data-order world-to-clip matrix."""

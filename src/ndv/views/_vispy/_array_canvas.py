@@ -88,6 +88,29 @@ class VispyImageHandle(ImageHandle):
         self._downsample_factors = downsample_factors
         self._visual.set_data(data)
 
+    def set_world_transform(
+        self,
+        scales: tuple[float, ...],
+        origins: tuple[float, ...],
+    ) -> None:
+        """Set this visual's scale and translation in data-axis order."""
+        scene_scales = list(reversed(scales))
+        scene_origins = list(reversed(origins))
+        while len(scene_scales) < 3:
+            scene_scales.append(1.0)
+            scene_origins.append(0.0)
+        factors = list(reversed(self._downsample_factors))
+        while len(factors) < 3:
+            factors.append(1)
+        effective = tuple(
+            scale * factor
+            for scale, factor in zip(scene_scales, factors, strict=True)
+        )
+        self._visual.transform = vispy.visuals.transforms.STTransform(
+            scale=effective,
+            translate=tuple(scene_origins),
+        )
+
     def visible(self) -> bool:
         return bool(self._visual.visible)
 
@@ -389,7 +412,9 @@ class VispyArrayCanvas(ArrayCanvas):
     def refresh(self) -> None:
         self._canvas.update()
 
-    def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
+    def add_image(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         data, downsample_factors = _downcast_and_downsample(data, three_d=False)
         try:
@@ -405,11 +430,13 @@ class VispyArrayCanvas(ArrayCanvas):
         handle = VispyImageHandle(img)
         handle._downsample_factors = downsample_factors
         self._elements[img] = handle
-        if data is not None:
+        if data is not None and reset_range:
             self.set_range()
         return handle
 
-    def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
+    def add_volume(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> VispyImageHandle:
         data, downsample_factors = _downcast_and_downsample(data, three_d=True)
         try:
             vol = scene.visuals.Volume(
@@ -429,7 +456,7 @@ class VispyArrayCanvas(ArrayCanvas):
         handle = VispyImageHandle(vol)
         handle._downsample_factors = downsample_factors
         self._elements[vol] = handle
-        if data is not None:
+        if data is not None and reset_range:
             self.set_range()
         return handle
 
@@ -468,25 +495,12 @@ class VispyArrayCanvas(ArrayCanvas):
         self._apply_world_transform()
 
     def _apply_world_transform(self) -> None:
-        sx, sy, sz = self._world_scales
-        ox, oy, oz = self._world_origins
         for handle in self._elements.values():
             if not isinstance(handle, VispyImageHandle):
                 continue
-            child = handle._visual
-            if not isinstance(child, (visuals.ImageVisual, visuals.VolumeVisual)):
-                continue
-            _sx, _sy, _sz = sx, sy, sz
-            # compensate for downsampling so coordinates stay correct
-            # factors are in data order; scene order is (x, y, z) = reversed
-            factors = handle._downsample_factors
-            if factors and any(f > 1 for f in factors):
-                rev = list(reversed(factors))
-                _sx *= rev[0]
-                _sy *= rev[1] if len(rev) > 1 else 1
-                _sz *= rev[2] if len(rev) > 2 else 1
-            child.transform = vispy.visuals.transforms.STTransform(
-                scale=(_sx, _sy, _sz), translate=(ox, oy, oz)
+            handle.set_world_transform(
+                tuple(reversed(self._world_scales)),
+                tuple(reversed(self._world_origins)),
             )
 
     def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
