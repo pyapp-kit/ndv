@@ -34,11 +34,28 @@ from ndv.views.bases._graphics._canvas_elements import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
+
+
+class _CameraChangeMixin:
+    _ndv_changed: Callable[[], None] | None = None
+
+    def view_changed(self) -> None:
+        super().view_changed()  # type: ignore[misc]
+        if self._ndv_changed is not None:
+            self._ndv_changed()
+
+
+class _NDVArcballCamera(_CameraChangeMixin, scene.ArcballCamera):
+    pass
+
+
+class _NDVPanZoomCamera(_CameraChangeMixin, scene.PanZoomCamera):
+    pass
 
 
 class VispyImageHandle(ImageHandle):
@@ -316,6 +333,8 @@ class VispyArrayCanvas(ArrayCanvas):
         central_wdg: scene.Widget = self._canvas.central_widget
         self._view: scene.ViewBox = central_wdg.add_view()
         self._ndim: Literal[2, 3] | None = None
+        self._world_scales = (1.0, 1.0, 1.0)
+        self._world_origins = (0.0, 0.0, 0.0)
 
         # Maps vispy visuals (scene children) → CanvasElement handles.
         # Entries are added by add_image/add_volume/add_bounding_box.
@@ -345,11 +364,13 @@ class VispyArrayCanvas(ArrayCanvas):
 
         self._ndim = ndim
         if ndim == 3:
-            cam = scene.ArcballCamera(fov=0)
+            cam = _NDVArcballCamera(fov=0)
             # this sets the initial view similar to what the panzoom view would have.
             cam._quaternion = DEFAULT_QUATERNION
         else:
-            cam = scene.PanZoomCamera(aspect=1, flip=(0, 1))
+            cam = _NDVPanZoomCamera(aspect=1, flip=(0, 1))
+
+        cam._ndv_changed = self.cameraChanged.emit
 
         # restore the previous state if it exists
         if state := self._last_state.get(ndim):
@@ -421,7 +442,9 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created = ReferenceType(roi)
         return roi
 
-    def set_scales(self, scales: tuple[float, ...]) -> None:
+    def set_scales(
+        self, scales: tuple[float, ...], *, reset_range: bool = True
+    ) -> None:
         """Set per-visible-axis scale factors for rendering."""
         if not scales:
             return
@@ -431,7 +454,22 @@ class VispyArrayCanvas(ArrayCanvas):
         # pad to 3 components
         while len(vis_scales) < 3:
             vis_scales.append(1.0)
-        sx, sy, sz = vis_scales[0], vis_scales[1], vis_scales[2]
+        self._world_scales = tuple(vis_scales[:3])
+        self._apply_world_transform()
+        if reset_range:
+            self.set_range()
+
+    def set_origins(self, origins: tuple[float, ...]) -> None:
+        """Set per-visible-axis world origins in data-axis order."""
+        vis_origins = list(reversed(origins))
+        while len(vis_origins) < 3:
+            vis_origins.append(0.0)
+        self._world_origins = tuple(vis_origins[:3])
+        self._apply_world_transform()
+
+    def _apply_world_transform(self) -> None:
+        sx, sy, sz = self._world_scales
+        ox, oy, oz = self._world_origins
         for handle in self._elements.values():
             if not isinstance(handle, VispyImageHandle):
                 continue
@@ -448,9 +486,28 @@ class VispyArrayCanvas(ArrayCanvas):
                 _sy *= rev[1] if len(rev) > 1 else 1
                 _sz *= rev[2] if len(rev) > 2 else 1
             child.transform = vispy.visuals.transforms.STTransform(
-                scale=(_sx, _sy, _sz)
+                scale=(_sx, _sy, _sz), translate=(ox, oy, oz)
             )
-        self.set_range()
+
+    def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
+        """Return viewport and data-order world-to-clip matrix."""
+        width, height = (int(value) for value in self._canvas.size)
+        ndim = self._ndim or 2
+        points = np.zeros((ndim + 1, 4), dtype=np.float64)
+        points[:, 3] = 1.0
+        # VisPy scene order is XYZ; public data order is YX or ZYX.
+        for axis in range(ndim):
+            points[axis + 1, ndim - axis - 1] = 1.0
+        mapped = np.asarray(self._view.scene.transform.map(points), dtype=np.float64)
+        mapped /= mapped[:, 3, np.newaxis]
+        clip = mapped.copy()
+        clip[:, 0] = 2.0 * mapped[:, 0] / width - 1.0
+        clip[:, 1] = 1.0 - 2.0 * mapped[:, 1] / height
+        matrix = np.eye(4, dtype=np.float64)
+        matrix[:ndim, -1] = clip[0, :ndim]
+        for axis in range(ndim):
+            matrix[:ndim, axis] = clip[axis + 1, :ndim] - clip[0, :ndim]
+        return (width, height), matrix
 
     def set_range(
         self,

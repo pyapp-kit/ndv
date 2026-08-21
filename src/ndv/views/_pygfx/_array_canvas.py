@@ -441,6 +441,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
         # Per-axis world-space scales (x, y, z) used for coordinate conversion
         self._world_scales: tuple[float, float, float] = (1.0, 1.0, 1.0)
+        self._world_origins: tuple[float, float, float] = (0.0, 0.0, 0.0)
+        self._last_camera_signature: bytes | None = None
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -543,7 +545,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._last_roi_created = ref(roi)
         return roi
 
-    def set_scales(self, scales: tuple[float, ...]) -> None:
+    def set_scales(
+        self, scales: tuple[float, ...], *, reset_range: bool = True
+    ) -> None:
         """Set per-visible-axis scale factors for rendering."""
         if not scales:
             return
@@ -556,7 +560,21 @@ class GfxArrayCanvas(ArrayCanvas):
 
         (sx, sy, sz) = gfx_scales[:3]
         self._world_scales = (sx, sy, sz)
-        has_visuals = False
+        self._apply_world_transform()
+        if reset_range:
+            self.set_range()
+
+    def set_origins(self, origins: tuple[float, ...]) -> None:
+        """Set per-visible-axis world origins in data-axis order."""
+        gfx_origins = list(reversed(origins))
+        while len(gfx_origins) < 3:
+            gfx_origins.append(0.0)
+        self._world_origins = tuple(gfx_origins[:3])
+        self._apply_world_transform()
+
+    def _apply_world_transform(self) -> None:
+        sx, sy, sz = self._world_scales
+        ox, oy, oz = self._world_origins
         for handle in self._elements.values():
             if not isinstance(handle, PyGFXImageHandle):
                 continue
@@ -573,9 +591,22 @@ class GfxArrayCanvas(ArrayCanvas):
                 _sy *= rev[1] if len(rev) > 1 else 1
                 _sz *= rev[2] if len(rev) > 2 else 1
             child.local.scale = (_sx, _sy, _sz)
-            has_visuals = True
-        if has_visuals:
-            self.set_range()
+            child.local.position = (ox, oy, oz)
+
+    def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
+        """Return viewport and data-order world-to-clip matrix."""
+        if self._camera is None:
+            raise RuntimeError("camera dimensionality has not been initialized")
+        width, height = self._canvas.get_logical_size()
+        scene_to_clip = np.asarray(self._camera.camera_matrix, dtype=np.float64)
+        ndim = self._ndim or 2
+        permutation = np.zeros((4, 4), dtype=np.float64)
+        for axis in range(ndim):
+            permutation[ndim - axis - 1, axis] = 1.0
+        for axis in range(ndim, 4):
+            permutation[axis, axis] = 1.0
+        matrix = scene_to_clip @ permutation
+        return (int(width), int(height)), matrix
 
     def set_range(
         self,
@@ -628,6 +659,13 @@ class GfxArrayCanvas(ArrayCanvas):
     def _animate(self) -> None:
         if self._camera is not None:
             self._renderer.render(self._scene, self._camera)
+            signature = np.asarray(self._camera.camera_matrix).tobytes()
+            if (
+                self._last_camera_signature is not None
+                and signature != self._last_camera_signature
+            ):
+                self.cameraChanged.emit()
+            self._last_camera_signature = signature
 
     def _canvas_to_world_raw(
         self, pos_xy: tuple[float, float]

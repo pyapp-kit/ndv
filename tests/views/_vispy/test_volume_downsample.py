@@ -103,6 +103,34 @@ def test_set_scales_compensates_for_volume_downsample() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_world_origin_and_camera_state_are_public() -> None:
+    canvas = VispyArrayCanvas(ArrayViewerModel())
+    changed = []
+    canvas.cameraChanged.connect(lambda: changed.append(True))
+    canvas.set_ndim(3)
+    handle = canvas.add_volume(np.zeros((10, 20, 30), dtype=np.float32))
+    canvas.set_scales((2.0, 3.0, 4.0))
+    canvas.set_origins((100.0, 200.0, 300.0))
+    canvas.set_range()
+
+    transform = handle._visual.transform
+    assert isinstance(transform, vispy.visuals.transforms.STTransform)
+    assert transform.scale[:3] == pytest.approx((4.0, 3.0, 2.0))
+    assert transform.translate[:3] == pytest.approx((300.0, 200.0, 100.0))
+    viewport, world_to_clip = canvas.camera_state()
+    assert viewport == (600, 600)
+    assert world_to_clip.shape == (4, 4)
+    assert np.isfinite(world_to_clip).all()
+
+    before = world_to_clip.copy()
+    canvas._camera.scale_factor /= 2
+    canvas._camera.view_changed()
+    assert changed
+    assert not np.allclose(before, canvas.camera_state()[1])
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_set_range_correct_bounds_after_downsample() -> None:
     """set_range should compute world bounds as if data were full-resolution."""
     canvas = VispyArrayCanvas(ArrayViewerModel())
