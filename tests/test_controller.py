@@ -87,6 +87,11 @@ def _patch_views(f: Callable) -> Callable:
 def test_controller() -> None:
     SHAPE = (10, 4, 10, 10)
     ctrl = ArrayViewer()
+    assert ctrl.canvas is ctrl._canvas
+    callback = MagicMock()
+    with patch.object(_app, "ndv_app") as ndv_app:
+        ctrl.dispatch(callback)
+        ndv_app.return_value.call_in_main_thread.assert_called_once_with(callback)
     ctrl._async = False
     model = ctrl.display_model
     mock_view = ctrl._view

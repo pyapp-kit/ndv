@@ -28,6 +28,7 @@ from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from typing import Any
 
     import cmap as cmap_mod
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
-    from ndv.views.bases import HistogramCanvas, SharedHistogramCanvas
+    from ndv.views.bases import ArrayCanvas, HistogramCanvas, SharedHistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
 
@@ -189,6 +190,20 @@ class ArrayViewer:
     def data_wrapper(self) -> Any:
         """Return the data wrapper object being used to interface with the data."""
         return self._data_wrapper
+
+    @property
+    def canvas(self) -> ArrayCanvas:
+        """Return the renderer-independent canvas used by this viewer.
+
+        This is the narrow integration surface for progressive data providers:
+        images and volumes can be added through the canvas while ndv continues
+        to select the concrete VisPy or pygfx implementation.
+        """
+        return self._canvas
+
+    def dispatch(self, callback: Callable[[], None]) -> None:
+        """Schedule ``callback`` on the active GUI frontend's main thread."""
+        _app.ndv_app().call_in_main_thread(callback)
 
     @property
     def data(self) -> Any:
