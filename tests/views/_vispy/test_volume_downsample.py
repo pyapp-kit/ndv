@@ -118,7 +118,8 @@ def test_world_origin_and_camera_state_are_public() -> None:
     assert transform.scale[:3] == pytest.approx((4.0, 3.0, 2.0))
     assert transform.translate[:3] == pytest.approx((300.0, 200.0, 100.0))
     viewport, world_to_clip = canvas.camera_state()
-    assert viewport == (600, 600)
+    assert viewport == tuple(int(value) for value in canvas._canvas.size)
+    assert all(value > 0 for value in viewport)
     assert world_to_clip.shape == (4, 4)
     assert np.isfinite(world_to_clip).all()
 

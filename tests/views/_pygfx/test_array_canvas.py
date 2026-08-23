@@ -60,6 +60,18 @@ def test_zoom_center() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_set_scales_before_image_is_safe() -> None:
+    """Initial model synchronization may set scales before data arrives."""
+    canvas = GfxArrayCanvas(ArrayViewerModel())
+    _force_canvas_size(canvas)
+    canvas.set_ndim(2)
+
+    canvas.set_scales((2.0, 3.0))
+
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_canvas_to_world_scale_aware_offset() -> None:
     """canvas_to_world pixel-center offset must scale with pixel size.
 

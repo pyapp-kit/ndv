@@ -630,7 +630,11 @@ class GfxArrayCanvas(ArrayCanvas):
 
         When called with no arguments, the range is set to the full extent of the data.
         """
-        if not self._scene.children or self._camera is None:
+        has_images = any(
+            isinstance(handle, PyGFXImageHandle) and handle.data() is not None
+            for handle in self._elements.values()
+        )
+        if not has_images or self._camera is None:
             return
 
         cam = self._camera
