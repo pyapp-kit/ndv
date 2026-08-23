@@ -108,8 +108,7 @@ class PyGFXImageHandle(ImageHandle):
         while len(factors) < 3:
             factors.append(1)
         self._image.local.scale = tuple(
-            scale * factor
-            for scale, factor in zip(scene_scales, factors, strict=True)
+            scale * factor for scale, factor in zip(scene_scales, factors, strict=True)
         )
         self._image.local.position = tuple(scene_origins)
 
@@ -593,7 +592,7 @@ class GfxArrayCanvas(ArrayCanvas):
         gfx_origins = list(reversed(origins))
         while len(gfx_origins) < 3:
             gfx_origins.append(0.0)
-        self._world_origins = tuple(gfx_origins[:3])
+        self._world_origins = (gfx_origins[0], gfx_origins[1], gfx_origins[2])
         self._apply_world_transform()
 
     def _apply_world_transform(self) -> None:

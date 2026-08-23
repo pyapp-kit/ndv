@@ -103,8 +103,7 @@ class VispyImageHandle(ImageHandle):
         while len(factors) < 3:
             factors.append(1)
         effective = tuple(
-            scale * factor
-            for scale, factor in zip(scene_scales, factors, strict=True)
+            scale * factor for scale, factor in zip(scene_scales, factors, strict=True)
         )
         self._visual.transform = vispy.visuals.transforms.STTransform(
             scale=effective,
@@ -481,7 +480,7 @@ class VispyArrayCanvas(ArrayCanvas):
         # pad to 3 components
         while len(vis_scales) < 3:
             vis_scales.append(1.0)
-        self._world_scales = tuple(vis_scales[:3])
+        self._world_scales = (vis_scales[0], vis_scales[1], vis_scales[2])
         self._apply_world_transform()
         if reset_range:
             self.set_range()
@@ -491,7 +490,7 @@ class VispyArrayCanvas(ArrayCanvas):
         vis_origins = list(reversed(origins))
         while len(vis_origins) < 3:
             vis_origins.append(0.0)
-        self._world_origins = tuple(vis_origins[:3])
+        self._world_origins = (vis_origins[0], vis_origins[1], vis_origins[2])
         self._apply_world_transform()
 
     def _apply_world_transform(self) -> None:
