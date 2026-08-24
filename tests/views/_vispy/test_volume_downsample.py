@@ -132,6 +132,33 @@ def test_world_origin_and_camera_state_are_public() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_camera_state_preserves_projective_point_mapping() -> None:
+    canvas = VispyArrayCanvas(ArrayViewerModel())
+    canvas.set_ndim(3)
+    canvas.add_volume(np.zeros((10, 20, 30), dtype=np.float32))
+    canvas.set_range()
+
+    viewport, world_to_clip = canvas.camera_state()
+    width, height = viewport
+    data_points = np.asarray(((0.0, 0.0, 0.0), (3.0, 7.0, 11.0), (8.0, 17.0, 27.0)))
+    # VisPy scene order is XYZ while the public camera matrix consumes ZYX.
+    scene_points = np.column_stack((data_points[:, ::-1], np.ones(len(data_points))))
+    framebuffer = np.asarray(
+        canvas._view.scene.transform.map(scene_points), dtype=np.float64
+    )
+    expected = framebuffer[:, :3] / framebuffer[:, 3, np.newaxis]
+    expected[:, 0] = 2.0 * expected[:, 0] / width - 1.0
+    expected[:, 1] = 1.0 - 2.0 * expected[:, 1] / height
+
+    homogeneous = np.column_stack((data_points, np.ones(len(data_points))))
+    actual = (world_to_clip @ homogeneous.T).T
+    actual = actual[:, :3] / actual[:, 3, np.newaxis]
+
+    assert actual == pytest.approx(expected)
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_image_handles_can_have_independent_world_transforms() -> None:
     canvas = VispyArrayCanvas(ArrayViewerModel())
     canvas.set_ndim(3)

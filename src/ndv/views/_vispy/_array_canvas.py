@@ -512,15 +512,19 @@ class VispyArrayCanvas(ArrayCanvas):
         for axis in range(ndim):
             points[axis + 1, ndim - axis - 1] = 1.0
         mapped = np.asarray(self._view.scene.transform.map(points), dtype=np.float64)
-        mapped /= mapped[:, 3, np.newaxis]
-        clip = mapped.copy()
-        clip[:, 0] = 2.0 * mapped[:, 0] / width - 1.0
-        clip[:, 1] = 1.0 - 2.0 * mapped[:, 1] / height
-        matrix = np.eye(4, dtype=np.float64)
-        matrix[:ndim, -1] = clip[0, :ndim]
+        # Keep homogeneous coordinates intact.  Dividing each basis sample by
+        # ``w`` before reconstructing the matrix turns a perspective camera
+        # into an affine approximation around the data origin.  That is badly
+        # wrong for camera-aware LOD and chunk priority away from the origin.
+        framebuffer = np.eye(4, dtype=np.float64)
+        framebuffer[:, -1] = mapped[0]
         for axis in range(ndim):
-            matrix[:ndim, axis] = clip[axis + 1, :ndim] - clip[0, :ndim]
-        return (width, height), matrix
+            framebuffer[:, axis] = mapped[axis + 1] - mapped[0]
+
+        framebuffer_to_clip = np.eye(4, dtype=np.float64)
+        framebuffer_to_clip[0] = (2.0 / width, 0.0, 0.0, -1.0)
+        framebuffer_to_clip[1] = (0.0, -2.0 / height, 0.0, 1.0)
+        return (width, height), framebuffer_to_clip @ framebuffer
 
     def set_range(
         self,
