@@ -300,6 +300,8 @@ def test_array_viewer_with_app() -> None:
     viewer.display_model.visible_axes = (0, -2, -1)
     visax_mock.assert_called_once()
     assert viewer.display_model.visible_axes == (0, -2, -1)
+    viewer.close()
+    _app.process_events()
 
 
 @pytest.mark.usefixtures("any_app")
@@ -354,7 +356,7 @@ def test_array_viewer_histogram() -> None:
     bin_edges = np.arange(maxval + 2) - 0.5
     histogram.set_data(counts, bin_edges)
 
-    histogram.close()
+    viewer.close()
 
 
 @no_type_check
@@ -394,7 +396,7 @@ def test_roi_controller() -> None:
     assert roi.bounding_box[0] == pytest.approx(expected_min)
     assert roi.bounding_box[1] == pytest.approx(expected_max)
     assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
-    ctrl._canvas.close()
+    ctrl.close()
 
 
 @no_type_check
@@ -506,7 +508,7 @@ def test_roi_interaction() -> None:
         (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
     )
     assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
-    ctrl._canvas.close()
+    ctrl.close()
 
 
 @pytest.mark.allow_leaks
@@ -521,6 +523,7 @@ def test_rgb_display_magic() -> None:
         assert cast("int", viewer.display_model.channel_axis) % rgb_data.ndim == 4
         assert cast("int", viewer.display_model.visible_axes[0]) % rgb_data.ndim == 2
         assert cast("int", viewer.display_model.visible_axes[1]) % rgb_data.ndim == 3
+        viewer.close()
 
     rgb_data = np.ones((1, 2, 3, 4, 3), dtype=np.uint8)
     assert_rgb_magic_works(rgb_data)
@@ -958,3 +961,4 @@ def test_handle_gc_on_data_reassign() -> None:
     gc.collect()
 
     assert handle_ref() is None
+    viewer.close()

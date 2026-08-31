@@ -515,7 +515,8 @@ class VispyArrayCanvas(ArrayCanvas):
         # Keep homogeneous coordinates intact.  Dividing each basis sample by
         # ``w`` before reconstructing the matrix turns a perspective camera
         # into an affine approximation around the data origin.  That is badly
-        # wrong for camera-aware LOD and chunk priority away from the origin.
+        # wrong for camera-aware level selection and chunk priority away from
+        # the origin.
         framebuffer = np.eye(4, dtype=np.float64)
         framebuffer[:, -1] = mapped[0]
         for axis in range(ndim):

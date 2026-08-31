@@ -55,7 +55,7 @@ class SliderThumb:
         max_value = self.parent.GetMax()
         fraction = value_to_fraction(self.value, min_value, max_value)
         low = int(fraction_to_value(fraction, min_x, max_x))
-        high = int(parent_size.GetHeight() / 2 + 1)  # type: ignore [attr-defined]
+        high = int(parent_size.GetHeight() / 2 + 1)
         return low, high
 
     def SetPosition(self, pos: tuple[int, int]) -> None:
@@ -98,7 +98,7 @@ class SliderThumb:
         return self.parent.border_width + int(self.size[0] / 2)
 
     def GetMax(self) -> int:
-        size = cast("wx.Size", self.parent.GetSize())
+        size = self.parent.GetSize()
         parent_w = int(size.GetWidth())
         return parent_w - self.parent.border_width - int(self.size[0] / 2)
 
@@ -293,7 +293,7 @@ class RangeSlider(wx.Panel):
 
     def OnPaint(self, evt: wx.Event) -> None:
         sz = self.GetSize()
-        w, h = sz.GetWidth(), sz.GetHeight()  # type: ignore [attr-defined]
+        w, h = sz.GetWidth(), sz.GetHeight()
         # BufferedPaintDC should reduce flickering
         dc = wx.BufferedPaintDC(self)
         background_brush = wx.Brush(self.GetBackgroundColour(), wx.SOLID)

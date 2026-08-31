@@ -48,6 +48,17 @@ def wxapp() -> Iterator[wx.App]:
     if (_wxapp := wx.App.Get()) is None:
         _wxapp = wx.App()
     yield _wxapp
+    # Release renderer resources before destroying wx.  Leaving either side
+    # to interpreter shutdown races wgpu's native poller with Cocoa/Win32
+    # window destruction (exit 139 on macOS and invalid handles on Windows).
+    for window in tuple(wx.GetTopLevelWindows()):
+        if window:
+            window.Destroy()
+    if "pygfx" in sys.modules:
+        from pygfx.renderers.wgpu import get_shared
+
+        get_shared().device.destroy()
+    _wxapp.Destroy()
 
 
 @pytest.fixture

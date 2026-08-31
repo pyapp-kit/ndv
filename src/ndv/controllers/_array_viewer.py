@@ -254,9 +254,19 @@ class ArrayViewer:
         self._view.set_visible(False)
 
     def close(self) -> None:
-        """Close the viewer."""
+        """Close the viewer and release its native rendering resources."""
         self._disconnect_key_events()
-        self._view.set_visible(False)
+        for future in tuple(self._futures):
+            future.cancel()
+        self._futures.clear()
+        for histogram in tuple(self._histograms.values()):
+            histogram.close()
+        self._histograms.clear()
+        if self._shared_histogram is not None:
+            self._shared_histogram.close()
+            self._shared_histogram = None
+        self._canvas.close()
+        self._view.close()
 
     def clone(self) -> ArrayViewer:
         """Return a new ArrayViewer instance with the same data and display model.
