@@ -119,6 +119,15 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
         allow.append(QRenderWidget)
     except (ImportError, RuntimeError):
         pass
+    try:
+        # rendercanvas can leave anonymous child QFrame wrappers in Qt's
+        # top-level enumeration after their native parent is destroyed. They
+        # have no Python referrers and are not independently owned windows.
+        from qtpy.QtWidgets import QFrame
+
+        allow.append(QFrame)
+    except (ImportError, RuntimeError):
+        pass
 
     before = {id(w) for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))}
     failures_before = request.session.testsfailed
