@@ -23,7 +23,7 @@ from ndv.views._util import downsample_data
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
 
-from ._util import rendercanvas_class
+from ._util import close_rendercanvas, rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -772,7 +772,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def close(self) -> None:
         self._disconnect_mouse_events()
-        self._canvas.close()
+        close_rendercanvas(self._canvas)
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
         if self._selection:

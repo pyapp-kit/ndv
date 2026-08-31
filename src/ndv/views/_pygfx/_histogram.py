@@ -13,7 +13,7 @@ from ndv.models._lut_model import ClimPolicy, ClimsManual
 from ndv.views._app import filter_mouse_events
 from ndv.views.bases import HistogramCanvas
 
-from ._util import rendercanvas_class
+from ._util import close_rendercanvas, rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -261,7 +261,7 @@ class PyGFXHistogramCanvas(HistogramCanvas):
 
     def close(self) -> None:
         self._disconnect_mouse_events()
-        self._canvas.close()
+        close_rendercanvas(self._canvas)
 
     def _resize(
         self, x: tuple[float, float] | None = None, y: tuple[float, float] | None = None

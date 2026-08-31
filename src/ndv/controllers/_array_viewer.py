@@ -265,6 +265,9 @@ class ArrayViewer:
         if self._shared_histogram is not None:
             self._shared_histogram.close()
             self._shared_histogram = None
+        # Renderer cleanup must precede closing the frontend ownership tree.
+        # Embedded rendercanvas widgets leave native child destruction to the
+        # frontend root (see the Qt rendercanvas adapter).
         self._canvas.close()
         self._view.close()
 

@@ -7,7 +7,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import psygnal
-from qtpy.QtCore import QObject, QPoint, QSize, Qt, Signal  # type: ignore[attr-defined]
+from qtpy.QtCore import (  # type: ignore[attr-defined]
+    QCoreApplication,
+    QEvent,
+    QObject,
+    QPoint,
+    QSize,
+    Qt,
+    Signal,
+)
 from qtpy.QtGui import QCursor, QFontDatabase, QMouseEvent, QMovie
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -962,7 +970,12 @@ class QtArrayView(ArrayView):
         self._qwidget.setVisible(visible)
 
     def close(self) -> None:
-        self._qwidget.close()
+        # Defer destruction until Qt has drained callbacks queued by embedded
+        # render canvases.  PySide can segfault when a parent's synchronous
+        # close destroys a QRenderWidget during event processing.
+        self._qwidget.hide()
+        self._qwidget.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
     def frontend_widget(self) -> QWidget:
         return self._qwidget
