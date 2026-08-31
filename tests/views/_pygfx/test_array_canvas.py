@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 from typing import TYPE_CHECKING, cast
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -68,6 +69,32 @@ def test_set_scales_before_image_is_safe() -> None:
 
     canvas.set_scales((2.0, 3.0))
 
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
+def test_camera_state_is_in_data_axis_order_and_emits_changes() -> None:
+    canvas = GfxArrayCanvas(ArrayViewerModel())
+    _force_canvas_size(canvas, 320, 180)
+    with pytest.raises(RuntimeError, match="dimensionality"):
+        canvas.camera_state()
+
+    canvas.set_ndim(3)
+    camera = canvas._camera
+    assert camera is not None
+    viewport, matrix = canvas.camera_state()
+    permutation = np.eye(4)
+    permutation[:3, :3] = permutation[:3, :3][::-1]
+    assert viewport == (320, 180)
+    np.testing.assert_allclose(matrix, camera.camera_matrix @ permutation)
+
+    changes = []
+    canvas.cameraChanged.connect(lambda: changes.append(None))
+    with patch.object(canvas._renderer, "render"):
+        canvas._animate()
+        camera.local.x += 1
+        canvas._animate()
+    assert changes == [None]
     canvas.close()
 
 
