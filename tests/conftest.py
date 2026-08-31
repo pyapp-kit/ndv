@@ -104,12 +104,6 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
         yield
         return
 
-    nbefore = len(qapp.topLevelWidgets())
-    failures_before = request.session.testsfailed
-    yield
-    # if the test failed, don't worry about checking widgets
-    if request.session.testsfailed - failures_before:
-        return
     allow: list[type] = []
     try:
         from vispy.app.backends._qt import CanvasBackendDesktop
@@ -126,9 +120,21 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     except (ImportError, RuntimeError):
         pass
 
+    before = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
+    failures_before = request.session.testsfailed
+    yield
+    # if the test failed, don't worry about checking widgets
+    if request.session.testsfailed - failures_before:
+        return
+    # Collect Python ownership cycles, then let Qt process deferred deletion
+    # before measuring native widgets.  The timing otherwise differs between
+    # PyQt/PySide and under loaded array-library CI jobs.
+    gc.collect()
+    qapp.processEvents()
+
     # This is a known widget that is not cleaned up properly
     remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
-    if len(remaining) > nbefore:
+    if len(remaining) > len(before):
         test_node = request.node
 
         test = f"{test_node.path.name}::{test_node.originalname}"
