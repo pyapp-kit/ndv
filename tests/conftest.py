@@ -120,7 +120,7 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     except (ImportError, RuntimeError):
         pass
 
-    before = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
+    before = {id(w) for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))}
     failures_before = request.session.testsfailed
     yield
     # if the test failed, don't worry about checking widgets
@@ -131,10 +131,18 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
     # PyQt/PySide and under loaded array-library CI jobs.
     gc.collect()
     qapp.processEvents()
+    from qtpy.QtCore import QCoreApplication, QEvent
 
-    # This is a known widget that is not cleaned up properly
-    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
-    if len(remaining) > len(before):
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    qapp.processEvents()
+    gc.collect()
+
+    remaining = [
+        w
+        for w in qapp.topLevelWidgets()
+        if not isinstance(w, tuple(allow)) and id(w) not in before
+    ]
+    if remaining:
         test_node = request.node
 
         test = f"{test_node.path.name}::{test_node.originalname}"
