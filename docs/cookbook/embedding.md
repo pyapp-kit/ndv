@@ -14,7 +14,7 @@ The following script shows an example on how to dynamically select a data set
 and load it in the `ArrayViewer`.
 
 ````python title="examples/cookbook/ndv_embedded.py"
---8<-- "examples/cookbook/ndv_embedded.py"
+--8 < --"examples/cookbook/ndv_embedded.py"
 ````
 
 {{ screenshot: examples/cookbook/ndv_embedded.py }}
@@ -26,7 +26,7 @@ The following script shows an example on how to create multiple instances of the
 each one.
 
 ````python title="examples/cookbook/multi_ndv.py"
---8<-- "examples/cookbook/multi_ndv.py"
+--8 < --"examples/cookbook/multi_ndv.py"
 ````
 
 {{ screenshot: examples/cookbook/multi_ndv.py }}
