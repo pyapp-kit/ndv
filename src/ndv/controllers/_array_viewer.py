@@ -28,6 +28,7 @@ from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
 from ndv.views import _app
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from typing import Any
 
     import cmap as cmap_mod
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from ndv._types import AxisKey, ChannelKey, KeyPressEvent, MouseMoveEvent
     from ndv.models._array_display_model import ArrayDisplayModelKwargs
     from ndv.models._viewer_model import ArrayViewerModelKwargs
-    from ndv.views.bases import HistogramCanvas, SharedHistogramCanvas
+    from ndv.views.bases import ArrayCanvas, HistogramCanvas, SharedHistogramCanvas
     from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle
 
 
@@ -191,6 +192,20 @@ class ArrayViewer:
         return self._data_wrapper
 
     @property
+    def canvas(self) -> ArrayCanvas:
+        """Return the renderer-independent canvas used by this viewer.
+
+        This is the narrow integration surface for progressive data providers:
+        images and volumes can be added through the canvas while ndv continues
+        to select the concrete VisPy or pygfx implementation.
+        """
+        return self._canvas
+
+    def dispatch(self, callback: Callable[[], None]) -> None:
+        """Schedule ``callback`` on the active GUI frontend's main thread."""
+        _app.ndv_app().call_in_main_thread(callback)
+
+    @property
     def data(self) -> Any:
         """Return data being displayed (the actual data, not the wrapper)."""
         if self._data_wrapper is None:
@@ -239,9 +254,22 @@ class ArrayViewer:
         self._view.set_visible(False)
 
     def close(self) -> None:
-        """Close the viewer."""
+        """Close the viewer and release its native rendering resources."""
         self._disconnect_key_events()
-        self._view.set_visible(False)
+        for future in tuple(self._futures):
+            future.cancel()
+        self._futures.clear()
+        for histogram in tuple(self._histograms.values()):
+            histogram.close()
+        self._histograms.clear()
+        if self._shared_histogram is not None:
+            self._shared_histogram.close()
+            self._shared_histogram = None
+        # Renderer cleanup must precede closing the frontend ownership tree.
+        # Embedded rendercanvas widgets leave native child destruction to the
+        # frontend root (see the Qt rendercanvas adapter).
+        self._canvas.close()
+        self._view.close()
 
     def clone(self) -> ArrayViewer:
         """Return a new ArrayViewer instance with the same data and display model.

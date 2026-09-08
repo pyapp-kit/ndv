@@ -175,7 +175,7 @@ class _LutChannelSelector(wx.Panel):
     def _on_dropdown_clicked(self, evt: wx.CommandEvent) -> None:
         """Show the dropdown checklist."""
         # Position the popup below the button
-        btn_size = cast("wx.Size", self._dropdown_btn.GetSize())
+        btn_size: Any = self._dropdown_btn.GetSize()
         btn_pos = self._dropdown_btn.GetPosition()
         popup_pos = self.ClientToScreen(
             wx.Point(btn_pos.x, btn_pos.y + btn_size.height)
@@ -369,7 +369,7 @@ class WxLUTView(LUTView):
     def _on_autoscale_rclick(self, event: wx.CommandEvent) -> None:
         btn = event.GetEventObject()
         pos = btn.ClientToScreen((0, 0))
-        sz = cast("wx.Size", btn.GetSize())
+        sz: Any = btn.GetSize()
         self._wxwidget.auto_popup.Position(pos, (0, sz.GetHeight()))
         self._wxwidget.auto_popup.Popup()
 

@@ -48,6 +48,17 @@ def wxapp() -> Iterator[wx.App]:
     if (_wxapp := wx.App.Get()) is None:
         _wxapp = wx.App()
     yield _wxapp
+    # Release renderer resources before destroying wx.  Leaving either side
+    # to interpreter shutdown races wgpu's native poller with Cocoa/Win32
+    # window destruction (exit 139 on macOS and invalid handles on Windows).
+    for window in tuple(wx.GetTopLevelWindows()):
+        if window:
+            window.Destroy()
+    if "pygfx" in sys.modules:
+        from pygfx.renderers.wgpu import get_shared
+
+        get_shared().device.destroy()
+    _wxapp.Destroy()
 
 
 @pytest.fixture
@@ -93,12 +104,6 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
         yield
         return
 
-    nbefore = len(qapp.topLevelWidgets())
-    failures_before = request.session.testsfailed
-    yield
-    # if the test failed, don't worry about checking widgets
-    if request.session.testsfailed - failures_before:
-        return
     allow: list[type] = []
     try:
         from vispy.app.backends._qt import CanvasBackendDesktop
@@ -114,10 +119,39 @@ def _catch_qt_leaks(request: FixtureRequest, qapp: QApplication) -> Iterator[Non
         allow.append(QRenderWidget)
     except (ImportError, RuntimeError):
         pass
+    try:
+        # rendercanvas can leave anonymous child QFrame wrappers in Qt's
+        # top-level enumeration after their native parent is destroyed. They
+        # have no Python referrers and are not independently owned windows.
+        from qtpy.QtWidgets import QFrame
 
-    # This is a known widget that is not cleaned up properly
-    remaining = [w for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))]
-    if len(remaining) > nbefore:
+        allow.append(QFrame)
+    except (ImportError, RuntimeError):
+        pass
+
+    before = {id(w) for w in qapp.topLevelWidgets() if not isinstance(w, tuple(allow))}
+    failures_before = request.session.testsfailed
+    yield
+    # if the test failed, don't worry about checking widgets
+    if request.session.testsfailed - failures_before:
+        return
+    # Collect Python ownership cycles, then let Qt process deferred deletion
+    # before measuring native widgets.  The timing otherwise differs between
+    # PyQt/PySide and under loaded array-library CI jobs.
+    gc.collect()
+    qapp.processEvents()
+    from qtpy.QtCore import QCoreApplication, QEvent
+
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    qapp.processEvents()
+    gc.collect()
+
+    remaining = [
+        w
+        for w in qapp.topLevelWidgets()
+        if not isinstance(w, tuple(allow)) and id(w) not in before
+    ]
+    if remaining:
         test_node = request.node
 
         test = f"{test_node.path.name}::{test_node.originalname}"
