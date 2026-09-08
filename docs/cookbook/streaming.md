@@ -13,7 +13,7 @@ update the buffer in place with the new data. Calling `update()` on the
 will force the display to fetch your new data:
 
 ````python title="examples/streaming.py"
---8<-- "examples/streaming.py"
+--8 < --"examples/streaming.py"
 ````
 
 ## Streaming, remembering the last N frames
@@ -24,5 +24,5 @@ you can use the [`ndv.models.RingBuffer`][] class.  It offers a convenient
 shape of the data (as far as the viewer is concerned):
 
 ````python title="examples/streaming_with_history.py"
---8<-- "examples/streaming_with_history.py"
+--8 < --"examples/streaming_with_history.py"
 ````

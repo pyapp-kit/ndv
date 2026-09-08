@@ -273,6 +273,7 @@ subclassing [`DataWrapper`][ndv.DataWrapper]:
 ```python
 import ndv
 
+
 class MyWrapper(ndv.DataWrapper):
     @classmethod
     def supports(cls, data):
