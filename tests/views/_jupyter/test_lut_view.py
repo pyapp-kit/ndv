@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import cmap
-from jupyter_rfb.widget import RemoteFrameBuffer
 from pytest import fixture
 
-from ndv.models._lut_model import ClimsManual, ClimsMinMax, ClimsPercentile, LUTModel
-from ndv.views._jupyter._array_view import JupyterLUTView
-from ndv.views.bases._graphics._canvas import HistogramCanvas
+from ndv.models._lut_model import ClimsManual, ClimsPercentile, LUTModel
+from ndv.views._jupyter._array_view import JupyterLUTView, NdvWidgetState
+
+
+@fixture
+def parent() -> NdvWidgetState:
+    return NdvWidgetState()
 
 
 @fixture
@@ -17,107 +18,93 @@ def model() -> LUTModel:
 
 
 @fixture
-def view(model: LUTModel) -> JupyterLUTView:
-    view = JupyterLUTView(None)
-    # Set the model
-    assert view.model is None
+def view(parent: NdvWidgetState, model: LUTModel) -> JupyterLUTView:
+    view = JupyterLUTView(parent, channel=0)
+    # Add initial LUT entry to parent state
+    parent.luts = [
+        {
+            "key": "0",
+            "name": "0",
+            "visible": True,
+            "cmap_name": "gray",
+            "cmap_colors": [],
+            "cmap_options": ["gray", "green", "magenta"],
+            "clim_min": 0,
+            "clim_max": 65535,
+            "clim_bound_min": 0,
+            "clim_bound_max": 65535,
+            "auto_clim": True,
+            "auto_lower_tail": 0,
+            "auto_upper_tail": 0,
+            "gamma": 1.0,
+            "show_histogram_btn": True,
+            "show_cmap": True,
+            "row_visible": True,
+        }
+    ]
     view.model = model
-    assert view.model is model
     return view
 
 
-def test_JupyterLUTView_update_model(model: LUTModel, view: JupyterLUTView) -> None:
-    """Ensures the view updates when the model is changed."""
+def _get_lut(parent: NdvWidgetState) -> dict:
+    """Get the first LUT dict from parent state."""
+    return parent.luts[0]
 
-    # Test modifying model.clims
-    assert view._auto_clim.value
-    model.clims = ClimsManual(min=0, max=1)
-    assert not view._auto_clim.value
-    model.clims = ClimsPercentile(min_percentile=0, max_percentile=100)
-    assert view._auto_clim.value
+
+def test_model_to_view(
+    parent: NdvWidgetState, model: LUTModel, view: JupyterLUTView
+) -> None:
+    """Model changes propagate to the widget state dict."""
+    # clim policy
+    model.clims = ClimsManual(min=100, max=500)
+    assert not _get_lut(parent)["auto_clim"]
+
     model.clims = ClimsPercentile(min_percentile=1, max_percentile=99)
-    assert view._auto_clim.value
-    assert view._auto_clim.lower_tail.value == 1
-    assert view._auto_clim.upper_tail.value == 1
+    lut = _get_lut(parent)
+    assert lut["auto_clim"]
+    assert lut["auto_lower_tail"] == 1
+    assert lut["auto_upper_tail"] == 1
 
-    # Test modifying model.visible
-    assert view._visible.value
+    # visibility
     model.visible = False
-    assert not view._visible.value
+    assert not _get_lut(parent)["visible"]
     model.visible = True
-    assert view._visible.value
+    assert _get_lut(parent)["visible"]
 
+    # colormap
     new_cmap = cmap.Colormap("red")
-    new_name = new_cmap.name.split(":")[-1]
-    assert view._cmap.value != new_name
     model.cmap = new_cmap
-    assert view._cmap.value == new_name
+    assert _get_lut(parent)["cmap_name"] == new_cmap.name.split(":")[-1]
+
+    # clim bounds
+    model.clim_bounds = (10, 1000)
+    lut = _get_lut(parent)
+    assert lut["clim_bound_min"] == 10.0
+    assert lut["clim_bound_max"] == 1000.0
+
+    # gamma
+    model.gamma = 0.5
+    assert _get_lut(parent)["gamma"] == 0.5
 
 
-def test_JupyterLUTView_update_view(model: LUTModel, view: JupyterLUTView) -> None:
-    """Ensures the model updates when the view is changed."""
+def test_view_set_methods(parent: NdvWidgetState, view: JupyterLUTView) -> None:
+    """Direct view set_* calls update the widget state dict."""
+    view.set_channel_name("DAPI")
+    assert _get_lut(parent)["name"] == "DAPI"
 
-    new_visible = not model.visible
-    view._visible.value = new_visible
-    assert view._visible.value == new_visible
+    view.set_clims((200.0, 800.0))
+    lut = _get_lut(parent)
+    assert lut["clim_min"] == 200.0
+    assert lut["clim_max"] == 800.0
 
-    new_cmap = view._cmap.options[1]
-    assert model.cmap != new_cmap
-    view._cmap.value = new_cmap
-    assert model.cmap == new_cmap
+    view.set_channel_visible(False)
+    assert not _get_lut(parent)["visible"]
 
-    # Test toggling auto_clim
-    assert model.clims == ClimsMinMax()
-    view._auto_clim.value = False
-    mi, ma = view._clims.value
-    assert model.clims == ClimsManual(min=mi, max=ma)
-    view._auto_clim.value = True
-    assert model.clims == ClimsPercentile(min_percentile=0, max_percentile=100)
-
-    # Test modifying tails changes percentiles
-    view._auto_clim.lower_tail.value = 0.1
-    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=100)
-    view._auto_clim.upper_tail.value = 0.2
-    assert model.clims == ClimsPercentile(min_percentile=0.1, max_percentile=99.8)
-
-    # When gui clims change, autoscale should be disabled
-    model.clims = ClimsMinMax()
-    view._clims.value = (0, 1)
-    assert model.clims == ClimsManual(min=0, max=1)  # type:ignore[union-attr]
+    view.set_visible(False)
+    assert not _get_lut(parent)["row_visible"]
 
 
-def test_JupyterLUTView_histogram_controls(view: JupyterLUTView) -> None:
-    # Mock up a histogram
-    hist_mock = MagicMock(spec=HistogramCanvas)
-    hist_frontend = RemoteFrameBuffer()
-    hist_mock.frontend_widget.return_value = hist_frontend
-
-    # Add the histogram and assert it was correctly added
-    view.add_histogram(hist_mock)
-    assert view._histogram is hist_mock
-
-    # Assert histogram button toggles visibility
-    view._histogram_btn.value = True
-    assert view._histogram_container.layout.display == "flex"
-    view._histogram_btn.value = False
-    assert view._histogram_container.layout.display == "none"
-
-    # Assert toggling the log button alters the logarithmic base
-    view._log.value = True
-    hist_mock.set_log_base.assert_called_once_with(10)
-    hist_mock.reset_mock()
-
-    view._log.value = False
-    hist_mock.set_log_base.assert_called_once_with(None)
-    hist_mock.reset_mock()
-
-    # Assert pressing the reset view button sets the histogram range
-    view._reset_histogram.click()
-    hist_mock.set_range.assert_called_once_with()
-    hist_mock.reset_mock()
-
-    # Assert pressing the reset view button turns off log mode
-    view._log.value = True
-    view._reset_histogram.click()
-    assert not view._log.value
-    hist_mock.reset_mock()
+def test_close_removes_lut(parent: NdvWidgetState, view: JupyterLUTView) -> None:
+    assert len(parent.luts) == 1
+    view.close()
+    assert len(parent.luts) == 0

@@ -79,6 +79,9 @@ class ArrayView(Viewable):
     def remove_histogram(self, widget: Any) -> None:
         raise NotImplementedError
 
+    def set_histogram_widget(self, widget: Any) -> None:
+        pass
+
     def add_shared_histogram(self, widget: Any) -> None:
         raise NotImplementedError
 
