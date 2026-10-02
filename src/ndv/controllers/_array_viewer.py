@@ -109,7 +109,10 @@ class ArrayViewer:
         # jupyter doesn't need async because it's already async (in that the
         # GUI is already running in JS)
         NDV_SYNCHRONOUS = os.getenv("NDV_SYNCHRONOUS", "0") in {"1", "True", "true"}
-        self._async = not NDV_SYNCHRONOUS and app != _app.GuiFrontend.JUPYTER
+        self._async = not NDV_SYNCHRONOUS and app not in (
+            _app.GuiFrontend.JUPYTER,
+            _app.GuiFrontend.MARIMO,
+        )
         # maps pending futures to their request generation (for stale detection)
         self._gen_counter = count()
         self._current_gen: int = 0
@@ -128,7 +131,22 @@ class ArrayViewer:
         self._histograms: dict[ChannelKey, HistogramCanvas] = {}
         self._shared_histogram: SharedHistogramCanvas | None = None
         self._shared_histogram_links: dict[ChannelKey, _SharedHistogramLink] = {}
+
+        # Pre-create the shared histogram canvas now (on the main thread).
+        # On macOS + jupyter_rfb backend, vispy creates a hidden GLFW window
+        # per canvas for the GL context, and GLFW/NSWindow creation must happen
+        # on the main thread. The histogram button handler runs on the kernel's
+        # I/O thread, so we must create the canvas here to avoid a crash.
+        self._precreated_shared_histogram: SharedHistogramCanvas | None = None
+        if app in (_app.GuiFrontend.JUPYTER, _app.GuiFrontend.MARIMO):
+            hist_cls = _app.get_shared_histogram_canvas_class()
+            self._precreated_shared_histogram = hist_cls()
+
         self._view = frontend_cls(self._canvas.frontend_widget(), self._viewer_model)
+        if self._precreated_shared_histogram is not None:
+            self._view.set_histogram_widget(
+                self._precreated_shared_histogram.frontend_widget()
+            )
 
         self._roi_view: RectangularROIHandle | None = None
 
@@ -336,8 +354,12 @@ class ArrayViewer:
         """Create and connect the shared multi-channel histogram."""
         if self._shared_histogram is not None:
             return
-        hist_cls = _app.get_shared_histogram_canvas_class()
-        hist = hist_cls()
+        if self._precreated_shared_histogram is not None:
+            hist = self._precreated_shared_histogram
+            self._precreated_shared_histogram = None
+        else:
+            hist_cls = _app.get_shared_histogram_canvas_class()
+            hist = hist_cls()
         self._shared_histogram = hist
         self._view.add_shared_histogram(hist)
 
@@ -925,7 +947,11 @@ class ArrayViewer:
 
 
 class _SharedHistogramLink:
-    """Binds one ChannelController to a SharedHistogramCanvas."""
+    """Binds one ChannelController to a SharedHistogramCanvas.
+
+    All signal connections use bound methods, so psygnal can weak-ref them
+    and they can be cleanly disconnected via `disconnect()`.
+    """
 
     def __init__(
         self,
@@ -984,3 +1010,13 @@ class _SharedHistogramLink:
 
     def _on_clim_bounds(self, bounds: tuple[float | None, float | None]) -> None:
         self._hist.set_clim_bounds(bounds)
+
+    def disconnect(self) -> None:
+        model = self._ctrl.lut_model
+        self._ctrl.stats_updated.disconnect(self._on_stats)
+        self._ctrl.clims_resolved.disconnect(self._on_clims_resolved)
+        model.events.cmap.disconnect(self._on_cmap)
+        model.events.visible.disconnect(self._on_visible)
+        model.events.gamma.disconnect(self._on_gamma)
+        model.events.name.disconnect(self._on_name)
+        model.events.clim_bounds.disconnect(self._on_clim_bounds)

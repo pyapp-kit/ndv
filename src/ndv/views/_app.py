@@ -48,11 +48,14 @@ class GuiFrontend(str, Enum):
         [Jupyter notebook/lab](https://jupyter.org)
     WX : str
         [wxPython](https://wxpython.org)
+    MARIMO : str
+        [marimo](https://marimo.io)
     """
 
     QT = "qt"
     JUPYTER = "jupyter"
     WX = "wx"
+    MARIMO = "marimo"
 
 
 class CanvasBackend(str, Enum):
@@ -102,7 +105,7 @@ class VispyProvider(CanvasProvider):
         # create_app by this point and vispy will autodetect that.
         # it's an extra precaution
         _frontend = gui_frontend()
-        if _frontend == GuiFrontend.JUPYTER:
+        if _frontend in (GuiFrontend.JUPYTER, GuiFrontend.MARIMO):
             use_app("jupyter_rfb")
         elif _frontend == GuiFrontend.WX:
             use_app("wx")
@@ -162,6 +165,7 @@ GUI_PROVIDERS: dict[GuiFrontend, tuple[str, str]] = {
     GuiFrontend.QT: ("ndv.views._qt._app", "QtAppWrap"),
     GuiFrontend.WX: ("ndv.views._wx._app", "WxAppWrap"),
     GuiFrontend.JUPYTER: ("ndv.views._jupyter._app", "JupyterAppWrap"),
+    GuiFrontend.MARIMO: ("ndv.views._marimo._app", "MarimoAppWrap"),
 }
 MOD_TO_KEY = {mod: key for key, (mod, _) in GUI_PROVIDERS.items()}
 CANVAS_PROVIDERS: dict[CanvasBackend, CanvasProvider] = {
@@ -182,10 +186,24 @@ def _running_apps() -> Iterator[GuiFrontend]:
     if (wx := sys.modules.get("wx")) and wx.App.Get() is not None:
         yield GuiFrontend.WX
 
-    if (ipy := sys.modules.get("IPython")) and (shell := ipy.get_ipython()):
+    if _is_marimo_running():
+        yield GuiFrontend.MARIMO
+    elif (ipy := sys.modules.get("IPython")) and (shell := ipy.get_ipython()):
         shell = cast("InteractiveShell", shell)
         if shell.__class__.__name__ == "ZMQInteractiveShell":
             yield GuiFrontend.JUPYTER
+
+
+def _is_marimo_running() -> bool:
+    """Check if we're running inside a marimo notebook runtime."""
+    if "marimo" not in sys.modules:
+        return False
+    try:
+        from marimo._runtime.context import get_context
+
+        return get_context() is not None
+    except Exception:
+        return False
 
 
 def _load_app(module: str, cls_name: str) -> NDVApp:
@@ -253,7 +271,9 @@ def set_canvas_backend(backend: Literal["pygfx", "vispy"] | None = None) -> None
         os.environ[CANVAS_ENV_VAR] = CanvasBackend(backend).value  # validate
 
 
-def set_gui_backend(backend: Literal["jupyter", "qt", "wx"] | None = None) -> None:
+def set_gui_backend(
+    backend: Literal["jupyter", "marimo", "qt", "wx"] | None = None,
+) -> None:
     """Sets the preferred GUI backend. Cannot be set after the GUI is running."""
     if _APP:
         raise RuntimeError("Cannot change the backend once the app is running")
