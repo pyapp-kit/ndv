@@ -34,11 +34,28 @@ from ndv.views.bases._graphics._canvas_elements import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
 
 turn = np.sin(np.pi / 4)
 DEFAULT_QUATERNION = Quaternion(turn, turn, 0, 0)
+
+
+class _CameraChangeMixin:
+    _ndv_changed: Callable[[], None] | None = None
+
+    def view_changed(self) -> None:
+        super().view_changed()  # type: ignore[misc]
+        if self._ndv_changed is not None:
+            self._ndv_changed()
+
+
+class _NDVArcballCamera(_CameraChangeMixin, scene.ArcballCamera):
+    pass
+
+
+class _NDVPanZoomCamera(_CameraChangeMixin, scene.PanZoomCamera):
+    pass
 
 
 class VispyImageHandle(ImageHandle):
@@ -70,6 +87,28 @@ class VispyImageHandle(ImageHandle):
         )
         self._downsample_factors = downsample_factors
         self._visual.set_data(data)
+
+    def set_world_transform(
+        self,
+        scales: tuple[float, ...],
+        origins: tuple[float, ...],
+    ) -> None:
+        """Set this visual's scale and translation in data-axis order."""
+        scene_scales = list(reversed(scales))
+        scene_origins = list(reversed(origins))
+        while len(scene_scales) < 3:
+            scene_scales.append(1.0)
+            scene_origins.append(0.0)
+        factors = list(reversed(self._downsample_factors))
+        while len(factors) < 3:
+            factors.append(1)
+        effective = tuple(
+            scale * factor for scale, factor in zip(scene_scales, factors, strict=True)
+        )
+        self._visual.transform = vispy.visuals.transforms.STTransform(
+            scale=effective,
+            translate=tuple(scene_origins),
+        )
 
     def visible(self) -> bool:
         return bool(self._visual.visible)
@@ -316,6 +355,8 @@ class VispyArrayCanvas(ArrayCanvas):
         central_wdg: scene.Widget = self._canvas.central_widget
         self._view: scene.ViewBox = central_wdg.add_view()
         self._ndim: Literal[2, 3] | None = None
+        self._world_scales = (1.0, 1.0, 1.0)
+        self._world_origins = (0.0, 0.0, 0.0)
 
         # Maps vispy visuals (scene children) → CanvasElement handles.
         # Entries are added by add_image/add_volume/add_bounding_box.
@@ -345,11 +386,13 @@ class VispyArrayCanvas(ArrayCanvas):
 
         self._ndim = ndim
         if ndim == 3:
-            cam = scene.ArcballCamera(fov=0)
+            cam = _NDVArcballCamera(fov=0)
             # this sets the initial view similar to what the panzoom view would have.
             cam._quaternion = DEFAULT_QUATERNION
         else:
-            cam = scene.PanZoomCamera(aspect=1, flip=(0, 1))
+            cam = _NDVPanZoomCamera(aspect=1, flip=(0, 1))
+
+        cam._ndv_changed = self.cameraChanged.emit
 
         # restore the previous state if it exists
         if state := self._last_state.get(ndim):
@@ -368,7 +411,9 @@ class VispyArrayCanvas(ArrayCanvas):
     def refresh(self) -> None:
         self._canvas.update()
 
-    def add_image(self, data: np.ndarray | None = None) -> VispyImageHandle:
+    def add_image(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> VispyImageHandle:
         """Add a new Image node to the scene."""
         data, downsample_factors = _downcast_and_downsample(data, three_d=False)
         try:
@@ -384,11 +429,13 @@ class VispyArrayCanvas(ArrayCanvas):
         handle = VispyImageHandle(img)
         handle._downsample_factors = downsample_factors
         self._elements[img] = handle
-        if data is not None:
+        if data is not None and reset_range:
             self.set_range()
         return handle
 
-    def add_volume(self, data: np.ndarray | None = None) -> VispyImageHandle:
+    def add_volume(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> VispyImageHandle:
         data, downsample_factors = _downcast_and_downsample(data, three_d=True)
         try:
             vol = scene.visuals.Volume(
@@ -408,7 +455,7 @@ class VispyArrayCanvas(ArrayCanvas):
         handle = VispyImageHandle(vol)
         handle._downsample_factors = downsample_factors
         self._elements[vol] = handle
-        if data is not None:
+        if data is not None and reset_range:
             self.set_range()
         return handle
 
@@ -421,7 +468,9 @@ class VispyArrayCanvas(ArrayCanvas):
         self._last_roi_created = ReferenceType(roi)
         return roi
 
-    def set_scales(self, scales: tuple[float, ...]) -> None:
+    def set_scales(
+        self, scales: tuple[float, ...], *, reset_range: bool = True
+    ) -> None:
         """Set per-visible-axis scale factors for rendering."""
         if not scales:
             return
@@ -431,26 +480,52 @@ class VispyArrayCanvas(ArrayCanvas):
         # pad to 3 components
         while len(vis_scales) < 3:
             vis_scales.append(1.0)
-        sx, sy, sz = vis_scales[0], vis_scales[1], vis_scales[2]
+        self._world_scales = (vis_scales[0], vis_scales[1], vis_scales[2])
+        self._apply_world_transform()
+        if reset_range:
+            self.set_range()
+
+    def set_origins(self, origins: tuple[float, ...]) -> None:
+        """Set per-visible-axis world origins in data-axis order."""
+        vis_origins = list(reversed(origins))
+        while len(vis_origins) < 3:
+            vis_origins.append(0.0)
+        self._world_origins = (vis_origins[0], vis_origins[1], vis_origins[2])
+        self._apply_world_transform()
+
+    def _apply_world_transform(self) -> None:
         for handle in self._elements.values():
             if not isinstance(handle, VispyImageHandle):
                 continue
-            child = handle._visual
-            if not isinstance(child, (visuals.ImageVisual, visuals.VolumeVisual)):
-                continue
-            _sx, _sy, _sz = sx, sy, sz
-            # compensate for downsampling so coordinates stay correct
-            # factors are in data order; scene order is (x, y, z) = reversed
-            factors = handle._downsample_factors
-            if factors and any(f > 1 for f in factors):
-                rev = list(reversed(factors))
-                _sx *= rev[0]
-                _sy *= rev[1] if len(rev) > 1 else 1
-                _sz *= rev[2] if len(rev) > 2 else 1
-            child.transform = vispy.visuals.transforms.STTransform(
-                scale=(_sx, _sy, _sz)
+            handle.set_world_transform(
+                tuple(reversed(self._world_scales)),
+                tuple(reversed(self._world_origins)),
             )
-        self.set_range()
+
+    def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
+        """Return viewport and data-order world-to-clip matrix."""
+        width, height = (int(value) for value in self._canvas.size)
+        ndim = self._ndim or 2
+        points = np.zeros((ndim + 1, 4), dtype=np.float64)
+        points[:, 3] = 1.0
+        # VisPy scene order is XYZ; public data order is YX or ZYX.
+        for axis in range(ndim):
+            points[axis + 1, ndim - axis - 1] = 1.0
+        mapped = np.asarray(self._view.scene.transform.map(points), dtype=np.float64)
+        # Keep homogeneous coordinates intact.  Dividing each basis sample by
+        # ``w`` before reconstructing the matrix turns a perspective camera
+        # into an affine approximation around the data origin.  That is badly
+        # wrong for camera-aware level selection and chunk priority away from
+        # the origin.
+        framebuffer = np.eye(4, dtype=np.float64)
+        framebuffer[:, -1] = mapped[0]
+        for axis in range(ndim):
+            framebuffer[:, axis] = mapped[axis + 1] - mapped[0]
+
+        framebuffer_to_clip = np.eye(4, dtype=np.float64)
+        framebuffer_to_clip[0] = (2.0 / width, 0.0, 0.0, -1.0)
+        framebuffer_to_clip[1] = (0.0, -2.0 / height, 0.0, 1.0)
+        return (width, height), framebuffer_to_clip @ framebuffer
 
     def set_range(
         self,
