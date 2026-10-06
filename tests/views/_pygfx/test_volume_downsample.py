@@ -111,6 +111,23 @@ def test_set_scales_compensates_for_volume_downsample() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_image_handles_can_have_independent_world_transforms() -> None:
+    canvas = GfxArrayCanvas(ArrayViewerModel())
+    _force_canvas_size(canvas)
+    canvas.set_ndim(3)
+    coarse = canvas.add_volume(np.zeros((4, 4, 4), dtype=np.float32))
+    fine = canvas.add_volume(np.zeros((4, 4, 4), dtype=np.float32))
+
+    coarse.set_world_transform((4.0, 4.0, 4.0), (0.0, 0.0, 0.0))
+    fine.set_world_transform((1.0, 1.0, 1.0), (8.0, 12.0, 16.0))
+
+    assert coarse._image.local.scale == pytest.approx((4.0, 4.0, 4.0))
+    assert fine._image.local.scale == pytest.approx((1.0, 1.0, 1.0))
+    assert fine._image.local.position == pytest.approx((16.0, 12.0, 8.0))
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_no_downsample_when_limits_none() -> None:
     """When GPU limits are unavailable, data should pass through unchanged."""
     canvas = GfxArrayCanvas(ArrayViewerModel())
