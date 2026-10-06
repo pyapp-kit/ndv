@@ -43,11 +43,11 @@ class SupportsIndexing(Protocol):
 
 ArrayT = TypeVar("ArrayT")
 NPArrayLike = TypeVar("NPArrayLike", bound=SupportsIndexing)
-_T = TypeVar("_T", bound=type)
+_T = TypeVar("_T")
 logger = logging.getLogger("ndv")
 
 
-def _recurse_subclasses(cls: _T) -> Iterator[_T]:
+def _recurse_subclasses(cls: type[_T]) -> Iterator[type[_T]]:
     for subclass in cls.__subclasses__():
         yield subclass
         yield from _recurse_subclasses(subclass)
