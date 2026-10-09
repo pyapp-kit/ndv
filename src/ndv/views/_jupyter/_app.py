@@ -34,16 +34,11 @@ class JupyterAppWrap(NDVApp):
 
     def create_app(self) -> Any:
         if not self.is_running() and not os.getenv("PYTEST_CURRENT_TEST"):
-            # if we got here, it probably means that someone used
-            # NDV_GUI_FRONTEND=jupyter without actually being in a jupyter notebook
-            # we allow it in tests, but not in normal usage.
             raise RuntimeError(  # pragma: no cover
                 "Jupyter is not running a notebook shell.  Cannot create app."
             )
 
-        # No app creation needed...
-        # but make sure we can actually import the stuff we need
-        import ipywidgets  # noqa: F401
+        import anywidget  # noqa: F401
         import jupyter  # noqa: F401
 
     def array_view_class(self) -> type[ArrayView]:
@@ -69,8 +64,6 @@ class JupyterAppWrap(NDVApp):
                 f"Expected canvas to be RemoteFrameBuffer, got {type(canvas)}"
             )
 
-        # patch the handle_event from _jupyter_rfb.CanvasBackend
-        # to intercept various mouse events.
         super_handle_event = canvas.handle_event
         active_btn: MouseButton = MouseButton.NONE
 
@@ -94,14 +87,10 @@ class JupyterAppWrap(NDVApp):
                 intercepted |= receiver.on_mouse_press(mpe)
                 receiver.mousePressed.emit(mpe)
             elif etype == "double_click":
-                # Note that in Jupyter, a double_click event is not a pointer event
-                # and as such, we need to handle both press and release. See
-                # https://github.com/vispy/jupyter_rfb/blob/62831dd5a87bc19b4fd5f921d802ed21141e61ec/js/lib/widget.js#L270
                 btn = JupyterAppWrap.mouse_btn(ev["button"])
                 mpe = MousePressEvent(x=ev["x"], y=ev["y"], btn=btn)
                 intercepted |= receiver.on_mouse_double_press(mpe)
                 receiver.mouseDoublePressed.emit(mpe)
-                # Release
                 mre = MouseReleaseEvent(x=ev["x"], y=ev["y"], btn=btn)
                 intercepted |= receiver.on_mouse_release(mre)
                 receiver.mouseReleased.emit(mre)
@@ -118,11 +107,11 @@ class JupyterAppWrap(NDVApp):
         return lambda: setattr(canvas, "handle_event", super_handle_event)
 
     def filter_key_events(self, widget: Any, receiver: ArrayView) -> Callable[[], None]:
-        # In Jupyter, key events must go through the RemoteFrameBuffer canvas
-        # (which uses a hidden <input> element to capture keys), not the
-        # ipywidgets container. Walk the widget tree to find it.
-        target = _find_rfb(widget)
+        # The widget is NdvWidgetState. Get the canvas from its _canvas_ref.
+        target = getattr(widget, "_canvas_ref", None)
         if target is None:
+            target = _find_rfb(widget)
+        if target is None or not isinstance(target, RemoteFrameBuffer):
             return lambda: None
 
         super_handle_event = target.handle_event
@@ -166,9 +155,14 @@ _JUPYTER_KEY_MAP: dict[str, KeyCode] = {
 
 
 def _find_rfb(widget: Any) -> RemoteFrameBuffer | None:
-    """Walk the ipywidgets tree to find a RemoteFrameBuffer child."""
+    """Walk widget attributes to find a RemoteFrameBuffer."""
     if isinstance(widget, RemoteFrameBuffer):
         return widget
+    # Check anywidget state's canvas ref
+    canvas = getattr(widget, "_canvas_ref", None)
+    if isinstance(canvas, RemoteFrameBuffer):
+        return canvas
+    # Fallback: walk ipywidgets children if present
     for child in getattr(widget, "children", ()):
         if found := _find_rfb(child):
             return found
