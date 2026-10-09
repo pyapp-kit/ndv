@@ -33,7 +33,7 @@ from ndv.views.bases._graphics._canvas import ArrayCanvas, HistogramCanvas
 from ndv.views.bases._graphics._canvas_elements import ImageHandle
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 try:
     from qtpy import API_NAME
@@ -80,6 +80,13 @@ def _patch_views(f: Callable) -> Callable:
     f = patch.object(_app, "get_histogram_canvas_class", lambda: _get_mock_hist_canvas)(f)  # fmt: skip # noqa
     f = patch.object(_app, "filter_key_events", lambda *a, **k: lambda: None)(f)
     return f
+
+
+@pytest.fixture
+def viewer() -> Iterator[ArrayViewer]:
+    viewer = ArrayViewer()
+    yield viewer
+    viewer.close()
 
 
 @no_type_check
@@ -264,9 +271,8 @@ def test_histogram_updates_on_first_draw() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_array_viewer_with_app() -> None:
+def test_array_viewer_with_app(viewer: ArrayViewer) -> None:
     """Example usage of new mvc pattern."""
-    viewer = ArrayViewer()
     assert gui_frontend() in type(viewer._view).__name__.lower()
     viewer.show()
 
@@ -327,10 +333,9 @@ def test_channel_autoscale() -> None:
     bool(IS_WIN and IS_PYSIDE6 and IS_PYGFX), reason="combo still segfaulting on CI"
 )
 @pytest.mark.usefixtures("any_app")
-def test_array_viewer_histogram() -> None:
+def test_array_viewer_histogram(viewer: ArrayViewer) -> None:
     """Mostly a smoke test for basic functionality of histogram backends."""
 
-    viewer = ArrayViewer()
     viewer.show()
     viewer._add_histogram(None)
     histogram = viewer._histograms.get(None, None)
@@ -354,57 +359,55 @@ def test_array_viewer_histogram() -> None:
 
 @no_type_check
 @pytest.mark.usefixtures("any_app")
-def test_roi_controller() -> None:
-    ctrl = ArrayViewer()
-    ctrl.show()
+def test_roi_controller(viewer: ArrayViewer) -> None:
+    viewer.show()
     _app.process_events()
     roi = RectangularROIModel()
-    viewer = ctrl._viewer_model
+    model = viewer._viewer_model
 
     # Until a user interacts with ctrl.roi, there is no ROI model
-    assert ctrl._roi_model is None
-    ctrl.roi = roi
-    assert ctrl._roi_model is not None
+    if hasattr(viewer, "_roi_model"):
+        assert viewer._roi_model is None
+    viewer.roi = roi
+    assert viewer._roi_model is not None
 
     # Clicking the ROI button and then clicking the canvas creates a ROI
-    viewer.interaction_mode = InteractionMode.CREATE_ROI
+    model.interaction_mode = InteractionMode.CREATE_ROI
     canvas_pos = (5, 5)
     mpe = MousePressEvent(canvas_pos[0], canvas_pos[1], MouseButton.LEFT)
 
     # Note - avoid diving into rendering logic here - just identify view
-    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
-        ctrl._canvas.on_mouse_press(mpe)
+    with patch.object(viewer._canvas, "elements_at", return_value=[viewer._roi_view]):
+        viewer._canvas.on_mouse_press(mpe)
 
     # The creation code emits raw world coords (no pixel-center offset).
     # Compute expected data-space bounding box via the same pipeline:
     # canvas -> raw world -> _world_point_to_data
-    w2d = ctrl._world_point_to_data
+    w2d = viewer._world_point_to_data
     # pygfx exposes _canvas_to_world_raw; vispy's canvas_to_world is already raw
     raw_c2w = getattr(
-        ctrl._canvas, "_canvas_to_world_raw", ctrl._canvas.canvas_to_world
+        viewer._canvas, "_canvas_to_world_raw", viewer._canvas.canvas_to_world
     )
     raw_world = raw_c2w(canvas_pos)
     expected_min = w2d(raw_world[0], raw_world[1])
     expected_max = w2d(raw_world[0] + 1, raw_world[1] + 1)
     assert roi.bounding_box[0] == pytest.approx(expected_min)
     assert roi.bounding_box[1] == pytest.approx(expected_max)
-    assert viewer.interaction_mode == InteractionMode.PAN_ZOOM
-    ctrl._canvas.close()
+    assert model.interaction_mode == InteractionMode.PAN_ZOOM
 
 
 @no_type_check
 @pytest.mark.usefixtures("any_app")
-def test_roi_interaction() -> None:
+def test_roi_interaction(viewer: ArrayViewer) -> None:
     if _app.gui_frontend() == _app.GuiFrontend.JUPYTER and IS_PYGFX:
         pytest.skip("Invalid canvas size on CI")
         return
 
-    ctrl = ArrayViewer()
-    ctrl.show()
+    viewer.show()
     _app.process_events()
     roi = RectangularROIModel()
-    ctrl.roi = roi
-    roi_view = ctrl._roi_view
+    viewer.roi = roi
+    roi_view = viewer._roi_view
     assert roi_view is not None
 
     # FIXME: We need a large world space on the canvas, but
@@ -412,7 +415,7 @@ def test_roi_interaction() -> None:
     # sets the range to the extent of the data i.e. the extent of the ROI.
     # bounding_box is in data space.
     roi.bounding_box = ((0, 0), (500, 500))
-    ctrl._canvas.set_range()
+    viewer._canvas.set_range()
 
     # Set the ROI to known data-space coordinates via two canvas positions.
     # Note that these positions are far apart to satisfy sufficient distance
@@ -424,8 +427,8 @@ def test_roi_interaction() -> None:
     # Use the ROI view's own boundingBoxChanged to set positions in the same
     # coordinate space the mouse handler uses (raw world for pygfx, scene
     # for vispy). This ensures the test works regardless of backend.
-    world_start = ctrl._canvas.canvas_to_world(canvas_roi_start)[:2]
-    world_end = ctrl._canvas.canvas_to_world(canvas_roi_end)[:2]
+    world_start = viewer._canvas.canvas_to_world(canvas_roi_start)[:2]
+    world_end = viewer._canvas.canvas_to_world(canvas_roi_end)[:2]
     roi_view.boundingBoxChanged.emit((world_start, world_end))
     bb_initial = roi.bounding_box
     roi_size = (
@@ -434,16 +437,16 @@ def test_roi_interaction() -> None:
     )
 
     # Note - avoid diving into rendering logic here - just identify view
-    with patch.object(ctrl._canvas, "elements_at", return_value=[ctrl._roi_view]):
+    with patch.object(viewer._canvas, "elements_at", return_value=[viewer._roi_view]):
         # Test moving handle: drag top-left corner to canvas_new_start
         assert not roi_view.selected()
         mpe = MousePressEvent(
             canvas_roi_start[0], canvas_roi_start[1], MouseButton.LEFT
         )
-        ctrl._canvas.on_mouse_press(mpe)
+        viewer._canvas.on_mouse_press(mpe)
         assert roi_view.selected()
         mme = MouseMoveEvent(canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT)
-        ctrl._canvas.on_mouse_move(mme)
+        viewer._canvas.on_mouse_move(mme)
         # The opposite (max) corner should not have moved
         assert roi.bounding_box[1] == pytest.approx(bb_initial[1], 1e-6)
         # The dragged (min) corner should have moved
@@ -451,7 +454,7 @@ def test_roi_interaction() -> None:
         mre = MouseReleaseEvent(
             canvas_new_start[0], canvas_new_start[1], MouseButton.LEFT
         )
-        ctrl._canvas.on_mouse_release(mre)
+        viewer._canvas.on_mouse_release(mre)
 
         # Test translation: reset ROI, then drag the body
         roi_view.boundingBoxChanged.emit((world_start, world_end))
@@ -462,14 +465,14 @@ def test_roi_interaction() -> None:
             (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
             MouseButton.LEFT,
         )
-        ctrl._canvas.on_mouse_press(mpe)
+        viewer._canvas.on_mouse_press(mpe)
         assert roi_view.selected()
         mme = MouseMoveEvent(
             (canvas_roi_start[0] + canvas_new_start[0]) / 2,
             (canvas_roi_start[1] + canvas_new_start[1]) / 2,
             MouseButton.LEFT,
         )
-        ctrl._canvas.on_mouse_move(mme)
+        viewer._canvas.on_mouse_move(mme)
         # Translation should preserve size
         bb_translated = roi.bounding_box
         translated_size = (
@@ -485,7 +488,7 @@ def test_roi_interaction() -> None:
             (canvas_roi_start[1] + canvas_new_start[1]) / 2,
             MouseButton.LEFT,
         )
-        ctrl._canvas.on_mouse_release(mre)
+        viewer._canvas.on_mouse_release(mre)
 
     # Test cursors
     roi_view.boundingBoxChanged.emit((world_start, world_end))
@@ -501,16 +504,16 @@ def test_roi_interaction() -> None:
         (canvas_roi_start[1] + canvas_roi_end[1]) / 2,
     )
     assert roi_view.get_cursor(mme) == CursorType.ALL_ARROW
-    ctrl._canvas.close()
 
 
 @pytest.mark.allow_leaks
 @pytest.mark.usefixtures("any_app")
-def test_rgb_display_magic() -> None:
+def test_rgb_display_magic(request: pytest.FixtureRequest) -> None:
     # FIXME: Something in the QLUTView is causing leaked qt widgets here.
     # Doesn't seem to be coming from the QRGBView...
     def assert_rgb_magic_works(rgb_data: np.ndarray) -> None:
         viewer = ArrayViewer(rgb_data)
+        request.addfinalizer(viewer.close)
         assert viewer.display_model.channel_mode == ChannelMode.RGBA
         # Note Multiple correct answers here - modulus covers both cases
         assert cast("int", viewer.display_model.channel_axis) % rgb_data.ndim == 4
@@ -940,9 +943,8 @@ def test_stats_signals() -> None:
 
 @no_type_check
 @pytest.mark.usefixtures("any_app")
-def test_handle_gc_on_data_reassign() -> None:
+def test_handle_gc_on_data_reassign(viewer: ArrayViewer) -> None:
     """Image handles should be GC'd when viewer.data is reassigned."""
-    viewer = ArrayViewer()
     viewer._async = False
     viewer.data = np.zeros((10, 10), dtype="uint8")
 
