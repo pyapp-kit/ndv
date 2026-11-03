@@ -103,6 +103,78 @@ def test_set_scales_compensates_for_volume_downsample() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
+def test_world_origin_and_camera_state_are_public() -> None:
+    canvas = VispyArrayCanvas(ArrayViewerModel())
+    changed = []
+    canvas.cameraChanged.connect(lambda: changed.append(True))
+    canvas.set_ndim(3)
+    handle = canvas.add_volume(np.zeros((10, 20, 30), dtype=np.float32))
+    canvas.set_scales((2.0, 3.0, 4.0))
+    canvas.set_origins((100.0, 200.0, 300.0))
+    canvas.set_range()
+
+    transform = handle._visual.transform
+    assert isinstance(transform, vispy.visuals.transforms.STTransform)
+    assert transform.scale[:3] == pytest.approx((4.0, 3.0, 2.0))
+    assert transform.translate[:3] == pytest.approx((300.0, 200.0, 100.0))
+    viewport, world_to_clip = canvas.camera_state()
+    assert viewport == tuple(int(value) for value in canvas._canvas.size)
+    assert all(value > 0 for value in viewport)
+    assert world_to_clip.shape == (4, 4)
+    assert np.isfinite(world_to_clip).all()
+
+    before = world_to_clip.copy()
+    canvas._camera.scale_factor /= 2
+    canvas._camera.view_changed()
+    assert changed
+    assert not np.allclose(before, canvas.camera_state()[1])
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
+def test_camera_state_preserves_projective_point_mapping() -> None:
+    canvas = VispyArrayCanvas(ArrayViewerModel())
+    canvas.set_ndim(3)
+    canvas.add_volume(np.zeros((10, 20, 30), dtype=np.float32))
+    canvas.set_range()
+
+    viewport, world_to_clip = canvas.camera_state()
+    width, height = viewport
+    data_points = np.asarray(((0.0, 0.0, 0.0), (3.0, 7.0, 11.0), (8.0, 17.0, 27.0)))
+    # VisPy scene order is XYZ while the public camera matrix consumes ZYX.
+    scene_points = np.column_stack((data_points[:, ::-1], np.ones(len(data_points))))
+    framebuffer = np.asarray(
+        canvas._view.scene.transform.map(scene_points), dtype=np.float64
+    )
+    expected = framebuffer[:, :3] / framebuffer[:, 3, np.newaxis]
+    expected[:, 0] = 2.0 * expected[:, 0] / width - 1.0
+    expected[:, 1] = 1.0 - 2.0 * expected[:, 1] / height
+
+    homogeneous = np.column_stack((data_points, np.ones(len(data_points))))
+    actual = (world_to_clip @ homogeneous.T).T
+    actual = actual[:, :3] / actual[:, 3, np.newaxis]
+
+    assert actual == pytest.approx(expected)
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
+def test_image_handles_can_have_independent_world_transforms() -> None:
+    canvas = VispyArrayCanvas(ArrayViewerModel())
+    canvas.set_ndim(3)
+    coarse = canvas.add_volume(np.zeros((4, 4, 4), dtype=np.float32))
+    fine = canvas.add_volume(np.zeros((4, 4, 4), dtype=np.float32))
+
+    coarse.set_world_transform((4.0, 4.0, 4.0), (0.0, 0.0, 0.0))
+    fine.set_world_transform((1.0, 1.0, 1.0), (8.0, 12.0, 16.0))
+
+    assert coarse._visual.transform.scale[:3] == pytest.approx((4.0, 4.0, 4.0))
+    assert fine._visual.transform.scale[:3] == pytest.approx((1.0, 1.0, 1.0))
+    assert fine._visual.transform.translate[:3] == pytest.approx((16.0, 12.0, 8.0))
+    canvas.close()
+
+
+@pytest.mark.usefixtures("any_app")
 def test_set_range_correct_bounds_after_downsample() -> None:
     """set_range should compute world bounds as if data were full-resolution."""
     canvas = VispyArrayCanvas(ArrayViewerModel())

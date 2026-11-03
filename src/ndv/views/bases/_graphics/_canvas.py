@@ -55,20 +55,39 @@ class GraphicsCanvas(Viewable, Mouseable):
 class ArrayCanvas(GraphicsCanvas):
     """ABC for canvases that show array data."""
 
+    cameraChanged = Signal()
+
     @abstractmethod
     def __init__(self, viewer_model: ArrayViewerModel | None = ...) -> None: ...
     @abstractmethod
     def set_ndim(self, ndim: Literal[2, 3]) -> None: ...
     @abstractmethod
+    def add_image(
+        self, data: np.ndarray | None = ..., *, reset_range: bool = ...
+    ) -> ImageHandle: ...
     @abstractmethod
-    def add_image(self, data: np.ndarray | None = ...) -> ImageHandle: ...
-    @abstractmethod
-    def add_volume(self, data: np.ndarray | None = ...) -> ImageHandle: ...
+    def add_volume(
+        self, data: np.ndarray | None = ..., *, reset_range: bool = ...
+    ) -> ImageHandle: ...
     @abstractmethod
     def add_bounding_box(self) -> RectangularROIHandle: ...
 
-    def set_scales(self, scales: tuple[float, ...]) -> None:
-        """Set per-visible-axis scale factors for rendering."""
+    def set_scales(
+        self, scales: tuple[float, ...], *, reset_range: bool = True
+    ) -> None:
+        """Set per-visible-axis scales, optionally fitting the camera."""
+
+    def set_origins(self, origins: tuple[float, ...]) -> None:
+        """Set per-visible-axis world origins in data-axis order."""
+
+    def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
+        """Return ``(viewport, world_to_clip)`` in visible data-axis order.
+
+        The matrix uses column-vector convention and maps world coordinates
+        ordered slowest-to-fastest (for example ZYX) into normalized clip
+        coordinates. Implementations emit :attr:`cameraChanged` when it changes.
+        """
+        raise NotImplementedError
 
 
 class HistogramCanvas(GraphicsCanvas, LUTView):

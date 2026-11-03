@@ -23,7 +23,7 @@ from ndv.views._util import downsample_data
 from ndv.views.bases import ArrayCanvas, CanvasElement, ImageHandle
 from ndv.views.bases._graphics._canvas_elements import RectangularROIHandle, ROIMoveMode
 
-from ._util import rendercanvas_class
+from ._util import close_rendercanvas, rendercanvas_class
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -92,6 +92,25 @@ class PyGFXImageHandle(ImageHandle):
             # RGB images (i.e. 3D datasets) cannot have a colormap
             if not is_three_d:
                 self._material.map = None if self._is_rgb() else self._cmap.to_pygfx()
+
+    def set_world_transform(
+        self,
+        scales: tuple[float, ...],
+        origins: tuple[float, ...],
+    ) -> None:
+        """Set this visual's scale and translation in data-axis order."""
+        scene_scales = list(reversed(scales))
+        scene_origins = list(reversed(origins))
+        while len(scene_scales) < 3:
+            scene_scales.append(1.0)
+            scene_origins.append(0.0)
+        factors = list(reversed(self._downsample_factors))
+        while len(factors) < 3:
+            factors.append(1)
+        self._image.local.scale = tuple(
+            scale * factor for scale, factor in zip(scene_scales, factors, strict=True)
+        )
+        self._image.local.position = tuple(scene_origins)
 
     def visible(self) -> bool:
         return bool(self._image.visible)
@@ -441,6 +460,8 @@ class GfxArrayCanvas(ArrayCanvas):
         self._last_roi_created: ReferenceType[PyGFXRectangle] | None = None
         # Per-axis world-space scales (x, y, z) used for coordinate conversion
         self._world_scales: tuple[float, float, float] = (1.0, 1.0, 1.0)
+        self._world_origins: tuple[float, float, float] = (0.0, 0.0, 0.0)
+        self._last_camera_signature: bytes | None = None
 
     def frontend_widget(self) -> Any:
         return self._canvas
@@ -484,7 +505,9 @@ class GfxArrayCanvas(ArrayCanvas):
         if state := self._last_state.get(ndim):
             cam.set_state(state)
 
-    def add_image(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
+    def add_image(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> PyGFXImageHandle:
         """Add a new Image node to the scene."""
         data, downsample_factors = _downcast_and_downsample(data, three_d=False)
         tex = pygfx.Texture(data, dim=2)
@@ -496,7 +519,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
         if data is not None:
             self._current_shape, prev_shape = data.shape, self._current_shape
-            if not prev_shape:
+            if reset_range and not prev_shape:
                 self.set_range()
 
         # FIXME: I suspect there are more performant ways to refresh the canvas
@@ -506,7 +529,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._elements[image] = handle
         return handle
 
-    def add_volume(self, data: np.ndarray | None = None) -> PyGFXImageHandle:
+    def add_volume(
+        self, data: np.ndarray | None = None, *, reset_range: bool = True
+    ) -> PyGFXImageHandle:
         data, downsample_factors = _downcast_and_downsample(data, three_d=True)
         tex = pygfx.Texture(data, dim=3)
         vol = pygfx.Volume(
@@ -520,7 +545,7 @@ class GfxArrayCanvas(ArrayCanvas):
         if data is not None:
             vol.local_position = [-0.5 * i for i in data.shape[::-1]]
             self._current_shape, prev_shape = data.shape, self._current_shape
-            if len(prev_shape) != 3:
+            if reset_range and len(prev_shape) != 3:
                 self.set_range()
 
         # FIXME: I suspect there are more performant ways to refresh the canvas
@@ -543,7 +568,9 @@ class GfxArrayCanvas(ArrayCanvas):
         self._last_roi_created = ref(roi)
         return roi
 
-    def set_scales(self, scales: tuple[float, ...]) -> None:
+    def set_scales(
+        self, scales: tuple[float, ...], *, reset_range: bool = True
+    ) -> None:
         """Set per-visible-axis scale factors for rendering."""
         if not scales:
             return
@@ -556,26 +583,41 @@ class GfxArrayCanvas(ArrayCanvas):
 
         (sx, sy, sz) = gfx_scales[:3]
         self._world_scales = (sx, sy, sz)
-        has_visuals = False
+        self._apply_world_transform()
+        if reset_range:
+            self.set_range()
+
+    def set_origins(self, origins: tuple[float, ...]) -> None:
+        """Set per-visible-axis world origins in data-axis order."""
+        gfx_origins = list(reversed(origins))
+        while len(gfx_origins) < 3:
+            gfx_origins.append(0.0)
+        self._world_origins = (gfx_origins[0], gfx_origins[1], gfx_origins[2])
+        self._apply_world_transform()
+
+    def _apply_world_transform(self) -> None:
         for handle in self._elements.values():
             if not isinstance(handle, PyGFXImageHandle):
                 continue
-            child = handle._image
-            if not isinstance(child, (pygfx.Image, pygfx.Volume)):
-                continue
-            _sx, _sy, _sz = sx, sy, sz
-            # compensate for downsampling so coordinates stay correct
-            # factors are in data order; pygfx order is (x, y, z) = reversed
-            factors = handle._downsample_factors
-            if factors and any(f > 1 for f in factors):
-                rev = list(reversed(factors))
-                _sx *= rev[0]
-                _sy *= rev[1] if len(rev) > 1 else 1
-                _sz *= rev[2] if len(rev) > 2 else 1
-            child.local.scale = (_sx, _sy, _sz)
-            has_visuals = True
-        if has_visuals:
-            self.set_range()
+            handle.set_world_transform(
+                tuple(reversed(self._world_scales)),
+                tuple(reversed(self._world_origins)),
+            )
+
+    def camera_state(self) -> tuple[tuple[int, int], np.ndarray]:
+        """Return viewport and data-order world-to-clip matrix."""
+        if self._camera is None:
+            raise RuntimeError("camera dimensionality has not been initialized")
+        width, height = self._canvas.get_logical_size()
+        scene_to_clip = np.asarray(self._camera.camera_matrix, dtype=np.float64)
+        ndim = self._ndim or 2
+        permutation = np.zeros((4, 4), dtype=np.float64)
+        for axis in range(ndim):
+            permutation[ndim - axis - 1, axis] = 1.0
+        for axis in range(ndim, 4):
+            permutation[axis, axis] = 1.0
+        matrix = scene_to_clip @ permutation
+        return (int(width), int(height)), matrix
 
     def set_range(
         self,
@@ -588,7 +630,11 @@ class GfxArrayCanvas(ArrayCanvas):
 
         When called with no arguments, the range is set to the full extent of the data.
         """
-        if not self._scene.children or self._camera is None:
+        has_images = any(
+            isinstance(handle, PyGFXImageHandle) and handle.data() is not None
+            for handle in self._elements.values()
+        )
+        if not has_images or self._camera is None:
             return
 
         cam = self._camera
@@ -628,6 +674,13 @@ class GfxArrayCanvas(ArrayCanvas):
     def _animate(self) -> None:
         if self._camera is not None:
             self._renderer.render(self._scene, self._camera)
+            signature = np.asarray(self._camera.camera_matrix).tobytes()
+            if (
+                self._last_camera_signature is not None
+                and signature != self._last_camera_signature
+            ):
+                self.cameraChanged.emit()
+            self._last_camera_signature = signature
 
     def _canvas_to_world_raw(
         self, pos_xy: tuple[float, float]
@@ -719,7 +772,7 @@ class GfxArrayCanvas(ArrayCanvas):
 
     def close(self) -> None:
         self._disconnect_mouse_events()
-        self._canvas.close()
+        close_rendercanvas(self._canvas)
 
     def on_mouse_press(self, event: MousePressEvent) -> bool:
         if self._selection:

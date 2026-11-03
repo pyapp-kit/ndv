@@ -28,7 +28,7 @@ from ndv.views.bases._graphics._histogram_utils import (
 )
 
 from ._histogram import _Controller, _OrthographicCamera
-from ._util import rendercanvas_class
+from ._util import close_rendercanvas, rendercanvas_class
 
 if TYPE_CHECKING:
     from ndv._types import (
@@ -214,7 +214,7 @@ class PyGFXSharedHistogramCanvas(SharedHistogramCanvas):
 
     def close(self) -> None:
         self._disconnect_mouse_events()
-        self._canvas.close()
+        close_rendercanvas(self._canvas)
 
     def frontend_widget(self) -> Any:
         return self._canvas

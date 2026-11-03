@@ -4,6 +4,18 @@ if TYPE_CHECKING:
     from rendercanvas import BaseRenderCanvas
 
 
+def close_rendercanvas(canvas: "BaseRenderCanvas") -> None:
+    """Close a render canvas after resolving any asynchronous bitmap download."""
+    context = getattr(canvas, "_canvas_context", None)
+    downloader = getattr(context, "_downloader", None)
+    if downloader is not None:
+        # rendercanvas 2.3 leaves an in-flight bitmap presentation alive during
+        # close.  Its completion can race destruction of an embedded Qt/wx
+        # widget.  Cancel it and synchronously unmap its staging buffer first.
+        downloader._clear_pending_download()
+    canvas.close()
+
+
 def rendercanvas_class() -> "type[BaseRenderCanvas]":
     from ndv.views._app import GuiFrontend, gui_frontend
 
@@ -13,6 +25,21 @@ def rendercanvas_class() -> "type[BaseRenderCanvas]":
         from qtpy.QtCore import QSize
 
         class QRenderWidget(rendercanvas.qt.QRenderWidget):
+            def _rc_request_paint(self) -> None:
+                # An asynchronous bitmap presentation can complete after close.
+                # rendercanvas 2.3 otherwise calls QWidget.update() on the
+                # already-deleted PySide object from its completion callback.
+                if not self.get_closed():
+                    super()._rc_request_paint()
+
+            def _rc_close(self) -> None:
+                # This widget is embedded in and owned by the frontend view.
+                # Base rendercanvas cleanup has already released its context and
+                # event queue when this hook runs.  Let Qt close the native child
+                # with its parent; closing it here leaves queued PySide paint
+                # events referring to a deleted QRenderWidget.
+                self._is_closed = True
+
             def sizeHint(self) -> QSize:
                 return QSize(self.width(), self.height())
 
