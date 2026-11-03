@@ -40,6 +40,9 @@ dependencies = [
     "ihist>=0.1.3",
 ]
 
+[project.scripts]
+ndv = "ndv.cli:main"
+
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 [project.optional-dependencies]
 # Supported GUI frontends
@@ -63,10 +66,27 @@ wxpython = ["pyconify>=0.2.1", "wxpython >=4.2.2"]
 vispy = ["vispy>=0.16", "pyopengl >=3.1"]
 pygfx = ["pygfx>=0.16.0", "rendercanvas>=2.6.2", "wgpu>=0.31.0"]
 
-# ready to go bundles with pygfx
-qt = ["ndv[pygfx,pyqt]", "imageio[tifffile] >=2.20"]
-jup = ["ndv[pygfx,jupyter]", "imageio[tifffile] >=2.20"]
-wx = ["ndv[pygfx,wxpython]", "imageio[tifffile] >=2.20"]
+# Core IO (tiff + zarr, no Java)
+io = [
+    "tifffile >=2024.1.30",
+    "xarray >=2024.7.0",
+    "yaozarrs >=0.1.0",
+    "tensorstore >=0.1.69,!=0.1.72",
+]
+
+# Format-specific readers
+nd2 = ["nd2[legacy] >=0.10.0"]
+lif = ["readlif >=0.6.0"]
+czi = ["pylibCZIrw >=4.1.0"]
+bioformats = ["bffile >=0.0.1rc1", "xarray >=2024.7.0"]
+
+# Everything
+io-all = ["ndv[io,nd2,lif,czi,bioformats]"]
+
+# ready to go bundles with pygfx and io
+qt = ["ndv[pygfx,pyqt,io-all]"]
+jup = ["ndv[pygfx,jupyter,io-all]"]
+wx = ["ndv[pygfx,wxpython,io-all]"]
 
 
 [project.urls]
