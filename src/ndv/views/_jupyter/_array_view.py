@@ -1,738 +1,533 @@
 from __future__ import annotations
 
-import contextlib
-import warnings
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import cmap
-import ipywidgets as widgets
 import psygnal
-from IPython.display import Javascript, display
+from anywidget.experimental import widget
 
 from ndv.models._array_display_model import ChannelMode
 from ndv.models._lut_model import ClimPolicy, ClimsManual, ClimsPercentile
-from ndv.models._viewer_model import ArrayViewerModel, InteractionMode
+from ndv.models._viewer_model import InteractionMode
 from ndv.views.bases import ArrayView, LUTView
 
 if TYPE_CHECKING:
-    from collections.abc import Container, Hashable, Iterator, Mapping, Sequence
+    from collections.abc import Container, Hashable, Mapping, Sequence
 
     from psygnal import EmissionInfo
-    from traitlets import HasTraits
-    from vispy.app.backends import _jupyter_rfb
 
     from ndv._types import AxisKey, ChannelKey
+    from ndv.models._viewer_model import ArrayViewerModel
     from ndv.views.bases._graphics._canvas import HistogramCanvas
 
-# not entirely sure why it's necessary to specifically annotat signals as : PSignal
-# i think it has to do with type variance?
+_STATIC = Path(__file__).parent / "static"
 
 
-@contextlib.contextmanager
-def notifications_blocked(
-    obj: HasTraits, name: str = "value", type: str = "change"
-) -> Iterator[None]:
-    # traitlets doesn't provide a public API for this
-    notifiers: list | None = obj._trait_notifiers.get(name, {}).pop(type, None)
-    try:
-        yield
-    finally:
-        if notifiers is not None:
-            obj._trait_notifiers[name][type] = notifiers
+def _cmap_css(cm: cmap.Colormap) -> str:
+    """Extract the linear-gradient(...) value from cmap's CSS output."""
+    line = cm.to_css(max_stops=16).split("\n")[1]
+    return line.replace("background: ", "").rstrip(";")  # type: ignore[no-any-return]
 
 
-class RightClickButton(widgets.ToggleButton):
-    """Custom Button widget that shows a popup on right-click."""
+_ESM_FILE = _STATIC / "ndv-jupyter.js"
+_CSS_FILE = _STATIC / "style.css"
 
-    # TODO: These are likely unnecessary
-    # _right_click_triggered = Bool(False).tag(sync=True)
-    # popup_content = Unicode("Right-click menu").tag(sync=True)
 
-    def __init__(self, channel: ChannelKey, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._channel = channel
-        self.add_class(f"right-click-button{channel}")
-        self.add_right_click_handler()
+def _read_or_stub(path: Path) -> str:
+    """Read file content, or return a stub if the JS hasn't been built yet."""
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return "export function render({ el }) { el.textContent = 'JS not built'; }"
 
-        self.lower_tail = widgets.BoundedFloatText(
-            value=0.0,
-            min=0.0,
-            max=100.0,
-            step=0.1,
-            description="Ignore Lower Tail:",
-            style={"description_width": "initial"},
-        )
-        self.upper_tail = widgets.BoundedFloatText(
-            value=0.0,
-            min=0.0,
-            max=100.0,
-            step=0.1,
-            description="Ignore Upper Tail:",
-            style={"description_width": "initial"},
-        )
-        self.popup_content = widgets.VBox(
-            [self.lower_tail, self.upper_tail],
-            layout=widgets.Layout(
-                display="none",
-            ),
-        )
-        self.popup_content.add_class(f"ipywidget-popup{channel}")
-        display(self.popup_content)  # type: ignore [no-untyped-call]
 
-    def add_right_click_handler(self) -> None:
-        # fmt: off
-        js_code = ( """
-        (function() {
-            function setup_rightclick() {
-                // Get all buttons with the right-click-button class
-                var button = document.getElementsByClassName(
-                    'right-click-button""" + f"{self._channel}" + """'
-                )[0];
-                if (!button) {
-                    return;
-                }
+@widget(
+    esm=_read_or_stub(_ESM_FILE),
+    css=_read_or_stub(_CSS_FILE),
+)
+@dataclass
+class NdvWidgetState:
+    """Widget state synced between Python and JS via anywidget + psygnal."""
 
-                // For each button, add a contextmenu listener
-                button.addEventListener('contextmenu', function(e) {
-                    // Prevent default context menu
-                    e.preventDefault();
-                    e.stopPropagation();
+    events = psygnal.SignalGroupDescriptor()
 
-                    // Get button position
-                    var rect = this.getBoundingClientRect();
-                    var scrollLeft = window.pageXOffset ||
-                        document.documentElement.scrollLeft;
-                    var scrollTop = window.pageYOffset ||
-                        document.documentElement.scrollTop;
+    # Dimension sliders: [{axis, label, min, max, value, step, visible}]
+    sliders: list[dict] = field(default_factory=list)
 
-                    // Position the popup above the button
-                    var popup = document.getElementsByClassName(
-                        'ipywidget-popup""" + f"{self._channel}" + """'
-                    )[0];
-                    popup.style.display = '';
-                    popup.style.position = 'absolute';
-                    popup.style.top = (rect.bottom + scrollTop) + 'px';
-                    popup.style.left = (rect.left + scrollLeft) + 'px';
+    # LUTs: [{key, name, visible, cmap_name, cmap_colors, cmap_options,
+    #         clim_min, clim_max, clim_bound_min, clim_bound_max,
+    #         auto_clim, auto_lower_tail, auto_upper_tail, gamma,
+    #         show_histogram_btn, show_cmap, row_visible}]
+    luts: list[dict] = field(default_factory=list)
 
-                    // Style the popup
-                    popup.style.background = 'white';
-                    popup.style.border = '1px solid #ccc';
-                    popup.style.borderRadius = '3px';
-                    popup.style.padding = '8px';
-                    popup.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-                    popup.style.zIndex = '1000';
+    # Channel mode
+    channel_mode: str = "grayscale"
+    channel_mode_options: list[dict] = field(default_factory=list)
 
-                    // Add to body
-                    document.body.appendChild(popup);
+    # Info labels
+    data_info: str = ""
+    hover_info: str = ""
 
-                    // Close popup when clicking elsewhere
-                    document.addEventListener('click', function closePopup(event) {
-                        var popup = document.getElementsByClassName(
-                            'ipywidget-popup""" + f"{self._channel}" + """'
-                        )[0];
-                        if (popup && !popup.contains(event.target)) {
-                            popup.style.display = 'none';
-                            document.removeEventListener('click', closePopup);
-                        }
-                    });
+    # UI visibility flags (from ViewerModel)
+    is_3d: bool = False
+    show_3d_button: bool = True
+    show_controls: bool = True
+    show_channel_mode_selector: bool = True
+    show_reset_zoom_button: bool = True
+    show_roi_button: bool = False
+    show_histogram_button: bool = True
+    use_shared_histogram: bool = False
+    show_data_info: bool = True
+    progress_visible: bool = False
 
-                    return false;
-                });
-            }
+    # Shared histogram state (toggle buttons live in the controls JS)
+    shared_histogram_visible: bool = False
+    shared_histogram_log: bool = False
 
-            // Make sure it works even after widget is redrawn/updated
-            setTimeout(setup_rightclick, 1000);
-        })();
-        """)
-        # fmt: on
-        display(Javascript(js_code))  # type: ignore [no-untyped-call]
+    # Theme info synced from JS (read-only on Python side)
+    _theme_kind: str = "dark"
+    _theme_background: str = ""
+
+    # JS -> Python event channel. JS writes via model.set + save_changes.
+    _js_event: dict = field(default_factory=dict)
 
 
 class JupyterLUTView(LUTView):
-    # NB: In practice this will be a ChannelKey but Unions not allowed here.
+    """Thin proxy -- translates LUTView ABC calls into NdvWidgetState.luts."""
+
     histogramRequested = psygnal.Signal(object)
 
     def __init__(
         self,
-        channel: ChannelKey = None,
+        parent: NdvWidgetState,
+        channel: ChannelKey,
         default_luts: Sequence[Any] = ("gray", "green", "magenta", "red", "blue"),
     ) -> None:
+        self._parent = parent
         self._channel = channel
-        self._histogram: HistogramCanvas | None = None
-        # WIDGETS
-        self._visible = widgets.Checkbox(value=True, indent=False)
-        self._visible.layout.width = "60px"
-        _luts = [cmap.Colormap(x).name.split(":")[-1] for x in default_luts]
-        self._cmap = widgets.Dropdown(options=_luts, value=_luts[0])
-        self._cmap.layout.width = "200px"
-        self._clims = widgets.FloatRangeSlider(
-            value=[0, 2**16],
-            min=0,
-            max=2**16,
-            step=1,
-            orientation="horizontal",
-            readout=True,
-            readout_format=".0f",
-        )
-        self._clims.layout.width = "100%"
-        self._auto_clim = RightClickButton(
-            channel=channel,
-            value=True,
-            description="Auto",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="Auto scale",
-            layout=widgets.Layout(min_width="40px"),
-        )
-        self._histogram_btn = widgets.ToggleButton(
-            value=False,
-            description="",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            icon="bar-chart",
-            tooltip="View Histogram",
-            layout=widgets.Layout(width="40px"),
-        )
+        self._key_str = str(channel)
+        self._is_rgb = channel == "RGB"
+        self._default_luts = [str(x) for x in default_luts]
 
-        histogram_ctrl_width = 40
-        self._log = widgets.ToggleButton(
-            value=False,
-            description="log",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="Apply logarithm (base 10, count+1) to bins",
-            layout=widgets.Layout(width=f"{histogram_ctrl_width}px"),
-        )
-        self._reset_histogram = widgets.Button(
-            description="",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            icon="expand",
-            tooltip="Reset histogram view",
-            layout=widgets.Layout(width=f"{histogram_ctrl_width}px"),
-        )
-
-        # LAYOUT
-
-        lut_ctrls = widgets.HBox(
-            [
-                self._visible,
-                self._cmap,
-                self._clims,
-                self._auto_clim,
-                self._histogram_btn,
-            ]
-        )
-
-        histogram_ctrls = widgets.VBox(
-            [self._log, self._reset_histogram],
-            layout=widgets.Layout(
-                # Avoids scrollbar on buttons
-                min_width=f"{histogram_ctrl_width + 10}px",
-                # Floats buttons to the bottom
-                justify_content="flex-end",
-            ),
-        )
-
-        self._histogram_container = widgets.HBox(
-            # Note that we'll add a histogram here later
-            [histogram_ctrls],
-            layout=widgets.Layout(
-                # Constrains histogram to 100px tall
-                max_height="100px",
-                # Avoids vertical scrollbar from
-                # histogram being *just a bit* too tall
-                overflow="hidden",
-                # Hide histogram initially
-                display="none",
-            ),
-        )
-        self.layout = widgets.VBox([lut_ctrls, self._histogram_container])
-
-        # CONNECTIONS
-        self._visible.observe(self._on_visible_changed, names="value")
-        self._cmap.observe(self._on_cmap_changed, names="value")
-        self._clims.observe(self._on_clims_changed, names="value")
-        self._auto_clim.observe(self._on_autoscale_changed, names="value")
-        self._auto_clim.lower_tail.observe(self._on_auto_tails_changed, names="value")
-        self._auto_clim.upper_tail.observe(self._on_auto_tails_changed, names="value")
-        self._histogram_btn.observe(self._on_histogram_requested, names="value")
-        self._log.observe(self._on_log_toggled, names="value")
-        self._reset_histogram.on_click(self._on_reset_histogram_clicked)
-
-    # ------------------ emit changes to the controller ------------------
-
-    def _on_clims_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
-            clims = self._clims.value
-            self._model.clims = ClimsManual(min=clims[0], max=clims[1])
-
-    def _on_visible_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
-            self._model.visible = self._visible.value
-
-    def _on_cmap_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
-            self._model.cmap = self._cmap.value
-
-    def _on_autoscale_changed(self, change: dict[str, Any]) -> None:
-        if self._model:
-            if change["new"]:  # Autoscale
-                lower_tail = self._auto_clim.lower_tail.value
-                upper_tail = self._auto_clim.upper_tail.value
-                self._model.clims = ClimsPercentile(
-                    min_percentile=lower_tail, max_percentile=100 - upper_tail
-                )
-            else:  # Manually scale
-                clims = self._clims.value
-                self._model.clims = ClimsManual(min=clims[0], max=clims[1])
-
-    def _on_auto_tails_changed(self, change: dict[str, Any]) -> None:
-        # Update clim policy if autoscaling is active
-        if self._auto_clim.value:
-            self._on_autoscale_changed({"new": True})
-
-    def _on_histogram_requested(self, change: dict[str, Any]) -> None:
-        # Generate the histogram if we haven't done so yet
-        if not self._histogram:
-            self.histogramRequested.emit(self._channel)
-        # show or hide the histogram controls
-        self._histogram_container.layout.display = "flex" if change["new"] else "none"
-
-    def _on_log_toggled(self, change: dict[str, Any]) -> None:
-        if hist := self._histogram:
-            hist.set_log_base(10 if change["new"] else None)
-
-    def _on_reset_histogram_clicked(self, change: dict[str, Any]) -> None:
-        self._log.value = False
-        if hist := self._histogram:
-            hist.set_range()
-
-    # ------------------ receive changes from the controller ---------------
+    def _update_lut_field(self, **kwargs: Any) -> None:
+        luts = list(self._parent.luts)
+        for i, lut in enumerate(luts):
+            if lut["key"] == self._key_str:
+                luts[i] = {**lut, **kwargs}
+                break
+        self._parent.luts = luts
 
     def set_channel_name(self, name: str) -> None:
-        self._visible.description = name
+        self._update_lut_field(name=name)
 
     def set_clim_policy(self, policy: ClimPolicy) -> None:
-        with notifications_blocked(self._auto_clim):
-            self._auto_clim.value = not policy.is_manual
-            if isinstance(policy, ClimsPercentile):
-                self._auto_clim.lower_tail.value = policy.min_percentile
-                self._auto_clim.upper_tail.value = 100 - policy.max_percentile
+        auto = not policy.is_manual
+        fields: dict[str, Any] = {"auto_clim": auto}
+        if isinstance(policy, ClimsPercentile):
+            fields["auto_lower_tail"] = policy.min_percentile
+            fields["auto_upper_tail"] = 100 - policy.max_percentile
+        self._update_lut_field(**fields)
 
-    def set_colormap(self, cmap: cmap.Colormap) -> None:
-        name = cmap.name.split(":")[-1]
-        if name not in self._cmap.options:
-            self._cmap.options = (*self._cmap.options, name)
-        self._cmap.value = name
+    def set_colormap(self, colormap: Any) -> None:
+        if not isinstance(colormap, cmap.Colormap):
+            colormap = cmap.Colormap(colormap)
+        name = colormap.name.split(":")[-1]
+        self._update_lut_field(cmap_name=name, cmap_css=_cmap_css(colormap))
 
     def set_clims(self, clims: tuple[float, float]) -> None:
-        # block self._clims.observe, otherwise autoscale will be forced off
-        with notifications_blocked(self._clims):
-            # FIXME: Internally the clims are being rounded to whole numbers.
-            # The rounding is somehow avoiding notifications_blocked.
-            self._clims.value = [int(c) for c in clims]
+        self._update_lut_field(clim_min=clims[0], clim_max=clims[1])
 
     def set_clim_bounds(
-        self,
-        bounds: tuple[float | None, float | None] = (None, None),
+        self, bounds: tuple[float | None, float | None] = (None, None)
     ) -> None:
-        mi = 0 if bounds[0] is None else int(bounds[0])
-        ma = 65535 if bounds[1] is None else int(bounds[1])
-        # block self._clims.observe, otherwise autoscale will be forced off
-        with notifications_blocked(self._clims):
-            self._clims.min = mi
-            self._clims.max = ma
-            current_value = self._clims.value
-            self._clims.value = (max(current_value[0], mi), min(current_value[1], ma))
+        mi = 0.0 if bounds[0] is None else float(bounds[0])
+        ma = 65535.0 if bounds[1] is None else float(bounds[1])
+        self._update_lut_field(clim_bound_min=mi, clim_bound_max=ma)
 
     def set_channel_visible(self, visible: bool) -> None:
-        self._visible.value = visible
+        self._update_lut_field(visible=visible)
 
     def set_gamma(self, gamma: float) -> None:
-        pass
+        self._update_lut_field(gamma=gamma)
 
     def set_visible(self, visible: bool) -> None:
-        # show or hide the actual widget itself
-        self.layout.layout.display = "flex" if visible else "none"
+        self._update_lut_field(row_visible=visible)
 
     def close(self) -> None:
-        self.layout.close()
+        self._parent.luts = [
+            lt for lt in self._parent.luts if lt["key"] != self._key_str
+        ]
 
     def frontend_widget(self) -> Any:
-        return self.layout
-
-    # ------------------ private methods ---------------
-
-    def add_histogram(self, histogram: HistogramCanvas) -> None:
-        widget = histogram.frontend_widget()
-        # Resize widget to a respectable size
-        widget.set_trait("css_height", "auto")
-        # Add widget to view
-        self._histogram_container.children = (
-            *self._histogram_container.children,
-            widget,
-        )
-        self._histogram = histogram
-
-
-class JupyterRGBView(JupyterLUTView):
-    def __init__(self, channel: ChannelKey = None) -> None:
-        super().__init__(channel)
-        self._cmap.layout.display = "none"
-
-
-SPIN_GIF = str(Path(__file__).parent.parent / "_resources" / "spin.gif")
+        return self._parent
 
 
 class JupyterArrayView(ArrayView):
+    """ArrayView backed by anywidget, composing [canvas, controls, histogram]."""
+
     def __init__(
         self,
-        canvas_widget: _jupyter_rfb.CanvasBackend,
+        canvas_widget: Any,
         viewer_model: ArrayViewerModel,
     ) -> None:
         self._viewer_model = viewer_model
-        self._viewer_model.events.connect(self._on_viewer_model_event)
-        # WIDGETS
         self._canvas_widget = canvas_widget
         self._visible_axes: Sequence[AxisKey] = []
         self._luts: dict[ChannelKey, JupyterLUTView] = {}
+        self._current_index: dict[AxisKey, int] = {}
+        self._shared_histogram: HistogramCanvas | None = None
+        self._histogram_frontend: Any | None = None
 
-        self._sliders: dict[Hashable, widgets.IntSlider] = {}
-        self._slider_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
-        self._luts_box = widgets.VBox([], layout=widgets.Layout(width="100%"))
+        # Controls widget (sliders, LUTs, toolbar, info bar)
+        self._widget = NdvWidgetState()
 
-        # labels for data and hover info
-        self._data_info_label = widgets.Label()
-        self._hover_info_label = widgets.Label()
+        # Sync initial viewer model flags
+        self._sync_viewer_model_flags()
+        self._viewer_model.events.connect(self._on_viewer_model_event)
 
-        # spinner to indicate progress
-        self._progress_spinner = widgets.Image.from_file(
-            SPIN_GIF, width=18, height=18, layout=widgets.Layout(display="none")
+        # Listen for JS events via _js_event field changes
+        self._updating_channel_mode = False
+        self._widget.events._js_event.connect(self._on_js_event)
+        self._widget.events.channel_mode.connect(self._on_channel_mode_field_changed)
+        self._widget.events.shared_histogram_log.connect(
+            self._on_shared_histogram_log_changed
+        )
+        self._widget.events.shared_histogram_visible.connect(
+            self._on_shared_histogram_visible_changed
         )
 
-        # the button that controls the display mode of the channels
-        self._channel_mode_combo = widgets.Dropdown(
-            options=[ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE, ChannelMode.RGBA],
-            value=str(ChannelMode.GRAYSCALE),
-        )
-        self._channel_mode_combo.layout.width = "120px"
-        self._channel_mode_combo.layout.align_self = "flex-end"
-        self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
+    # ---- JS event handler (JS -> Python via _js_event field) ----
 
-        # Reset zoom button
-        self._reset_zoom_btn = widgets.Button(
-            tooltip="Reset Zoom",
-            icon="expand",
-            layout=widgets.Layout(width="40px"),
-        )
-        self._reset_zoom_btn.on_click(self._on_reset_zoom_clicked)
+    def _on_js_event(self, msg: dict) -> None:
+        event_type = msg.get("type")
+        if event_type == "slider_changed":
+            axis_key = self._axis_from_str(msg["axis"])
+            self._current_index[axis_key] = msg["value"]
+            sliders = list(self._widget.sliders)
+            for i, s in enumerate(sliders):
+                if s["axis"] == msg["axis"]:
+                    sliders[i] = {**s, "value": msg["value"]}
+            self._widget.sliders = sliders
+            self.currentIndexChanged.emit()
 
-        # 3d view button
-        self._ndims_btn = widgets.ToggleButton(
-            value=False,
-            description="3D",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="View in 3D",
-            layout=widgets.Layout(width="40px"),
-        )
-        self._ndims_btn.observe(self._on_ndims_toggled, names="value")
+        elif event_type == "reset_zoom":
+            self.resetZoomClicked.emit()
 
-        # Add ROI button
-        self._add_roi_btn = widgets.ToggleButton(
-            value=False,
-            description="New ROI",
-            button_style="",  # 'success', 'info', 'warning', 'danger' or ''
-            tooltip="Adds a new Rectangular ROI.",
-            icon="square",
-        )
+        elif event_type == "ndim_toggle":
+            self.ndimToggleRequested.emit(msg["value"])
 
-        self._add_roi_btn.observe(self._on_add_roi_button_toggle, names="value")
-        if not viewer_model.show_roi_button:
-            self._add_roi_btn.layout.display = "none"
+        elif event_type == "shared_histogram_request":
+            self.sharedHistogramRequested.emit()
 
-        # Shared histogram button
-        self._shared_histogram_btn = widgets.ToggleButton(
-            value=False,
-            description="",
-            icon="bar-chart",
-            tooltip="Toggle shared histogram",
-            layout=widgets.Layout(width="40px", display="none"),
-        )
-        self._shared_histogram_btn.observe(
-            self._on_shared_histogram_toggled, names="value"
-        )
+        elif event_type == "roi_toggle":
+            self._viewer_model.interaction_mode = (
+                InteractionMode.CREATE_ROI if msg["value"] else InteractionMode.PAN_ZOOM
+            )
 
-        # Shared histogram log button
-        self._shared_hist_log_btn = widgets.ToggleButton(
-            value=False,
-            description="Log",
-            tooltip="Log scale (base 10)",
-            layout=widgets.Layout(width="50px", display="none"),
-        )
-        self._shared_hist_log_btn.observe(
-            self._on_shared_hist_log_toggled, names="value"
-        )
+        elif event_type == "update_lut":
+            key = self._key_from_str(msg["key"])
+            lut_view = self._luts.get(key)
+            if lut_view is None or lut_view._model is None:
+                return
+            model = lut_view._model
 
-        # Container for the shared histogram widget
-        self._shared_histogram: Any = None
-        self._shared_histogram_container = widgets.HBox(
-            layout=widgets.Layout(display="none", height="120px"),
-        )
+            if "visible" in msg:
+                model.visible = msg["visible"]
+            if "cmap_name" in msg:
+                model.cmap = msg["cmap_name"]
+            if "clim_min" in msg and "clim_max" in msg:
+                model.clims = ClimsManual(min=msg["clim_min"], max=msg["clim_max"])
+            if "auto_clim" in msg:
+                if msg["auto_clim"]:
+                    model.clims = ClimsPercentile(
+                        min_percentile=msg.get("auto_lower_tail", 0),
+                        max_percentile=100 - msg.get("auto_upper_tail", 0),
+                    )
+                else:
+                    model.clims = ClimsManual(
+                        min=msg.get("clim_min", 0),
+                        max=msg.get("clim_max", 65535),
+                    )
 
-        if viewer_model.use_shared_histogram:
-            self._shared_histogram_btn.layout.display = "block"
-            for lut in self._luts.values():
-                lut._histogram_btn.layout.display = "none"
+    def _on_shared_histogram_log_changed(self) -> None:
+        if self._shared_histogram is not None:
+            log_on = self._widget.shared_histogram_log
+            self._shared_histogram.set_log_base(10 if log_on else None)
 
-        # LAYOUT
+    def _on_channel_mode_field_changed(self) -> None:
+        if not self._updating_channel_mode:
+            self.channelModeChanged.emit(ChannelMode(self._widget.channel_mode))
 
-        top_row = widgets.HBox(
-            [self._data_info_label, self._progress_spinner],
-            layout=widgets.Layout(
-                display="flex",
-                justify_content="space-between",
-                align_items="center",
-            ),
-        )
+    # ---- Axis key serialization ----
 
+    def _axis_str_map(self) -> dict[str, AxisKey]:
+        return {str(ax): ax for ax in self._current_index}
+
+    def _axis_from_str(self, s: str) -> AxisKey:
+        mapping = self._axis_str_map()
+        if s in mapping:
+            return mapping[s]
         try:
-            width = getattr(canvas_widget, "css_width", "600px").replace("px", "")
-            width = f"{int(width) + 4}px"
-        except Exception:
-            width = "604px"
+            return int(s)
+        except (ValueError, TypeError):
+            return s
 
-        self._btns_box = widgets.HBox(
-            [
-                self._shared_histogram_btn,
-                self._shared_hist_log_btn,
-                widgets.Box(layout=widgets.Layout(flex="1")),
-                self._channel_mode_combo,
-                self._ndims_btn,
-                self._add_roi_btn,
-                self._reset_zoom_btn,
-            ],
-        )
-        self.layout = widgets.VBox(
-            [
-                top_row,
-                self._canvas_widget,
-                self._hover_info_label,
-                self._slider_box,
-                self._luts_box,
-                self._shared_histogram_container,
-                self._btns_box,
-            ],
-            layout=widgets.Layout(width=width),
-        )
+    def _key_str_map(self) -> dict[str, ChannelKey]:
+        return {str(k): k for k in self._luts}
 
-        # CONNECTIONS
+    def _key_from_str(self, s: str) -> ChannelKey:
+        mapping = self._key_str_map()
+        if s in mapping:
+            return mapping[s]
+        try:
+            return int(s)
+        except (ValueError, TypeError):
+            return s
 
-        self._channel_mode_combo.observe(self._on_channel_mode_changed, names="value")
+    # ---- ArrayView ABC implementation ----
 
     def create_sliders(self, coords: Mapping[Hashable, Sequence]) -> None:
-        """Update sliders with the given coordinate ranges."""
         sliders = []
-        self._sliders.clear()
+        self._current_index.clear()
         for axis, _coords in coords.items():
             if not isinstance(_coords, range):
                 raise NotImplementedError("Only range is supported for now")
-
-            sld = widgets.IntSlider(
-                value=_coords.start,
-                min=_coords.start,
-                max=_coords.stop - 1,
-                step=_coords.step,
-                description=str(axis),
-                continuous_update=True,
-                orientation="horizontal",
+            self._current_index[axis] = _coords.start
+            sliders.append(
+                {
+                    "axis": str(axis),
+                    "label": str(axis),
+                    "min": _coords.start,
+                    "max": _coords.stop - 1,
+                    "value": _coords.start,
+                    "step": _coords.step,
+                    "visible": True,
+                }
             )
-            sld.layout.width = "99%"
-            sld.observe(self._on_slider_change, "value")
-            sliders.append(sld)
-            self._sliders[axis] = sld
-        self._slider_box.children = sliders
-
+        self._widget.sliders = sliders
         self.currentIndexChanged.emit()
 
-    def hide_sliders(
-        self, axes_to_hide: Container[Hashable], show_remainder: bool = True
-    ) -> None:
-        """Hide sliders based on visible axes."""
-        for ax, slider in self._sliders.items():
-            if ax in axes_to_hide:
-                slider.layout.display = "none"
-            elif show_remainder:
-                slider.layout.display = "flex"
-
     def current_index(self) -> Mapping[AxisKey, int | slice]:
-        """Return the current value of the sliders."""
-        return {axis: slider.value for axis, slider in self._sliders.items()}
+        return dict(self._current_index)
 
     def set_current_index(self, value: Mapping[AxisKey, int | slice]) -> None:
-        """Set the current value of the sliders."""
         changed = False
-        # this type ignore is only necessary because we had to override the signal
-        # to be a PSignal in the class def above :(
         with self.currentIndexChanged.blocked():
             for axis, val in value.items():
                 if isinstance(val, slice):
                     raise NotImplementedError("Slices are not supported yet")
+                if self._current_index.get(axis) != val:
+                    self._current_index[axis] = val
+                    changed = True
 
-                if sld := self._sliders.get(axis):
-                    if sld.value != val:
-                        sld.value = val
-                        changed = True
-                else:  # pragma: no cover
-                    warnings.warn(f"Axis {axis} not found in sliders", stacklevel=2)
+            if changed:
+                sliders = list(self._widget.sliders)
+                for i, s in enumerate(sliders):
+                    ax = self._axis_from_str(s["axis"])
+                    if ax in value:
+                        v = value[ax]
+                        if not isinstance(v, slice):
+                            sliders[i] = {**s, "value": v}
+                self._widget.sliders = sliders
+
         if changed:
             self.currentIndexChanged.emit()
-
-    def add_lut_view(self, channel: ChannelKey) -> JupyterLUTView:
-        """Add a LUT view to the viewer."""
-        wdg = (
-            JupyterRGBView(channel)
-            if channel == "RGB"
-            else JupyterLUTView(channel, self._viewer_model.default_luts)
-        )
-        layout = self._luts_box
-        self._luts[channel] = wdg
-
-        wdg.histogramRequested.connect(self.histogramRequested)
-        if self._viewer_model.use_shared_histogram:
-            wdg._histogram_btn.layout.display = "none"
-        layout.children = (*layout.children, wdg.layout)
-        return wdg
-
-    def remove_lut_view(self, view: LUTView) -> None:
-        """Remove a LUT view from the viewer."""
-        if view not in self._luts.values():
-            return
-        view = cast("JupyterLUTView", view)
-        layout = self._luts_box
-        layout.children = tuple(
-            wdg for wdg in layout.children if wdg != view.frontend_widget()
-        )
-
-    def set_data_info(self, data_info: str) -> None:
-        self._data_info_label.value = data_info
-
-    def set_hover_info(self, hover_info: str) -> None:
-        self._hover_info_label.value = hover_info
-
-    def set_channel_mode(self, mode: ChannelMode) -> None:
-        with self.channelModeChanged.blocked():
-            self._channel_mode_combo.value = mode.value
-
-    def _on_slider_change(self, change: dict[str, Any]) -> None:
-        """Emit signal when a slider value changes."""
-        self.currentIndexChanged.emit()
-
-    def _on_channel_mode_changed(self, change: dict[str, Any]) -> None:
-        """Emit signal when the channel mode changes."""
-        self.channelModeChanged.emit(ChannelMode(change["new"]))
-
-    def add_histogram(self, channel: ChannelKey, histogram: HistogramCanvas) -> None:
-        if lut := self._luts.get(channel, None):
-            lut.add_histogram(histogram)
-
-    def _on_add_roi_button_toggle(self, change: dict[str, Any]) -> None:
-        """Emit signal when the channel mode changes."""
-        self._viewer_model.interaction_mode = (
-            InteractionMode.CREATE_ROI if change["new"] else InteractionMode.PAN_ZOOM
-        )
-
-    def _on_shared_histogram_toggled(self, change: dict[str, Any]) -> None:
-        toggled = change["new"]
-        if toggled:
-            self.sharedHistogramRequested.emit()
-        self._shared_histogram_container.layout.display = "flex" if toggled else "none"
-        self._shared_hist_log_btn.layout.display = "block" if toggled else "none"
-
-    def _on_shared_hist_log_toggled(self, change: dict[str, Any]) -> None:
-        if self._shared_histogram is not None:
-            self._shared_histogram.set_log_base(10 if change["new"] else None)
-
-    def remove_histogram(self, widget: Any) -> None:
-        """Remove a histogram widget from the viewer."""
-
-    def add_shared_histogram(self, widget: Any) -> None:
-        self._shared_histogram = widget
-        frontend = widget.frontend_widget()
-        self._shared_histogram_container.children = (frontend,)
-
-    def remove_shared_histogram(self) -> None:
-        self._shared_histogram_container.children = ()
-        self._shared_histogram = None
-
-    def frontend_widget(self) -> Any:
-        return self.layout
-
-    def set_visible(self, visible: bool) -> None:
-        # show or hide the actual widget itself
-        from IPython import display
-
-        if visible:
-            display.display(self.layout)  # type: ignore [no-untyped-call]
-        else:
-            display.clear_output()  # type: ignore [no-untyped-call]
 
     def visible_axes(self) -> Sequence[AxisKey]:
         return self._visible_axes
 
     def set_visible_axes(self, axes: Sequence[AxisKey]) -> None:
         self._visible_axes = tuple(axes)
-        with notifications_blocked(self._ndims_btn):
-            self._ndims_btn.value = len(axes) > 2
+        self._widget.is_3d = len(axes) > 2
 
-    def _on_ndims_toggled(self, change: dict[str, Any]) -> None:
-        self.ndimToggleRequested.emit(change["new"])
+    def set_channel_mode(self, mode: ChannelMode) -> None:
+        self._updating_channel_mode = True
+        self._widget.channel_mode = mode.value
+        self._updating_channel_mode = False
 
-    def _on_reset_zoom_clicked(self, change: dict[str, Any]) -> None:
-        self.resetZoomClicked.emit()
+    def set_channel_mode_enabled(self, mode: ChannelMode, enabled: bool) -> None:
+        options = list(self._widget.channel_mode_options)
+        for i, opt in enumerate(options):
+            if opt["value"] == mode.value:
+                options[i] = {**opt, "enabled": enabled}
+                break
+        self._widget.channel_mode_options = options
+
+    def set_data_info(self, data_info: str) -> None:
+        self._widget.data_info = data_info
+
+    def set_hover_info(self, hover_info: str) -> None:
+        self._widget.hover_info = hover_info
+
+    def hide_sliders(
+        self, axes_to_hide: Container[Hashable], *, show_remainder: bool = True
+    ) -> None:
+        sliders = list(self._widget.sliders)
+        for i, s in enumerate(sliders):
+            ax = self._axis_from_str(s["axis"])
+            if ax in axes_to_hide:
+                sliders[i] = {**s, "visible": False}
+            elif show_remainder:
+                sliders[i] = {**s, "visible": True}
+        self._widget.sliders = sliders
+
+    def add_lut_view(self, channel: ChannelKey) -> JupyterLUTView:
+        lut_view = JupyterLUTView(
+            self._widget, channel, self._viewer_model.default_luts
+        )
+        self._luts[channel] = lut_view
+
+        key_str = str(channel)
+        lut_options = []
+        for x in self._viewer_model.default_luts:
+            cm = cmap.Colormap(x)
+            name = cm.name.split(":")[-1]
+            lut_options.append({"name": name, "css": _cmap_css(cm)})
+        new_lut: dict[str, Any] = {
+            "key": key_str,
+            "name": key_str,
+            "visible": True,
+            "cmap_name": lut_options[0]["name"] if lut_options else "gray",
+            "cmap_css": "",
+            "cmap_options": lut_options,
+            "clim_min": 0,
+            "clim_max": 65535,
+            "clim_bound_min": 0,
+            "clim_bound_max": 65535,
+            "auto_clim": True,
+            "auto_lower_tail": 0,
+            "auto_upper_tail": 0,
+            "gamma": 1.0,
+            "show_histogram_btn": self._viewer_model.show_histogram_button,
+            "show_cmap": channel != "RGB",
+            "row_visible": True,
+        }
+        self._widget.luts = [*self._widget.luts, new_lut]
+        return lut_view
+
+    def remove_lut_view(self, view: LUTView) -> None:
+        if not isinstance(view, JupyterLUTView):
+            return
+        self._luts.pop(view._channel, None)
+        self._widget.luts = [
+            lt for lt in self._widget.luts if lt["key"] != view._key_str
+        ]
+
+    def add_histogram(self, channel: ChannelKey, widget: Any) -> None:
+        raise NotImplementedError("Per-channel histograms not implemented")
+
+    def remove_histogram(self, widget: Any) -> None:
+        raise NotImplementedError("Per-channel histograms not implemented")
+
+    def set_histogram_widget(self, widget: Any) -> None:
+        """Pre-set the histogram frontend widget (included in layout, hidden)."""
+        self._histogram_frontend = widget
+        if hasattr(widget, "css_height"):
+            widget.css_height = "120px"
+        if hasattr(widget, "css_width"):
+            widget.css_width = "100%"
+        # Also set ipywidgets layout so the widget container stretches
+        if hasattr(widget, "layout"):
+            widget.layout.width = "100%"
+            widget.layout.height = "120px"
+
+    def add_shared_histogram(self, widget: Any) -> None:
+        self._shared_histogram = widget
+        if self._histogram_frontend is None:
+            self.set_histogram_widget(widget.frontend_widget())
+        self._widget.shared_histogram_visible = True
+
+    def remove_shared_histogram(self) -> None:
+        self._shared_histogram = None
+        self._widget.shared_histogram_visible = False
+
+    def _on_shared_histogram_visible_changed(self) -> None:
+        """Toggle histogram widget visibility when JS toggles the flag."""
+        visible = self._widget.shared_histogram_visible
+        self._set_histogram_visible(visible)
+
+    def _set_histogram_visible(self, visible: bool) -> None:
+        """Show or hide the histogram widget in the layout."""
+        import ipywidgets
+
+        box = getattr(self, "_histogram_box", None)
+        if isinstance(box, ipywidgets.Box):
+            box.layout.display = "" if visible else "none"
+
+    def frontend_widget(self) -> Any:
+        import ipywidgets
+        from IPython import display as ipy_display
+
+        # Wrap NdvWidgetState (descriptor-based, not an ipywidget) in Output
+        # so it can be a child of VBox.
+        controls_output = ipywidgets.Output()
+        with controls_output:
+            ipy_display.display(self._widget)  # type: ignore[no-untyped-call]
+
+        # Histogram box: always in layout, hidden until toggled
+        hist_children = []
+        if self._histogram_frontend is not None:
+            hist_children = [self._histogram_frontend]
+        self._histogram_box = ipywidgets.Box(
+            hist_children,
+            layout=ipywidgets.Layout(display="none", width="100%", overflow="hidden"),
+        )
+
+        return ipywidgets.VBox(
+            [self._canvas_widget, controls_output, self._histogram_box]
+        )
+
+    def set_visible(self, visible: bool) -> None:
+        if visible:
+            from IPython import display
+
+            display.display(self.frontend_widget())  # type: ignore[no-untyped-call]
 
     def close(self) -> None:
-        self.layout.close()
+        self._viewer_model.events.disconnect(self._on_viewer_model_event)
+        self._widget.events._js_event.disconnect(self._on_js_event)
+        self._widget.events.channel_mode.disconnect(self._on_channel_mode_field_changed)
+        self._widget.events.shared_histogram_log.disconnect(
+            self._on_shared_histogram_log_changed
+        )
+        self._widget.events.shared_histogram_visible.disconnect(
+            self._on_shared_histogram_visible_changed
+        )
+
+    # ---- ViewerModel reactivity ----
+
+    def _sync_viewer_model_flags(self) -> None:
+        vm = self._viewer_model
+        self._widget.show_3d_button = vm.show_3d_button
+        self._widget.show_controls = vm.show_controls
+        self._widget.show_channel_mode_selector = vm.show_channel_mode_selector
+        self._widget.show_reset_zoom_button = vm.show_reset_zoom_button
+        self._widget.show_roi_button = vm.show_roi_button
+        self._widget.show_histogram_button = vm.show_histogram_button
+        self._widget.use_shared_histogram = vm.use_shared_histogram
+        self._widget.show_data_info = vm.show_data_info
+        self._widget.progress_visible = vm.show_progress_spinner
+        self._widget.channel_mode_options = [
+            {"value": m.value, "label": m.value, "enabled": True}
+            for m in [ChannelMode.GRAYSCALE, ChannelMode.COMPOSITE, ChannelMode.RGBA]
+        ]
 
     def _on_viewer_model_event(self, info: EmissionInfo) -> None:
         sig_name = info.signal.name
         value = info.args[0]
-        if sig_name == "show_progress_spinner":
-            self._progress_spinner.layout.display = "flex" if value else "none"
+        flag_map: dict[str, str] = {
+            "show_progress_spinner": "progress_visible",
+            "show_3d_button": "show_3d_button",
+            "show_controls": "show_controls",
+            "show_channel_mode_selector": "show_channel_mode_selector",
+            "show_reset_zoom_button": "show_reset_zoom_button",
+            "show_roi_button": "show_roi_button",
+            "show_histogram_button": "show_histogram_button",
+            "use_shared_histogram": "use_shared_histogram",
+            "show_data_info": "show_data_info",
+        }
+        if sig_name in flag_map:
+            setattr(self._widget, flag_map[sig_name], value)
         elif sig_name == "interaction_mode":
-            # If leaving CanvasMode.CREATE_ROI, uncheck the ROI button
-            _new, old = info.args
-            if old == InteractionMode.CREATE_ROI:
-                self._add_roi_btn.value = False
-        elif sig_name == "show_histogram_button":
-            # Note that "block" displays the icon better than "flex"
-            for lut in self._luts.values():
-                lut._histogram_btn.layout.display = "block" if value else "none"
-        elif sig_name == "use_shared_histogram":
-            self._shared_histogram_btn.layout.display = "block" if value else "none"
-            if value:
-                for lut in self._luts.values():
-                    lut._histogram_btn.layout.display = "none"
-                if not self._shared_histogram_btn.value:
-                    self._shared_histogram_btn.value = True
-                self._shared_hist_log_btn.layout.display = "block"
-            else:
-                show_hist = self._viewer_model.show_histogram_button
-                for lut in self._luts.values():
-                    lut._histogram_btn.layout.display = "block" if show_hist else "none"
-                self._shared_hist_log_btn.layout.display = "none"
-        elif sig_name == "show_roi_button":
-            self._add_roi_btn.layout.display = "flex" if value else "none"
-        elif sig_name == "show_channel_mode_selector":
-            self._channel_mode_combo.layout.display = "flex" if value else "none"
-        elif sig_name == "show_reset_zoom_button":
-            self._reset_zoom_btn.layout.display = "flex" if value else "none"
-        elif sig_name == "show_3d_button":
-            self._ndims_btn.layout.display = "flex" if value else "none"
-        # elif sig_name == "show_play_button":
-        #     ...
-        elif sig_name == "show_data_info":
-            self._data_info_label.display = "flex" if value else None
-            self._hover_info_label.display = "flex" if value else None
-        elif sig_name == "show_controls":
-            # Show or hide the entire controls area (dims sliders + LUTs + btns)
-            self._slider_box.display = "flex" if value else None
-            self._btns_box.display = "flex" if value else None
-            self._luts_box.display = "flex" if value else None
+            pass  # handled by JS side
