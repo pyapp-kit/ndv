@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock
 
 import wx
@@ -9,12 +10,21 @@ from ndv.models._viewer_model import ArrayViewerModel
 from ndv.views._app import get_histogram_canvas_class
 from ndv.views._wx._array_view import WxArrayView
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from pytest import FixtureRequest
+
 
 @fixture
-def viewer(wxapp: wx.App) -> WxArrayView:
+def viewer(wxapp: wx.App) -> Iterator[WxArrayView]:
     viewer = WxArrayView(MagicMock(), ArrayViewerModel())
     viewer.add_lut_view(None)
-    return viewer
+    yield viewer
+    # _wxwidget is itself a top-level wx.Frame; it must be explicitly destroyed
+    # rather than left for Python's GC, or wx corrupts its window bookkeeping
+    # during interpreter shutdown (manifests as a heap-corruption crash on Windows).
+    viewer._wxwidget.Destroy()
 
 
 def _processEvent(
@@ -63,7 +73,7 @@ def test_array_options(viewer: WxArrayView) -> None:
     assert wxwdg.add_roi_btn.IsShown()
 
 
-def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
+def test_histogram(wxapp: wx.App, viewer: WxArrayView, request: FixtureRequest) -> None:
     channel = None
     lut = viewer._luts[channel]
     btn = lut._wxwidget.histogram_btn
@@ -78,6 +88,9 @@ def test_histogram(wxapp: wx.App, viewer: WxArrayView) -> None:
     # Test adding the histogram widget puts it on the relevant lut
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 1
     histogram = get_histogram_canvas_class()()  # will raise if not supported
+    # must close (stops its background render thread) before the frame it's
+    # embedded in is destroyed, or the two race and corrupt the process heap
+    request.addfinalizer(histogram.close)
     viewer.add_histogram(channel, histogram)
     assert len(lut._wxwidget._histogram_sizer.GetChildren()) == 2
 
@@ -230,13 +243,14 @@ def test_none_all(wxapp: wx.App, viewer: WxArrayView) -> None:
             assert lut_view._wxwidget.IsShown()
 
 
-def test_key_event_filter(wxapp: wx.App) -> None:
+def test_key_event_filter(wxapp: wx.App, request: FixtureRequest) -> None:
     from ndv._types import KeyCode, KeyMod, KeyPressEvent
     from ndv.views._wx._app import WxAppWrap
 
     app = WxAppWrap()
     view = WxArrayView(MagicMock(), ArrayViewerModel())
     widget = view.frontend_widget()
+    request.addfinalizer(widget.Destroy)
 
     received: list[KeyPressEvent] = []
     view.keyPressed.connect(received.append)

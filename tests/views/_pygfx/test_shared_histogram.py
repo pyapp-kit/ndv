@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 from pytest import fixture
@@ -14,6 +16,9 @@ from ndv._types import (
 )
 from ndv.views._pygfx._shared_histogram import PyGFXSharedHistogramCanvas
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 def _force_canvas_size(
     canvas: PyGFXSharedHistogramCanvas, w: int = 600, h: int = 600
@@ -24,11 +29,14 @@ def _force_canvas_size(
 
 
 @fixture
-def hist() -> PyGFXSharedHistogramCanvas:
+def hist() -> Iterator[PyGFXSharedHistogramCanvas]:
     canvas = PyGFXSharedHistogramCanvas()
     _force_canvas_size(canvas)
     canvas.set_range(x=(0, 100), y=(0, 1))
-    return canvas
+    yield canvas
+    # must close to stop its background wgpu/rendercanvas poller thread, or
+    # leftover threads crash the interpreter at process shutdown
+    canvas.close()
 
 
 def _world_to_canvas(
@@ -102,10 +110,8 @@ def test_channel_visibility(hist: PyGFXSharedHistogramCanvas) -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_none_key_channel() -> None:
+def test_none_key_channel(hist: PyGFXSharedHistogramCanvas) -> None:
     """key=None (grayscale default channel) works correctly."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(None, counts, edges)
@@ -125,9 +131,8 @@ def test_none_key_channel() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_clim_drag_emits_signal() -> None:
+def test_clim_drag_emits_signal(hist: PyGFXSharedHistogramCanvas) -> None:
     """Dragging a clim handle emits climsChanged with correct key."""
-    hist = PyGFXSharedHistogramCanvas()
     _force_canvas_size(hist)
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
@@ -153,10 +158,8 @@ def test_clim_drag_emits_signal() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_none_key_clim_drag() -> None:
+def test_none_key_clim_drag(hist: PyGFXSharedHistogramCanvas) -> None:
     """Clim dragging works for key=None (grayscale channel)."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(None, counts, edges)
@@ -179,10 +182,8 @@ def test_none_key_clim_drag() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_gamma_double_click_resets() -> None:
+def test_gamma_double_click_resets(hist: PyGFXSharedHistogramCanvas) -> None:
     """Double-clicking gamma handle emits gammaChanged with 1.0."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
@@ -210,10 +211,8 @@ def test_gamma_double_click_resets() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_clim_bounds_constrain_drag() -> None:
+def test_clim_bounds_constrain_drag(hist: PyGFXSharedHistogramCanvas) -> None:
     """Clim drag respects clim_bounds."""
-    hist = PyGFXSharedHistogramCanvas()
-    _force_canvas_size(hist)
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
@@ -241,9 +240,8 @@ def test_clim_bounds_constrain_drag() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_log_scale() -> None:
+def test_log_scale(hist: PyGFXSharedHistogramCanvas) -> None:
     """Log scale can be toggled without errors."""
-    hist = PyGFXSharedHistogramCanvas()
     counts = np.array([5, 10, 15, 10, 5])
     edges = np.linspace(0, 100, 6)
     hist.set_channel_data(0, counts, edges)
@@ -259,9 +257,8 @@ def test_log_scale() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_highlight() -> None:
+def test_highlight(hist: PyGFXSharedHistogramCanvas) -> None:
     """Highlight line shows and hides correctly."""
-    hist = PyGFXSharedHistogramCanvas()
     assert not hist._highlight_lines
 
     hist.highlight({"ch0": 50})
@@ -275,9 +272,8 @@ def test_highlight() -> None:
 
 
 @pytest.mark.usefixtures("any_app")
-def test_legend_names() -> None:
+def test_legend_names(hist: PyGFXSharedHistogramCanvas) -> None:
     """Legend entries track channel names."""
-    hist = PyGFXSharedHistogramCanvas()
     counts = np.array([5, 10, 15])
     edges = np.array([0, 33, 66, 100], dtype=float)
 
