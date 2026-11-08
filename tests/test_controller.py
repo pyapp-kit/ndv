@@ -545,11 +545,13 @@ def test_stale_response_discard() -> None:
     """Test that responses from old request generations are discarded."""
     ctrl = ArrayViewer()
 
-    # simulate a stale response from generation 1 when we're on generation 2
+    # simulate a stale response from generation 1 when we're on generation 2,
+    # and the request for generation 2 changed more than the index
     old_response = DataResponse(n_visible_axes=2, data={None: np.zeros((8, 8))})
     future = Future()
     future.set_result(old_response)
     ctrl._current_gen = 2
+    ctrl._min_drawable_gen = 2
     ctrl._futures[future] = 1  # old generation
 
     ctrl._on_data_response_ready(future)
@@ -557,6 +559,112 @@ def test_stale_response_discard() -> None:
     # stale response should be ignored — no LUT controllers created, no refresh
     assert len(ctrl._lut_controllers) == 0
     ctrl._canvas.refresh.assert_not_called()
+
+
+def _response_future(ctrl: ArrayViewer, gen: int, value: int) -> Future:
+    future: Future[DataResponse] = Future()
+    future.set_result(
+        DataResponse(n_visible_axes=2, data={None: np.full((8, 8), value)})
+    )
+    ctrl._futures[future] = gen
+    return future
+
+
+@no_type_check
+@_patch_views
+def test_superseded_index_response_is_drawn() -> None:
+    """While only the index changes (slider drag), a late response still draws."""
+    ctrl = ArrayViewer()
+    ctrl._current_gen = 5  # gens 1..5 were index-only changes after gen 1
+    ctrl._min_drawable_gen = 1
+
+    ctrl._on_data_response_ready(_response_future(ctrl, 3, value=3))
+
+    assert ctrl._shown_gen == 3
+    ctrl._canvas.refresh.assert_called_once()
+
+
+@no_type_check
+@_patch_views
+def test_response_older_than_shown_is_discarded() -> None:
+    """A superseded response never replaces a newer one already on screen."""
+    ctrl = ArrayViewer()
+    ctrl._current_gen = 5
+    ctrl._min_drawable_gen = 1
+
+    ctrl._on_data_response_ready(_response_future(ctrl, 4, value=4))
+    ctrl._canvas.refresh.reset_mock()
+    ctrl._on_data_response_ready(_response_future(ctrl, 2, value=2))
+
+    assert ctrl._shown_gen == 4
+    ctrl._canvas.refresh.assert_not_called()
+
+
+@no_type_check
+@_patch_views
+def test_cancel_keeps_running_futures() -> None:
+    """Queued requests are cancelled; started ones stay tracked with their gen."""
+    ctrl = ArrayViewer()
+    pending: Future[DataResponse] = Future()
+    running: Future[DataResponse] = Future()
+    running.set_running_or_notify_cancel()  # a worker picked it up
+    ctrl._futures[pending] = 0
+    ctrl._futures[running] = 0
+
+    ctrl._cancel_futures()
+
+    assert pending.cancelled()
+    assert pending not in ctrl._futures
+    assert ctrl._futures == {running: 0}
+
+
+@no_type_check
+@_patch_views
+def test_layout_change_discards_earlier_responses() -> None:
+    """After a visible-axes change, responses requested before it never draw."""
+    ctrl = ArrayViewer(np.zeros((4, 4, 8, 8)))
+    ctrl._join()
+    before = ctrl._current_gen
+
+    ctrl.display_model.visible_axes = (1, 2, 3)  # 2D -> 3D
+    ctrl._join()
+
+    assert ctrl._min_drawable_gen == ctrl._current_gen > before
+    assert not ctrl._is_drawable(before)
+
+
+@no_type_check
+@_patch_views
+def test_index_change_keeps_earlier_responses_drawable() -> None:
+    """A pure index change leaves the previous request drawable."""
+    ctrl = ArrayViewer(np.zeros((4, 8, 8)))
+    ctrl._join()
+    before = ctrl._current_gen
+    min_before = ctrl._min_drawable_gen
+
+    ctrl.display_model.current_index.update({0: 3})
+    ctrl._join()
+
+    assert ctrl._current_gen > before
+    assert ctrl._min_drawable_gen == min_before
+    assert ctrl._is_drawable(before) == (ctrl._shown_gen <= before)
+
+
+@no_type_check
+@_patch_views
+def test_dims_change_discards_earlier_responses() -> None:
+    """Responses requested for the old shape never draw after dims change."""
+    ctrl = ArrayViewer(np.zeros((4, 8, 8)))
+    ctrl._join()
+    ctrl._shown_gen = -1
+    before = ctrl._current_gen
+    ctrl._current_gen = before + 1  # a later index-only request is in flight
+    ctrl._min_drawable_gen = 0
+
+    ctrl._on_dims_changed()  # no index change, so no new request
+
+    assert not ctrl._is_drawable(before)
+    assert ctrl._is_drawable(before + 1)  # the current request still draws
 
 
 @no_type_check
