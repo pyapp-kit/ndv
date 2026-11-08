@@ -114,6 +114,13 @@ class ArrayViewer:
         self._gen_counter = count()
         self._current_gen: int = 0
         self._futures: dict[Future[DataResponse], int] = {}
+        # A superseded response may still be drawn if only the current index changed
+        # since it was requested (e.g. while dragging a slider), so the display keeps
+        # up instead of freezing until the slider stops. Responses older than
+        # `_min_drawable_gen` (requested before a data, shape or layout change) or
+        # older than the one already on screen (`_shown_gen`) are discarded.
+        self._min_drawable_gen: int = 0
+        self._shown_gen: int = -1
 
         # mapping of channel keys to their respective controllers
         # where None is the default channel
@@ -469,14 +476,13 @@ class ArrayViewer:
             if old.current_index != new.current_index:
                 self._view.set_current_index(self._display_model.current_index)
 
-        needs_data = (
+        layout_changed = (
             old.visible_axes != new.visible_axes
             or old.channel_axis != new.channel_axis
             or old.channel_mode != new.channel_mode
-            or old.current_index != new.current_index
         )
-        if needs_data:
-            self._request_data()
+        if layout_changed or old.current_index != new.current_index:
+            self._request_data(index_only=not layout_changed)
 
         if old.visible_scales != new.visible_scales:
             self._canvas.set_scales(new.visible_scales)
@@ -591,6 +597,10 @@ class ArrayViewer:
         """Update sliders and info when dimension sizes change."""
         if self._data_wrapper is None:
             return
+        # responses requested for the old shape must not be drawn as superseded
+        # frames (they may have other channels or extents); the current request
+        # is still drawn if nothing newer is issued, as before
+        self._min_drawable_gen = self._current_gen + 1
         with self._view.currentIndexChanged.blocked():
             self._view.create_sliders(self._data_wrapper.coords)
         self._re_resolve()
@@ -750,17 +760,23 @@ class ArrayViewer:
     # 4. each request is submitted as a future
     # 5. when the future resolves, `_on_data_response_ready` draws the response.
 
-    def _request_data(self) -> None:
+    def _request_data(self, *, index_only: bool = False) -> None:
         """Fetch and update the displayed data.
 
         This is called (frequently) when anything changes that requires a redraw.
         It fetches the current data slice from the model and updates the image handle.
+
+        `index_only` means only the current index changed since the last request, so
+        a response still in flight from an earlier request may be drawn when it
+        arrives (it is a valid, just older, view of the same data).
         """
         if not self._data_wrapper:
             return  # pragma: no cover
 
         self._cancel_futures()
         self._current_gen = gen = next(self._gen_counter)
+        if not index_only:
+            self._min_drawable_gen = gen
 
         for req in build_slice_requests(self._resolved, self._data_wrapper):
             future: Future[DataResponse]
@@ -785,10 +801,21 @@ class ArrayViewer:
             future.result()
 
     def _cancel_futures(self) -> None:
-        while self._futures:
-            f, _ = self._futures.popitem()
-            f.cancel()
+        # Futures that already started cannot be cancelled. They stay tracked so
+        # their generation is known when they finish (see `_is_drawable`).
+        for f in list(self._futures):
+            if f.cancel():
+                # cancel() may already have run the done callback, which pops it
+                self._futures.pop(f, None)
         self._viewer_model.show_progress_spinner = False
+
+    def _is_drawable(self, gen: int) -> bool:
+        """Return True if a response from request generation `gen` may be drawn."""
+        if gen == self._current_gen:
+            return True
+        # superseded: draw only if nothing but the index changed since, and it is
+        # not older than what is already on screen
+        return 0 <= gen and self._min_drawable_gen <= gen and self._shown_gen <= gen
 
     @_app.ensure_main_thread
     def _on_data_response_ready(self, future: Future[DataResponse]) -> None:
@@ -798,7 +825,7 @@ class ArrayViewer:
         if not self._futures:
             self._viewer_model.show_progress_spinner = False
 
-        if future.cancelled() or gen != self._current_gen:
+        if future.cancelled() or not self._is_drawable(gen):
             return
 
         try:
@@ -806,6 +833,7 @@ class ArrayViewer:
         except Exception as e:
             warnings.warn(f"Error fetching data: {e}", stacklevel=1)
             return
+        self._shown_gen = max(self._shown_gen, gen)
 
         for key, data in response.data.items():
             if data.size == 0:
